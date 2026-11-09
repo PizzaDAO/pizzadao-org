@@ -13,7 +13,7 @@
 //   - vouch_received    (Prisma: Vouch where followeeId = memberId)
 //   - mission_approved  (Prisma: MissionCompletion where status=APPROVED)
 //   - mission_rejected  (Prisma: MissionCompletion where status=REJECTED)
-//   - ticket_added      (Prisma: UnlockTicketClaim.connectedAt)
+//   - ticket_added      (Prisma: UnlockKey.firstSeenAt)
 //   - notification      (Prisma: Notification for recipientId=discordId)
 //   - task_claimed      (Prisma: TaskClaimEvent — written by /api/claim-task)
 //   - poap_received     (Prisma: PoapFirstSeen — written by /api/poaps/[memberId])
@@ -164,25 +164,26 @@ export async function GET(
             }
         }
 
-        // --- Unlock tickets (each claim row = one "ticket(s) added" event) ---
-        const ticketClaims = await safe(
-            prisma.unlockTicketClaim.findMany({
-                where: { memberId },
-                orderBy: { connectedAt: "desc" },
-                take: PER_SOURCE_LIMIT,
-                select: { id: true, connectedAt: true, ticketCount: true },
+        // --- Unlock tickets: one "tickets found" event, dated when the first ticket was first seen ---
+        const ticketKeys = await safe(
+            prisma.unlockKey.findMany({
+                where: { memberId, gone: false },
+                orderBy: { firstSeenAt: "asc" },
+                take: 500,
+                select: { id: true, firstSeenAt: true },
             }),
-            [] as Array<{ id: number; connectedAt: Date; ticketCount: number }>,
+            [] as Array<{ id: number; firstSeenAt: Date }>,
         );
 
-        for (const t of ticketClaims) {
-            const plural = t.ticketCount === 1 ? "ticket" : "tickets";
+        if (ticketKeys.length > 0) {
+            const first = ticketKeys[0];
+            const plural = ticketKeys.length === 1 ? "ticket" : "tickets";
             events.push({
-                id: makeId("ticket_added", t.id),
+                id: makeId("ticket_added", first.id),
                 kind: "ticket_added",
-                title: `${t.ticketCount} Unlock ${plural} linked`,
+                title: `${ticketKeys.length} Unlock ${plural} linked`,
                 href: `/profile/${memberId}`,
-                at: toISO(t.connectedAt),
+                at: toISO(first.firstSeenAt),
             });
         }
 

@@ -45,16 +45,17 @@ describe('query building', () => {
 })
 
 describe('fetchKeys', () => {
-  it('sends a User-Agent and pages until a short page', async () => {
+  it('sends a User-Agent and pages until an empty page', async () => {
     const full = Array.from({ length: 1000 }, (_, i) => ({ id: `k${String(i).padStart(4, '0')}`, owner: A, tokenId: String(i), expiration: '0', cancelled: false, lock: { id: L } }))
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(ok({ keys: full }))
       .mockResolvedValueOnce(ok({ keys: [{ ...full[0], id: 'z', tokenId: '5000' }] }))
+      .mockResolvedValueOnce(ok({ keys: [] }))
     vi.stubGlobal('fetch', fetchMock)
     const keys = await fetchKeys(8453, [A], [L])
     expect(keys).toHaveLength(1001)
-    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock).toHaveBeenCalledTimes(3)
     const [url, init] = fetchMock.mock.calls[0]
     expect(url).toBe('https://subgraph.unlock-protocol.com/8453')
     expect(init.headers['User-Agent']).toBeTruthy()
@@ -94,12 +95,13 @@ describe('errors throw', () => {
 })
 
 describe('fetchLocksByTerms', () => {
-  it('returns nothing without terms and pages by address', async () => {
+  it('returns nothing without terms and pages by id', async () => {
     expect(await fetchLocksByTerms(8453, [])).toEqual([])
-    const page = Array.from({ length: 1000 }, (_, i) => ({ address: '0x' + i.toString(16).padStart(40, '0'), name: 'Pizza', lastKeyMintedAt: null }))
+    const page = Array.from({ length: 1000 }, (_, i) => ({ id: '0x' + i.toString(16).padStart(40, '0'), address: '0x' + i.toString(16).padStart(40, '0'), name: 'Pizza', lastKeyMintedAt: null }))
     const fetchMock = vi.fn().mockResolvedValueOnce(ok({ locks: page })).mockResolvedValueOnce(ok({ locks: [] }))
     vi.stubGlobal('fetch', fetchMock)
     expect(await fetchLocksByTerms(8453, ['pizza'])).toHaveLength(1000)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
     expect(JSON.parse(fetchMock.mock.calls[1][1].body).query).toContain(`id_gt: "${page[999].address}"`)
   })
 })

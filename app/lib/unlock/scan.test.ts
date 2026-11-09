@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const db = vi.hoisted(() => ({
   unlockLock: { findMany: vi.fn() },
   unlockKey: { findMany: vi.fn(), createMany: vi.fn(), updateMany: vi.fn(), update: vi.fn() },
-  unlockScanState: { upsert: vi.fn(), update: vi.fn(), updateMany: vi.fn(), findUnique: vi.fn() },
+  unlockScanState: { upsert: vi.fn(), update: vi.fn(), updateMany: vi.fn(), findUnique: vi.fn(), findMany: vi.fn(), createMany: vi.fn() },
   memberWallet: { findMany: vi.fn(), count: vi.fn() },
   $transaction: vi.fn(),
 }))
@@ -13,7 +13,7 @@ vi.mock('@/app/lib/settings', () => ({ getSetting: vi.fn(async () => 24) }))
 const fetchKeys = vi.fn()
 vi.mock('./subgraph', async (orig) => ({ ...(await orig<typeof import('./subgraph')>()), fetchKeys: (...a: unknown[]) => fetchKeys(...a) }))
 
-import { buildOwnerMap, isStale, planKeys, rescanWaitSeconds, scanMembers, sortEvents, type ExistingKey, type FoundKey } from './scan'
+import { buildOwnerMap, claimRefreshOnView, scanAllMembers, isStale, planKeys, rescanWaitSeconds, scanMembers, sortEvents, type ExistingKey, type FoundKey } from './scan'
 
 const W1 = '0x' + '1'.repeat(40)
 const W2 = '0x' + '2'.repeat(40)
@@ -89,7 +89,7 @@ describe('scanMembers', () => {
     expect(db.unlockKey.update).not.toHaveBeenCalled()
     expect(db.$transaction).not.toHaveBeenCalled()
     expect(db.unlockScanState.update).not.toHaveBeenCalled()
-    expect(db.unlockScanState.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { lastError: 'deployment does not exist' } }))
+    expect(db.unlockScanState.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { lastError: 'Base: deployment does not exist' } }))
   })
 
   it('upserts found keys, marks transferred-away keys gone, and stores the count', async () => {
@@ -110,6 +110,100 @@ describe('scanMembers', () => {
     const r = await scanMembers(['m1'], [{ memberId: 'm1', wallet: W2 }])
     expect(fetchKeys.mock.calls[0][1]).toEqual([W1, W2])
     expect(r.found).toBe(0)
+  })
+})
+
+describe('shared wallets and per-chain failure', () => {
+  const raw = (owner: string, token: string, lock = L1) => ({ id: 'k' + token, owner, tokenId: token, expiration: '0', cancelled: false, lock: { id: lock } })
+
+  it('gives a shared wallet to the lowest row id member whoever scans, and updates both counts', async () => {
+    db.memberWallet.findMany.mockResolvedValue([
+      { id: 9, memberId: 'm2', walletAddress: W1 },
+      { id: 3, memberId: 'm1', walletAddress: W1 },
+    ])
+    fetchKeys.mockResolvedValue([raw(W1, '7')])
+    // m2 scans; the key was previously (wrongly) held by m2
+    db.unlockKey.findMany
+      .mockResolvedValueOnce([have({ id: 5, memberId: 'm2', tokenId: '7' })])
+      .mockResolvedValueOnce([{ memberId: 'm1', networkId: 8453, lockAddress: L1 }])
+    await scanMembers(['m2'])
+    expect(db.unlockKey.update).toHaveBeenCalledWith({ where: { id: 5 }, data: { memberId: 'm1' } })
+    const counted = db.unlockScanState.upsert.mock.calls.concat(db.unlockScanState.update.mock.calls).map((c) => c[0].where.memberId).sort()
+    expect(counted).toEqual(expect.arrayContaining(['m1', 'm2']))
+    const m2 = db.unlockScanState.update.mock.calls.find((c) => c[0].where.memberId === 'm2')
+    expect(m2?.[0].data.ticketCount).toBe(0)
+  })
+
+  it('does not take a key from the global winner when the loser scans', async () => {
+    db.memberWallet.findMany.mockResolvedValue([
+      { id: 3, memberId: 'm1', walletAddress: W1 },
+      { id: 9, memberId: 'm2', walletAddress: W1 },
+    ])
+    fetchKeys.mockResolvedValue([raw(W1, '7')])
+    db.unlockKey.findMany.mockResolvedValueOnce([have({ id: 5, memberId: 'm1', tokenId: '7' })]).mockResolvedValueOnce([])
+    await scanMembers(['m2'])
+    expect(db.unlockKey.update).not.toHaveBeenCalled()
+  })
+
+  it('a failing chain adds nothing and marks nothing gone, while the other chain advances', async () => {
+    db.unlockLock.findMany.mockResolvedValue([
+      { networkId: 8453, address: L1 },
+      { networkId: 137, address: L2 },
+    ])
+    fetchKeys.mockImplementation(async (net: number) => {
+      if (net === 137) throw new Error('polygon down')
+      return [raw(W1, '1')]
+    })
+    db.unlockKey.findMany
+      .mockResolvedValueOnce([have({ id: 1 }), have({ id: 2, networkId: 137, lockAddress: L2, tokenId: '4' })])
+      .mockResolvedValueOnce([])
+    const r = await scanMembers(['m1'])
+    expect(r.failedChains).toEqual([137])
+    expect(r.gone).toBe(0) // the Polygon key survives the outage
+    const upd = db.unlockScanState.update.mock.calls[0][0]
+    expect(upd.data.lastError).toContain('polygon down')
+    expect(upd.data.lastScanAt).toBeUndefined() // not a clean scan
+  })
+})
+
+describe('claimRefreshOnView', () => {
+  beforeEach(() => {
+    db.unlockScanState.findUnique.mockResolvedValue({ memberId: 'm1' })
+    db.unlockScanState.updateMany.mockReset()
+  })
+  it('claims with one updateMany and only the winner (count 1) scans', async () => {
+    db.unlockScanState.updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 })
+    expect(await claimRefreshOnView('m1')).toBe(true)
+    expect(await claimRefreshOnView('m1')).toBe(false)
+    const where = db.unlockScanState.updateMany.mock.calls[0][0].where
+    expect(where.memberId).toBe('m1')
+    expect(JSON.stringify(where)).toContain('lastAttemptAt')
+  })
+  it('skips members with no state and no wallet', async () => {
+    db.unlockScanState.findUnique.mockResolvedValue(null)
+    db.memberWallet.count.mockResolvedValue(0)
+    expect(await claimRefreshOnView('m1')).toBe(false)
+    expect(db.unlockScanState.updateMany).not.toHaveBeenCalled()
+  })
+})
+
+describe('scanAllMembers', () => {
+  it('scans oldest first (never-scanned first) and stops at the time budget', async () => {
+    const ids = Array.from({ length: 90 }, (_, i) => 'm' + i)
+    db.memberWallet.findMany.mockResolvedValue(ids.map((memberId) => ({ memberId })))
+    db.unlockKey.findMany.mockResolvedValue([])
+    db.unlockScanState.findMany.mockResolvedValue(ids.slice(1).map((memberId, i) => ({ memberId, lastScanAt: new Date(2026, 0, 1 + (90 - i)) })))
+    const order: string[][] = []
+    fetchKeys.mockResolvedValue([])
+    db.memberWallet.findMany.mockImplementation(async (a: { where: { memberId?: { in: string[] } } }) => {
+      if (a.where.memberId) order.push(a.where.memberId.in)
+      return ids.map((memberId) => ({ memberId, id: 1, walletAddress: W1 }))
+    })
+    let t = 0
+    const r = await scanAllMembers(250_000, () => (t += 200_000)) // second batch check is over budget
+    expect(r.stoppedEarly).toBe(true)
+    expect(r.batches).toBe(1)
+    expect(order[0][0]).toBe('m0') // never scanned comes first
   })
 })
 

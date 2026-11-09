@@ -83,7 +83,7 @@ export function UnlockTicketCard({ memberId }: UnlockTicketCardProps) {
     setBusy(true);
     setNote(null);
     try {
-      const res = await fetch(url, { method });
+      const res = await fetch(url, method === "POST" ? { method, headers: { "content-type": "application/json" }, body: "{}" } : { method });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
         if (typeof data.totalTickets === "number") setSummary(data);

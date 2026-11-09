@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { rejectUnsafeWrite } from '@/app/lib/admin-guard'
 import { getSession } from '@/app/lib/session'
 import { prisma } from '@/app/lib/db'
 import { getSetting } from '@/app/lib/settings'
@@ -10,7 +11,9 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 /** POST: the signed-in member rescans their own wallets. Rate limited per member (tickets.rescanCooldownMinutes). */
-export async function POST() {
+export async function POST(request: Request) {
+  const bad = rejectUnsafeWrite(request)
+  if (bad) return bad
   const session = await getSession()
   if (!session?.discordId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const memberId = await fetchMemberIdByDiscordId(session.discordId)
@@ -22,11 +25,13 @@ export async function POST() {
     return NextResponse.json({ error: 'Please wait before rescanning', retryAfterSeconds: wait }, { status: 429, headers: { 'Retry-After': String(wait) } })
   }
   const extra = session.unlockWallet ? [{ memberId, wallet: session.unlockWallet }] : []
+  let partial = false
   try {
-    await scanMembers([memberId], extra)
+    const r = await scanMembers([memberId], extra)
+    partial = r.failedChains.length > 0
   } catch (e) {
     console.error('[unlock-tickets/rescan]', e)
     return NextResponse.json({ error: 'The Unlock service could not be reached. Your tickets are unchanged; try again later.' }, { status: 502 })
   }
-  return NextResponse.json({ ok: true, ...(await getTicketSummary(memberId)) })
+  return NextResponse.json({ ok: true, partial, ...(await getTicketSummary(memberId)) })
 }

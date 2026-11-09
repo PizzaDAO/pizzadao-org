@@ -90,24 +90,39 @@ export interface ScanResult {
   found: number
   created: number
   gone: number
+  /** Chains whose subgraph could not be read: their keys were left exactly as they were. */
+  failedChains: number[]
 }
 
-/** Fetch every chain's keys for the owners, or throw. Nothing is written here. */
-export async function fetchFound(ownerMap: Map<string, string>, locksByNet: Map<number, string[]>): Promise<FoundKey[]> {
+export interface FetchedKeys {
+  found: FoundKey[]
+  failed: Map<number, string>
+}
+
+/**
+ * Fetch each chain's keys. A chain that fails is reported in `failed` (and contributes nothing);
+ * the others still succeed. Nothing is written here.
+ */
+export async function fetchFound(ownerMap: Map<string, string>, locksByNet: Map<number, string[]>): Promise<FetchedKeys> {
   const owners = [...ownerMap.keys()]
-  const found: FoundKey[] = []
-  if (owners.length === 0) return found
+  const out: FetchedKeys = { found: [], failed: new Map() }
+  if (owners.length === 0) return out
   for (const [networkId, locks] of locksByNet) {
     if (locks.length === 0) continue
-    for (const k of await fetchKeys(networkId, owners, locks)) {
-      if (k.cancelled) continue
-      const owner = normAddress(k.owner)
-      const memberId = ownerMap.get(owner)
-      if (!memberId) continue
-      found.push({ networkId, lockAddress: normAddress(k.lock.id), tokenId: String(k.tokenId), owner, memberId })
+    try {
+      const keys = await fetchKeys(networkId, owners, locks)
+      for (const k of keys) {
+        if (k.cancelled) continue
+        const owner = normAddress(k.owner)
+        const memberId = ownerMap.get(owner)
+        if (!memberId) continue
+        out.found.push({ networkId, lockAddress: normAddress(k.lock.id), tokenId: String(k.tokenId), owner, memberId })
+      }
+    } catch (e) {
+      out.failed.set(networkId, e instanceof Error ? e.message : 'failed')
     }
   }
-  return found
+  return out
 }
 
 async function enabledLocksByNet(): Promise<Map<number, string[]>> {
@@ -122,34 +137,60 @@ async function enabledLocksByNet(): Promise<Map<number, string[]>> {
 
 /**
  * Scan these members' wallets (every EVM MemberWallet row plus any extra wallet given) and update
- * UnlockKey + UnlockScanState. Throws (after recording lastError) when the subgraph fails, having
- * changed no keys.
+ * UnlockKey + UnlockScanState.
+ *
+ * - Who owns an address is decided across ALL MemberWallet rows (lowest row id wins globally), so a
+ *   wallet shared by two members is counted once, for the same member whoever triggers the scan.
+ *   Every member whose count changes gets their ticketCount updated.
+ * - Chains are all-or-nothing each: a failing chain adds no keys and marks none gone, its error is
+ *   recorded, and the other chains still advance. If every chain fails this throws having written
+ *   no keys, so an outage is never stored as "0 tickets".
  */
 export async function scanMembers(memberIds: string[], extraWallets: Array<{ memberId: string; wallet: string }> = []): Promise<ScanResult> {
   const ids = [...new Set(memberIds)]
   const members = new Set(ids)
   const now = new Date()
+  const extra = extraWallets.filter((e) => members.has(e.memberId))
   await Promise.all(
     ids.map((memberId) =>
       prisma.unlockScanState.upsert({ where: { memberId }, create: { memberId, lastAttemptAt: now }, update: { lastAttemptAt: now } }),
     ),
   )
   try {
-    const wallets = await prisma.memberWallet.findMany({
+    const own = await prisma.memberWallet.findMany({
       where: { memberId: { in: ids }, chainType: 'evm' },
-      select: { id: true, memberId: true, walletAddress: true },
+      select: { walletAddress: true },
     })
-    const ownerMap = buildOwnerMap(wallets, extraWallets.filter((e) => members.has(e.memberId)))
+    const addrs = [...new Set([...own.map((w) => normAddress(w.walletAddress)), ...extra.map((e) => normAddress(e.wallet))])].filter((a) => ADDRESS_RE.test(a))
+    // Every row for those addresses (any member), to pick the global winner per address.
+    const allRows = addrs.length
+      ? await prisma.memberWallet.findMany({
+          where: { chainType: 'evm', OR: addrs.map((a) => ({ walletAddress: { equals: a, mode: 'insensitive' as const } })) },
+          select: { id: true, memberId: true, walletAddress: true },
+        })
+      : []
+    const ownerMap = buildOwnerMap(allRows, extra)
     const locksByNet = await enabledLocksByNet()
-    const found = await fetchFound(ownerMap, locksByNet) // throws before any write
+    const { found, failed } = await fetchFound(ownerMap, locksByNet)
+    const chainsWithLocks = [...locksByNet.values()].filter((l) => l.length > 0).length
+    if (failed.size > 0 && failed.size === chainsWithLocks) {
+      throw new Error([...failed].map(([n, m]) => `${CHAINS[n] ?? n}: ${m}`).join('; '))
+    }
 
-    const scannedLocks = new Set<string>()
-    for (const [net, addrs] of locksByNet) for (const a of addrs) scannedLocks.add(`${net}:${a}`)
+    const enabledLocks = new Set<string>()
+    const scannedLocks = new Set<string>() // enabled locks on chains that were read successfully
+    for (const [net, list] of locksByNet) {
+      for (const a of list) {
+        enabledLocks.add(`${net}:${a}`)
+        if (!failed.has(net)) scannedLocks.add(`${net}:${a}`)
+      }
+    }
+    const owners = [...ownerMap.keys()]
     const existing = await prisma.unlockKey.findMany({
-      where: { OR: [{ memberId: { in: ids } }, { owner: { in: [...ownerMap.keys()] } }] },
+      where: { OR: [{ memberId: { in: ids } }, ...(owners.length ? [{ owner: { in: owners } }] : [])] },
       select: { id: true, memberId: true, networkId: true, lockAddress: true, tokenId: true, owner: true, gone: true },
     })
-    // A row held by a member outside this scan is left alone unless a scanned wallet now holds it.
+    // Keys on a failed chain never reach `found`, and planKeys only marks gone on scanned chains.
     const plan = planKeys(existing, found, members, scannedLocks)
 
     const ops = []
@@ -161,19 +202,36 @@ export async function scanMembers(memberIds: string[], extraWallets: Array<{ mem
     if (plan.goneIds.length) ops.push(prisma.unlockKey.updateMany({ where: { id: { in: plan.goneIds } }, data: { gone: true, goneAt: now } }))
     if (ops.length) await prisma.$transaction(ops)
 
-    // Count what each member holds now (enabled locks only).
-    const live = await prisma.unlockKey.findMany({ where: { memberId: { in: ids }, gone: false }, select: { memberId: true, networkId: true, lockAddress: true } })
+    // Everyone whose keys may have changed: the scanned members, new owners, and previous holders.
+    const affected = new Set<string>(ids)
+    for (const f of plan.create) affected.add(f.memberId)
+    const heldBy = new Map(existing.map((e) => [e.id, e.memberId]))
+    for (const r of plan.reassign) {
+      affected.add(r.memberId)
+      const prev = heldBy.get(r.id)
+      if (prev) affected.add(prev)
+    }
+    const affectedIds = [...affected]
+    const live = await prisma.unlockKey.findMany({ where: { memberId: { in: affectedIds }, gone: false }, select: { memberId: true, networkId: true, lockAddress: true } })
     const counts = new Map<string, number>()
-    for (const k of live) if (scannedLocks.has(`${k.networkId}:${k.lockAddress}`)) counts.set(k.memberId, (counts.get(k.memberId) ?? 0) + 1)
+    for (const k of live) if (enabledLocks.has(`${k.networkId}:${k.lockAddress}`)) counts.set(k.memberId, (counts.get(k.memberId) ?? 0) + 1)
+    const failedChains = [...failed.keys()]
+    const errorText = failedChains.length ? failedChains.map((n) => `${CHAINS[n] ?? n}: ${failed.get(n)}`).join('; ').slice(0, 300) : null
     await Promise.all(
-      ids.map((memberId) =>
-        prisma.unlockScanState.update({
-          where: { memberId },
-          data: { lastScanAt: now, lastError: null, ticketCount: counts.get(memberId) ?? 0 },
-        }),
+      affectedIds.map((memberId) =>
+        members.has(memberId)
+          ? prisma.unlockScanState.update({
+              where: { memberId },
+              data: { ...(failedChains.length ? {} : { lastScanAt: now }), lastError: errorText, ticketCount: counts.get(memberId) ?? 0 },
+            })
+          : prisma.unlockScanState.upsert({
+              where: { memberId },
+              create: { memberId, ticketCount: counts.get(memberId) ?? 0 },
+              update: { ticketCount: counts.get(memberId) ?? 0 },
+            }),
       ),
     )
-    return { members: ids.length, wallets: ownerMap.size, found: found.length, created: plan.create.length, gone: plan.goneIds.length }
+    return { members: ids.length, wallets: ownerMap.size, found: found.length, created: plan.create.length, gone: plan.goneIds.length, failedChains }
   } catch (e) {
     const msg = (e instanceof Error ? e.message : 'scan failed').slice(0, 300)
     await prisma.unlockScanState.updateMany({ where: { memberId: { in: ids } }, data: { lastError: msg } }).catch(() => undefined)
@@ -183,34 +241,57 @@ export async function scanMembers(memberIds: string[], extraWallets: Array<{ mem
 
 export interface CronScanResult {
   members: number
+  scanned: number
   batches: number
   failedBatches: number
+  partialBatches: number
   created: number
   gone: number
+  stoppedEarly: boolean
   errors: string[]
 }
 
 const CRON_BATCH = 40
+export const CRON_BUDGET_MS = 250_000
 
-/** Nightly: every member with an EVM wallet, plus members who hold keys but lost their wallets. */
-export async function scanAllMembers(): Promise<CronScanResult> {
+/**
+ * Nightly: every member with an EVM wallet, plus members who hold keys but lost their wallets.
+ * Oldest lastScanAt first (never-scanned first), and it stops at ~250s, so a run cut short is
+ * resumed by the next one from where the stalest members are.
+ */
+export async function scanAllMembers(budgetMs = CRON_BUDGET_MS, nowFn: () => number = Date.now): Promise<CronScanResult> {
+  const start = nowFn()
   const [w, k] = await Promise.all([
     prisma.memberWallet.findMany({ where: { chainType: 'evm' }, select: { memberId: true }, distinct: ['memberId'] }),
     prisma.unlockKey.findMany({ where: { gone: false }, select: { memberId: true }, distinct: ['memberId'] }),
   ])
-  const ids = [...new Set([...w, ...k].map((r) => r.memberId))]
-  const out: CronScanResult = { members: ids.length, batches: 0, failedBatches: 0, created: 0, gone: 0, errors: [] }
+  const all = [...new Set([...w, ...k].map((r) => r.memberId))]
+  const states = await prisma.unlockScanState.findMany({ where: { memberId: { in: all } }, select: { memberId: true, lastScanAt: true } })
+  const last = new Map(states.map((s) => [s.memberId, s.lastScanAt ? s.lastScanAt.getTime() : -1]))
+  const ids = all.sort((a, b) => (last.get(a) ?? -1) - (last.get(b) ?? -1))
+  const out: CronScanResult = { members: ids.length, scanned: 0, batches: 0, failedBatches: 0, partialBatches: 0, created: 0, gone: 0, stoppedEarly: false, errors: [] }
   for (let i = 0; i < ids.length; i += CRON_BATCH) {
+    if (nowFn() - start > budgetMs) {
+      out.stoppedEarly = true
+      break
+    }
+    const batch = ids.slice(i, i + CRON_BATCH)
     out.batches++
     try {
-      const r = await scanMembers(ids.slice(i, i + CRON_BATCH))
+      const r = await scanMembers(batch)
+      out.scanned += batch.length
       out.created += r.created
       out.gone += r.gone
+      if (r.failedChains.length) {
+        out.partialBatches++
+        out.errors.push(`chains failed: ${r.failedChains.join(',')}`)
+      }
     } catch (e) {
       out.failedBatches++
       out.errors.push(e instanceof Error ? e.message.slice(0, 200) : 'failed')
     }
   }
+  console.log('[unlock-tickets] nightly scan', JSON.stringify(out))
   return out
 }
 
@@ -237,13 +318,30 @@ export function rescanWaitSeconds(state: StateTimes | null, cooldownMinutes: num
   return left > 0 ? Math.ceil(left / 1000) : 0
 }
 
-export async function shouldRefreshOnView(memberId: string): Promise<boolean> {
+/**
+ * Atomically claim a background refresh for a profile view: true for exactly one caller when the
+ * cache is stale and no attempt was made in the last 10 minutes (updateMany on lastAttemptAt).
+ */
+export async function claimRefreshOnView(memberId: string, now = new Date()): Promise<boolean> {
+  const intervalHours = await getSetting('tickets.scanIntervalHours')
   const state = await prisma.unlockScanState.findUnique({ where: { memberId } })
   if (!state) {
-    const hasWallet = await prisma.memberWallet.count({ where: { memberId, chainType: 'evm' } })
-    if (!hasWallet) return false
+    if (!(await prisma.memberWallet.count({ where: { memberId, chainType: 'evm' } }))) return false
+    await prisma.unlockScanState.createMany({ data: [{ memberId }], skipDuplicates: true })
   }
-  return isStale(state, await getSetting('tickets.scanIntervalHours'))
+  const retryCutoff = new Date(now.getTime() - MIN_RETRY_MS)
+  const staleCutoff = new Date(now.getTime() - intervalHours * 3_600_000)
+  const res = await prisma.unlockScanState.updateMany({
+    where: {
+      memberId,
+      AND: [
+        { OR: [{ lastAttemptAt: null }, { lastAttemptAt: { lt: retryCutoff } }] },
+        { OR: [{ lastScanAt: null }, { lastScanAt: { lt: staleCutoff } }] },
+      ],
+    },
+    data: { lastAttemptAt: now },
+  })
+  return res.count === 1
 }
 
 // ---- Read side ----

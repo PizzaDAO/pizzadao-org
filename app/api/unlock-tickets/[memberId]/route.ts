@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse, after } from 'next/server'
 import { fetchMemberById } from '@/app/lib/sheets/member-repository'
-import { getTicketSummary, scanMembers, shouldRefreshOnView } from '@/app/lib/unlock/scan'
+import { getSession } from '@/app/lib/session'
+import { claimRefreshOnView, getTicketSummary, scanMembers } from '@/app/lib/unlock/scan'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -17,10 +18,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ mem
     const member = await fetchMemberById(memberId)
     if (!member) return NextResponse.json({ error: 'Member not found' }, { status: 404 })
 
-    const summary = await getTicketSummary(memberId)
+    // Before the migration (or on a DB hiccup) show 0 rather than an error.
+    const summary = await getTicketSummary(memberId).catch(() => ({ totalTickets: 0, events: [], wallets: 0, lastScanAt: null }))
     let refreshing = false
     try {
-      if (await shouldRefreshOnView(memberId)) {
+      // Only signed-in viewers can trigger the background refresh (it spends subgraph calls).
+      const session = await getSession()
+      if (session?.discordId && (await claimRefreshOnView(memberId))) {
         refreshing = true
         after(async () => {
           try {

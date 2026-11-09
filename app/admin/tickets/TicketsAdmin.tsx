@@ -11,6 +11,7 @@ interface Lock {
   eventSlug: string | null;
   enabled: boolean;
   source: string;
+  createdAt: string;
 }
 interface DiscoveryResult { networkId: number; chain: string; found: number; added: number; error?: string }
 
@@ -78,7 +79,7 @@ export function TicketsAdmin() {
       (l) =>
         (!needle || l.name.toLowerCase().includes(needle) || l.address.includes(needle)) &&
         (!chain || String(l.networkId) === chain) &&
-        (!source || l.source === source) &&
+        (!source || (source === "recent" ? l.source === "discovered" && Date.now() - new Date(l.createdAt).getTime() < 7 * 86400_000 : l.source === source)) &&
         (!state || (state === "on" ? l.enabled : !l.enabled)),
     );
   }, [locks, q, chain, source, state]);
@@ -165,7 +166,7 @@ export function TicketsAdmin() {
           </select>
           <select className={input} value={source} onChange={(e) => { setSource(e.target.value); setPage(0); }}>
             <option value="">Any source</option>
-            <option value="seed">Seed</option><option value="discovered">Discovered</option><option value="admin">Admin</option>
+            <option value="recent">Recently discovered (7 days)</option><option value="seed">Seed</option><option value="discovered">Discovered</option><option value="admin">Admin</option>
           </select>
           <select className={input} value={state} onChange={(e) => { setState(e.target.value); setPage(0); }}>
             <option value="">Enabled and disabled</option>

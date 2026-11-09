@@ -34,6 +34,7 @@ export interface SubgraphKey {
 }
 
 export interface SubgraphLock {
+  id?: string
   address: string
   name: string
   lastKeyMintedAt: string | null
@@ -85,7 +86,7 @@ export function buildLocksQuery(terms: string[], afterId: string, first = PAGE_S
   const ors = terms.map((t) => `{ id_gt: ${JSON.stringify(afterId)}, name_contains_nocase: ${JSON.stringify(t)} }`).join(', ')
   return `{
     locks(first: ${first}, orderBy: id, orderDirection: asc, where: { or: [${ors}] }) {
-      address name lastKeyMintedAt
+      id address name lastKeyMintedAt
     }
   }`
 }
@@ -112,8 +113,8 @@ export async function fetchKeys(networkId: number, owners: string[], locks: stri
       for (;;) {
         const data = await querySubgraph(url, buildKeysQuery(o, l, after))
         const page = (data.keys ?? []) as SubgraphKey[]
+        if (page.length === 0) break // a short page is not proof of the end: read until an empty one
         out.push(...page)
-        if (page.length < PAGE_SIZE) break
         after = page[page.length - 1].id
       }
     }
@@ -130,9 +131,9 @@ export async function fetchLocksByTerms(networkId: number, terms: string[]): Pro
   for (;;) {
     const data = await querySubgraph(url, buildLocksQuery(terms, after))
     const page = (data.locks ?? []) as SubgraphLock[]
+    if (page.length === 0) break
     out.push(...page)
-    if (page.length < PAGE_SIZE) break
-    after = page[page.length - 1].address.toLowerCase()
+    after = page[page.length - 1].id ?? page[page.length - 1].address.toLowerCase()
   }
   return out
 }

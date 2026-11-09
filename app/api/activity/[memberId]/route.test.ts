@@ -20,7 +20,7 @@ vi.mock("@/app/lib/db", () => ({
     prisma: {
         vouch: { findMany: vi.fn() },
         missionCompletion: { findMany: vi.fn() },
-        unlockTicketClaim: { findMany: vi.fn() },
+        unlockKey: { findMany: vi.fn() },
         notification: { findMany: vi.fn() },
         taskClaimEvent: { findMany: vi.fn() },
         poapFirstSeen: { findMany: vi.fn() },
@@ -109,13 +109,11 @@ describe("GET /api/activity/[memberId]", () => {
                     mission: { title: "Vouch", level: 1 },
                 },
             ]);
-        (prisma.unlockTicketClaim.findMany as ReturnType<typeof vi.fn>)
+        (prisma.unlockKey.findMany as ReturnType<typeof vi.fn>)
             .mockResolvedValue([
-                {
-                    id: 20,
-                    connectedAt: new Date(now - 6000),
-                    ticketCount: 3,
-                },
+                { id: 20, firstSeenAt: new Date(now - 6000) },
+                { id: 21, firstSeenAt: new Date(now - 5000) },
+                { id: 22, firstSeenAt: new Date(now - 5000) },
             ]);
         (prisma.notification.findMany as ReturnType<typeof vi.fn>)
             .mockResolvedValue([
@@ -252,14 +250,8 @@ describe("GET /api/activity/[memberId]", () => {
         );
         (prisma.missionCompletion.findMany as ReturnType<typeof vi.fn>)
             .mockResolvedValue([]);
-        (prisma.unlockTicketClaim.findMany as ReturnType<typeof vi.fn>)
-            .mockResolvedValue(
-                Array.from({ length: 10 }, (_, i) => ({
-                    id: 200 + i,
-                    connectedAt: new Date(now - (i + 10) * 1000),
-                    ticketCount: 1,
-                })),
-            );
+        (prisma.unlockKey.findMany as ReturnType<typeof vi.fn>)
+            .mockResolvedValue([{ id: 200, firstSeenAt: new Date(now - 10_000) }]);
         (prisma.notification.findMany as ReturnType<typeof vi.fn>)
             .mockResolvedValue(
                 Array.from({ length: 10 }, (_, i) => ({
