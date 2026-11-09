@@ -19,7 +19,7 @@ export async function getDailyJobsCount(): Promise<number> {
 /**
  * Get the start of the current UTC day
  */
-function getDayStart(): Date {
+export function getDayStart(): Date {
   const now = new Date()
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
 }
@@ -63,6 +63,8 @@ export async function recordDailyJobCompletion(
   jobId: number,
   reward: number,
   description: string,
+  /** The Discord post that verified the job, recorded on the ledger row. */
+  proof?: { messageId: string; channelId?: string },
 ): Promise<boolean> {
   const dayStart = getDayStart()
   try {
@@ -79,7 +81,7 @@ export async function recordDailyJobCompletion(
         await tx.jobAssignment.create({ data: { jobId, userId } })
       }
 
-      await creditInTx(tx, userId, reward, 'JOB_REWARD', description, { jobId })
+      await creditInTx(tx, userId, reward, 'JOB_REWARD', description, { jobId, ...(proof ? { messageId: proof.messageId, channelId: proof.channelId } : {}) })
       return true
     })
   } catch (e: unknown) {

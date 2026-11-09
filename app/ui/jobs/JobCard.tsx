@@ -58,6 +58,7 @@ export function JobCard({
 }: JobCardProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [channelUrl, setChannelUrl] = useState<string | null>(null);
   const [justCompleted, setJustCompleted] = useState(false);
   const [earnedReward, setEarnedReward] = useState<number | null>(null);
 
@@ -69,6 +70,7 @@ export function JobCard({
     if (inactive) return;
     setLoading(true);
     setError(null);
+    setChannelUrl(null);
 
     try {
       const res = await fetch("/api/jobs/assign", {
@@ -78,7 +80,11 @@ export function JobCard({
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) {
+        // "We couldn't find your post" comes with a link to the channel to post in.
+        if (typeof data.channelUrl === "string") setChannelUrl(data.channelUrl);
+        throw new Error(data.error);
+      }
 
       setJustCompleted(true);
       setEarnedReward(data.reward);
@@ -99,7 +105,7 @@ export function JobCard({
   const plainDescription = discordMarkupToPlainText(
     parseDiscordMarkup(job.description, { channels, roles, users }),
   );
-  const actionWord = completed ? "Paid" : loading ? "Working on" : "Complete";
+  const actionWord = completed ? "Paid" : loading ? "Checking" : "Complete";
 
   return (
     <div>
@@ -164,7 +170,7 @@ export function JobCard({
             {formatPep(reward)}
           </span>
           <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-foreground/55">
-            {loading ? "Working…" : completed ? "Paid" : "Complete"}
+            {loading ? "Checking…" : completed ? "Paid" : "Complete"}
             {!completed && !loading && (
               <span aria-hidden className="ml-1 inline-block transition-transform group-hover:translate-x-0.5">
                 →
@@ -181,6 +187,14 @@ export function JobCard({
           className="mt-2 mb-0 rounded-[var(--radius)] border border-[hsl(var(--tomato)/0.30)] bg-[hsl(var(--tomato)/0.06)] p-2 text-xs text-tomato"
         >
           {error}
+          {channelUrl && (
+            <>
+              {" "}
+              <a href={channelUrl} target="_blank" rel="noopener noreferrer" className="font-semibold underline">
+                Open the channel
+              </a>
+            </>
+          )}
         </p>
       )}
     </div>
