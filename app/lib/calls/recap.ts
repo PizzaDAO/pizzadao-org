@@ -33,7 +33,7 @@ export interface RecapLimits {
   chars: number
 }
 
-export const DEFAULT_RECAP_LIMITS: RecapLimits = { bullets: 5, actions: 5, chars: 220 }
+export const DEFAULT_RECAP_LIMITS: RecapLimits = { bullets: 5, actions: 10, chars: 220 }
 
 export function recapLimits(settings?: Settings): RecapLimits {
   return {
@@ -166,6 +166,16 @@ export function resolveMentionId(rawName: string, people: RecapPeople | undefine
   if (byFirst.length === 1) return byFirst[0].id
   const members = [...new Set(people.members.filter((m) => SNOWFLAKE.test(m.discordId) && normalizeName(m.name) === name).map((m) => m.discordId))]
   return members.length === 1 ? members[0] : null
+}
+
+/** Whether an action item's owner and suggester are the same person (same normalized name, or the same resolved Discord id). */
+export function sameActionPerson(owner: string, by: string, people?: RecapPeople): boolean {
+  const a = normalizeName(owner)
+  const b = normalizeName(by)
+  if (!a || !b) return false
+  if (a === b) return true
+  const ia = resolveMentionId(owner, people)
+  return !!ia && ia === resolveMentionId(by, people)
 }
 
 /** What to show for an id: the speaker's display name, else the member's name. */
@@ -322,17 +332,35 @@ export function buildRecapParts(input: RecapInput, base: string = SITE_URL, filt
       const text = typeof o?.text === 'string' ? oneLine(o.text) : ''
       const owner = typeof o?.owner === 'string' ? oneLine(o.owner) : ''
       const by = typeof o?.suggestedBy === 'string' ? oneLine(o.suggestedBy) : ''
-      return text && !mentionsBlockedTerm(text, filter) && !mentionsBlockedTerm(owner, filter) && !mentionsBlockedTerm(by, filter)
-        ? `${clip(text, limits.chars)}${owner ? ` (${mentionNames(clip(owner, 40), who, found)})` : ''}${by ? ` — suggested by ${mentionNames(clip(by, 40), who, found)}` : ''}`
-        : ''
+      if (!text || mentionsBlockedTerm(text, filter) || mentionsBlockedTerm(owner, filter) || mentionsBlockedTerm(by, filter)) return ''
+      // One person who both suggested and owns it: say so once instead of "(Ann) — suggested by Ann".
+      if (owner && by && sameActionPerson(owner, by, who)) return `${clip(text, limits.chars)} — ${mentionNames(clip(owner, 40), who, found)} (suggested, owner)`
+      return `${clip(text, limits.chars)}${owner ? ` (${mentionNames(clip(owner, 40), who, found)})` : ''}${by ? ` — suggested by ${mentionNames(clip(by, 40), who, found)}` : ''}`
     })
     .filter(Boolean)
     .slice(0, limits.actions)
   const url = recapUrl(rec.id, base)
   const lines = [`**Call recap: ${title}**`]
   if (bullets.length) lines.push('', ...bullets.map((b) => `- ${b}`))
-  if (actions.length) lines.push('', '**Action items**', ...actions.map((a) => `- ${a}`))
-  lines.push('', `Full summary and transcript: ${url}`)
+  const tail = ['', `Full summary and transcript: ${url}`]
+  if (actions.length) {
+    // As many whole action lines as fit under Discord's limit (the "+N more" note and the link line are reserved).
+    const head = [...lines, '', '**Action items**']
+    const len = (ls: string[]) => ls.join('\n').length
+    const moreLine = (n: number) => `+${n} more on the call page`
+    let kept = actions.length
+    while (kept > 0) {
+      const shown = actions.slice(0, kept).map((a) => `- ${a}`)
+      const extra = kept < actions.length ? [moreLine(actions.length - kept)] : []
+      if (len([...head, ...shown, ...extra, ...tail]) <= DISCORD_MESSAGE_LIMIT) break
+      kept--
+    }
+    if (kept > 0) {
+      lines.push('', '**Action items**', ...actions.slice(0, kept).map((a) => `- ${a}`))
+      if (kept < actions.length) lines.push(moreLine(actions.length - kept))
+    }
+  }
+  lines.push(...tail)
   let text = lines.join('\n')
   // Safety net: drop trailing bullets until it fits (the link line must survive).
   while (text.length > DISCORD_MESSAGE_LIMIT && lines.length > 3) {

@@ -1034,6 +1034,7 @@
       "summaryRestricted": "The summary is available to members at level {level} and above.",
       "actionItemsRestricted": "The action items are available to members at level {level} and above.",
       "suggestedBy": "suggested by {name}",
+      "suggestedAndOwns": "{name} · suggested & owns it",
       "chaptersRestricted": "The chapters are available to members at level {level} and above.",
       "chatLine": "Written in the call chat",
       "unknownSpeaker": "Speaker",

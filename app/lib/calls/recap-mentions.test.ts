@@ -243,3 +243,12 @@ describe('wrong-person matching', () => {
     expect(mentionInBullet('ENZO left', people)).toBe(`<@${ENZO}> left`)
   })
 })
+
+describe('owner who is also the suggester', () => {
+  it('mentions once and pings the id once when both names resolve to the same person', () => {
+    const { text, mentions } = buildRecapParts({ id: 'r1', title: 'T', crewLabel: 'C', summary: null, actionItems: [{ text: 'Do it', owner: 'Enzo Pepperoni', suggestedBy: 'Enzo' }, { text: 'Other', owner: 'Enzo Pepperoni', suggestedBy: 'Lou Olive' }] }, base, undefined, undefined, people)
+    expect(text).toContain(`- Do it \u2014 <@${ENZO}> (suggested, owner)`)
+    expect(text).toContain(`- Other (<@${ENZO}>) \u2014 suggested by <@${MEM}>`)
+    expect([...mentions.keys()].sort()).toEqual([ENZO, MEM].sort())
+  })
+})
