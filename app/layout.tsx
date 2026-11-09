@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { Asap, Asap_Condensed, Geist_Mono, Rock_Salt } from "next/font/google";
+import localFont from "next/font/local";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import "./globals.css";
@@ -11,36 +11,42 @@ import { XConnectNotice } from "@/app/ui/XConnectNotice";
 import { GlobalBallotPreparer } from "@/app/proposals/_components/GlobalBallotPreparer";
 import { SITE_URL } from "@/app/lib/site-url";
 
-// Body / UI sans — matches pizzadao.org marketing site.
-const asapSans = Asap({
+// Fonts are self-hosted (app/fonts, latin subset; licenses alongside) so the
+// build never has to fetch from Google Fonts.
+
+// Body / UI sans — matches pizzadao.org marketing site. Asap (variable wght).
+const asapSans = localFont({
   variable: "--font-sans-asap",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  src: [{ path: "./fonts/Asap-latin-variable.woff2", weight: "400 700", style: "normal" }],
   display: "swap",
 });
 
 // Display / headings — Asap Condensed.
-const asapDisplay = Asap_Condensed({
+const asapDisplay = localFont({
   variable: "--font-display-asap-condensed",
-  subsets: ["latin"],
-  weight: ["500", "600", "700", "800"],
+  src: [
+    { path: "./fonts/AsapCondensed-500-latin.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/AsapCondensed-600-latin.woff2", weight: "600", style: "normal" },
+    { path: "./fonts/AsapCondensed-700-latin.woff2", weight: "700", style: "normal" },
+    { path: "./fonts/AsapCondensed-800-latin.woff2", weight: "800", style: "normal" },
+  ],
   display: "swap",
 });
 
 // anchovy-28942: Rock Salt — handwritten editorial accent. Used by the
 // `.handwritten` utility in globals.css and the restyled NameStep margin
 // annotations. Single weight, swap display so we never block render.
-const rockSalt = Rock_Salt({
+const rockSalt = localFont({
   variable: "--font-handwritten-rock-salt",
-  subsets: ["latin"],
-  weight: "400",
+  src: [{ path: "./fonts/RockSalt-400-latin.woff2", weight: "400", style: "normal" }],
   display: "swap",
 });
 
 // Kept for `font-mono` consumers (app/tech/projects/[slug]/page.tsx).
-const geistMono = Geist_Mono({
+const geistMono = localFont({
   variable: "--font-geist-mono",
-  subsets: ["latin"],
+  src: [{ path: "./fonts/GeistMono-latin-variable.woff2", weight: "100 900", style: "normal" }],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
