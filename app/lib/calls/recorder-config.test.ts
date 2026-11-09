@@ -16,6 +16,8 @@ vi.mock('@/app/lib/settings', () => ({
 vi.mock('@/app/lib/crew-mappings', () => ({ getCrewMappings: async () => ({ crews: state.crews, cached: true }) }))
 
 import { buildRecorderConfig, RECORDER_CONFIG_OFF } from './recorder-config'
+import { MAX_WHISPER_PROMPT_TOKENS, estimateKeytermTokens, normalizeKeyterms, whisperPrompt } from './keyterms'
+import { transcriptionPrompt } from './transcribe'
 
 beforeEach(() => {
   vi.stubEnv('VERCEL_ENV', 'production')
@@ -49,5 +51,54 @@ describe('recorder config: supersede deferral', () => {
     expect((await buildRecorderConfig()).supersedeMaxDeferMinutes).toBe(30)
     state.over = { 'calls.supersedeMaxDeferMinutes': 0 }
     expect((await buildRecorderConfig()).supersedeMaxDeferMinutes).toBe(0)
+  })
+})
+
+describe('recorder config: transcription keyterms', () => {
+  it('defaults to the starter list, without personal names', async () => {
+    const terms = (await buildRecorderConfig()).transcriptionKeyterms
+    expect(terms).toEqual(['PizzaDAO', 'RSVPizza', 'Pizza MCP', 'OpenPizza', 'ETHDenver', 'Devcon', 'EthCC', 'Global Pizza Party', 'Bitcoin Pizza Day', 'PEP', 'Metalhead', 'Rare Pizzas'])
+    expect(RECORDER_CONFIG_OFF.transcriptionKeyterms).toEqual([])
+  })
+  it('one term per line, blanks and duplicates dropped, limits enforced', async () => {
+    state.over = { 'calls.transcriptionTerms': ' ETHDenver \n\nethdenver\n' + 'x'.repeat(41) + '\nDevcon' }
+    expect((await buildRecorderConfig()).transcriptionKeyterms).toEqual(['ETHDenver', 'Devcon'])
+    state.over = { 'calls.transcriptionTerms': '' }
+    expect((await buildRecorderConfig()).transcriptionKeyterms).toEqual([])
+  })
+  it('summary prompt carries the same terms as spellings to prefer', async () => {
+    const { summarySystemPrompt } = await import('./summarize')
+    const settings = { get: (k: string) => (k === 'calls.transcriptionTerms' ? 'ETHDenver\nDevcon' : '') } as unknown as Settings
+    expect(summarySystemPrompt(settings)).toContain('Spellings to prefer')
+    expect(summarySystemPrompt(settings)).toContain('ETHDenver, Devcon')
+    expect(summarySystemPrompt({ get: () => '' } as unknown as Settings)).not.toContain('Spellings')
+  })
+})
+
+describe('whisper prompt from the terms', () => {
+  it('is terms only, and absent with no terms', () => {
+    expect(whisperPrompt(['ETHDenver', 'Devcon'])).toBe('Terms: ETHDenver, Devcon.')
+    expect(whisperPrompt([])).toBeUndefined()
+    expect(whisperPrompt([' ', ''])).toBeUndefined()
+  })
+  it("is capped well under Whisper's 224 tokens", () => {
+    const many = Array.from({ length: 100 }, (_, i) => `Term number ${i} here`)
+    const p = whisperPrompt(many)!
+    const used = normalizeKeyterms(p.replace(/^Terms: /, '').replace(/\.$/, '').split(', '))
+    expect(used.reduce((n, t) => n + estimateKeytermTokens(t), 0)).toBeLessThanOrEqual(MAX_WHISPER_PROMPT_TOKENS)
+    expect(used.length).toBeLessThan(many.length)
+    expect(MAX_WHISPER_PROMPT_TOKENS).toBeLessThan(224)
+  })
+  it('transcriptionPrompt reads the setting and fails soft', async () => {
+    const s = (v: string) => ({ get: () => v }) as unknown as Settings
+    expect(await transcriptionPrompt(s('ETHDenver\nDevcon'))).toBe('Terms: ETHDenver, Devcon.')
+    expect(await transcriptionPrompt(s(''))).toBeUndefined()
+    expect(
+      await transcriptionPrompt({
+        get: () => {
+          throw new Error('x')
+        },
+      } as unknown as Settings),
+    ).toBeUndefined()
   })
 })

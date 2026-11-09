@@ -8,6 +8,7 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { z, ZodError } from 'zod'
 import { publicChatText } from './chat'
 import type { TranscriptSegment } from './ingest-schema'
+import { normalizeKeyterms } from './keyterms'
 import { importedSpeakerNumber } from './speaker-labels'
 import { loadSettings, type Settings } from '@/app/lib/settings'
 import { storedOverride } from '@/app/lib/settings/numbers'
@@ -61,9 +62,15 @@ export function summaryModel(env: Record<string, string | undefined> = process.e
  * if one is saved. If the settings cannot be read, this throws so the summary fails and is retried
  * instead of being written without the addendum.
  */
+/** The "spellings to prefer" line (the same terms Deepgram gets as keyterms); empty with no terms. */
+export function spellingsHint(terms: readonly string[]): string {
+  return terms.length ? `Spellings to prefer when a name or term in the transcript sounds like one of these: ${terms.join(', ')}.` : ''
+}
+
 export function summarySystemPrompt(settings?: Settings): string {
   const extra = settings ? String(settings.get('calls.summaryPromptExtra') ?? '').trim() : ''
-  return extra ? `${SUMMARY_SYSTEM_PROMPT}\n\n${extra}` : SUMMARY_SYSTEM_PROMPT
+  const terms = settings ? normalizeKeyterms(String(settings.get('calls.transcriptionTerms') ?? '').split('\n')) : []
+  return [SUMMARY_SYSTEM_PROMPT, spellingsHint(terms), extra].filter(Boolean).join('\n\n')
 }
 
 export function summaryFallbackModel(env: Record<string, string | undefined> = process.env): string {
