@@ -64,6 +64,7 @@ export function HeroBlock({
     const badge = levelBadge ?? missionLevel ?? null;
     const initials = initialsOf(name);
     const t = useTranslations("dashboard.hero");
+    const tc = useTranslations("collectPep");
     const format = useFormatter();
 
     return (
@@ -198,6 +199,13 @@ export function HeroBlock({
                         >
                             <Send size={14} aria-hidden />
                         </button>
+                        <Link
+                            href="/pep"
+                            className="ui inline-flex items-center rounded-full px-3 text-[12px] font-semibold uppercase tracking-[0.08em] text-tomato-readable hover:bg-tomato/10"
+                            style={{ minHeight: 44, textDecoration: "none" }}
+                        >
+                            {tc("dashLink")}
+                        </Link>
                     </div>
                 </div>
             </div>
