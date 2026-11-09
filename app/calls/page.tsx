@@ -39,7 +39,6 @@ interface Attendee {
   discordId: string;
   displayName: string;
   memberId: string | null;
-  minutes?: number | null;
 }
 
 interface CallDetail {
@@ -326,7 +325,6 @@ export default function CallsPage() {
                               className="text-[13px] px-2.5 py-1 rounded-full bg-[hsl(var(--tomato)/0.08)] text-tomato-readable no-underline whitespace-nowrap hover:bg-[hsl(var(--tomato)/0.16)]"
                             >
                               {a.displayName}
-                              {a.minutes != null && <span className="opacity-60">{` · ${t("attendeeMinutes", { count: a.minutes })}`}</span>}
                             </Link>
                           ) : (
                             <span
@@ -334,7 +332,6 @@ export default function CallsPage() {
                               className="text-[13px] px-2.5 py-1 rounded-full bg-[hsl(var(--ink)/0.06)] text-foreground/70 whitespace-nowrap"
                             >
                               {a.displayName}
-                              {a.minutes != null && <span className="opacity-60">{` · ${t("attendeeMinutes", { count: a.minutes })}`}</span>}
                             </span>
                           )
                         )}

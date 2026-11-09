@@ -1410,6 +1410,7 @@ model CallRecording {
   endReason               String? // event-ended | empty | max-duration | superseded | shutdown | ...
   partial                 Boolean             @default(false)
   participantIds          String[]            @default([]) // non-bot Discord ids seen in the voice channel (recorder); feeds attendance
+  scheduledSec            Int? // scheduled call length (Discord event start to end) when known; the short-call attendance rule uses it
   presence                CallPresence[] // measured time in the voice channel per person (recorder); feeds attendance thresholds
   mixKey                  String? // R2 key of the mixed m4a
   mixBytes                Int?

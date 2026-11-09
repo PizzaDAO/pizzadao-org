@@ -92,8 +92,8 @@ describe('Nov 8 scenario', () => {
       id: 'r1', durationSec: 3600, presence: [], crewId: 'community', crewLabel: 'community', startedAt: new Date('2026-11-09T00:30:00Z'), source: 'DISCORD', status: 'READY',
       participantIds: [A, B], speakers: [],
     })
-    prismaMock.callAttendance.findMany.mockImplementation(async (q: { where: { crewId: { in: string[] }; discordId: { in: string[] } } }) =>
-      rows.filter((r) => q.where.crewId.in.includes(r.crewId) && q.where.discordId.in.includes(r.discordId)).map((r) => ({ discordId: r.discordId })))
+    prismaMock.callAttendance.findMany.mockImplementation(async (q: { where: { crewId: { in: string[] }; discordId?: { in: string[] } } }) =>
+      rows.filter((r) => q.where.crewId.in.includes(r.crewId) && (!q.where.discordId || q.where.discordId.in.includes(r.discordId))).map((r) => ({ id: 1, discordId: r.discordId, source: 'sheet', presentSec: null })))
     prismaMock.callAttendance.createMany.mockImplementation(async ({ data }: { data: typeof rows }) => {
       rows.push(...data)
       return { count: data.length }

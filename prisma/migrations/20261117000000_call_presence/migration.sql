@@ -22,3 +22,4 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 ALTER TABLE "CallAttendance" ADD COLUMN IF NOT EXISTS "presentSec" INTEGER;
 ALTER TABLE "CallAttendance" ADD COLUMN IF NOT EXISTS "recordingId" TEXT;
+ALTER TABLE "CallRecording" ADD COLUMN IF NOT EXISTS "scheduledSec" INTEGER;

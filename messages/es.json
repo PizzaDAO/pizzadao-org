@@ -1000,7 +1000,6 @@
     "room": "Asistentes",
     "loadingAttendees": "Cargando asistentes…",
     "attendeesError": "No se pudieron cargar los asistentes.",
-    "attendeeMinutes": "{count} min",
     "loadError": "No se pudieron cargar las llamadas. Inténtalo de nuevo.",
     "prev": "← Anterior",
     "next": "Siguiente →",

@@ -33,7 +33,7 @@ describe('presenceStats', () => {
     expect(by(s, 'b')?.presentSec).toBe(5 * 60 + 10 * 60)
   })
 
-  it('ignores records out of order and after the end', () => {
+  it('ignores records out of order and at or after the end', () => {
     const records: ManifestRecord[] = [
       { t: 'presence', atMs: T0 + min(10), userIds: ['b'] },
       { t: 'presence', atMs: T0, userIds: ['a'] },
@@ -42,7 +42,7 @@ describe('presenceStats', () => {
     const s = presenceStats(records, T0 + min(20))
     expect(by(s, 'a')?.presentSec).toBe(600)
     expect(by(s, 'b')?.presentSec).toBe(600)
-    expect(by(s, 'c')?.presentSec).toBe(0)
+    expect(by(s, 'c')).toBeUndefined() // a record at or after the end adds nothing
   })
 
   it('drops purged users (bots are never recorded as present)', () => {

@@ -265,6 +265,9 @@ export class CallRecorder {
       endedAtMs: null,
       endReason: null,
       partial: false,
+      ...(event.scheduledStartMs != null && event.scheduledEndMs != null && event.scheduledEndMs > event.scheduledStartMs
+        ? { scheduledSec: Math.round((event.scheduledEndMs - event.scheduledStartMs) / 1000) }
+        : {}),
     }
     writeSessionMeta(dir, meta)
 
@@ -833,6 +836,7 @@ export class CallRecorder {
 
   /** Record who is in the channel right now (new ids only) so silent attendees reach the app's attendance. Never throws. */
   private async notePresent(s: ActiveSession): Promise<void> {
+    if (s.stopping) return
     try {
       const now = (await this.humanIds(s.guild)).sort()
       // Full member set, only when it changed: the time between records is what presence minutes are summed from.

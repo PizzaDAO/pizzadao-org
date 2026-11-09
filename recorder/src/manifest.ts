@@ -90,6 +90,7 @@ export function presenceStats(records: ManifestRecord[], endMs: number): Presenc
   }
   const acc = new Map<string, { ms: number; first: number; last: number }>()
   marks.forEach((m, i) => {
+    if (m.atMs >= endMs) return
     const from = m.atMs
     const to = Math.min(i + 1 < marks.length ? marks[i + 1].atMs : endMs, endMs)
     const len = Math.max(0, to - from)

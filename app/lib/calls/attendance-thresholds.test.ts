@@ -40,6 +40,7 @@ describe('thresholdSec', () => {
     expect(thresholdSec(600, DEFAULT_THRESHOLDS)).toBe(300) // exactly 2x: still the minimum
     expect(thresholdSec(480, DEFAULT_THRESHOLDS)).toBe(240) // 50% of 8 min
     expect(thresholdSec(480, { ...DEFAULT_THRESHOLDS, shortCallPercent: 0 })).toBe(0)
+    expect(thresholdSec(null, DEFAULT_THRESHOLDS)).toBe(300) // no scheduled length known: the minimum only
   })
   it('0 minutes means anyone seen counts', () => {
     expect(thresholdSec(3600, { ...DEFAULT_THRESHOLDS, minMinutes: 0 })).toBe(0)
@@ -68,9 +69,16 @@ describe('countedAttendees', () => {
     expect(m.get(A)?.presentSec).toBe(400)
   })
 
-  it('uses the short-call share when the whole day is under twice the minimum', () => {
-    const m = countedAttendees([rec({ durationSec: 480, presence: [{ discordId: A, presentSec: 250 }, { discordId: B, presentSec: 200 }] })], DEFAULT_THRESHOLDS)
+  it('uses the short-call share when the scheduled call is under twice the minimum', () => {
+    const m = countedAttendees([rec({ durationSec: 480, scheduledSec: 480, presence: [{ discordId: A, presentSec: 250 }, { discordId: B, presentSec: 200 }] })], DEFAULT_THRESHOLDS)
     expect(ids(m)).toEqual([A]) // 240 s needed
+  })
+
+  it('a short first part of a long scheduled call does not lower the bar; with no scheduled length it is the minimum only', () => {
+    const part1 = rec({ durationSec: 480, scheduledSec: 3600, presence: [{ discordId: A, presentSec: 480 }, { discordId: B, presentSec: 250 }] })
+    expect(ids(countedAttendees([part1], DEFAULT_THRESHOLDS))).toEqual([A])
+    const unknown = rec({ durationSec: 480, presence: [{ discordId: A, presentSec: 480 }, { discordId: B, presentSec: 250 }] })
+    expect(ids(countedAttendees([unknown], DEFAULT_THRESHOLDS))).toEqual([A])
   })
 
   it('speakers always count, unless switched off', () => {
@@ -136,6 +144,29 @@ describe('recordAttendanceForRecording with measured presence', () => {
     expect(rows[0]).toMatchObject({ discordId: B, presentSec: 400, dailySheetId: 'rec:ops:2026-11-02', recordingId: 'r2' })
     // A's minutes on the existing recording row follow the day total.
     expect(prismaMock.callAttendance.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { presentSec: 3400 } })
+  })
+
+  it('short first part then a long second part: B is not added on the short share', async () => {
+    const p1 = { ...part('r1', '2026-11-03T00:30:00Z', [{ discordId: A, presentSec: 480 }, { discordId: B, presentSec: 250 }]), durationSec: 480, scheduledSec: 3600 }
+    const p2 = { ...part('r2', '2026-11-03T01:10:00Z', [{ discordId: A, presentSec: 1700 }]), scheduledSec: 3600 }
+    prismaMock.callRecording.findUnique.mockResolvedValue(p1)
+    prismaMock.callRecording.findMany.mockResolvedValue([p1])
+    await recordAttendanceForRecording('r1', { skipSummary: true })
+    prismaMock.callRecording.findUnique.mockResolvedValue(p2)
+    prismaMock.callRecording.findMany.mockResolvedValue([p1, p2])
+    prismaMock.callAttendance.findMany.mockResolvedValue([{ id: 1, discordId: A, source: 'recording', presentSec: 480 }])
+    await recordAttendanceForRecording('r2', { skipSummary: true })
+    const all = prismaMock.callAttendance.createMany.mock.calls.flatMap((c) => (c[0].data as Array<{ discordId: string }>).map((r) => r.discordId))
+    expect(all).toEqual([A])
+  })
+
+  it('refreshes minutes on every existing recording row of the day, even for someone now under the threshold', async () => {
+    const p1 = part('r1', '2026-11-03T00:30:00Z', [{ discordId: A, presentSec: 1700 }, { discordId: B, presentSec: 100 }])
+    prismaMock.callRecording.findUnique.mockResolvedValue(p1)
+    prismaMock.callRecording.findMany.mockResolvedValue([p1])
+    prismaMock.callAttendance.findMany.mockResolvedValue([{ id: 5, discordId: B, source: 'recording', presentSec: 40 }])
+    await recordAttendanceForRecording('r1', { skipSummary: true })
+    expect(prismaMock.callAttendance.update).toHaveBeenCalledWith({ where: { id: 5 }, data: { presentSec: 100 } })
   })
 
   it('does not add back someone an admin removed for that crew and day', async () => {

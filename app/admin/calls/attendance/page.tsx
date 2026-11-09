@@ -53,6 +53,7 @@ export default async function AdminCallAttendancePage({ searchParams }: { search
                         Who the daily sheets counted versus who the recordings counted, per crew and day. Recording attendance applies the minimum minutes
                         in Settings. Sheet-only people are the ones the recordings missed; close to none over two weeks means the sheets can be switched off.
                     </p>
+                    <p className="m-0 text-sm text-foreground/60">Removing someone here does not revoke a Slice they already claimed for that call.</p>
                     <nav className="flex gap-4 text-sm">
                         {[7, 14, 30, 60, 120].map((d) => (
                             <Link key={d} href={`/admin/calls/attendance?days=${d}`} aria-current={d === days ? "page" : undefined} className={d === days ? "font-bold underline" : "underline text-foreground/70"}>

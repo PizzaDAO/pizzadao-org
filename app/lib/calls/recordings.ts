@@ -90,6 +90,7 @@ export async function ingestRecording(p: IngestPayload): Promise<{ id: string; d
       endReason: p.endReason,
       partial: p.partial,
       participantIds: p.participantIds,
+      scheduledSec: p.scheduledSec,
       ...(p.presence.length
         ? {
             presence: {

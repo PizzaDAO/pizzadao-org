@@ -215,6 +215,7 @@ export async function finalizeSession(dir: string, deps: FinalizeDeps): Promise<
       ...(chat.length ? { chat } : {}),
       ...(participants.length ? { participantIds: participants } : {}),
       ...(presence.length ? { presence } : {}),
+      ...(meta.scheduledSec ? { scheduledSec: meta.scheduledSec } : {}),
     }
 
     if (payload.speakers.length === 0 && !payload.mix && chat.length < MIN_CHAT_FOR_TEXT_ONLY) {

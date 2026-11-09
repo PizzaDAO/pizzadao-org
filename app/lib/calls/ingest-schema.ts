@@ -79,6 +79,8 @@ export interface IngestPayload {
   participantIds: string[]
   /** Measured time in the voice channel per person. Absent from older workers (then participantIds decides). */
   presence: IngestPresence[]
+  /** Scheduled call length in seconds (Discord event start to end), when the recorder knew it. */
+  scheduledSec: number | null
 }
 
 export interface IngestPresence {
@@ -248,5 +250,6 @@ export function parseIngestPayload(body: unknown): IngestPayload {
     chat: parseChat(body.chat),
     participantIds: parseParticipants(body.participantIds),
     presence: parsePresence(body.presence),
+    scheduledSec: typeof body.scheduledSec === 'number' && Number.isFinite(body.scheduledSec) && body.scheduledSec > 0 && body.scheduledSec <= MAX_SECONDS ? Math.round(body.scheduledSec) : null,
   }
 }

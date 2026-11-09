@@ -64,6 +64,8 @@ export const DEFAULT_THRESHOLDS: AttendanceThresholds = { minMinutes: 5, shortCa
 
 export interface CountedRecording extends AttendanceRecordingInput {
   durationSec: number
+  /** Scheduled length (Discord event start to end) in seconds, when known. */
+  scheduledSec?: number | null
   presence: Array<{ discordId: string; presentSec: number }>
 }
 
@@ -73,11 +75,12 @@ export interface CountedAttendee {
   presentSec: number | null
 }
 
-/** Seconds a person must be present: the minimum, or the short-call share of the call when the call is under twice the minimum. */
-export function thresholdSec(totalDurationSec: number, t: AttendanceThresholds): number {
+/** Seconds a person must be present: the minimum, or the short-call share of the scheduled length when that is under twice the minimum (unknown length: the minimum only). */
+export function thresholdSec(scheduledSec: number | null | undefined, t: AttendanceThresholds): number {
   const min = Math.max(0, t.minMinutes) * 60
   if (min === 0) return 0
-  if (totalDurationSec < 2 * min) return Math.floor((totalDurationSec * Math.min(100, Math.max(0, t.shortCallPercent))) / 100)
+  // Only a known scheduled length can make a call "short": what was recorded so far (one part of a split call) must not.
+  if (scheduledSec && scheduledSec < 2 * min) return Math.floor((scheduledSec * Math.min(100, Math.max(0, t.shortCallPercent))) / 100)
   return min
 }
 
@@ -92,7 +95,7 @@ export function countedAttendees(recordings: CountedRecording[], t: AttendanceTh
   const names = new Map<string, string | null>()
   const speakers = new Set<string>()
   const measuredIds = new Set<string>()
-  let total = 0
+  let scheduled = 0
   for (const r of recordings) {
     if (r.presence.length === 0) {
       // Old rule: no presence was measured for this recording.
@@ -103,7 +106,7 @@ export function countedAttendees(recordings: CountedRecording[], t: AttendanceTh
       }
       continue
     }
-    total += Math.max(0, r.durationSec)
+    scheduled = Math.max(scheduled, r.scheduledSec ?? 0)
     for (const p of r.presence) {
       if (!DISCORD_ID.test(p.discordId)) continue
       measured.set(p.discordId, (measured.get(p.discordId) ?? 0) + p.presentSec)
@@ -115,7 +118,7 @@ export function countedAttendees(recordings: CountedRecording[], t: AttendanceTh
     }
     for (const id of r.participantIds) if (DISCORD_ID.test(id)) measuredIds.add(id)
   }
-  const need = thresholdSec(total, t)
+  const need = thresholdSec(scheduled || null, t)
   for (const id of measuredIds) {
     const sec = measured.get(id) ?? 0
     if (sec >= need || (t.speakersAlwaysCount && speakers.has(id))) out.set(id, { name: names.get(id) ?? out.get(id)?.name ?? null, presentSec: sec })
@@ -123,6 +126,13 @@ export function countedAttendees(recordings: CountedRecording[], t: AttendanceTh
   if (t.speakersAlwaysCount) {
     for (const id of speakers) if (!out.has(id)) out.set(id, { name: names.get(id) ?? null, presentSec: measured.get(id) ?? 0 })
   }
+  return out
+}
+
+/** Pure: summed measured seconds per person across the recordings that have presence data. */
+export function measuredSeconds(recordings: Array<{ presence: Array<{ discordId: string; presentSec: number }> }>): Map<string, number> {
+  const out = new Map<string, number>()
+  for (const r of recordings) for (const p of r.presence) out.set(p.discordId, (out.get(p.discordId) ?? 0) + p.presentSec)
   return out
 }
 
@@ -162,6 +172,7 @@ export async function recordAttendanceForRecording(
     crewLabel: true,
     startedAt: true,
     durationSec: true,
+    scheduledSec: true,
     source: true,
     participantIds: true,
     status: true,
@@ -192,7 +203,7 @@ export async function recordAttendanceForRecording(
   const ids = [...counted.keys()]
   // Already counted that day for this crew (by the sheet, an admin or an earlier part of this call).
   const existing = await prisma.callAttendance.findMany({
-    where: { crewId: { in: crewIds }, callDate: day, discordId: { in: ids } },
+    where: { crewId: { in: crewIds }, callDate: day },
     select: { id: true, discordId: true, source: true, presentSec: true },
   })
   const have = new Set(existing.map((e) => e.discordId))
@@ -206,13 +217,15 @@ export async function recordAttendanceForRecording(
   for (const e of edits) latest.set(e.discordId, e.action)
   const fresh = ids.filter((id) => !have.has(id) && latest.get(id) !== 'remove' && !opts.planned?.has(`${key}|${id}`))
   // Minutes on existing recording rows follow the whole day's total.
-  const refresh = existing.filter((e) => e.source === 'recording' && counted.get(e.discordId)?.presentSec != null && counted.get(e.discordId)!.presentSec !== e.presentSec)
+  // Every existing recording row of the day, whether or not the person is still over the threshold (rows are never removed).
+  const dayTotals = measuredSeconds(sameDay)
+  const refresh = existing.filter((e) => e.source === 'recording' && dayTotals.has(e.discordId) && dayTotals.get(e.discordId) !== e.presentSec)
   if (opts.dryRun) {
     for (const id of fresh) opts.planned?.add(`${key}|${id}`)
     return { recordingId, attendees: ids.length, created: fresh.length }
   }
   for (const e of refresh) {
-    await prisma.callAttendance.update({ where: { id: e.id }, data: { presentSec: counted.get(e.discordId)!.presentSec } })
+    await prisma.callAttendance.update({ where: { id: e.id }, data: { presentSec: dayTotals.get(e.discordId) } })
   }
   if (fresh.length === 0) return { recordingId, attendees: ids.length, created: 0 }
 

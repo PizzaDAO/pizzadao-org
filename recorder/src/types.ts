@@ -52,6 +52,8 @@ export interface IngestPayload {
   participantIds?: string[]
   /** Measured time in the voice channel per member (purged users dropped). Omitted when nothing was measured; apps without it use participantIds. */
   presence?: IngestPresence[]
+  /** Scheduled length of the call (Discord event start to end) in seconds, when the event has an end. Omitted otherwise. */
+  scheduledSec?: number
 }
 
 export interface IngestPresence {
@@ -73,6 +75,8 @@ export interface SessionMeta {
   endedAtMs: number | null
   endReason: string | null
   partial: boolean
+  /** Scheduled event length in seconds (start to end); absent when unknown. */
+  scheduledSec?: number | null
 }
 
 export interface SegmentRecord {
