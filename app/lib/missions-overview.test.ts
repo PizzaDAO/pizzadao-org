@@ -35,3 +35,15 @@ describe('getMissionsOverview guideHref', () => {
     for (const m of o.levels[0].missions) expect('guideHref' in m).toBe(false)
   })
 })
+
+describe('getMissionsOverview vouch link', () => {
+  it('flags vouch_received missions with the threshold, without per-viewer data when signed out', async () => {
+    vi.mocked(getMissionsByLevel).mockResolvedValue({
+      6: [{ ...row(1, 2, null), verifierKey: 'vouch_received', verifierParams: { min: 5, sources: ['PIZZADAO'] } }, row(2, 3, null)],
+    } as never)
+    const o = await getMissionsOverview(null)
+    expect(o.levels[0].missions[0].vouchLink).toEqual({ need: 5, sources: ['PIZZADAO'] })
+    expect('vouchLink' in o.levels[0].missions[1]).toBe(false)
+    expect(o.memberId ?? null).toBeNull()
+  })
+})
