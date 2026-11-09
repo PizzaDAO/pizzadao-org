@@ -183,6 +183,8 @@ describe('settings registry', () => {
       ['reengage.enabled', false],
       ['onboarding.traineeNickEnabled', false],
       ['names.requireThemed', false],
+      ['mafia.rankFreshHours', 26],
+      ['mafia.rankPrecomputeConcurrency', 4],
       ['games.enabled', false],
       ['crime.enabled', false],
       ['portrait.enabled', false],

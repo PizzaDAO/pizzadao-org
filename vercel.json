@@ -18,6 +18,7 @@
     { "path": "/api/cron/followups", "schedule": "*/10 * * * *" },
     { "path": "/api/cron/payments-ingest", "schedule": "*/15 * * * *" },
     { "path": "/api/cron/telegram-posts", "schedule": "*/5 * * * *" },
-    { "path": "/api/cron/event-time-sync", "schedule": "40 */6 * * *" }
+    { "path": "/api/cron/event-time-sync", "schedule": "40 */6 * * *" },
+    { "path": "/api/cron/mafia-ranks", "schedule": "30 3 * * *" }
   ]
 }

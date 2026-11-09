@@ -2678,3 +2678,17 @@ model PfpAdminEvent {
   @@index([createdAt])
   @@index([assetId, createdAt])
 }
+
+/// Nightly precomputed Pizza Mafia rank per member (cron /api/cron/mafia-ranks). The profile reads
+/// this first and falls back to the live lookup when the row is missing or stale.
+model MafiaRankCache {
+  memberId   String   @id
+  rank       Int // the rank minPoints (monotonic across tiers)
+  tier       String   @db.VarChar(80)
+  points     Int
+  inputs     Json // the point breakdown the rank was computed from
+  memberName String   @default("")
+  computedAt DateTime @default(now())
+
+  @@index([computedAt])
+}

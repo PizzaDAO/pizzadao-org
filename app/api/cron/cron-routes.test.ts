@@ -39,7 +39,13 @@ vi.mock('@/app/lib/trainee-nick-run', () => ({
   runTraineeNicks: vi.fn(async ({ dryRun }: { dryRun: boolean }) => ({ status: 'finished', dryRun })),
 }))
 
+vi.mock('@/app/lib/mafia-points/precompute', () => ({
+  runMafiaRankPrecompute: vi.fn(async () => ({ total: 2, computed: 2, failed: 0, remaining: 0, stoppedEarly: false })),
+}))
+
 import { after } from 'next/server'
+import { GET as mafiaRanksGET } from './mafia-ranks/route'
+import { runMafiaRankPrecompute } from '@/app/lib/mafia-points/precompute'
 import { GET as missionsGET } from './missions/route'
 import { GET as attendanceGET } from './attendance/route'
 import { GET as missionSlaGET } from './mission-sla/route'
@@ -84,6 +90,7 @@ describe.each([
 
   ['/api/cron/followups', followupsGET, () => processDue],
   ['/api/cron/telegram-posts', telegramPostsGET, () => processOutbox],
+  ['/api/cron/mafia-ranks', mafiaRanksGET, () => runMafiaRankPrecompute],
 ] as const)('%s auth', (path, GET, work) => {
   it('401 without the bearer token, and does no work', async () => {
     const res = await GET(req(path))

@@ -8,6 +8,7 @@ import { fetchFilteredPOAPs } from "@/app/lib/poap";
 import { fetchMemberById } from "@/app/lib/sheets/member-repository";
 import { cacheGetOrSet } from "@/app/api/lib/cache";
 import { loadSettings } from "@/app/lib/settings";
+import { effectiveInt } from "@/app/lib/settings/numbers";
 import { mafiaRanks, mafiaSources } from "@/app/lib/settings/mafia";
 import {
   REGIONAL_CREW_IDS,
@@ -50,7 +51,7 @@ export interface MafiaRankResult {
 // Core calculation
 // ---------------------------------------------------------------------------
 
-async function calculateMafiaPoints(
+export async function calculateMafiaPoints(
   memberId: string,
 ): Promise<MafiaPointsResult> {
   // Fetch member data from crew sheet to get discordId + wallet
@@ -222,10 +223,89 @@ async function getMafiaPoints(
 export async function getMafiaRank(
   memberId: string,
 ): Promise<MafiaRankResult> {
+  const settings = await loadSettings();
+  const ranks = mafiaRanks(settings);
+
+  // 1. The nightly precompute (MafiaRankCache): one indexed read. The tier is re-derived from
+  //    the stored points so a change to the rank thresholds applies at once.
+  const freshMs = effectiveInt("mafia.rankFreshHours", settings) * 60 * 60 * 1000;
+  const cached = await readPrecomputedRank(memberId);
+  if (cached && Date.now() - cached.computedAt.getTime() <= freshMs) {
+    const r = getRankForPoints(cached.points, ranks);
+    return {
+      memberId,
+      memberName: cached.memberName,
+      rank: { name: r.name, minPoints: r.minPoints },
+      lastCalculated: cached.computedAt.getTime(),
+    };
+  }
+
+  // 2. Missing or stale: the live path (KV-cached), then store it for next time.
   const result = await getMafiaPoints(memberId);
-  const rank = getRankForPoints(result.totalPoints, mafiaRanks(await loadSettings()));
+  void storeMafiaRank(result, ranks);
+  const rank = getRankForPoints(result.totalPoints, ranks);
   return {
     memberId: result.memberId,
+    memberName: result.memberName,
+    rank: { name: rank.name, minPoints: rank.minPoints },
+    lastCalculated: result.lastCalculated,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Precomputed rank table
+// ---------------------------------------------------------------------------
+
+async function readPrecomputedRank(
+  memberId: string,
+): Promise<{ points: number; memberName: string; computedAt: Date } | null> {
+  try {
+    return await prisma.mafiaRankCache.findUnique({
+      where: { memberId },
+      select: { points: true, memberName: true, computedAt: true },
+    });
+  } catch {
+    return null; // table missing or database down: use the live path
+  }
+}
+
+/** Upsert one member's computed rank. Never throws. */
+async function storeMafiaRank(
+  result: MafiaPointsResult,
+  ranks: ReturnType<typeof mafiaRanks>,
+): Promise<void> {
+  try {
+    if (result.memberName === "Unknown" && result.breakdown.length === 0) return; // no such member
+    const rank = getRankForPoints(result.totalPoints, ranks);
+    const data = {
+      rank: rank.minPoints,
+      tier: rank.name,
+      points: result.totalPoints,
+      inputs: result.breakdown as unknown as object,
+      memberName: result.memberName,
+      computedAt: new Date(),
+    };
+    await prisma.mafiaRankCache.upsert({
+      where: { memberId: result.memberId },
+      create: { memberId: result.memberId, ...data },
+      update: data,
+    });
+  } catch {
+    // best effort
+  }
+}
+
+/**
+ * Recompute one member's rank from scratch (bypassing the KV cache) and store it. Used by the
+ * nightly cron; callable after anything that changes a rank.
+ */
+export async function refreshMafiaRank(memberId: string): Promise<MafiaRankResult> {
+  const result = await calculateMafiaPoints(memberId);
+  const ranks = mafiaRanks(await loadSettings());
+  await storeMafiaRank(result, ranks);
+  const rank = getRankForPoints(result.totalPoints, ranks);
+  return {
+    memberId,
     memberName: result.memberName,
     rank: { name: rank.name, minPoints: rank.minPoints },
     lastCalculated: result.lastCalculated,
@@ -236,7 +316,7 @@ export async function getMafiaRank(
 // Helpers
 // ---------------------------------------------------------------------------
 
-function findWallet(member: Record<string, unknown>): string | null {
+export function findWallet(member: Record<string, unknown>): string | null {
   for (const key of Object.keys(member)) {
     if (key.toLowerCase().includes("wallet") || key.toLowerCase().includes("address")) {
       const val = String(member[key] || "").trim();
