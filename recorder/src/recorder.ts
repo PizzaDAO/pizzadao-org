@@ -31,6 +31,7 @@ import { appendRecord, MAX_CHAT_TEXT } from './manifest.js'
 import { EndSongMarker, isEndSongStop, postPlayCrew } from './end-song.js'
 import { matchesStartBand, postPlayBand, START_BAND_LATE_EXTRA_MINUTES } from './start-band.js'
 import { SlotMemory } from './slots.js'
+import { allowedChannels, recordableEvents } from './channels.js'
 import { NicknameManager } from './nickname.js'
 import { StopTracker, type StopReason } from './stop-conditions.js'
 import { REMOTE_CONFIG_OFF, REMOTE_CONFIG_START_WAIT_MS, type RemoteConfig, type RemoteConfigClient } from './remote-config.js'
@@ -71,6 +72,8 @@ interface ActiveSession {
   endSong: EndSongState | null
   /** Waiting for the scheduled start to play the house band (cancelled on stop). */
   bandTimer: NodeJS.Timeout | null
+  /** The voice channel this session records (presence, welcomes, stop detection and radio all use it). */
+  channelId: string
   stopping: boolean
   /** Scheduled start of the event being recorded (forward-only switching). */
   eventStartMs: number | null
@@ -102,6 +105,7 @@ export class CallRecorder {
   private readonly endSongMarker: EndSongMarker
   private readonly startBandMarker: EndSongMarker
   private warnedNoRadio = false
+  private readonly overlapLogged = new Set<string>()
   private warnedNoRadioBand = false
   private retryTimer: NodeJS.Timeout | null = null
   /** Sessions finalized but not yet uploaded (shown on /health). */
@@ -120,7 +124,7 @@ export class CallRecorder {
     /** Live action items request (tests inject it); default POSTs to the app. */
     private readonly livePost: ((body: LiveRequest) => Promise<string[]>) | null = null,
   ) {
-    this.slots = new SlotMemory(path.join(cfg.dataDir, 'slots.json'), cfg.callChannelId, log)
+    this.slots = new SlotMemory(path.join(cfg.dataDir, 'slots.json'), (ch) => ch !== null && this.allowedNow().has(ch), log)
     this.limits = new CallLimits(path.join(cfg.dataDir, 'call-limits.json'), log)
     this.endSongMarker = new EndSongMarker(path.join(cfg.dataDir, 'end-song.json'), log)
     this.startBandMarker = new EndSongMarker(path.join(cfg.dataDir, 'start-band.json'), log)
@@ -128,6 +132,16 @@ export class CallRecorder {
 
   private eventLimitMs(eventName: string): number {
     return maxMinutesFor(this.cfg, eventName) * 60_000
+  }
+
+  /** Channels that may be recorded right now: the default one plus the admin allowlist. */
+  private allowedNow(): Set<string> {
+    return allowedChannels((this.remote?.get() ?? REMOTE_CONFIG_OFF).voiceChannels, this.cfg.callChannelId)
+  }
+
+  /** True for a channel the recorder cares about: a recordable one, or the one it is recording now. */
+  isWatchedChannel(channelId: string | null): boolean {
+    return channelId !== null && (this.allowedNow().has(channelId) || this.current?.channelId === channelId)
   }
 
   get currentEventId(): string | null {
@@ -160,30 +174,67 @@ export class CallRecorder {
     // then jumps to next week, so the live list alone forgets today's slot.
     // The call being recorded keeps its slot even if its event was rescheduled mid-call.
     const keep = new Set(this.current ? [this.current.key] : [])
-    this.slots.observe(liveEvents, Date.now(), keep)
-    const events = this.slots.merge(liveEvents, keep)
+    // Every event gets its channel (its own, else the crew mapping); events in channels that may not be
+    // recorded drop out here, so nothing below can start a recording in an unexpected channel.
+    const vc = (this.remote?.get() ?? REMOTE_CONFIG_OFF).voiceChannels
+    const recordable = (list: EventInfo[]) => recordableEvents(list, vc, this.cfg.callChannelId)
+    const live = recordable(liveEvents)
+    this.slots.observe(live, Date.now(), keep)
+    const allEvents = recordable(this.slots.merge(live, keep))
     if (this.shuttingDown || this.starting) return
     if (this.current?.stopping) return
+    const cur0 = this.current
+    // The session's channel was taken off the allowlist mid-call: stop recording it.
+    if (cur0 && !this.allowedNow().has(cur0.channelId)) {
+      this.log(`channel of ${cur0.meta.sessionId} is no longer recordable; stopping`)
+      await this.stop('channel-disallowed')
+      return
+    }
+    const nowMs = Date.now()
+    const maxCallMs = this.cfg.maxCallMinutes * 60_000
+    const blocked = (e: EventInfo) => this.limits.blocks(e, nowMs)
+    // One recording at a time. While one runs, only its channel is considered (a later call in the same
+    // channel can still take over). Idle, the busy recordable channels compete: the default channel's call
+    // first (a restart mid-call must resume the main call), else the channel with the most people, else the
+    // earliest scheduled.
+    const counts = new Map<string, number>()
+    let events: EventInfo[]
+    let channelId: string | undefined
     let humans: number
+    let guild: Guild
     try {
-      const guild = await this.client.guilds.fetch(this.cfg.guildId)
-      humans = await this.humanCount(guild)
+      guild = await this.client.guilds.fetch(this.cfg.guildId)
+      if (cur0) {
+        channelId = cur0.channelId
+        counts.set(channelId, await this.humanCount(guild, channelId))
+        events = allEvents.filter((e) => e.channelId === channelId)
+        humans = counts.get(channelId) ?? 0
+      } else {
+        for (const ch of new Set([this.cfg.callChannelId, ...allEvents.map((e) => e.channelId as string)])) counts.set(ch, await this.humanCount(guild, ch))
+        const cands: { ch: string; n: number; first: number }[] = []
+        for (const [ch, n] of counts) {
+          if (n <= 0) continue
+          const inWin = eventsInWindow(allEvents.filter((e) => e.channelId === ch), { maxCallMs, nowMs, blocked })
+          if (inWin.length) cands.push({ ch, n, first: Math.min(...inWin.map((e) => e.scheduledStartMs ?? Infinity)) })
+        }
+        const isDef = (ch: string) => (ch === this.cfg.callChannelId ? 1 : 0)
+        cands.sort((a, b) => isDef(b.ch) - isDef(a.ch) || b.n - a.n || a.first - b.first)
+        channelId = cands[0]?.ch
+        events = channelId ? allEvents.filter((e) => e.channelId === channelId) : []
+        humans = cands[0]?.n ?? 0
+      }
     } catch (err) {
       this.log(`schedule check failed: ${err instanceof Error ? err.message : String(err)}`)
       return
     }
-    const nowMs = Date.now()
-    if (humans === 0) this.limits.noteChannelEmpty(nowMs)
-    const opts = {
-      callChannelId: this.cfg.callChannelId,
-      maxCallMs: this.cfg.maxCallMinutes * 60_000,
-      nowMs,
-      blocked: (e: EventInfo) => this.limits.blocks(e, nowMs),
-    }
+    for (const [ch, n] of counts) if (n === 0) this.limits.noteChannelEmpty(nowMs, ch)
+    const opts = { callChannelId: channelId, maxCallMs, nowMs, blocked }
     // Back-off bookkeeping: a session that ran long enough recovered; closed windows are forgotten.
     const cur = this.current
     if (cur && opts.nowMs - cur.meta.startedAtMs >= RECOVERY_MS) this.backoff.clear(cur.key)
-    this.backoff.prune(new Set([...eventsInWindow(events, opts).map(eventKey), ...(cur ? [cur.key] : [])]))
+    const windowKeys = new Set(eventsInWindow(allEvents, { maxCallMs, nowMs, blocked }).map(eventKey))
+    this.backoff.prune(new Set([...windowKeys, ...(cur ? [cur.key] : [])]))
+    for (const k of this.overlapLogged) if (!windowKeys.has(k)) this.overlapLogged.delete(k)
     const deferMaxMs = (this.remote?.get() ?? REMOTE_CONFIG_OFF).supersedeMaxDeferMinutes * 60_000
     let handoff: HandoffInput | undefined
     if (cur && deferMaxMs > 0 && humans > 0) {
@@ -191,7 +242,7 @@ export class CallRecorder {
         const guild = await this.client.guilds.fetch(this.cfg.guildId)
         handoff = {
           deferMaxMs,
-          presentIds: await this.humanIds(guild),
+          presentIds: await this.humanIds(guild, cur.channelId),
           lastSpokeMs: cur.capture.lastSpokeByUser(nowMs),
           firstSpokeMs: cur.capture.firstSpokeByUser(nowMs),
           startPresentIds: cur.startPresent,
@@ -219,6 +270,7 @@ export class CallRecorder {
         this.log(`deferring switch to "${due.name}" (${due.id}): the current call still has people talking (up to ${this.remote?.get().supersedeMaxDeferMinutes} min)`)
       }
     }
+    await this.noteOverlap(guild, allEvents, counts, cur?.channelId ?? channelId, cur?.meta.eventId ?? (action.type === 'start' ? action.event.id : null), nowMs)
     if ((action.type === 'start' || action.type === 'switch') && !this.backoff.allows(eventKey(action.event), Date.now())) return
     if (action.type === 'start' || action.type === 'switch') {
       const k = eventKey(action.event)
@@ -237,6 +289,33 @@ export class CallRecorder {
     }
   }
 
+  /**
+   * Calls overlap in different channels: only one recording runs at a time, so the running call (or, idle,
+   * the one chosen) keeps the recorder and a call in another channel inside its window is skipped. Logged
+   * once per occurrence, and only for calls that would otherwise start (people in their channel, not backed
+   * off). The skipped call starts later only if the recorder is free while its window is open.
+   */
+  private async noteOverlap(
+    guild: Guild,
+    events: EventInfo[],
+    counts: Map<string, number>,
+    keepChannel: string | undefined,
+    keepId: string | null,
+    nowMs: number,
+  ): Promise<void> {
+    if (!keepChannel) return
+    const opts = { maxCallMs: this.cfg.maxCallMinutes * 60_000, nowMs, blocked: (e: EventInfo) => this.limits.blocks(e, nowMs) }
+    for (const e of eventsInWindow(events, opts)) {
+      if (e.channelId === keepChannel || e.id === keepId) continue
+      const k = eventKey(e)
+      if (this.overlapLogged.has(k) || !this.backoff.allows(k, nowMs)) continue
+      const here = counts.get(e.channelId as string) ?? (await this.humanCount(guild, e.channelId as string).catch(() => 0))
+      if (here <= 0) continue
+      this.overlapLogged.add(k)
+      this.log(`skipping "${e.name}" (${e.id}): it overlaps a call being recorded in another channel (one recording at a time)`)
+    }
+  }
+
   // ---- start / stop ----------------------------------------------------
 
   private async start(event: EventInfo): Promise<void> {
@@ -251,6 +330,7 @@ export class CallRecorder {
     // Fresh settings for this session (5 s cap, never throws; failure keeps the last good value or all-off).
     await this.remote?.refresh(REMOTE_CONFIG_START_WAIT_MS)
     const startedAtMs = Date.now()
+    const channelId = event.channelId ?? this.cfg.callChannelId
     const sessionId = `${event.id}-${startedAtMs}`
     const dir = path.join(this.cfg.dataDir, sessionId)
     mkdirSync(dir, { recursive: true })
@@ -260,7 +340,7 @@ export class CallRecorder {
       sessionId,
       eventId: event.id,
       eventName: event.name,
-      channelId: this.cfg.callChannelId,
+      channelId,
       startedAtMs,
       endedAtMs: null,
       endReason: null,
@@ -290,8 +370,9 @@ export class CallRecorder {
 
     try {
       guild = await this.client.guilds.fetch(this.cfg.guildId)
-      const channel = (await guild.channels.fetch(this.cfg.callChannelId)) as VoiceBasedChannel | null
-      if (!channel?.isVoiceBased()) return await abort(`channel ${this.cfg.callChannelId} is not a voice channel`)
+      if (!this.allowedNow().has(channelId)) return await abort(`channel ${channelId} is not in the recordable channels`)
+      const channel = (await guild.channels.fetch(channelId)) as VoiceBasedChannel | null
+      if (!channel?.isVoiceBased()) return await abort(`channel ${channelId} is not a voice channel`)
       const g = guild
 
       capture = new VoiceCapture({
@@ -327,7 +408,7 @@ export class CallRecorder {
       let present: string[] = []
       if (rc.welcome.enabled) {
         try {
-          present = await this.humanIds(g)
+          present = await this.humanIds(g, channelId)
         } catch {
           present = []
         }
@@ -345,14 +426,14 @@ export class CallRecorder {
       const limitMs = this.eventLimitMs(event.name)
       const capped = eventCapMinutes(this.cfg, event.name) !== undefined
       const tracker = new StopTracker(
-        capped ? this.limits.noteStart(event.id, { baseMs: limitBaseMs, limitMs, startMs: event.scheduledStartMs ?? limitBaseMs }) : limitBaseMs,
+        capped ? this.limits.noteStart(event.id, { baseMs: limitBaseMs, limitMs, startMs: event.scheduledStartMs ?? limitBaseMs, channelId }) : limitBaseMs,
         {
           maxCallMs: limitMs,
           emptyGraceMs: this.cfg.emptyGraceMinutes * 60_000,
         },
         event.scheduledStartMs === null ? null : event.scheduledStartMs + NO_SHOW_GRACE_MS,
       )
-      tracker.observeHumans(await this.humanCount(g), Date.now())
+      tracker.observeHumans(await this.humanCount(g, channelId), Date.now())
       live = this.liveFor(event, rc, { sessionId, dir, startedAtMs, channel, names })
       capture.beginCapture()
       live?.start()
@@ -362,6 +443,7 @@ export class CallRecorder {
         dir,
         guild: g,
         capture,
+        channelId,
         tracker,
         reminded: new Set(present),
         endSong,
@@ -419,7 +501,7 @@ export class CallRecorder {
     if (!s || s.stopping) return
     let humans = 0
     try {
-      humans = await this.humanCount(s.guild)
+      humans = await this.humanCount(s.guild, s.channelId)
       s.tracker.observeHumans(humans, Date.now())
     } catch (err) {
       this.log(`human count failed: ${err instanceof Error ? err.message : String(err)}`)
@@ -451,7 +533,7 @@ export class CallRecorder {
       // The call really ended with people possibly still here. empty / superseded / shutdown / disconnected never play.
       let humans = 0
       try {
-        humans = await this.humanCount(s.guild)
+        humans = await this.humanCount(s.guild, s.channelId)
       } catch {
         // cannot tell who is here: stay quiet
       }
@@ -525,7 +607,7 @@ export class CallRecorder {
     this.log(`end song (${why}): asking pizza-radio to play "${e.crew}"`)
     // The "already played" marker is written only once pizza-radio answered: a 2xx, or a 4xx that retrying will
     // not fix (logged once, marked so it does not loop). A network error or 5xx after the retry leaves it unmarked.
-    void postPlayCrew(radio.url, radio.apiKey, e.crew, this.cfg.callChannelId, this.log)
+    void postPlayCrew(radio.url, radio.apiKey, e.crew, s.channelId, this.log)
       .then((outcome) => {
         if (outcome === 'failed') this.log('end song: pizza-radio unreachable; not marked as played')
         else this.endSongMarker.mark(s.key, Date.now())
@@ -568,7 +650,7 @@ export class CallRecorder {
         if (this.startBandMarker.has(s.key)) return
         let humans = 0
         try {
-          humans = await this.humanCount(s.guild)
+          humans = await this.humanCount(s.guild, s.channelId)
         } catch {
           humans = 0
         }
@@ -579,7 +661,7 @@ export class CallRecorder {
         }
         this.startBandMarker.mark(s.key, Date.now()) // before the request, so a crash or restart cannot replay it
         this.log(`start band: asking pizza-radio to play the house band (${b.maxSongs} song${b.maxSongs === 1 ? '' : 's'}) for "${event.name}"`)
-        void postPlayBand(radio.url, radio.apiKey, this.cfg.callChannelId, b.maxSongs, this.log)
+        void postPlayBand(radio.url, radio.apiKey, s.channelId, b.maxSongs, this.log)
           .then((outcome) => this.log(`start band: ${outcome === 'ok' ? 'pizza-radio accepted' : outcome === 'rejected' ? 'pizza-radio refused' : 'pizza-radio unreachable or timed out'}`))
           .catch((err) => this.log(`start band failed: ${err instanceof Error ? err.message : String(err)}`))
       }
@@ -674,10 +756,10 @@ export class CallRecorder {
     const s = this.current
     if (!s || s.stopping) return
     // A join or leave of the call channel: record the new member set now, so short visits are measured too.
-    if (oldState.channelId !== newState.channelId && (oldState.channelId === this.cfg.callChannelId || newState.channelId === this.cfg.callChannelId)) {
+    if (oldState.channelId !== newState.channelId && (oldState.channelId === s.channelId || newState.channelId === s.channelId)) {
       this.serial(() => this.notePresent(s))
     }
-    if (newState.channelId !== this.cfg.callChannelId || oldState.channelId === newState.channelId) return
+    if (newState.channelId !== s.channelId || oldState.channelId === newState.channelId) return
     if (s.welcome) {
       this.queueWelcome(s, s.welcome, newState)
       return
@@ -749,7 +831,7 @@ export class CallRecorder {
 
   private inSession(msg: Message | PartialMessage): ActiveSession | null {
     const s = this.current
-    if (!s || s.stopping || msg.channelId !== this.cfg.callChannelId) return null
+    if (!s || s.stopping || msg.channelId !== s.channelId) return null
     const at = msg.createdTimestamp
     if (typeof at !== 'number' || at < s.meta.startedAtMs || at > Date.now() + 5000) return null
     return s
@@ -823,12 +905,12 @@ export class CallRecorder {
     return user.bot
   }
 
-  private async humanCount(guild: Guild): Promise<number> {
-    return (await this.humanIds(guild)).length
+  private async humanCount(guild: Guild, channelId: string): Promise<number> {
+    return (await this.humanIds(guild, channelId)).length
   }
 
-  private async humanIds(guild: Guild): Promise<string[]> {
-    const ids = guild.voiceStates.cache.filter((vs) => vs.channelId === this.cfg.callChannelId).map((vs) => vs.id)
+  private async humanIds(guild: Guild, channelId: string): Promise<string[]> {
+    const ids = guild.voiceStates.cache.filter((vs) => vs.channelId === channelId).map((vs) => vs.id)
     const humans: string[] = []
     for (const id of ids) if (!(await this.isBot(id))) humans.push(id)
     return humans
@@ -838,7 +920,7 @@ export class CallRecorder {
   private async notePresent(s: ActiveSession): Promise<void> {
     if (s.stopping) return
     try {
-      const now = (await this.humanIds(s.guild)).sort()
+      const now = (await this.humanIds(s.guild, s.channelId)).sort()
       // Full member set, only when it changed: the time between records is what presence minutes are summed from.
       const key = now.join(',')
       if (key !== s.presenceKey) {

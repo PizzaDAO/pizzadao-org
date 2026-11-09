@@ -120,6 +120,8 @@ describe('settings registry', () => {
       ['calls.agendaPostEnabled', false],
       ['calls.agendaLinks', ''],
       ['calls.attendanceCrewAliases', 'community = community_call'],
+      ['calls.recordableVoiceChannels', ''],
+      ['calls.crewVoiceChannels', ''],
       ['calls.attendanceMinMinutes', 5],
       ['calls.attendanceShortCallPercent', 50],
       ['calls.attendanceSpeakersAlwaysCount', true],

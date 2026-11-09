@@ -104,10 +104,10 @@ async function scheduleCheck(refetch: boolean) {
 
 client.on('voiceStateUpdate', (o, n) => {
   recorder.onVoiceState(o, n)
-  // Someone joined or left the call channel: maybe a call is starting without its event being set ACTIVE.
+  // Someone joined or left a recordable call channel: maybe a call is starting without its event being set ACTIVE.
   if (n.guild.id !== cfg.guildId) return
   if (n.id === client.user?.id) return // the bot's own join/leave must not trigger a check
-  if (n.channelId !== cfg.callChannelId && o.channelId !== cfg.callChannelId) return
+  if (!recorder.isWatchedChannel(n.channelId) && !recorder.isWatchedChannel(o.channelId)) return
   serial(() => scheduleCheck(false))
 })
 client.on('messageCreate', (m) => recorder.onMessage(m))
@@ -136,6 +136,9 @@ client.once('ready', () => {
     clearAllStarting(cfg.dataDir) // nothing is live at boot: finish sessions a crash left "starting"
     recorder.recoverPending()
     recorder.startRetryLoop()
+
+    // Settings first: the recordable channels decide which events the first check may start.
+    await remote.refresh() // up to 5 s; a failure leaves the defaults until the next refresh
 
     // A call may already be running (restart mid-call): the schedule window picks it up.
     const events = [...(await guild.scheduledEvents.fetch()).values()].map(toInfo)

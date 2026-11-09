@@ -18,6 +18,8 @@ interface Entry {
   limitMs: number
   /** The call's scheduled start. */
   startMs: number
+  /** The call's voice channel; entries without one (an older file) apply to every channel. */
+  channelId?: string
   hitAtMs?: number
   /** The channel emptied after the limit: the call is over, later events may lead-window again. */
   released?: boolean
@@ -69,11 +71,12 @@ export class CallLimits {
     this.save(nowMs)
   }
 
-  noteChannelEmpty(nowMs: number): void {
+  /** `channelId` emptied: capped calls of that channel are over (all channels when omitted). */
+  noteChannelEmpty(nowMs: number, channelId?: string): void {
     let changed = false
     for (const id of Object.keys(this.entries)) {
       const e = this.active(id, nowMs)
-      if (e && spent(e, nowMs) && !e.released) {
+      if (e && spent(e, nowMs) && !e.released && (channelId === undefined || !e.channelId || e.channelId === channelId)) {
         e.released = true
         changed = true
       }
@@ -85,12 +88,15 @@ export class CallLimits {
    * True when `event` must not start because a capped call used up its time: the call itself, any
    * event that began no later than it, and, until the channel empties, anything whose slot has not begun.
    */
-  blocks(event: Pick<EventInfo, 'id' | 'scheduledStartMs'>, nowMs: number): boolean {
+  blocks(event: Pick<EventInfo, 'id' | 'scheduledStartMs'> & { channelId?: string | null }, nowMs: number): boolean {
     const start = event.scheduledStartMs
     return Object.keys(this.entries).some((id) => {
       const e = this.active(id, nowMs)
       if (!e || !spent(e, nowMs)) return false
-      if (id === event.id || start === null || start <= e.startMs) return true
+      if (id === event.id) return true
+      // A capped call in one channel does not hold back calls in another.
+      if (e.channelId && event.channelId && e.channelId !== event.channelId) return false
+      if (start === null || start <= e.startMs) return true
       return !e.released && start > nowMs
     })
   }

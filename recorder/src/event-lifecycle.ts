@@ -34,7 +34,8 @@ export type EventAction =
   | { type: 'switch'; event: EventInfo; reason: StopReason }
 
 export interface LifecycleOptions {
-  callChannelId: string
+  /** Only events in this channel count; omitted: the events passed in are already limited to recordable channels. */
+  callChannelId?: string
   maxCallMs: number
   nowMs: number
   /** Events that must not start. They still count for other events' window math. */
@@ -64,10 +65,11 @@ export function eventWindow(
   const start = event.scheduledStartMs
   if (start === null) return null
   let closeMs = event.scheduledEndMs ?? null
+  const channel = o.callChannelId ?? event.channelId
   if (closeMs === null) {
     closeMs = start + NO_END_WINDOW_MS
     for (const e of events) {
-      if (e.id === event.id || e.channelId !== o.callChannelId || e.status === EventStatus.Canceled) continue
+      if (e.id === event.id || e.channelId !== channel || e.status === EventStatus.Canceled) continue
       if (e.scheduledStartMs !== null && e.scheduledStartMs > start) closeMs = Math.min(closeMs, e.scheduledStartMs)
     }
   }
@@ -77,7 +79,7 @@ export function eventWindow(
 /** Events in the call channel (SCHEDULED or ACTIVE) whose window covers now. */
 export function eventsInWindow(events: EventInfo[], o: LifecycleOptions): EventInfo[] {
   return events.filter((e) => {
-    if (e.channelId !== o.callChannelId) return false
+    if (o.callChannelId !== undefined && e.channelId !== o.callChannelId) return false
     if (o.blocked?.(e)) return false
     if (e.status !== EventStatus.Scheduled && e.status !== EventStatus.Active) return false
     const w = eventWindow(e, o, events)
@@ -220,7 +222,7 @@ export function decideWindowAction(i: WindowInput): EventAction {
       (e) =>
         e.id === pendingId &&
         e.id !== i.currentEventId &&
-        e.channelId === i.callChannelId &&
+        (i.callChannelId === undefined || e.channelId === i.callChannelId) &&
         e.status !== EventStatus.Canceled &&
         i.handoff!.liveEvents.some(
           (l) => l.id === e.id && l.scheduledStartMs === e.scheduledStartMs && (l.status === EventStatus.Scheduled || l.status === EventStatus.Active),
@@ -236,7 +238,7 @@ export function decideWindowAction(i: WindowInput): EventAction {
   // The cap counts from the FIRST later slot that came due, so a chain of back-to-back slots cannot restart it.
   if (!provisional && i.handoff) {
     const dueStarts = i.events
-      .filter((e) => e.channelId === i.callChannelId && e.status !== EventStatus.Canceled && e.scheduledStartMs !== null)
+      .filter((e) => (i.callChannelId === undefined || e.channelId === i.callChannelId) && e.status !== EventStatus.Canceled && e.scheduledStartMs !== null)
       .map((e) => e.scheduledStartMs as number)
       .filter((t) => t <= i.nowMs && (i.currentStartMs === null || t > i.currentStartMs))
     const firstDue = Math.min(event.scheduledStartMs as number, ...dueStarts)
@@ -284,5 +286,5 @@ export class StartBackoff {
 
 /** Stop reasons that are not failures; anything else (e.g. 'disconnected') counts as one. */
 export function isFailureStop(reason: string): boolean {
-  return !['empty', 'max-duration', 'event-ended', 'superseded', 'shutdown'].includes(reason)
+  return !['empty', 'max-duration', 'event-ended', 'superseded', 'shutdown', 'channel-disallowed'].includes(reason)
 }

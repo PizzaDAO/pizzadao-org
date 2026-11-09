@@ -39,7 +39,7 @@ Known limits: stereo 48 kHz Opus is stored as received; pauses inside a speaker'
 | `R2_SECRET_ACCESS_KEY` | yes | | |
 | `R2_BUCKET_NAME` | yes | | Private bucket for call audio. |
 | `DEEPGRAM_API_KEY` | no | | Deepgram Nova-3 transcription of each speaker's speech. Unset: calls are ingested without a transcript (logged once). |
-| `CALL_VOICE_CHANNEL_ID` | no | `823956905739026442` | |
+| `CALL_VOICE_CHANNEL_ID` | no | `823956905739026442` | The default call channel (always recordable). Other channels: admin settings `calls.recordableVoiceChannels` (allowlist) and `calls.crewVoiceChannels` (crew = channel, for events with no channel of their own). See "Multiple voice channels". |
 | `APP_BASE_URL` | no | `https://app.pizzadao.org` | Ingest API host. |
 | `DATA_DIR` | no | `/data` | Mount the Railway volume here. |
 | `MAX_CALL_MINUTES` | no | `120` | |
@@ -125,3 +125,9 @@ npm run build && npm start
 ```
 
 The root Next.js app ignores this directory (tsconfig, eslint, vitest, `.vercelignore`); CI runs the tests here as a separate step.
+
+## Multiple voice channels
+
+Each call is recorded in the channel it uses: the scheduled event's own voice channel, else the channel mapped to its crew (`calls.crewVoiceChannels`); an event with neither is ignored. Only channels in `calls.recordableVoiceChannels`, plus the default `CALL_VOICE_CHANNEL_ID`, may be joined; anything else is never recorded. Presence, welcomes, the recording notice, stop/empty detection, live items and the pizza-radio band / end song all use the session's channel.
+
+One recording runs at a time. If two calls overlap in different channels, the running one is kept (idle: the best-fitting window among channels with people in them) and the other is skipped with a log line (`skipping ... overlaps a call being recorded in another channel`); it can still start later if the recorder is free while its window is open. A later call in the same channel still takes over as before.
