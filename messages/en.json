@@ -2391,6 +2391,7 @@
     "unavailable": "Could not check your roles right now. Try again soon.",
     "error": "Could not collect. Try again.",
     "tooMany": "Too many tries. Wait a moment.",
-    "dashLink": "Collect daily PEP"
+    "dashLink": "Collect daily PEP",
+    "getRoleEvery": "Get the {role} role to earn {amount} PEP every {hours} hours."
   }
 }

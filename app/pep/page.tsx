@@ -572,11 +572,11 @@ export default function PepDashboard() {
         </header>
 
 
+        <DailyPepCard onCollected={refreshWallet} />
+        <TermExplanation term="pep" />
         {/*
           sicilian-41551: stacks under lg, side-by-side from lg up.
         */}
-        <DailyPepCard onCollected={refreshWallet} />
-        <TermExplanation term="pep" />
       <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
           {/* Left: Jobs and Bounties */}
           <div className="min-w-0">

@@ -2391,6 +2391,7 @@
     "unavailable": "Impossible de vérifier vos rôles pour le moment. Réessayez bientôt.",
     "error": "Impossible de récupérer. Réessayez.",
     "tooMany": "Trop d''essais. Patientez un instant.",
-    "dashLink": "Récupérer le PEP du jour"
+    "dashLink": "Récupérer le PEP du jour",
+    "getRoleEvery": "Obtenez le rôle {role} pour gagner {amount} PEP toutes les {hours} heures."
   }
 }

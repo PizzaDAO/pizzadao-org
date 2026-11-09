@@ -98,6 +98,7 @@ export const RATE_LIMITS = {
   "pfp-restyle": { limit: 6, windowSec: 10 * 60 },
   // Daily PEP on the website (shares cooldowns with /collect-income): per IP and per member.
   "collect-income": { limit: 20, windowSec: 10 * 60 },
+  "collect-income-status": { limit: 60, windowSec: 10 * 60 },
 } as const satisfies Record<string, RateLimitRule>;
 
 export type RateLimitName = keyof typeof RATE_LIMITS;

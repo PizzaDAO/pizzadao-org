@@ -4,6 +4,7 @@
  * collectIncome itself (the slash-command path), so "collect in one place blocks the other" is exercised for real.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { NextResponse } from 'next/server'
 
 const state = vi.hoisted(() => ({
   wallets: new Map<string, number>(),
@@ -108,8 +109,13 @@ describe('/api/pep/collect-income', () => {
   })
 
   it('rate limits per IP and per member', async () => {
-    limits.ip = new Response('{}', { status: 429 })
-    expect((await post()).status).toBe(429)
+    limits.ip = NextResponse.json({}, { status: 429 })
+    const ipLimited = await post()
+    expect(ipLimited.status).toBe(429)
+    expect(ipLimited.headers.get('cache-control')).toBe('private, no-store')
+    limits.member = { success: false }
+    expect((await GET()).status).toBe(429)
+    limits.member = { success: true }
     limits.ip = null
     limits.member = { success: false }
     expect((await post()).status).toBe(429)

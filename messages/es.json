@@ -2391,6 +2391,7 @@
     "unavailable": "No pudimos revisar tus roles ahora. Inténtalo pronto.",
     "error": "No se pudo cobrar. Inténtalo de nuevo.",
     "tooMany": "Demasiados intentos. Espera un momento.",
-    "dashLink": "Cobra tu PEP diario"
+    "dashLink": "Cobra tu PEP diario",
+    "getRoleEvery": "Consigue el rol {role} para ganar {amount} PEP cada {hours} horas."
   }
 }

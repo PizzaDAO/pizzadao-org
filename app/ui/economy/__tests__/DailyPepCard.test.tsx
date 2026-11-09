@@ -46,6 +46,26 @@ describe("DailyPepCard", () => {
     expect((await screen.findByTestId("daily-pep-noroles")).textContent).toContain("Get the Box Mafia role to earn 42 PEP a day.");
   });
 
+  it("says 'every N hours' for non-daily roles", async () => {
+    stubFetch([{ status: 200, body: { totalAvailable: 0, nextReadyAt: null, earnRoles: [{ name: "OG", amount: 5, intervalHours: 12 }] } }]);
+    renderWithIntl(<DailyPepCard />);
+    expect((await screen.findByTestId("daily-pep-noroles")).textContent).toContain("5 PEP every 12 hours");
+  });
+
+  it("retries every 15s while the countdown is over but the server says not ready", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const fn = stubFetch([{ status: 200, body: { totalAvailable: 0, nextReadyAt: new Date(Date.now() - 1000).toISOString(), earnRoles: roles } }]);
+      renderWithIntl(<DailyPepCard />);
+      await waitFor(() => expect(fn.mock.calls.length).toBeGreaterThanOrEqual(2));
+      const before = fn.mock.calls.length;
+      await vi.advanceTimersByTimeAsync(15_100);
+      expect(fn.mock.calls.length).toBeGreaterThan(before);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("renders in Spanish", async () => {
     stubFetch([{ status: 200, body: { totalAvailable: 42, nextReadyAt: null, earnRoles: roles } }]);
     renderWithIntl(<DailyPepCard />, { locale: "es" });

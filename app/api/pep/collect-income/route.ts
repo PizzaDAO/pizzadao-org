@@ -10,11 +10,18 @@ export const runtime = 'nodejs'
 
 const reply = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: NO_STORE_HEADERS })
 
+const withNoStore = (r: NextResponse) => {
+  r.headers.set('Cache-Control', 'private, no-store')
+  return r
+}
+
 /** GET: what the signed-in member can collect right now (same cooldowns as /collect-income). */
 export async function GET() {
   const session = await getSession()
   if (!session?.discordId) return reply({ error: 'Not authenticated' }, 401)
-  const ctx = await loadIncomeContext(session.discordId)
+  const statusLimit = await checkKeyedRateLimit('collect-income-status', session.discordId)
+  if (!statusLimit.success) return reply({ error: 'rate_limited' }, 429)
+  const ctx = await loadIncomeContext(session.discordId, { cached: true })
   if (!ctx.ok) return reply({ error: 'roles_unavailable' }, 503)
   const s = await incomeStatus(session.discordId, ctx.roleIds, ctx.incomes)
   return reply({
@@ -34,7 +41,7 @@ export async function POST(request: NextRequest) {
   const unsafe = rejectUnsafeWrite(request)
   if (unsafe) return unsafe
   const limited = await enforceRateLimit(request, 'collect-income')
-  if (limited) return limited
+  if (limited) return withNoStore(limited)
   const session = await getSession()
   if (!session?.discordId) return reply({ error: 'Not authenticated' }, 401)
   const memberLimit = await checkKeyedRateLimit('collect-income', session.discordId)

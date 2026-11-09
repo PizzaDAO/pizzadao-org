@@ -13,8 +13,11 @@ import { cardSurface, primaryButton, useCountdown } from "./CrimeCard";
 type Status = {
   totalAvailable: number;
   nextReadyAt: string | null;
-  earnRoles: Array<{ name: string; amount: number }>;
+  earnRoles: Array<{ name: string; amount: number; intervalHours?: number }>;
 };
+
+const RETRY_MS = 15_000;
+const MAX_RETRIES = 8;
 
 type Phase = "loading" | "ready" | "unavailable";
 
@@ -59,10 +62,21 @@ export function DailyPepCard({ onCollected }: { onCollected?: (balance: number) 
     void load();
   }, [load]);
 
-  // When a countdown reaches zero, the next period has opened: refresh.
+  // When a countdown reaches zero, the next period has opened: refresh. If the server still says
+  // not ready (clock skew), retry every ~15s, at most MAX_RETRIES times.
+  const [retry, setRetry] = useState(0);
   useEffect(() => {
-    if (readyAt && wait === 0 && Date.now() >= readyAt) void load();
-  }, [readyAt, wait, load]);
+    if (!readyAt || wait !== 0 || Date.now() < readyAt || retry >= MAX_RETRIES) return;
+    const timer = setTimeout(
+      () => {
+        setRetry((n) => n + 1);
+        void load();
+      },
+      retry === 0 ? 0 : RETRY_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [readyAt, wait, load, retry]);
+  useEffect(() => setRetry(0), [readyAt]);
 
   const collect = async () => {
     setBusy(true);
@@ -144,7 +158,9 @@ export function DailyPepCard({ onCollected }: { onCollected?: (balance: number) 
         {t("noRoles")}{" "}
         {first
           ? roles.length === 1
-            ? t("getRole", { role: first.name, amount: first.amount })
+            ? (first.intervalHours ?? 24) === 24
+              ? t("getRole", { role: first.name, amount: first.amount })
+              : t("getRoleEvery", { role: first.name, amount: first.amount, hours: first.intervalHours ?? 24 })
             : t("joinRoles", { roles: roles.map((r) => `${r.name} (${r.amount})`).join(", ") })
           : ""}
       </p>
