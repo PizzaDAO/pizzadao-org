@@ -30,6 +30,11 @@ export async function requireDpr(): Promise<GuardResult> {
 export function rejectUnsafeWrite(request: Request): NextResponse | null {
   const type = request.headers.get('content-type') ?? ''
   if (!type.toLowerCase().startsWith('application/json')) return json({ error: 'Content-Type must be application/json' }, 415)
+  return rejectCrossOrigin(request)
+}
+
+/** Null when a browser Origin header is absent or this host; otherwise the 403 response (for multipart uploads). */
+export function rejectCrossOrigin(request: Request): NextResponse | null {
   const origin = request.headers.get('origin')
   if (origin) {
     const host = request.headers.get('x-forwarded-host') ?? request.headers.get('host')
