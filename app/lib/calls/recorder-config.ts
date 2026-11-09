@@ -18,6 +18,8 @@ import { parseCrewVoiceChannels, VOICE_CHANNEL_ID_LINE } from '@/app/lib/setting
 
 export interface RecorderConfig {
   welcome: { enabled: boolean; template: string; batchSeconds: number; recordingLine: string }
+  /** Text posted in the voice channel chat when a call starts; empty = nothing (calls.startNotice). */
+  startNotice: string
   endSong: { enabled: boolean; minHumans: number; crewMap: { crew: string; radio: string }[] }
   /** House band at the start of the listed calls (pizza-radio /play-band). */
   startBand: { enabled: boolean; calls: string[]; maxSongs: number }
@@ -45,6 +47,7 @@ export const RECORDER_CONFIG_OFF: RecorderConfig = {
     batchSeconds: 20,
     recordingLine: "🔴 This call is recorded and transcribed; audio stays private. Leave the call if you'd rather not be recorded.",
   },
+  startNotice: '',
   endSong: { enabled: false, minHumans: 1, crewMap: [] },
   startBand: { enabled: false, calls: [], maxSongs: 1 },
   crews: [],
@@ -108,6 +111,7 @@ export async function buildRecorderConfig(): Promise<RecorderConfig> {
       batchSeconds: settings.get('calls.welcomeBatchSeconds'),
       recordingLine: settings.get('calls.recordingLine'),
     },
+    startNotice: settings.get('calls.startNotice'),
     endSong: {
       enabled: resolveToggle('calls.endSongTriggerEnabled', settings),
       minHumans: settings.get('calls.endSongMinHumans'),
