@@ -1,151 +1,149 @@
-const MAX_RETRIES = 3;
+/**
+ * Unlock Protocol subgraph client. One endpoint per chain: https://subgraph.unlock-protocol.com/<chainId>
+ * (it rejects requests without a User-Agent). Every failure THROWS: a scan that cannot read the
+ * subgraph must never look like "this member has no tickets", so callers persist nothing on error.
+ */
+const MAX_RETRIES = 3
+const PAGE_SIZE = 1000
+/** Owners and locks per query (keeps the request body and the `_in` lists small). */
+export const OWNER_CHUNK = 50
+export const LOCK_CHUNK = 200
 
-const SUBGRAPHS: Record<number, string> = {
-  8453: "https://api.studio.thegraph.com/query/65299/unlock-protocol-base/version/latest",
-  137: "https://api.studio.thegraph.com/query/65299/unlock-protocol-polygon/version/latest",
-  10: "https://api.studio.thegraph.com/query/65299/unlock-protocol-optimism/version/latest",
-  1: "https://api.studio.thegraph.com/query/65299/unlock-protocol-mainnet/version/latest",
-  42161: "https://api.studio.thegraph.com/query/65299/unlock-protocol-arbitrum/version/latest",
-  56: "https://api.studio.thegraph.com/query/65299/unlock-protocol-bsc/version/latest",
-};
-
-interface SubgraphKey {
-  id: string;
-  owner: string;
-  tokenId: string;
-  expiration: string;
+export const CHAINS: Record<number, string> = {
+  1: 'Ethereum',
+  10: 'Optimism',
+  56: 'BSC',
+  100: 'Gnosis',
+  137: 'Polygon',
+  8453: 'Base',
+  42161: 'Arbitrum',
 }
 
-async function querySubgraph(
-  url: string,
-  query: string,
-  retries = MAX_RETRIES
-): Promise<Record<string, unknown>> {
+export const SUBGRAPH_BASE = 'https://subgraph.unlock-protocol.com'
+export const SUBGRAPHS: Record<number, string> = Object.fromEntries(
+  Object.keys(CHAINS).map((id) => [Number(id), `${SUBGRAPH_BASE}/${id}`]),
+)
+
+export interface SubgraphKey {
+  id: string
+  owner: string
+  tokenId: string
+  expiration: string
+  cancelled: boolean
+  lock: { id: string }
+}
+
+export interface SubgraphLock {
+  id?: string
+  address: string
+  name: string
+  lastKeyMintedAt: string | null
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+export async function querySubgraph(url: string, query: string, retries = MAX_RETRIES): Promise<Record<string, unknown>> {
+  let lastErr: unknown
   for (let i = 0; i < retries; i++) {
     try {
       const res = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "User-Agent": "PizzaDAO-Unlock-Claim/1.0",
-        },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'User-Agent': 'PizzaDAO-Unlock-Scan/2.0' },
         body: JSON.stringify({ query }),
-      });
-
-      if (res.status === 200) {
-        const parsed = await res.json();
-        if (parsed.errors) {
-          throw new Error(JSON.stringify(parsed.errors));
-        }
-        return parsed.data;
-      }
-
+      })
       if (res.status === 429) {
-        await new Promise((r) => setTimeout(r, 3000 * (i + 1)));
-        continue;
+        lastErr = new Error('HTTP 429 from the Unlock subgraph')
+        await sleep(3000 * (i + 1))
+        continue
       }
-
-      const body = await res.text();
-      throw new Error(`HTTP ${res.status}: ${body.slice(0, 200)}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`)
+      const parsed = (await res.json()) as { data?: Record<string, unknown>; errors?: unknown }
+      if (parsed.errors) throw new Error(`Subgraph error: ${JSON.stringify(parsed.errors).slice(0, 300)}`)
+      if (!parsed.data) throw new Error('Subgraph returned no data')
+      return parsed.data
     } catch (e) {
-      if (i === retries - 1) throw e;
-      await new Promise((r) => setTimeout(r, 2000 * (i + 1)));
+      lastErr = e
+      if (i < retries - 1) await sleep(2000 * (i + 1))
     }
   }
-  throw new Error("querySubgraph: exhausted retries");
+  throw lastErr instanceof Error ? lastErr : new Error('querySubgraph: exhausted retries')
 }
 
-export interface TicketInfo {
-  lockAddress: string;
-  networkId: number;
-  eventName: string;
-  tokenId: string;
-  owner: string;
+const list = (xs: string[]) => `[${xs.map((x) => JSON.stringify(x.toLowerCase())).join(',')}]`
+
+/** keys query for a batch of owners and locks, paged by id (id_gt cursor, ascending). */
+export function buildKeysQuery(owners: string[], locks: string[], afterId: string, first = PAGE_SIZE): string {
+  return `{
+    keys(first: ${first}, orderBy: id, orderDirection: asc, where: { owner_in: ${list(owners)}, lock_in: ${list(locks)}, id_gt: ${JSON.stringify(afterId)} }) {
+      id owner tokenId expiration cancelled lock { id }
+    }
+  }`
 }
 
-export async function checkWalletForLock(
-  walletAddress: string,
-  lockAddress: string,
-  networkId: number
-): Promise<SubgraphKey[]> {
-  const subgraphUrl = SUBGRAPHS[networkId];
-  if (!subgraphUrl) return [];
+/** Locks whose name contains any term (case-insensitive), paged by id. */
+export function buildLocksQuery(terms: string[], afterId: string, first = PAGE_SIZE): string {
+  // The subgraph refuses a column filter beside `or`, so the cursor goes inside every branch.
+  const ors = terms.map((t) => `{ id_gt: ${JSON.stringify(afterId)}, name_contains_nocase: ${JSON.stringify(t)} }`).join(', ')
+  return `{
+    locks(first: ${first}, orderBy: id, orderDirection: asc, where: { or: [${ors}] }) {
+      id address name lastKeyMintedAt
+    }
+  }`
+}
 
-  const query = `{
-    keys(
-      where: {
-        lock: "${lockAddress.toLowerCase()}",
-        owner: "${walletAddress.toLowerCase()}"
+const chunk = <T,>(xs: T[], n: number): T[][] => {
+  const out: T[][] = []
+  for (let i = 0; i < xs.length; i += n) out.push(xs.slice(i, i + n))
+  return out
+}
+
+export function subgraphUrl(networkId: number): string {
+  const url = SUBGRAPHS[networkId]
+  if (!url) throw new Error(`No Unlock subgraph for chain ${networkId}`)
+  return url
+}
+
+/** Every key held by any of `owners` on any of `locks` (one chain). Throws on any failure. */
+export async function fetchKeys(networkId: number, owners: string[], locks: string[]): Promise<SubgraphKey[]> {
+  const url = subgraphUrl(networkId)
+  const out: SubgraphKey[] = []
+  for (const o of chunk(owners, OWNER_CHUNK)) {
+    for (const l of chunk(locks, LOCK_CHUNK)) {
+      let after = ''
+      for (;;) {
+        const data = await querySubgraph(url, buildKeysQuery(o, l, after))
+        const page = (data.keys ?? []) as SubgraphKey[]
+        if (page.length === 0) break // a short page is not proof of the end: read until an empty one
+        out.push(...page)
+        after = page[page.length - 1].id
       }
-    ) {
-      id
-      owner
-      tokenId
-      expiration
-    }
-  }`;
-
-  try {
-    const data = await querySubgraph(subgraphUrl, query);
-    return (data.keys as SubgraphKey[]) || [];
-  } catch (e) {
-    console.error(
-      `Error checking lock ${lockAddress} on chain ${networkId}:`,
-      e
-    );
-    return [];
-  }
-}
-
-export async function findTicketsForWallet(
-  walletAddress: string,
-  contracts: Array<{
-    address: string;
-    network_id: number;
-    event_name: string;
-  }>
-): Promise<TicketInfo[]> {
-  const tickets: TicketInfo[] = [];
-
-  const byNetwork = new Map<number, typeof contracts>();
-  for (const c of contracts) {
-    const list = byNetwork.get(c.network_id) || [];
-    list.push(c);
-    byNetwork.set(c.network_id, list);
-  }
-
-  for (const [networkId, networkContracts] of byNetwork) {
-    const subgraphUrl = SUBGRAPHS[networkId];
-    if (!subgraphUrl) continue;
-
-    const batchSize = 5;
-    for (let i = 0; i < networkContracts.length; i += batchSize) {
-      const batch = networkContracts.slice(i, i + batchSize);
-      const results = await Promise.all(
-        batch.map(async (contract) => {
-          try {
-            const keys = await checkWalletForLock(
-              walletAddress,
-              contract.address,
-              networkId
-            );
-            return keys.map((key) => ({
-              lockAddress: contract.address,
-              networkId,
-              eventName: contract.event_name,
-              tokenId: key.tokenId,
-              owner: key.owner,
-            }));
-          } catch {
-            return [];
-          }
-        })
-      );
-      tickets.push(...results.flat());
     }
   }
-
-  return tickets;
+  return out
 }
 
-export { SUBGRAPHS };
+/** Locks on one chain whose name matches any term. Throws on any failure. */
+export async function fetchLocksByTerms(networkId: number, terms: string[]): Promise<SubgraphLock[]> {
+  if (terms.length === 0) return []
+  const url = subgraphUrl(networkId)
+  const out: SubgraphLock[] = []
+  let after = ''
+  for (;;) {
+    const data = await querySubgraph(url, buildLocksQuery(terms, after))
+    const page = (data.locks ?? []) as SubgraphLock[]
+    if (page.length === 0) break
+    out.push(...page)
+    after = page[page.length - 1].id ?? page[page.length - 1].address.toLowerCase()
+  }
+  return out
+}
+
+/** One lock by address, or null when the subgraph does not know it. */
+export async function fetchLock(networkId: number, address: string): Promise<SubgraphLock | null> {
+  const data = await querySubgraph(
+    subgraphUrl(networkId),
+    `{ locks(first: 1, where: { id: ${JSON.stringify(address.toLowerCase())} }) { address name lastKeyMintedAt } }`,
+  )
+  const locks = (data.locks ?? []) as SubgraphLock[]
+  return locks[0] ?? null
+}

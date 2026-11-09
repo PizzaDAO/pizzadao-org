@@ -977,6 +977,52 @@ model UnlockTicketRecord {
   @@unique([lockAddress, tokenId, networkId])
 }
 
+// ===== UNLOCK PIZZA PARTY TICKETS (lock list + per-key scan) =====
+//
+// The legacy UnlockTicketClaim/UnlockTicketRecord tables above are kept as-is (read-only history).
+// Counts now come from UnlockKey, scanned from every EVM wallet a member has, against the enabled
+// locks below. Addresses are stored lowercase.
+
+model UnlockLock {
+  id        Int      @id @default(autoincrement())
+  networkId Int
+  address   String
+  name      String   @db.VarChar(200)
+  year      Int?
+  eventSlug String?  @db.VarChar(200) // Unlock event page slug, when known
+  enabled   Boolean  @default(true)
+  source    String   @default("seed") @db.VarChar(12) // 'seed' | 'discovered' | 'admin'
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([networkId, address])
+  @@index([enabled])
+}
+
+model UnlockKey {
+  id          Int       @id @default(autoincrement())
+  memberId    String
+  networkId   Int
+  lockAddress String
+  tokenId     String
+  owner       String
+  gone        Boolean   @default(false) // transferred away or cancelled
+  firstSeenAt DateTime  @default(now())
+  lastSeenAt  DateTime  @default(now())
+  goneAt      DateTime?
+
+  @@unique([networkId, lockAddress, tokenId, owner])
+  @@index([memberId])
+}
+
+model UnlockScanState {
+  memberId      String    @id
+  lastScanAt    DateTime? // last successful scan
+  lastAttemptAt DateTime? // last scan started (rescan rate limit)
+  lastError     String?   @db.VarChar(300)
+  ticketCount   Int       @default(0)
+}
+
 // ===== MEMBER PROFILE EXTRAS =====
 //
 // Free-form profile fields owned by the member (not from the sheet). Today:
