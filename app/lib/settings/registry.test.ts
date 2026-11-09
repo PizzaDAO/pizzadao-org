@@ -156,6 +156,7 @@ describe('settings registry', () => {
       ['vouches.dailyLimit', 50],
       ['vouches.requestsEnabled', false],
       ['vouches.requestDailyLimit', 5],
+      ['vouches.requestCooldownDays', 14],
       ['vouches.quickVouchEnabled', false],
       ['vouches.showVouchersEnabled', false],
       ['dashboard.levelCardEnabled', false],

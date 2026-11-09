@@ -819,7 +819,8 @@
           "pending": "You already have an open request with that member.",
           "limit": "Daily limit reached ({limit} requests). Try again tomorrow.",
           "no-profile": "We could not find your member profile.",
-          "error": "Could not send the request. Try again."
+          "error": "Could not send the request. Try again.",
+          "cooldown": "You asked that member recently. Try again later."
         }
       }
     },

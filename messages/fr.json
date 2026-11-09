@@ -819,7 +819,8 @@
           "pending": "Vous avez déjà une demande ouverte avec ce membre.",
           "limit": "Limite quotidienne atteinte ({limit} demandes). Réessayez demain.",
           "no-profile": "Nous n'avons pas trouvé votre profil de membre.",
-          "error": "Impossible d'envoyer la demande. Réessayez."
+          "error": "Impossible d'envoyer la demande. Réessayez.",
+          "cooldown": "Vous avez demandé à ce membre récemment. Réessayez plus tard."
         }
       }
     },

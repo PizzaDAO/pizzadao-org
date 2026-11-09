@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { AskForVouches } from "./AskForVouches";
 
 type VouchSummary = {
   memberId: string;
@@ -216,7 +215,6 @@ export function VouchesWidget({ memberId }: VouchesWidgetProps) {
           </Link>
         </div>
       )}
-      <AskForVouches memberId={memberId} />
     </div>
   );
 }

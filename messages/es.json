@@ -819,7 +819,8 @@
           "pending": "Ya tienes una solicitud abierta con ese miembro.",
           "limit": "Límite diario alcanzado ({limit} solicitudes). Inténtalo mañana.",
           "no-profile": "No encontramos tu perfil de miembro.",
-          "error": "No se pudo enviar la solicitud. Inténtalo de nuevo."
+          "error": "No se pudo enviar la solicitud. Inténtalo de nuevo.",
+          "cooldown": "Ya le pediste a ese miembro hace poco. Inténtalo más tarde."
         }
       }
     },

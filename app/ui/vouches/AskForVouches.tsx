@@ -8,7 +8,7 @@ type Candidate = { memberId: string; name: string; city: string | null };
 
 type Props = { memberId: string };
 
-const REASON_KEYS = ["self", "not-found", "unreachable", "already-vouched", "pending", "limit", "no-profile"] as const;
+const REASON_KEYS = ["self", "not-found", "unreachable", "already-vouched", "pending", "cooldown", "limit", "no-profile"] as const;
 
 /**
  * Dashboard block: share your public profile link to ask for vouches, and (when the

@@ -474,6 +474,7 @@ model Notification {
 
   @@index([recipientId, createdAt])
   @@index([recipientId, readAt])
+  @@index([actorId, type, createdAt])
 }
 
 // ===== ARTICLES / BLOG =====

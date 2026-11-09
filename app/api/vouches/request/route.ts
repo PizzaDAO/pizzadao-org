@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/app/lib/session";
 import { requestVouch } from "@/app/lib/vouch-request";
+import { enforceRateLimit } from "@/app/lib/rate-limit";
 import { toggleEnabled } from "@/app/lib/settings/toggles";
 
 export const runtime = "nodejs";
@@ -35,6 +36,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Vouch requests are not available", reason: "disabled" }, { status: 404, headers: NO_STORE });
     }
 
+    const limited = await enforceRateLimit(req, "vouch-request");
+    if (limited) return limited;
+
     const body = await req.json().catch(() => ({}));
     const targetMemberId = String(body?.targetMemberId ?? "").trim();
     if (!targetMemberId) {
@@ -51,6 +55,7 @@ export async function POST(req: NextRequest) {
       unreachable: 422,
       "already-vouched": 409,
       pending: 409,
+      cooldown: 409,
       limit: 429,
     };
     return NextResponse.json(
