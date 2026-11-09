@@ -22,12 +22,20 @@ const PIZZA_WORDS = [
   "parmesan", "parmigiano", "gorgonzola", "provolone", "feta", "artichoke", "arugula", "rucola",
   "onion", "pepper", "chicken", "beef", "meatball", "egg", "corn", "tuna", "shrimp", "truffle",
   "eggplant", "zucchini", "hawaiian", "hawaiano", "bbq", "tomato",
+  // Spanish / Portuguese / Italian and other toppings and pizza words
+  "piña", "pina", "champiñon", "champinon", "cebolla", "pollo", "jamon", "albahaca", "palmito",
+  "palmitos", "provoleta", "calabresa", "rucula", "funghi", "napolitana", "napoletana",
+  "stracciatella", "guanciale", "serrano", "capsicum", "chili", "chilli", "suya", "sardine",
+  "honey", "walnut", "aubergine", "sourdough", "hotdog", "fries", "supreme", "suprema",
+  "quattro", "mexicana", "menta", "jengibre", "ginger", "capparis", "caper", "marinara",
+  "vegetable", "veggie", "meat", "pepperone", "chilorio", "chikanda",
 ];
 
 /** Common misspellings, matched exactly (no fuzzy matching). */
 const ALIASES = [
   "jalepeno", "jalapeno", "jalepeño", "peperoni", "pepperonni", "mozarella", "mozzarela",
   "proscuitto", "prosciuto", "parmesean", "parmigiana", "chorrizo", "anchovie",
+  "marguerita", "margarita", "pinnaple", "pinapple", "cheeze", "guancciale",
 ];
 
 /** Multi-word catalog toppings only match as the whole phrase; single-word ones match as words. */
@@ -45,7 +53,8 @@ const SINGLE_TOKENS: Set<string> = new Set([
   ...ALIASES.filter((a) => words(a).length === 1).flatMap((a) => words(a)),
   ...PIZZA_TOPPINGS.filter((t) => words(t).length === 1).flatMap((t) => words(t)),
 ]);
-const PHRASES: string[] = PIZZA_TOPPINGS.filter((t) => words(t).length > 1).map((t) => words(t).join(" "));
+const EXTRA_PHRASES = ["peri peri", "pili pili", "hot dog"];
+const PHRASES: string[] = [...EXTRA_PHRASES, ...PIZZA_TOPPINGS].filter((t) => words(t).length > 1).map((t) => words(t).join(" "));
 
 const singular = (w: string) => (w.endsWith("s") ? w.slice(0, -1) : w);
 /** Plural forms: "-s" and "-es" (tomatoes). */
@@ -54,6 +63,7 @@ const stems = (w: string) => [w, singular(w), ...(w.endsWith("es") ? [w.slice(0,
 /** Whether the name contains a recognised topping or pizza word (plurals match). */
 export function isThemedName(name: string): boolean {
   const ws = words(name);
+  if (ws[0] === "don" && ws.length > 1) return true; // "Don Malbec": mafia-themed
   if (ws.some((w) => stems(w).some((x) => SINGLE_TOKENS.has(x)))) return true;
   const joined = " " + ws.map(singular).join(" ") + " ";
   return PHRASES.some((p) => joined.includes(" " + p.split(" ").map(singular).join(" ") + " "));
