@@ -818,6 +818,7 @@
         "copied": "Link copied. Paste it in a message.",
         "copyFailed": "Could not copy the link",
         "askMember": "Ask a member to vouch for you",
+        "askMemberLink": "Ask a member",
         "searchPlaceholder": "Search members by name or ID",
         "send": "Send request",
         "sent": "Request sent to {name}.",
@@ -918,6 +919,16 @@
     }
   },
   "missionLinks": {
+    "vouch": {
+      "title": "Your vouch link",
+      "copy": "Copy",
+      "copied": "Copied",
+      "progress": "{have} of {need} vouches",
+      "share": "Share",
+      "shareText": "Vouch for me on PizzaDAO:",
+      "shareCopied": "Link copied. Paste it in a message.",
+      "copyFailed": "Could not copy the link"
+    },
     "bonusBadge": "Bonus",
     "bonusOptional": "Bonus: optional, does not count toward completing a level.",
     "bonusPays": "Bonus: +{reward} $PEP when approved.",

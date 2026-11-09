@@ -818,6 +818,7 @@
         "copied": "Lien copié. Collez-le dans un message.",
         "copyFailed": "Impossible de copier le lien",
         "askMember": "Demandez à un membre de vous parrainer",
+        "askMemberLink": "Demander à un membre",
         "searchPlaceholder": "Rechercher un membre par nom ou ID",
         "send": "Envoyer la demande",
         "sent": "Demande envoyée à {name}.",
@@ -918,6 +919,16 @@
     }
   },
   "missionLinks": {
+    "vouch": {
+      "title": "Votre lien de parrainage",
+      "copy": "Copier",
+      "copied": "Copié",
+      "progress": "{have} sur {need} parrainages",
+      "share": "Partager",
+      "shareText": "Parrainez-moi sur PizzaDAO :",
+      "shareCopied": "Lien copié. Collez-le dans un message.",
+      "copyFailed": "Impossible de copier le lien"
+    },
     "bonusBadge": "Bonus",
     "bonusOptional": "Bonus : facultatif, ne compte pas pour terminer le niveau.",
     "bonusPays": "Bonus : +{reward} $PEP à l'approbation.",

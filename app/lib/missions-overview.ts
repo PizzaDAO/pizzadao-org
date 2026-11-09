@@ -16,6 +16,7 @@ import { BOX_PURCHASE_URL } from "@/app/lib/box-mafia";
 import { PIZZA_BOX_LINK } from "@/app/lib/rare-pizza-box";
 import { inviteUrl } from "@/app/lib/referral-link";
 import { parseGuideHref } from "@/app/lib/guide-href";
+import { defaultSources } from "@/app/lib/mission-verify/sources";
 import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
 
 /** Whether a mission's verifier can approve it automatically (not "manual", not a semi pre-check). */
@@ -61,6 +62,8 @@ export type MissionsOverview = {
       xFollow?: boolean;
       /** L5.3 "Own a Rare Pizza Box": where to get one (an extra link on the card). */
       getBoxUrl?: string;
+      /** "Get vouched by N members" (the vouch_received verifier): shows the member's vouch link; `have` only when signed in. */
+      vouchLink?: { need: number; sources: string[]; have?: number };
       /** Handbook page that explains this mission (an internal path, validated). */
       guideHref?: string;
       /** Optional: not needed to complete the level. */
@@ -82,13 +85,32 @@ export type MissionsOverview = {
   inviteUrl?: string | null;
   /** The viewer's own profile edit page (where Connect X lives), when signed in and onboarded. */
   profileEditHref?: string | null;
+  /** The viewer's own member id (for their public vouch link), when signed in and onboarded. */
+  memberId?: string | null;
 };
+
+/** The vouch_received threshold and sources from a mission row (defaults like the verifier; a bad row gets the defaults). */
+function vouchParams(raw: unknown): { need: number; sources: string[] } {
+  try {
+    const p = getVerifier("vouch_received")!.parse(raw) as { min: number; sources: string[] };
+    return { need: p.min, sources: p.sources };
+  } catch {
+    return { need: 1, sources: ["PIZZADAO"] };
+  }
+}
+
+/** Received vouches for a member: distinct other members, counted like the verifier. */
+async function countReceivedVouches(memberId: string, sources: string[]): Promise<number> {
+  const rows = await defaultSources.getVouchesReceived(memberId, sources);
+  return new Set(rows.filter((r) => r.followerId && r.followerId !== memberId && sources.includes(r.source)).map((r) => r.followerId)).size;
+}
 
 export async function getMissionsOverview(discordId: string | null | undefined): Promise<MissionsOverview> {
   const progressMap: Record<number, MissionProgress> = {};
   let currentLevel = 1;
   let levelTitle: string | null = null;
   let myInviteUrl: string | null = null;
+  let myMemberId: string | null = null;
   let myProfileEditHref: string | null = null;
   let paidLevels: number[] = [];
   let earnedPep = 0;
@@ -101,6 +123,7 @@ export async function getMissionsOverview(discordId: string | null | undefined):
     paidLevels = [...paid.levels].sort((a, b) => a - b);
     earnedPep = paid.pep;
     const memberId = await fetchMemberIdByDiscordId(discordId).catch(() => null);
+    myMemberId = memberId || null;
     myInviteUrl = memberId ? inviteUrl(memberId) : null;
     myProfileEditHref = memberId ? `/profile/${encodeURIComponent(memberId)}/edit` : null;
     for (const p of progress) {
@@ -131,6 +154,7 @@ export async function getMissionsOverview(discordId: string | null | undefined):
         ...(getVerifier(m.verifierKey)?.mode === "semi" ? { semiChecked: true } : {}),
         ...(m.verifierKey && PROOF_HINTS[m.verifierKey] ? { proofHint: PROOF_HINTS[m.verifierKey] } : {}),
         ...(m.verifierKey === "referral" ? { referral: true } : {}),
+        ...(m.verifierKey === "vouch_received" ? { vouchLink: vouchParams(m.verifierParams) } : {}),
         ...(m.verifierKey === "x_linked" ? { xFollow: true } : {}),
         ...(acceptsManualSubmission({ verifierKey: m.verifierKey, proofKind: m.proofKind }) ? {} : { noManualSubmit: true }),
         ...(m.bonus ? { bonus: true, bonusReward: m.bonusReward ?? 0 } : {}),
@@ -142,5 +166,25 @@ export async function getMissionsOverview(discordId: string | null | undefined):
     if (!discordId) setCachedMissionsList(levels);
   }
 
-  return { levels, currentLevel, levelTitle, paidLevels, earnedPep, isAuthenticated: !!discordId, inviteUrl: myInviteUrl, profileEditHref: myProfileEditHref };
+  // Per-viewer: how many vouches they have received (never written into the shared anonymous cache).
+  if (myMemberId) {
+    const memberId = myMemberId;
+    const counts = new Map<string, number>();
+    const enriched: MissionsOverview["levels"] = [];
+    for (const l of levels) {
+      const missions: MissionsOverview["levels"][number]["missions"] = [];
+      for (const m of l.missions) {
+        if (!m.vouchLink) { missions.push(m); continue; }
+        const { sources } = m.vouchLink;
+        const key = sources.join(",");
+        if (!counts.has(key)) counts.set(key, await countReceivedVouches(memberId, sources).catch(() => -1));
+        const have = counts.get(key)!;
+        missions.push(have < 0 ? m : { ...m, vouchLink: { ...m.vouchLink, have } });
+      }
+      enriched.push({ ...l, missions });
+    }
+    levels = enriched;
+  }
+
+  return { levels, currentLevel, levelTitle, paidLevels, earnedPep, isAuthenticated: !!discordId, inviteUrl: myInviteUrl, profileEditHref: myProfileEditHref, memberId: myMemberId };
 }

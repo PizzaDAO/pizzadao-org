@@ -13,6 +13,7 @@
 
 import { GetBoxLink, BonusNote, BonusBadge } from "./GetBoxLink";
 import { GuideLink } from "./GuideLink";
+import { VouchLink } from "./VouchLink";
 import { XFollowNote, xLinkState } from "./XFollowNote";
 import { useState } from "react";
 import { input } from "../shared-styles";
@@ -54,6 +55,8 @@ type MissionData = {
   noManualSubmit?: boolean;
   /** The "follow on X" mission: only the X link is verified, the follow is on the honor system. */
   xFollow?: boolean;
+  /** "Get vouched by N members": show the viewer's vouch link (needs `memberId`). */
+  vouchLink?: { need: number; sources?: string[]; have?: number };
   /** Optional mission: not needed to complete the level. */
   bonus?: boolean;
   /** PEP paid once on approval. */
@@ -74,6 +77,8 @@ type Props = {
   check?: MissionCheckInfo;
   /** L3.1: the viewer's personal invite link (null = not onboarded yet). */
   inviteUrl?: string | null;
+  /** The signed-in viewer's own member id (null or omitted: signed out, no vouch link). */
+  memberId?: string | null;
   /** The member's profile edit page (Connect X). */
   profileEditHref?: string | null;
   levelUnlocked: boolean;
@@ -144,7 +149,7 @@ function statusPillStyle(variant: StatusVariant) {
   };
 }
 
-export function MissionCard({ mission, levelUnlocked, bonus, onSubmit, check, inviteUrl, profileEditHref, humanReleaseMinLevel }: Props) {
+export function MissionCard({ mission, levelUnlocked, bonus, onSubmit, check, inviteUrl, profileEditHref, humanReleaseMinLevel, memberId }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [evidence, setEvidence] = useState("");
   const [notes, setNotes] = useState("");
@@ -320,6 +325,7 @@ export function MissionCard({ mission, levelUnlocked, bonus, onSubmit, check, in
             </div>
           )}
           {inviteUrl !== undefined && !isCompleted && <InviteLink url={inviteUrl} />}
+          {mission.vouchLink && memberId && !isCompleted && <VouchLink memberId={memberId} have={mission.vouchLink.have} need={mission.vouchLink.need} />}
           {mission.bonus && <BonusBadge reward={mission.bonusReward} />}
           {bonus && !mission.bonus && !isCompleted && <BonusNote />}
           {mission.getBoxUrl && !isCompleted && <GetBoxLink url={mission.getBoxUrl} />}

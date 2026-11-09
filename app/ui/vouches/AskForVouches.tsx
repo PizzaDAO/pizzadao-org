@@ -6,7 +6,13 @@ import { ShareProfileButton } from "./ShareProfileButton";
 
 type Candidate = { memberId: string; name: string; city: string | null };
 
-type Props = { memberId: string };
+type Props = {
+  memberId: string;
+  /** Show the share button (default). The mission card shows its own share button. */
+  showShare?: boolean;
+  /** Mission card mode: no outer grid placement, and the picker opens from an "Ask a member" link. */
+  compact?: boolean;
+};
 
 const REASON_KEYS = ["self", "not-found", "unreachable", "already-vouched", "pending", "cooldown", "limit", "no-profile"] as const;
 
@@ -14,11 +20,12 @@ const REASON_KEYS = ["self", "not-found", "unreachable", "already-vouched", "pen
  * Dashboard block: share your public profile link to ask for vouches, and (when the
  * vouches.requestsEnabled setting is on) send a request straight to a specific member.
  */
-export function AskForVouches({ memberId }: Props) {
+export function AskForVouches({ memberId, showShare = true, compact = false }: Props) {
   const t = useTranslations("dashboard.vouches.ask");
   const [enabled, setEnabled] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Candidate[]>([]);
+  const [open, setOpen] = useState(!compact);
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const [sending, setSending] = useState<string | null>(null);
   const searchSeq = useRef(0);
@@ -80,19 +87,33 @@ export function AskForVouches({ memberId }: Props) {
   }
 
   return (
-    <div style={{ gridColumn: "1 / -1", marginTop: 16 }}>
-      <div className="flex flex-wrap items-center gap-3">
-        <ShareProfileButton
-          memberId={memberId}
-          label={t("share")}
-          text={t("shareText")}
-          copiedLabel={t("copied")}
-          failedLabel={t("copyFailed")}
-        />
-      </div>
+    <div style={compact ? { marginTop: 4 } : { gridColumn: "1 / -1", marginTop: 16 }}>
+      {showShare && (
+        <div className="flex flex-wrap items-center gap-3">
+          <ShareProfileButton
+            memberId={memberId}
+            label={t("share")}
+            text={t("shareText")}
+            copiedLabel={t("copied")}
+            failedLabel={t("copyFailed")}
+          />
+        </div>
+      )}
 
-      {enabled && (
-        <div style={{ marginTop: 14 }}>
+      {enabled && compact && (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="ui text-[13px] font-semibold underline underline-offset-4"
+          style={{ minHeight: 44, background: "none", border: "none", padding: 0, cursor: "pointer", color: "hsl(var(--foreground))" }}
+        >
+          {t("askMemberLink")}
+        </button>
+      )}
+
+      {enabled && open && (
+        <div style={{ marginTop: compact ? 4 : 14 }}>
           <label htmlFor="vouch-request-search" className="ui text-[13px] uppercase tracking-[0.08em] text-foreground/70">
             {t("askMember")}
           </label>
