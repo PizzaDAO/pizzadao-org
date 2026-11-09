@@ -40,6 +40,7 @@ type MissionData = {
   bonus?: boolean;
   bonusReward?: number;
   guideHref?: string;
+  xFollow?: boolean;
   noManualSubmit?: boolean;
   progress: { status: string; submittedAt: string; reviewNote?: string | null; holdReason?: string | null } | null;
 };
@@ -63,6 +64,7 @@ type MissionsResponse = {
   /** Levels from this one up wait for a reviewer's release (admin setting). */
   humanReleaseMinLevel?: number;
   inviteUrl?: string | null;
+  profileEditHref?: string | null;
 };
 
 type CheckResponse = {
@@ -903,6 +905,7 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
                       key={mission.id}
                       mission={mission}
                       check={checks[mission.id]}
+                      profileEditHref={data?.profileEditHref ?? null}
                       inviteUrl={mission.referral ? (data?.inviteUrl ?? null) : undefined}
                       levelUnlocked={isUnlocked}
                       bonus={!isAnytime && isPaid && mission.progress?.status !== "APPROVED"}

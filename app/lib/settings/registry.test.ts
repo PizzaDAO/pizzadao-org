@@ -161,6 +161,7 @@ describe('settings registry', () => {
       ['vouches.quickVouchEnabled', false],
       ['vouches.showVouchersEnabled', false],
       ['dashboard.levelCardEnabled', false],
+      ['dashboard.startHereMaxLevel', 2],
       ['discord.vouchCommandEnabled', false],
       ['discord.levelCommandEnabled', false],
       ['discord.profileCommandEnabled', false],

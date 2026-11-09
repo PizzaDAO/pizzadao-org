@@ -9,13 +9,22 @@
 import { LS_KEY } from "./types";
 import { sanitizeSignupDraft } from "@/app/lib/signup-draft";
 import { trackActivation } from "@/app/lib/activation-client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { ArrowLeft, ArrowUpRight, Sparkles } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 const DISCORD_INVITE =
   process.env.NEXT_PUBLIC_DISCORD_INVITE || "https://discord.gg/pizzadao";
+
+/** Discord OAuth login: identifies the member without sending a DM. */
+const DISCORD_LOGIN_PATH = "/api/discord/login";
+
+/** The Discord login link, carrying this page's ?returnTo so the member lands where they were headed. */
+export function discordLoginHref(search: string): string {
+  const returnTo = new URLSearchParams(search).get("returnTo");
+  return returnTo ? `${DISCORD_LOGIN_PATH}?next=${encodeURIComponent(returnTo)}` : DISCORD_LOGIN_PATH;
+}
 
 type State =
   | { step: "form" }
@@ -37,6 +46,10 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
   const t = useTranslations("onboarding.magicLogin");
   const [username, setUsername] = useState("");
   const [state, setState] = useState<State>({ step: "form" });
+  // Read after mount so server and client markup match.
+  const [search, setSearch] = useState("");
+  useEffect(() => setSearch(window.location.search), []);
+  const discordHref = discordLoginHref(search);
 
   async function handleSubmit(retryUsername?: string) {
     const name = retryUsername || username.trim();
@@ -243,14 +256,31 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
             tone="error"
             message={t("openDmsMessage")}
           />
-          <ol
-            className="ml-5 grid gap-2 text-[14px] leading-relaxed text-foreground/80"
-            style={{ listStyleType: "decimal" }}
-          >
-            <li>{t("openDmsStep1")}</li>
-            <li>{t("openDmsStep2")}</li>
-            <li>{t("openDmsStep3")}</li>
-          </ol>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <section className="rounded-2xl border border-foreground/15 p-4" aria-label={t("openDmsDesktopTitle")}>
+              <h3 className="font-bold text-[15px]">{t("openDmsDesktopTitle")}</h3>
+              <ol
+                className="mt-2 ml-5 grid gap-2 text-[14px] leading-relaxed text-foreground/80"
+                style={{ listStyleType: "decimal" }}
+              >
+                <li>{t("openDmsStep1")}</li>
+                <li>{t("openDmsStep2")}</li>
+                <li>{t("openDmsStep3")}</li>
+              </ol>
+            </section>
+            <section className="rounded-2xl border border-foreground/15 p-4" aria-label={t("openDmsMobileTitle")}>
+              <h3 className="font-bold text-[15px]">{t("openDmsMobileTitle")}</h3>
+              <ol
+                className="mt-2 ml-5 grid gap-2 text-[14px] leading-relaxed text-foreground/80"
+                style={{ listStyleType: "decimal" }}
+              >
+                <li>{t("openDmsMobile1")}</li>
+                <li>{t("openDmsMobile2")}</li>
+                <li>{t("openDmsMobile3")}</li>
+                <li>{t("openDmsMobile4")}</li>
+              </ol>
+            </section>
+          </div>
           <div className="grid gap-3">
             <button
               type="button"
@@ -264,6 +294,18 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
               {t("tryAgainButton")}
               <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
             </button>
+            <p className="text-sm text-foreground/70">{t("openDmsAltIntro")}</p>
+            <a
+              href={discordHref}
+              className="btn-pill-lg no-underline"
+              style={{
+                background: "transparent",
+                color: "hsl(var(--foreground))",
+                border: "1px solid hsl(var(--foreground) / 0.25)",
+              }}
+            >
+              {t("openDmsAltButton")}
+            </a>
             <BackLink onBack={onBack} label={t("back")} />
           </div>
         </Shell>
@@ -331,6 +373,21 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
       >
         {t("tagline")}
       </p>
+      <p className="max-w-md text-foreground/70" style={{ fontSize: "14px", lineHeight: 1.5 }}>
+        {t("dmHint")}
+      </p>
+      <a
+        href={discordHref}
+        className="btn-pill-lg no-underline justify-self-start"
+        style={{
+          background: "transparent",
+          color: "hsl(var(--foreground))",
+          border: "1px solid hsl(var(--foreground) / 0.25)",
+          minHeight: 44,
+        }}
+      >
+        {t("dmHintAlt")}
+      </a>
 
       <div
         className="relative overflow-hidden rounded-[22px] transition-shadow"

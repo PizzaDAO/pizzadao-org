@@ -438,10 +438,10 @@
       "errorLookupFailed": "Discord está ocupado, inténtalo de nuevo en un minuto.",
       "ambiguousHeadline": "Usa tu usuario exacto.",
       "ambiguousMessage": "Más de un miembro coincide con ese nombre. Escribe tu nombre de usuario exacto de Discord (Discord → Ajustes → Mi cuenta).",
-      "openDmsMessage": "No pudimos mandarte un MD. Para recibir el enlace de acceso, activa los MD de miembros del servidor:",
-      "openDmsStep1": "Abre Discord y entra al servidor de PizzaDAO",
-      "openDmsStep2": "Haz clic en el nombre del servidor arriba",
-      "openDmsStep3": "Configuración de privacidad → Activa \"Mensajes directos\"",
+      "openDmsMessage": "No pudimos enviarte un MD. Discord bloquea a nuestro bot cuando los mensajes directos de miembros del servidor están desactivados. Se arregla en unos 30 segundos:",
+      "openDmsStep1": "Abre Discord y haz clic derecho en el icono del servidor de PizzaDAO (barra izquierda)",
+      "openDmsStep2": "Elige Configuración de privacidad",
+      "openDmsStep3": "Activa \"Mensajes directos\" y guarda",
       "rateLimitedMessage": "Demasiadas peticiones. Inténtalo de nuevo en unos minutos.",
       "errorInvalidToken": "Ese enlace de acceso no es válido.",
       "errorLinkExpired": "Ese enlace de acceso ha caducado. Pide uno nuevo.",
@@ -450,7 +450,17 @@
       "errorGeneric": "El acceso falló. Inténtalo de nuevo.",
       "errorSomethingWrong": "Algo salió mal",
       "errorNetwork": "Error de red. Comprueba tu conexión e inténtalo de nuevo.",
-      "sameBrowserHint": "Tus datos de registro acompañan este enlace. Ábrelo en cualquier dispositivo y revisa tu nombre y ciudad."
+      "sameBrowserHint": "Tus datos de registro acompañan este enlace. Ábrelo en cualquier dispositivo y revisa tu nombre y ciudad.",
+      "dmHint": "Debes estar en el Discord de PizzaDAO y tener activados los mensajes directos de miembros del servidor para recibir el enlace. Si no llega, te mostramos cómo activarlos.",
+      "openDmsDesktopTitle": "En ordenador",
+      "openDmsMobileTitle": "En el móvil (app de Discord)",
+      "openDmsMobile1": "Abre Discord y toca el servidor de PizzaDAO",
+      "openDmsMobile2": "Toca el nombre del servidor arriba, luego Ajustes y después Configuración de privacidad",
+      "openDmsMobile3": "Activa \"Mensajes directos\"",
+      "openDmsMobile4": "Vuelve a esta página y toca Intentar de nuevo",
+      "openDmsAltIntro": "¿Prefieres no cambiarlo? Entra con tu cuenta de Discord. No hace falta MD.",
+      "openDmsAltButton": "Entrar con Discord",
+      "dmHintAlt": "¿No te llegan los MD? Entra con Discord"
     },
     "claim": {
       "askOverline": "§ ··· Bienvenido de nuevo",
@@ -887,6 +897,24 @@
       "maxBody": "Has llegado a todos los niveles que existen.",
       "viewAll": "Todas las misiones",
       "nextLevel": "Siguiente nivel: {title}"
+    },
+    "startHere": {
+      "overline": "Empieza aquí",
+      "headline": "¿Eres nuevo? Tres pasos para empezar.",
+      "intro": "Hazlos en orden. Cada uno lleva unos minutos.",
+      "done": "Hecho",
+      "step1Title": "Mira tu nivel",
+      "step1Body": "Estás en el nivel {level}. Mira qué desbloquea cada nivel.",
+      "step1Cta": "Ver mi nivel",
+      "step2Title": "Haz tu próxima misión",
+      "step2Body": "Siguiente: {mission}",
+      "step2BodyNone": "No queda nada por enviar ahora. Revisa tus misiones por si hay novedades.",
+      "step2Cta": "Abrir misiones",
+      "step3Title": "Consigue un aval",
+      "step3Body": "Pide a un miembro que abra tu perfil y toque Avalar. Comparte el enlace de tu perfil con alguien que conozcas.",
+      "step3Done": "Un miembro te ha avalado.",
+      "step3Cta": "Abrir mi perfil",
+      "step2BodyPending": "Todo está enviado y esperando revisión."
     }
   },
   "missionLinks": {
@@ -897,7 +925,17 @@
     "getBox": "Consigue una Rare Pizza Box",
     "bonus": "Extra: este nivel ya está completo. Esta misión es opcional y no da más recompensa.",
     "howTo": "Cómo hacerlo",
-    "howLevelsWork": "Cómo funcionan los niveles"
+    "howLevelsWork": "Cómo funcionan los niveles",
+    "x": {
+      "title": "Seguir en X",
+      "linked": "Cuenta de X vinculada.",
+      "notLinked": "Aún no has vinculado tu cuenta de X. Conecta X primero en tu perfil.",
+      "unchecked": "Aún sin comprobar. Toca Comprobar mi progreso después de vincular tu cuenta.",
+      "honor": "Solo podemos comprobar que tu cuenta de X está vinculada. No vemos a quién sigues, así que seguir a @RarePizzas y @Pizza_DAO es de palabra. Por favor, sigue a ambas.",
+      "open": "Abrir @{handle} en X",
+      "mobile": "En el móvil se abre la app de X (o la web de X si no la tienes). Toca Seguir y vuelve a esta página.",
+      "connectLink": "Conecta X en tu perfil"
+    }
   },
   "crewsPage": {
     "joined": "Inscrito",

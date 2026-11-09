@@ -57,6 +57,8 @@ export type MissionsOverview = {
       proofHint?: string;
       /** L3.1 "Invite a friend": the mission that shows the viewer's invite link. */
       referral?: boolean;
+      /** L1 "follow on X": only the X link is verified; the follow is on the honor system. */
+      xFollow?: boolean;
       /** L5.3 "Own a Rare Pizza Box": where to get one (an extra link on the card). */
       getBoxUrl?: string;
       /** Handbook page that explains this mission (an internal path, validated). */
@@ -78,6 +80,8 @@ export type MissionsOverview = {
   isAuthenticated: boolean;
   /** The viewer's personal invite link (/join?ref=<memberId>), when signed in and onboarded. */
   inviteUrl?: string | null;
+  /** The viewer's own profile edit page (where Connect X lives), when signed in and onboarded. */
+  profileEditHref?: string | null;
 };
 
 export async function getMissionsOverview(discordId: string | null | undefined): Promise<MissionsOverview> {
@@ -85,6 +89,7 @@ export async function getMissionsOverview(discordId: string | null | undefined):
   let currentLevel = 1;
   let levelTitle: string | null = null;
   let myInviteUrl: string | null = null;
+  let myProfileEditHref: string | null = null;
   let paidLevels: number[] = [];
   let earnedPep = 0;
 
@@ -97,6 +102,7 @@ export async function getMissionsOverview(discordId: string | null | undefined):
     earnedPep = paid.pep;
     const memberId = await fetchMemberIdByDiscordId(discordId).catch(() => null);
     myInviteUrl = memberId ? inviteUrl(memberId) : null;
+    myProfileEditHref = memberId ? `/profile/${encodeURIComponent(memberId)}/edit` : null;
     for (const p of progress) {
       progressMap[p.missionId] = {
         status: p.status,
@@ -125,6 +131,7 @@ export async function getMissionsOverview(discordId: string | null | undefined):
         ...(getVerifier(m.verifierKey)?.mode === "semi" ? { semiChecked: true } : {}),
         ...(m.verifierKey && PROOF_HINTS[m.verifierKey] ? { proofHint: PROOF_HINTS[m.verifierKey] } : {}),
         ...(m.verifierKey === "referral" ? { referral: true } : {}),
+        ...(m.verifierKey === "x_linked" ? { xFollow: true } : {}),
         ...(acceptsManualSubmission({ verifierKey: m.verifierKey, proofKind: m.proofKind }) ? {} : { noManualSubmit: true }),
         ...(m.bonus ? { bonus: true, bonusReward: m.bonusReward ?? 0 } : {}),
         ...guideField(m.guideHref),
@@ -135,5 +142,5 @@ export async function getMissionsOverview(discordId: string | null | undefined):
     if (!discordId) setCachedMissionsList(levels);
   }
 
-  return { levels, currentLevel, levelTitle, paidLevels, earnedPep, isAuthenticated: !!discordId, inviteUrl: myInviteUrl };
+  return { levels, currentLevel, levelTitle, paidLevels, earnedPep, isAuthenticated: !!discordId, inviteUrl: myInviteUrl, profileEditHref: myProfileEditHref };
 }

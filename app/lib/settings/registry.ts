@@ -1362,6 +1362,15 @@ export const SETTINGS = {
     help: 'Show a card with the current level, title, progress through the level and the next missions. The DASHBOARD_LEVEL_CARD_ENABLED env var set to off always wins; on preview deploys only the env var counts.',
     confirmOn: 'Members will see a level card on their dashboard.',
   }),
+  'dashboard.startHereMaxLevel': intSetting({
+    key: 'dashboard.startHereMaxLevel',
+    area: 'features',
+    label: 'Start here card: highest level',
+    help: 'Members at this level or below see a "Start here" card on their dashboard (next steps: check your level, do your next mission, get vouched). 0 turns the card off.',
+    min: 0,
+    max: 10,
+    default: 2,
+  }),
   'discord.vouchCommandEnabled': boolSetting({
     key: 'discord.vouchCommandEnabled',
     area: 'discord',

@@ -13,6 +13,7 @@
 
 import { GetBoxLink, BonusNote, BonusBadge } from "./GetBoxLink";
 import { GuideLink } from "./GuideLink";
+import { XFollowNote, xLinkState } from "./XFollowNote";
 import { useState } from "react";
 import { input } from "../shared-styles";
 
@@ -51,6 +52,8 @@ type MissionData = {
   guideHref?: string;
   /** Checked automatically, nothing to submit. */
   noManualSubmit?: boolean;
+  /** The "follow on X" mission: only the X link is verified, the follow is on the honor system. */
+  xFollow?: boolean;
   /** Optional mission: not needed to complete the level. */
   bonus?: boolean;
   /** PEP paid once on approval. */
@@ -71,6 +74,8 @@ type Props = {
   check?: MissionCheckInfo;
   /** L3.1: the viewer's personal invite link (null = not onboarded yet). */
   inviteUrl?: string | null;
+  /** The member's profile edit page (Connect X). */
+  profileEditHref?: string | null;
   levelUnlocked: boolean;
   /** The setting missions.humanReleaseMinLevel, for the hold copy (omitted: the default). */
   humanReleaseMinLevel?: number;
@@ -139,7 +144,7 @@ function statusPillStyle(variant: StatusVariant) {
   };
 }
 
-export function MissionCard({ mission, levelUnlocked, bonus, onSubmit, check, inviteUrl, humanReleaseMinLevel }: Props) {
+export function MissionCard({ mission, levelUnlocked, bonus, onSubmit, check, inviteUrl, profileEditHref, humanReleaseMinLevel }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [evidence, setEvidence] = useState("");
   const [notes, setNotes] = useState("");
@@ -205,6 +210,7 @@ export function MissionCard({ mission, levelUnlocked, bonus, onSubmit, check, in
 
   return (
     <div
+      id={`mission-${mission.id}`}
       className={isLocked ? "" : "paper-soft"}
       style={{
         position: "relative",
@@ -317,6 +323,7 @@ export function MissionCard({ mission, levelUnlocked, bonus, onSubmit, check, in
           {mission.bonus && <BonusBadge reward={mission.bonusReward} />}
           {bonus && !mission.bonus && !isCompleted && <BonusNote />}
           {mission.getBoxUrl && !isCompleted && <GetBoxLink url={mission.getBoxUrl} />}
+          {mission.xFollow && <XFollowNote state={xLinkState(isCompleted, check?.status)} profileEditHref={profileEditHref} />}
           {mission.guideHref && <GuideLink href={mission.guideHref} muted={isCompleted} />}
           {isPending && mission.progress?.holdReason && (
             <div style={{ fontSize: 13, color: "hsl(var(--ink) / 0.75)", marginTop: 8 }}>

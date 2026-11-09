@@ -438,10 +438,10 @@
       "errorLookupFailed": "Discord est occupé, réessaie dans une minute.",
       "ambiguousHeadline": "Utilise ton nom d'utilisateur exact.",
       "ambiguousMessage": "Plusieurs membres correspondent à ce nom. Saisis ton nom d'utilisateur Discord exact (Discord → Paramètres → Mon compte).",
-      "openDmsMessage": "Impossible de t'envoyer un MP. Pour recevoir le lien de connexion, active les MP des membres du serveur :",
-      "openDmsStep1": "Ouvre Discord et va sur le serveur PizzaDAO",
-      "openDmsStep2": "Clique sur le nom du serveur en haut",
-      "openDmsStep3": "Paramètres de confidentialité → Active « Messages privés »",
+      "openDmsMessage": "Impossible de t'envoyer un MP. Discord bloque notre bot quand les messages privés des membres du serveur sont désactivés. Ça se règle en 30 secondes :",
+      "openDmsStep1": "Ouvre Discord et fais un clic droit sur l'icône du serveur PizzaDAO (barre de gauche)",
+      "openDmsStep2": "Choisis Paramètres de confidentialité",
+      "openDmsStep3": "Active « Messages privés », puis enregistre",
       "rateLimitedMessage": "Trop de requêtes. Réessaie dans quelques minutes.",
       "errorInvalidToken": "Ce lien de connexion n'est pas valide.",
       "errorLinkExpired": "Ce lien de connexion a expiré. Demandes-en un nouveau.",
@@ -450,7 +450,17 @@
       "errorGeneric": "La connexion a échoué. Réessaie.",
       "errorSomethingWrong": "Quelque chose a mal tourné",
       "errorNetwork": "Erreur réseau. Vérifie ta connexion et réessaie.",
-      "sameBrowserHint": "Vos informations d’inscription accompagnent ce lien. Ouvrez-le sur n’importe quel appareil, puis vérifiez votre nom et votre ville."
+      "sameBrowserHint": "Vos informations d’inscription accompagnent ce lien. Ouvrez-le sur n’importe quel appareil, puis vérifiez votre nom et votre ville.",
+      "dmHint": "Tu dois être sur le Discord PizzaDAO, avec les messages privés des membres du serveur activés, pour recevoir le lien. Si le lien n'arrive pas, on te montre comment les activer.",
+      "openDmsDesktopTitle": "Sur ordinateur",
+      "openDmsMobileTitle": "Sur téléphone (appli Discord)",
+      "openDmsMobile1": "Ouvre Discord et touche le serveur PizzaDAO",
+      "openDmsMobile2": "Touche le nom du serveur en haut, puis Paramètres, puis Paramètres de confidentialité",
+      "openDmsMobile3": "Active « Messages privés »",
+      "openDmsMobile4": "Reviens sur cette page et touche Réessayer",
+      "openDmsAltIntro": "Tu préfères ne rien changer ? Connecte-toi avec ton compte Discord. Pas besoin de MP.",
+      "openDmsAltButton": "Se connecter avec Discord",
+      "dmHintAlt": "Pas de MP ? Connecte-toi avec Discord"
     },
     "claim": {
       "askOverline": "§ ··· Content de te revoir",
@@ -887,6 +897,24 @@
       "maxBody": "Tu as atteint tous les niveaux existants.",
       "viewAll": "Toutes les missions",
       "nextLevel": "Niveau suivant : {title}"
+    },
+    "startHere": {
+      "overline": "Commence ici",
+      "headline": "Nouveau ? Trois étapes pour démarrer.",
+      "intro": "Fais-les dans l'ordre. Chacune prend quelques minutes.",
+      "done": "Fait",
+      "step1Title": "Vérifie ton niveau",
+      "step1Body": "Tu es au niveau {level}. Découvre ce que débloque chaque niveau.",
+      "step1Cta": "Voir mon niveau",
+      "step2Title": "Fais ta prochaine mission",
+      "step2Body": "À suivre : {mission}",
+      "step2BodyNone": "Rien à envoyer pour l'instant. Regarde tes missions pour les nouveautés.",
+      "step2Cta": "Ouvrir les missions",
+      "step3Title": "Fais-toi parrainer",
+      "step3Body": "Demande à un membre d'ouvrir ton profil et de toucher Vouch. Partage le lien de ton profil avec quelqu'un que tu connais.",
+      "step3Done": "Un membre s'est porté garant pour toi.",
+      "step3Cta": "Ouvrir mon profil",
+      "step2BodyPending": "Tout est envoyé et en attente de relecture."
     }
   },
   "missionLinks": {
@@ -897,7 +925,17 @@
     "getBox": "Obtenir une Rare Pizza Box",
     "bonus": "Bonus : ce niveau est déjà terminé. Cette mission est facultative et ne rapporte rien de plus.",
     "howTo": "Comment faire",
-    "howLevelsWork": "Comment fonctionnent les niveaux"
+    "howLevelsWork": "Comment fonctionnent les niveaux",
+    "x": {
+      "title": "Suivre sur X",
+      "linked": "Compte X relié.",
+      "notLinked": "Compte X pas encore relié. Connecte d'abord X sur ton profil.",
+      "unchecked": "Pas encore vérifié. Touche Vérifier ma progression après avoir relié ton compte.",
+      "honor": "Nous pouvons seulement vérifier que ton compte X est relié. Nous ne voyons pas qui tu suis : suivre @RarePizzas et @Pizza_DAO reste sur parole. Merci de suivre les deux.",
+      "open": "Ouvrir @{handle} sur X",
+      "mobile": "Sur téléphone, ça ouvre l'appli X (ou le site X si tu ne l'as pas). Touche Suivre, puis reviens sur cette page.",
+      "connectLink": "Connecte X sur ton profil"
+    }
   },
   "crewsPage": {
     "joined": "Inscrit",

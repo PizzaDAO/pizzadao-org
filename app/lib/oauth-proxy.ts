@@ -119,6 +119,8 @@ export interface OAuthState {
   return_to?: string;
   nonce?: string;
   join?: boolean;
+  /** Local page to land on after login (validated with loginReturnPath when used). NOT return_to, which is a preview origin. */
+  next?: string;
 }
 
 export function generateOAuthNonce(): string {
@@ -142,6 +144,7 @@ export function encodeOAuthState(state: OAuthState): string {
   if (state.return_to) payload.return_to = state.return_to;
   if (state.nonce) payload.nonce = state.nonce;
   if (state.join) payload.join = true;
+  if (state.next) payload.next = state.next;
   return Buffer.from(JSON.stringify(payload)).toString("base64url");
 }
 
@@ -155,6 +158,7 @@ export function decodeOAuthState(state: string): OAuthState {
         return_to: typeof decoded.return_to === "string" ? decoded.return_to : undefined,
         nonce: typeof decoded.nonce === "string" ? decoded.nonce : undefined,
         ...(decoded.join === true ? { join: true } : {}),
+        ...(typeof decoded.next === "string" ? { next: decoded.next } : {}),
       };
     }
   } catch {

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const fetchGuildMember = vi.fn();
 const getGuildRoles = vi.fn();
+let vouchCounts = { total: 0, pizzadao: 0, farcaster: 0, twitter: 0, followers: 0, pizzadaoFollowers: 0 };
 const resolveNextAction = vi.fn((_input: unknown) => ({ kind: "join_crew" }));
 
 vi.mock("@/app/lib/session", () => ({ getSession: async () => ({ discordId: "d1" }) }));
@@ -20,7 +21,7 @@ vi.mock("@/app/lib/missions", () => ({
     getLevelTitle: async () => null,
 }));
 vi.mock("@/app/lib/vouches", () => ({
-    getVouchCounts: async () => ({ total: 0, pizzadao: 0, farcaster: 0, twitter: 0, followers: 0, pizzadaoFollowers: 0 }),
+    getVouchCounts: async () => vouchCounts,
 }));
 vi.mock("@/app/lib/notifications", () => ({ getNotifications: async () => [], getUnreadCount: async () => 0 }));
 vi.mock("@/app/lib/crew-mappings", () => ({ getCrewMappings: async () => ({ crews: [], cached: false }) }));
@@ -81,5 +82,17 @@ describe("GET /api/dashboard-summary reviewer + Box Mafia", () => {
         getGuildRoles.mockResolvedValue(null);
         const body = await call();
         expect(body.boxMafia.status).toBe("unknown");
+    });
+});
+
+describe("GET /api/dashboard-summary startHere vouches", () => {
+    afterEach(() => {
+        vouchCounts = { total: 0, pizzadao: 0, farcaster: 0, twitter: 0, followers: 0, pizzadaoFollowers: 0 };
+    });
+    it("counts vouches received, not the ones the member gave", async () => {
+        vouchCounts = { ...vouchCounts, total: 4, followers: 0 };
+        expect((await call()).startHere.vouchesReceived).toBe(0);
+        vouchCounts = { ...vouchCounts, total: 0, followers: 2 };
+        expect((await call()).startHere.vouchesReceived).toBe(2);
     });
 });

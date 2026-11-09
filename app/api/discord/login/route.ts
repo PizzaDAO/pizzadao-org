@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { loginReturnPath } from "@/app/lib/login-return";
 import {
   isPreviewEnvironment,
   getProductionOrigin,
@@ -22,6 +23,8 @@ export async function GET(req: Request) {
   // join=1 is the explicit second step for people who are NOT yet in the
   // PizzaDAO Discord: only then do we ask Discord for guilds.join.
   const join = url.searchParams.get("join") === "1";
+  // Optional local page to land on after login; validated again in the callback.
+  const next = loginReturnPath(url.searchParams.get("next"));
 
   // Preview detection: redirect to production login
   if (isPreviewEnvironment() && !returnTo) {
@@ -29,6 +32,7 @@ export async function GET(req: Request) {
     productionLogin.searchParams.set("return_to", url.origin);
     if (state) productionLogin.searchParams.set("state", state);
     if (join) productionLogin.searchParams.set("join", "1");
+    if (next) productionLogin.searchParams.set("next", next);
     return NextResponse.redirect(productionLogin.toString());
   }
 
@@ -68,7 +72,7 @@ export async function GET(req: Request) {
   if (join) auth.searchParams.set("prompt", "consent");
   auth.searchParams.set(
     "state",
-    encodeOAuthState({ sessionId: state, return_to: returnTo || undefined, nonce, join }),
+    encodeOAuthState({ sessionId: state, return_to: returnTo || undefined, nonce, join, next }),
   );
 
   const res = NextResponse.redirect(auth.toString());
