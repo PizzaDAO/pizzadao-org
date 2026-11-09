@@ -14,6 +14,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { promisify } from 'node:util'
+import { normalizeKeyterms } from './keyterms.js'
 import type { SpeakerSummary } from './manifest.js'
 import type { IngestTranscript, TranscriptSegment } from './types.js'
 
@@ -104,6 +105,12 @@ export function buildSpeechTrackArgs(listFile: string, outFile: string): string[
 
 export const DEEPGRAM_URL = 'https://api.deepgram.com/v1/listen?model=nova-3&smart_format=true&utterances=true&language=multi'
 
+/** The request URL with one `keyterm=` per term (limits enforced); no terms gives DEEPGRAM_URL unchanged. */
+export function buildDeepgramUrl(keyterms: readonly string[] = []): string {
+  const terms = normalizeKeyterms([...keyterms])
+  return terms.length ? `${DEEPGRAM_URL}${terms.map((t) => `&keyterm=${encodeURIComponent(t)}`).join('')}` : DEEPGRAM_URL
+}
+
 export interface DeepgramResult {
   utterances: Array<{ start: number; end: number; transcript: string }>
   language: string | null
@@ -127,25 +134,44 @@ export type FetchLike = (url: string, init: { method: string; headers: Record<st
   text(): Promise<string>
 }>
 
+/** Shared by every speaker of one session: set once Deepgram has rejected the keyterms. */
+export interface KeytermSession {
+  keytermsRejected: boolean
+}
+
 /** Transcribe one audio file. Retries 429 and 5xx; throws with the status (never the key) otherwise. */
 export async function transcribeWithDeepgram(
   file: string,
   apiKey: string,
-  deps: { fetch?: FetchLike; sleep?: (ms: number) => Promise<void>; attempts?: number } = {},
+  deps: { fetch?: FetchLike; sleep?: (ms: number) => Promise<void>; attempts?: number; keyterms?: readonly string[]; session?: KeytermSession; log?: (msg: string) => void } = {},
 ): Promise<DeepgramResult> {
   const doFetch = deps.fetch ?? (fetch as unknown as FetchLike)
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)))
   const attempts = deps.attempts ?? 3
   const body = await readFile(file)
+  const session = deps.session ?? { keytermsRejected: false }
   let lastErr = 'not attempted'
   for (let i = 0; i < attempts; i++) {
     try {
-      const res = await doFetch(DEEPGRAM_URL, {
+      const withTerms = !session.keytermsRejected && normalizeKeyterms([...(deps.keyterms ?? [])]).length > 0
+      const url = session.keytermsRejected ? DEEPGRAM_URL : buildDeepgramUrl(deps.keyterms)
+      let res = await doFetch(url, {
         method: 'POST',
         headers: { Authorization: `Token ${apiKey}`, 'Content-Type': 'audio/ogg' },
         body,
         signal: AbortSignal.timeout(10 * 60_000),
       })
+      if (withTerms && res.status >= 400 && res.status < 500 && res.status !== 429) {
+        // A bad keyterm list must never cost a transcript: remember it for the session and retry without terms.
+        session.keytermsRejected = true
+        deps.log?.(`Deepgram rejected the keyterms (${res.status}: ${(await res.text()).slice(0, 200)}); transcribing without them for the rest of this session`)
+        res = await doFetch(DEEPGRAM_URL, {
+          method: 'POST',
+          headers: { Authorization: `Token ${apiKey}`, 'Content-Type': 'audio/ogg' },
+          body,
+          signal: AbortSignal.timeout(10 * 60_000),
+        })
+      }
       if (res.ok) return parseDeepgram(await res.json())
       lastErr = `Deepgram answered ${res.status}: ${(await res.text()).slice(0, 200)}`
       if (res.status !== 429 && res.status < 500) break
@@ -177,6 +203,8 @@ export interface TranscribeDeps {
   ffmpeg?: (args: string[]) => Promise<void>
   probeMs?: (file: string) => Promise<number>
   transcribeFile?: (file: string) => Promise<DeepgramResult>
+  /** Spellings to prefer (Deepgram keyterm prompting). */
+  keyterms?: readonly string[]
 }
 
 let warnedNoKey = false
@@ -210,7 +238,8 @@ export async function transcribeSession(sessionDir: string, outDir: string, spea
   }
   const ffmpeg = deps.ffmpeg ?? defaultFfmpeg
   const probe = deps.probeMs ?? defaultProbeMs
-  const send = deps.transcribeFile ?? ((file: string) => transcribeWithDeepgram(file, deps.apiKey!))
+  const kt: KeytermSession = { keytermsRejected: false }
+  const send = deps.transcribeFile ?? ((file: string) => transcribeWithDeepgram(file, deps.apiKey!, { keyterms: deps.keyterms, session: kt, log: deps.log }))
 
   const perSpeaker: Array<{ discordId: string; utterances: Utterance[] }> = []
   const languages = new Map<string, number>()

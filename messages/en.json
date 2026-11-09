@@ -669,7 +669,12 @@
       "levelBadge": "Lv.{level}",
       "sendPep": "Send PEP",
       "editProfile": "Edit profile",
-      "manageWallets": "Manage wallets"
+      "manageWallets": "Manage wallets",
+      "viewPublicProfile": "View public profile",
+      "shareProfile": "Share profile",
+      "shareProfileText": "Check out my PizzaDAO profile:",
+      "profileLinkCopied": "Profile link copied",
+      "profileLinkCopyFailed": "Could not copy the link"
     },
     "completion": {
       "overline": "§ profile setup",
@@ -806,7 +811,28 @@
       "vouchedByTitle": "Vouched for by",
       "vouchedByCount": "{count, plural, one {# member} other {# members}}",
       "vouchedByEmpty": "Nobody has vouched yet.",
-      "vouchedByMore": "and {count} more"
+      "vouchedByMore": "and {count} more",
+      "ask": {
+        "share": "Ask for vouches",
+        "shareText": "Vouch for me on PizzaDAO:",
+        "copied": "Link copied. Paste it in a message.",
+        "copyFailed": "Could not copy the link",
+        "askMember": "Ask a member to vouch for you",
+        "searchPlaceholder": "Search members by name or ID",
+        "send": "Send request",
+        "sent": "Request sent to {name}.",
+        "errors": {
+          "self": "You cannot ask yourself.",
+          "not-found": "Member not found.",
+          "unreachable": "That member cannot receive requests yet.",
+          "already-vouched": "That member already vouched for you.",
+          "pending": "You already have an open request with that member.",
+          "limit": "Daily limit reached ({limit} requests). Try again tomorrow.",
+          "no-profile": "We could not find your member profile.",
+          "error": "Could not send the request. Try again.",
+          "cooldown": "You asked that member recently. Try again later."
+        }
+      }
     },
     "celebrations": {
       "profile": {
@@ -996,6 +1022,7 @@
       "transcriptRestricted": "The full transcript is available to members at level {level} and above.",
       "summaryRestricted": "The summary is available to members at level {level} and above.",
       "actionItemsRestricted": "The action items are available to members at level {level} and above.",
+      "suggestedBy": "suggested by {name}",
       "chaptersRestricted": "The chapters are available to members at level {level} and above.",
       "chatLine": "Written in the call chat",
       "unknownSpeaker": "Speaker",
@@ -1233,7 +1260,8 @@
     "redactLines": "Hide their lines",
     "redactConfirm": "Hide all of this speaker's lines from the public page and from summaries? Nothing is deleted and you can restore them. A published call goes back to review. The summary is not rewritten.",
     "processingNote": "The summary is being generated. Reload in a minute.",
-    "actionItemsHint": "One per line. Optional owner after a vertical bar: Send the deck | Ann",
+    "actionItemsHint": "One per line. Optional owner after a vertical bar, then optional \"by: Name\" for who suggested it: Send the deck | Ann | by: Bob",
+    "suggestedBy": "suggested by {name}",
     "chaptersHint": "One per line: start time then title, like 12:30 Budget update",
     "restoreLines": "Restore their lines",
     "redactedBadge": "Hidden from the public page",

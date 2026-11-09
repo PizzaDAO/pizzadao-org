@@ -12,6 +12,7 @@ import type { Settings } from '@/app/lib/settings'
 import { resolveToggle } from '@/app/lib/settings/toggles'
 import { normalizeCrewId } from '@/app/lib/crew-id'
 import type { TranscriptSegment } from './ingest-schema'
+import { cleanSuggestedBy } from './summarize'
 
 const SNOWFLAKE = /^\d{5,25}$/
 const SESSION_ID = /^[A-Za-z0-9_-]{6,80}$/
@@ -213,12 +214,14 @@ function spokenLineOverlaps(segments: readonly TranscriptSegment[], speakerIds: 
  * `segments` are the visible segments the summary was made from.
  */
 export function mergeLiveActionItems(
-  base: ReadonlyArray<{ text: string; owner: string | null }>,
+  base: ReadonlyArray<{ text: string; owner: string | null; suggestedBy?: string | null }>,
   live: readonly StoredLiveItem[],
   segments: readonly TranscriptSegment[],
   redactedSpeakerIds: readonly string[] | null | undefined,
   max = 30,
-): Array<{ text: string; owner: string | null }> {
+  /** Display names by Discord id (buildSpeakerNames); the first speaker of a live item becomes its suggestedBy. */
+  names: Readonly<Record<string, string>> = {},
+): Array<{ text: string; owner: string | null; suggestedBy?: string | null }> {
   const hidden = new Set(redactedSpeakerIds ?? [])
   const chatLines = new Set(segments.filter((s) => s.kind === 'chat' && s.id).map((s) => s.id as string))
   const out = [...base]
@@ -231,7 +234,8 @@ export function mergeLiveActionItems(
       if (!spokenLineOverlaps(segments, it.speakerIds, it.startMs, it.endMs)) continue
     }
     if (out.some((o) => isSameItem(o.text, it.text))) continue
-    out.push({ text: it.text, owner: it.owner })
+    const by = cleanSuggestedBy(names[it.speakerIds[0]] ?? null)
+    out.push({ text: it.text, owner: it.owner, ...(by ? { suggestedBy: by } : {}) })
   }
   return out
 }

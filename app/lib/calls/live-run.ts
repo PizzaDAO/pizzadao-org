@@ -29,7 +29,7 @@ import type { TranscriptSegment } from './ingest-schema'
 import { isCrewExcluded, loadPostFilter, mentionsBlockedTerm, type PostFilter } from './post-filters'
 import { extractSpeech, mapChunkResult, MAX_CHUNK_MS, planChunks, renderChunkWav, wordJoiner, type Region } from './speech'
 import { buildTranscriptText, formatClock, isFallbackWorthy, summaryFallbackModel, summaryModel, summarySchema } from './summarize'
-import { cleanSegments, mergeSpeakerTurns, transcribeAudio, transcribeLanguage, type Utterance, type WhisperResult } from './transcribe'
+import { cleanSegments, mergeSpeakerTurns, transcribeAudio, transcribeLanguage, transcriptionPrompt, type Utterance, type WhisperResult } from './transcribe'
 import { chatItemText, cleanItemText, cleanOwner, formatConfirmation, isSameItem, liveConfigFrom, normKey, type LiveConfig, type LiveRequest } from './live-items'
 
 export interface LiveCandidate {
@@ -251,10 +251,11 @@ async function detectFromSpeech(req: LiveRequest, cfg: LiveConfig, settings: Set
     throw err
   }
   const hint = transcribeLanguage(env)
+  const prompt = await transcriptionPrompt(settings)
   const tdeps = {
     download: deps.download ?? ((k: string) => getObjectBytes(k, MAX_SEGMENT_BYTES)),
     decode: deps.decode ?? defaultDecode,
-    transcribe: deps.transcribe ?? ((wav: Uint8Array, deadline: number) => transcribeAudio(wav, apiKey!, { deadline, language: hint, words: true, attempts: 2 })),
+    transcribe: deps.transcribe ?? ((wav: Uint8Array, deadline: number) => transcribeAudio(wav, apiKey!, { deadline, language: hint, prompt, words: true, attempts: 2 })),
   }
   const names = new Map<string, string | null>()
   const bySpeaker = new Map<string, typeof segs>()
@@ -329,7 +330,7 @@ export interface DetectInput {
 }
 
 const actionItemShape = summarySchema.shape.actionItems.element
-export const detectedItemSchema = actionItemShape.extend({
+export const detectedItemSchema = actionItemShape.omit({ suggestedBy: true }).extend({
   speaker: z.string().nullable().describe('Label (S1, S2, ...) of who said it, or null'),
 })
 export const detectionSchema = z.object({ items: z.array(detectedItemSchema).max(5) })

@@ -127,6 +127,11 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 export const END_SONG_CREW_LINE = /^([^=\n]{1,60}?)\s*=\s*([^=\n]{1,60})$/
 export const END_SONG_CREW_MAP_DEFAULT = ['Ops', 'Tech', 'Comms', 'Biz Dev', 'Events', 'Art', 'Merch', 'Real Estate', 'Governance'].map((c) => `${c} = ${c}`).join('\n')
 
+/** Starter spellings for calls.transcriptionTerms (no personal names; member nicknames are added in the setting). */
+export const TRANSCRIPTION_KEYTERMS_DEFAULT = [
+  'PizzaDAO', 'RSVPizza', 'Pizza MCP', 'OpenPizza', 'ETHDenver', 'Devcon', 'EthCC', 'Global Pizza Party', 'Bitcoin Pizza Day', 'PEP', 'Metalhead', 'Rare Pizzas',
+].join('\n')
+
 /** One line of calls.agendaLinks: `crew-id = Label | https://...`. */
 export const AGENDA_LINK_LINE = /^([A-Za-z0-9_-]+)\s*=\s*([^|\n]{1,60}?)\s*\|\s*(https:\/\/\S+)$/
 
@@ -1024,6 +1029,17 @@ export const SETTINGS = {
     onReadFailure: 'lastKnownGood',
     placeholder: 'Community Call',
   }),
+  'calls.transcriptionTerms': textSetting({
+    key: 'calls.transcriptionTerms',
+    area: 'calls',
+    label: 'Transcription: spellings to prefer',
+    help: 'One term per line (conference names, community lingo, nicknames). Sent to Deepgram as keyterms when a call is transcribed, and given to the summary as spellings to prefer. At most 100 terms, 40 characters each, about 1000 characters in all (Deepgram allows 500 tokens per request); extra or longer lines are ignored. Applies to calls recorded after the recorder next reads its settings (within about 5 minutes).',
+    maxLength: 2000,
+    multiline: true,
+    default: TRANSCRIPTION_KEYTERMS_DEFAULT,
+    onReadFailure: 'lastKnownGood',
+    placeholder: 'ETHDenver',
+  }),
   'calls.startBandMaxSongs': intSetting({
     key: 'calls.startBandMaxSongs',
     area: 'calls',
@@ -1297,6 +1313,33 @@ export const SETTINGS = {
     max: 50,
     default: 50,
     unit: 'vouches',
+  }),
+  'vouches.requestsEnabled': boolSetting({
+    key: 'vouches.requestsEnabled',
+    area: 'features',
+    label: 'Ask a member to vouch for you',
+    help: "Signed-in members can pick a member on their dashboard and send them a \"vouch for me\" request, which shows in that member's notification bell (they can dismiss it). Needs the VOUCH_REQUEST notification type migration applied first. The VOUCH_REQUESTS_ENABLED env var set to off always wins; on preview deploys only the env var counts.",
+    confirmOn: 'Members will be able to send vouch requests to other members.',
+  }),
+  'vouches.requestDailyLimit': intSetting({
+    key: 'vouches.requestDailyLimit',
+    area: 'features',
+    label: 'Vouch requests per member per day',
+    help: 'Most vouch requests one member can send in a rolling 24 hours. A member can also have only one unread request open with another member at a time, and the cooldown below applies per member pair.',
+    min: 1,
+    max: 50,
+    default: 5,
+    unit: 'requests',
+  }),
+  'vouches.requestCooldownDays': intSetting({
+    key: 'vouches.requestCooldownDays',
+    area: 'features',
+    label: 'Days before asking the same member again',
+    help: 'After a member sends a vouch request to someone, they cannot send that same member another for this many days, whether or not it was read or dismissed. 0 turns the cooldown off.',
+    min: 0,
+    max: 365,
+    default: 14,
+    unit: 'days',
   }),
   'vouches.quickVouchEnabled': boolSetting({
     key: 'vouches.quickVouchEnabled',

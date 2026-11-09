@@ -25,6 +25,7 @@ import { norm } from "../../lib/strings";
 import { SendPepModal } from "../../ui/economy";
 import { MissionsProgress } from "../../ui/missions";
 import { VouchesWidget } from "../../ui/vouches/VouchesWidget";
+import { AskForVouches } from "../../ui/vouches/AskForVouches";
 import { LanguageEditor } from "../../ui/profile/LanguageEditor";
 import {
     useUserData,
@@ -325,6 +326,8 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                     {/* ── 5. Vouches Widget ── */}
                     <div className="rule-warm" style={{ paddingTop: 24 }}>
                         <VouchesWidget memberId={idValue} />
+                        {/* Owner-only: the dashboard is the member's own page. */}
+                        <AskForVouches memberId={idValue} />
                     </div>
 
                     {/* ── 5.5. Language preference ── */}

@@ -49,6 +49,7 @@ export const RATE_LIMITS = {
   "missions-submit": { limit: 10, windowSec: 60 * 60 },
   "missions-bulk-review": { limit: 20, windowSec: 60 * 60 },
   "referral-search": { limit: 60, windowSec: 60 },
+  "vouch-request": { limit: 20, windowSec: 10 * 60 },
   // Disavow list (plans/disavow-list.md). The real nomination cap is the DB check.
   "disavow-nominate": { limit: 5, windowSec: 60 * 60 },
   "disavow-vote": { limit: 60, windowSec: 10 * 60 },

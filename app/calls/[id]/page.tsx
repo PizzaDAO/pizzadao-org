@@ -50,7 +50,7 @@ export default async function PublishedCallPage({ params }: Params) {
     const speakerText = { speakerN: (n: number) => t("speakerN", { n }), fallback: t("unknownSpeaker") };
     const names = new Map(rec.speakers.map((s) => [s.discordId, displaySpeakerName(s.discordId, s.displayName, speakerText)]));
     const segments = showTranscript ? asSegments(rec.transcript) : [];
-    const actionItems = (!showActionItems ? [] : Array.isArray(rec.actionItems) ? rec.actionItems : []) as Array<{ text?: string; owner?: string }>;
+    const actionItems = (!showActionItems ? [] : Array.isArray(rec.actionItems) ? rec.actionItems : []) as Array<{ text?: string; owner?: string; suggestedBy?: string }>;
     const chapters = (!showChapters ? [] : Array.isArray(rec.chapters) ? rec.chapters : []) as Array<{ startMs?: number; title?: string }>;
 
     return (
@@ -94,6 +94,7 @@ export default async function PublishedCallPage({ params }: Params) {
                                 <li key={i}>
                                     {item.text}
                                     {item.owner ? <span className="text-foreground/60"> ({item.owner})</span> : null}
+                                    {item.suggestedBy ? <span className="text-foreground/60"> {"\u2014"} {t("suggestedBy", { name: item.suggestedBy })}</span> : null}
                                 </li>
                             ))}
                         </ul>

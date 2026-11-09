@@ -3,6 +3,16 @@ import { parseRemoteConfig, REMOTE_CONFIG_OFF, RemoteConfigClient } from './remo
 
 const ok = (body: unknown) => ({ ok: true, status: 200, json: async () => body }) as Response
 
+describe('parseRemoteConfig: transcriptionKeyterms', () => {
+  it('is empty by default and for garbage', () => {
+    expect(parseRemoteConfig({}).transcriptionKeyterms).toEqual([])
+    expect(parseRemoteConfig({ transcriptionKeyterms: 'ETHDenver' }).transcriptionKeyterms).toEqual([])
+  })
+  it('keeps clean terms and drops blanks, duplicates and non-strings', () => {
+    expect(parseRemoteConfig({ transcriptionKeyterms: [' ETHDenver ', '', 'ethdenver', 7, 'Devcon'] }).transcriptionKeyterms).toEqual(['ETHDenver', 'Devcon'])
+  })
+})
+
 describe('parseRemoteConfig', () => {
   it('falls back to all-off for garbage', () => {
     expect(parseRemoteConfig(null)).toEqual(REMOTE_CONFIG_OFF)

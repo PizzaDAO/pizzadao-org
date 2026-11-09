@@ -669,7 +669,12 @@
       "levelBadge": "Nv.{level}",
       "sendPep": "Enviar PEP",
       "editProfile": "Editar perfil",
-      "manageWallets": "Gestionar wallets"
+      "manageWallets": "Gestionar wallets",
+      "viewPublicProfile": "Ver perfil público",
+      "shareProfile": "Compartir perfil",
+      "shareProfileText": "Mira mi perfil de PizzaDAO:",
+      "profileLinkCopied": "Enlace del perfil copiado",
+      "profileLinkCopyFailed": "No se pudo copiar el enlace"
     },
     "completion": {
       "overline": "§ configuración del perfil",
@@ -806,7 +811,28 @@
       "vouchedByTitle": "Avalado por",
       "vouchedByCount": "{count, plural, one {# miembro} other {# miembros}}",
       "vouchedByEmpty": "Todavía nadie ha dado su aval.",
-      "vouchedByMore": "y {count} más"
+      "vouchedByMore": "y {count} más",
+      "ask": {
+        "share": "Pedir avales",
+        "shareText": "Aválame en PizzaDAO:",
+        "copied": "Enlace copiado. Pégalo en un mensaje.",
+        "copyFailed": "No se pudo copiar el enlace",
+        "askMember": "Pide a un miembro que te avale",
+        "searchPlaceholder": "Busca miembros por nombre o ID",
+        "send": "Enviar solicitud",
+        "sent": "Solicitud enviada a {name}.",
+        "errors": {
+          "self": "No puedes pedírtelo a ti mismo.",
+          "not-found": "Miembro no encontrado.",
+          "unreachable": "Ese miembro aún no puede recibir solicitudes.",
+          "already-vouched": "Ese miembro ya te avaló.",
+          "pending": "Ya tienes una solicitud abierta con ese miembro.",
+          "limit": "Límite diario alcanzado ({limit} solicitudes). Inténtalo mañana.",
+          "no-profile": "No encontramos tu perfil de miembro.",
+          "error": "No se pudo enviar la solicitud. Inténtalo de nuevo.",
+          "cooldown": "Ya le pediste a ese miembro hace poco. Inténtalo más tarde."
+        }
+      }
     },
     "celebrations": {
       "profile": {
@@ -996,6 +1022,7 @@
       "transcriptRestricted": "La transcripción completa está disponible para los miembros de nivel {level} o superior.",
       "summaryRestricted": "El resumen está disponible para los miembros de nivel {level} o superior.",
       "actionItemsRestricted": "Las tareas pendientes están disponibles para los miembros de nivel {level} o superior.",
+      "suggestedBy": "sugerido por {name}",
       "chaptersRestricted": "Los capítulos están disponibles para los miembros de nivel {level} o superior.",
       "chatLine": "Escrito en el chat de la llamada",
       "unknownSpeaker": "Orador",
@@ -1233,7 +1260,8 @@
     "redactLines": "Ocultar sus líneas",
     "redactConfirm": "¿Ocultar todas las líneas de este orador en la página pública y en los resúmenes? No se borra nada y puedes restaurarlas. Una llamada publicada vuelve a revisión. El resumen no se reescribe.",
     "processingNote": "Se está generando el resumen. Recarga en un minuto.",
-    "actionItemsHint": "Una por línea. Responsable opcional tras una barra vertical: Enviar la presentación | Ann",
+    "actionItemsHint": "Una por línea. Responsable facultativo tras una barra vertical y, si quieres, \"by: Nombre\" para quien la sugirió: Enviar la presentación | Ann | by: Bob",
+    "suggestedBy": "sugerido por {name}",
     "chaptersHint": "Una por línea: hora de inicio y título, como 12:30 Actualización del presupuesto",
     "restoreLines": "Restaurar sus líneas",
     "redactedBadge": "Oculto en la página pública",
