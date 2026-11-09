@@ -178,6 +178,9 @@ beforeEach(() => {
 async function listedEntry() {
   const r = await nominate({ ...nominateInput(), now: T0 })
   if (!r.ok) throw new Error('setup')
+  // The fake store stamps rows with the real clock; pin them to the fake clock so the
+  // "submitted before the round closed" checks don't depend on today's date.
+  for (const x of state.submission) if (x.disavowalId === r.id) x.createdAt = T0
   const round = state.round[0]
   const early = new Date(T0.getTime() + 2 * D)
   for (const v of ['dpr1', 'dpr2', 'dpr3']) {
