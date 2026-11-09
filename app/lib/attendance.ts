@@ -18,6 +18,7 @@ import { getCellValue } from "@/app/lib/gviz-parser";
 import { fetchGviz } from "@/app/lib/sheets/gviz";
 import { SHEET_IDS } from "@/app/lib/sheets/config";
 import { getSheetData } from "@/app/lib/sheets/member-repository";
+import { crewIdsFor, loadCrewAliases } from "@/app/lib/calls/crew-alias";
 import promiseLimit from "promise-limit";
 
 // ---------------------------------------------------------------------------
@@ -339,6 +340,7 @@ async function syncCrewAttendance(
   let totalNewCalls = 0;
   const affectedDiscordIds = new Set<string>();
 
+  const aliases = await loadCrewAliases();
   for (const result of results) {
     if (!result) continue;
     const { entry, attendees } = result;
@@ -357,7 +359,7 @@ async function syncCrewAttendance(
     const fromRecordings = new Set(
       (
         await prisma.callAttendance.findMany({
-          where: { crewId, callDate: entry.date, source: "recording", discordId: { in: attendees.map((a) => a.discordId) } },
+          where: { crewId: { in: crewIdsFor(crewId, aliases) }, callDate: entry.date, source: "recording", discordId: { in: attendees.map((a) => a.discordId) } },
           select: { discordId: true },
         })
       ).map((r) => r.discordId)

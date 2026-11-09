@@ -135,6 +135,19 @@ export const TRANSCRIPTION_KEYTERMS_DEFAULT = [
 /** One line of calls.agendaLinks: `crew-id = Label | https://...`. */
 export const AGENDA_LINK_LINE = /^([A-Za-z0-9_-]+)\s*=\s*([^|\n]{1,60}?)\s*\|\s*(https:\/\/\S+)$/
 
+/** One line of calls.attendanceCrewAliases: `from = to` (crew ids). */
+export const CREW_ALIAS_LINE = /^([A-Za-z0-9_-]+)\s*=\s*([A-Za-z0-9_-]+)$/
+
+/** Parse calls.attendanceCrewAliases into lower-case from -> to. Lines that do not parse, and self-maps, are skipped. */
+export function parseCrewAliases(raw: string | null | undefined): Map<string, string> {
+  const out = new Map<string, string>()
+  for (const line of String(raw ?? '').split('\n')) {
+    const m = CREW_ALIAS_LINE.exec(line.trim())
+    if (m && m[1].toLowerCase() !== m[2].toLowerCase()) out.set(m[1].toLowerCase(), m[2].toLowerCase())
+  }
+  return out
+}
+
 export function textSetting(o: {
   key: string
   area: SettingArea
@@ -955,6 +968,19 @@ export const SETTINGS = {
     placeholder: 'crew-id = Call guide | https://example.com/guide',
     check: (v) => v.split('\n').every((line) => line.trim() === '' || AGENDA_LINK_LINE.test(line.trim())),
     checkMessage: 'Use one line per crew: crew-id = Label | https link',
+  }),
+  'calls.attendanceCrewAliases': textSetting({
+    key: 'calls.attendanceCrewAliases',
+    area: 'calls',
+    label: 'Attendance crew aliases',
+    help: 'One per line: recorder crew id = attendance crew id. Recording attendance is stored under the second id, so it matches the sheets and is never counted twice.',
+    maxLength: 1000,
+    multiline: true,
+    default: 'community = community_call',
+    onReadFailure: 'lastKnownGood',
+    placeholder: 'community = community_call',
+    check: (v) => v.split('\n').every((line) => line.trim() === '' || CREW_ALIAS_LINE.test(line.trim())),
+    checkMessage: 'Use one line per alias: from-id = to-id',
   }),
   // Metalhead call features (plans/metalhead-call-features.md). All off: the recorder keeps today's behaviour.
   'calls.welcomeEnabled': boolSetting({

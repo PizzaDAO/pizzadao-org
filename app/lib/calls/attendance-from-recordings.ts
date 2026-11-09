@@ -12,6 +12,7 @@
 import { prisma } from '@/app/lib/db'
 import { toggleEnabled } from '@/app/lib/settings/toggles'
 import { rebuildAttendanceSummaries } from '@/app/lib/attendance'
+import { attendanceCrewId, crewIdsFor, loadCrewAliases } from './crew-alias'
 import { isImportedSource } from './imported'
 
 const DISCORD_ID = /^\d{17,20}$/
@@ -26,6 +27,10 @@ export async function attendanceFromRecordingsEnabled(): Promise<boolean> {
 export function callDay(startedAt: Date): Date {
   const ymd = new Intl.DateTimeFormat('en-CA', { timeZone: DAY_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).format(startedAt)
   return new Date(`${ymd}T00:00:00.000Z`)
+}
+
+function humanizeCrewId(id: string): string {
+  return id.split(/[_-]+/).filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join(' ')
 }
 
 export function recordingAttendanceKey(crewId: string, day: Date): string {
@@ -81,12 +86,14 @@ export async function recordAttendanceForRecording(
   const attendees = attendeesOf(rec)
   if (attendees.size === 0) return { ...base, skipped: isImportedSource(rec.source) ? 'imported' : 'no-attendees' }
 
-  const crewId = rec.crewId
+  const aliases = await loadCrewAliases()
+  const crewId = attendanceCrewId(rec.crewId, aliases)
+  const crewLabel = crewId === rec.crewId ? (rec.crewLabel ?? crewId) : humanizeCrewId(crewId)
   const day = callDay(rec.startedAt)
   const key = recordingAttendanceKey(crewId, day)
   const ids = [...attendees.keys()]
   // Already counted that day for this crew (by the sheet or by the first part of this call).
-  const existing = await prisma.callAttendance.findMany({ where: { crewId, callDate: day, discordId: { in: ids } }, select: { discordId: true } })
+  const existing = await prisma.callAttendance.findMany({ where: { crewId: { in: crewIdsFor(crewId, aliases) }, callDate: day, discordId: { in: ids } }, select: { discordId: true } })
   const have = new Set(existing.map((e) => e.discordId))
   const fresh = ids.filter((id) => !have.has(id) && !opts.planned?.has(`${key}|${id}`))
   if (opts.dryRun) {
@@ -100,7 +107,7 @@ export async function recordAttendanceForRecording(
       discordId,
       displayName: attendees.get(discordId) ?? null,
       crewId,
-      crewLabel: rec.crewLabel ?? crewId,
+      crewLabel,
       callDate: day,
       dailySheetId: key,
       source: 'recording',
