@@ -118,6 +118,7 @@ describe('settings registry', () => {
       ['calls.recapPostEnabled', false],
       ['calls.agendaPostEnabled', false],
       ['calls.agendaLinks', ''],
+      ['calls.attendanceCrewAliases', 'community = community_call'],
       ['calls.welcomeEnabled', false],
       ['calls.welcomeTemplate', 'Welcome {members} to the {call} 🍕'],
       ['calls.welcomeBatchSeconds', 20],
