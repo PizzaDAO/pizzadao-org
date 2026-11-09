@@ -14,11 +14,12 @@ export interface StartHereProps {
     enabled?: boolean;
     memberId: string;
     level: number;
-    nextMission: { id: number; title: string } | null;
-    vouchTotal: number;
+    mission?: { state: "todo" | "pending" | "done"; id?: number; title?: string };
+    /** Vouches received from other members. */
+    vouchesReceived: number;
 }
 
-export function StartHere({ enabled, memberId, level, nextMission, vouchTotal }: StartHereProps) {
+export function StartHere({ enabled, memberId, level, mission, vouchesReceived }: StartHereProps) {
     const t = useTranslations("dashboard.startHere");
     if (!enabled) return null;
 
@@ -33,17 +34,22 @@ export function StartHere({ enabled, memberId, level, nextMission, vouchTotal }:
         },
         {
             key: "mission",
-            done: !nextMission,
+            done: mission?.state === "done",
             title: t("step2Title"),
-            body: nextMission ? t("step2Body", { mission: nextMission.title }) : t("step2BodyNone"),
+            body:
+                mission?.state === "todo" && mission.title
+                    ? t("step2Body", { mission: mission.title })
+                    : mission?.state === "pending"
+                      ? t("step2BodyPending")
+                      : t("step2BodyNone"),
             cta: t("step2Cta"),
-            href: nextMission ? `/missions#mission-${nextMission.id}` : "/missions",
+            href: mission?.state === "todo" && mission.id != null ? `/missions#mission-${mission.id}` : "/missions",
         },
         {
             key: "vouch",
-            done: vouchTotal > 0,
+            done: vouchesReceived > 0,
             title: t("step3Title"),
-            body: vouchTotal > 0 ? t("step3Done") : t("step3Body"),
+            body: vouchesReceived > 0 ? t("step3Done") : t("step3Body"),
             cta: t("step3Cta"),
             href: `/profile/${encodeURIComponent(memberId)}`,
         },

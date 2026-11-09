@@ -13,11 +13,12 @@ export type XLinkState = "linked" | "notLinked" | "unchecked";
 /** Link state from the mission card: approved = linked; a failed check = not linked; else unknown. */
 export function xLinkState(completed: boolean, checkStatus?: string): XLinkState {
   if (completed) return "linked";
+  if (checkStatus === "pass") return "linked";
   if (checkStatus === "fail") return "notLinked";
   return "unchecked";
 }
 
-export function XFollowNote({ state }: { state: XLinkState }) {
+export function XFollowNote({ state, profileEditHref }: { state: XLinkState; profileEditHref?: string | null }) {
   const t = useTranslations("missionLinks.x");
   return (
     <div
@@ -35,7 +36,12 @@ export function XFollowNote({ state }: { state: XLinkState }) {
     >
       <strong>{t("title")}</strong>
       <p style={{ margin: "4px 0 0" }} data-testid="x-link-state">
-        {t(state)}
+        {t(state)}{" "}
+        {state !== "linked" && profileEditHref && (
+          <a href={profileEditHref} style={{ fontWeight: 600, textDecoration: "underline", textUnderlineOffset: 3 }}>
+            {t("connectLink")}
+          </a>
+        )}
       </p>
       <p style={{ margin: "6px 0 0" }}>{t("honor")}</p>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>

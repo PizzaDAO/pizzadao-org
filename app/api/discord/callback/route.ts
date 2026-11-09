@@ -1,4 +1,5 @@
 // app/api/discord/callback/route.ts
+import { loginReturnPath } from "@/app/lib/login-return";
 import { NextResponse } from "next/server";
 import { createSessionToken, getSessionCookieOptions, COOKIE_NAME } from "@/app/lib/session";
 import {
@@ -121,9 +122,10 @@ async function finishLogin(
     joined: boolean;
     state: string;
     return_to?: string;
+    next?: string;
   },
 ) {
-  const { me, nick, joined, state, return_to } = opts;
+  const { me, nick, joined, state, return_to, next } = opts;
   // If this is a proxy flow (return_to exists), create transfer token
   // and redirect back to the preview
   if (return_to && validateReturnTo(return_to)) {
@@ -169,7 +171,7 @@ async function finishLogin(
   let redirectUrl: URL;
   if (existingMember?.memberId) {
     // Existing member - go directly to dashboard
-    redirectUrl = new URL(`/dashboard/${existingMember.memberId}`, url.origin);
+    redirectUrl = new URL(loginReturnPath(next) || `/dashboard/${existingMember.memberId}`, url.origin);
   } else {
     // New user - go to home page with params
     redirectUrl = new URL("/", url.origin);
@@ -200,7 +202,7 @@ async function handleCallback(req: Request): Promise<NextResponse> {
   try {
     const url = new URL(req.url);
     const rawState = url.searchParams.get("state") || "";
-    const { return_to, join: isJoinStep, nonce: stateNonce, sessionId: stateSessionId } =
+    const { return_to, join: isJoinStep, nonce: stateNonce, sessionId: stateSessionId, next } =
       decodeOAuthState(rawState);
 
     // Handle OAuth errors (e.g. user clicked "Cancel" on Discord authorization screen)
@@ -223,6 +225,7 @@ async function handleCallback(req: Request): Promise<NextResponse> {
             joined: false,
             state: stateSessionId,
             return_to,
+            next,
           });
         }
       }
@@ -274,6 +277,8 @@ async function handleCallback(req: Request): Promise<NextResponse> {
         joinUrl.searchParams.set("join", "1");
         if (state) joinUrl.searchParams.set("state", state);
         if (return_to && validateReturnTo(return_to)) joinUrl.searchParams.set("return_to", return_to);
+        const safeNext = loginReturnPath(next);
+        if (safeNext) joinUrl.searchParams.set("next", safeNext);
         // Mint the join-step nonce here and bind the pending login to it.
         const joinNonce = generateOAuthNonce();
         joinUrl.searchParams.set("nonce", joinNonce);
@@ -291,7 +296,7 @@ async function handleCallback(req: Request): Promise<NextResponse> {
 
     const joined = membership.status === "member" || addedToGuild;
 
-    return finishLogin(req, url, { me, nick, joined, state, return_to });
+    return finishLogin(req, url, { me, nick, joined, state, return_to, next });
   } catch (e: unknown) {
     return internalError(e, "discord/callback", "Discord login failed. Please try again.");
   }

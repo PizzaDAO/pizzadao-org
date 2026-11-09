@@ -451,7 +451,7 @@
       "errorSomethingWrong": "Quelque chose a mal tourné",
       "errorNetwork": "Erreur réseau. Vérifie ta connexion et réessaie.",
       "sameBrowserHint": "Vos informations d’inscription accompagnent ce lien. Ouvrez-le sur n’importe quel appareil, puis vérifiez votre nom et votre ville.",
-      "dmHint": "Tu dois être sur le Discord PizzaDAO, avec les messages privés des membres du serveur activés, pour recevoir le lien. Pas sûr ? On te montre comment faire.",
+      "dmHint": "Tu dois être sur le Discord PizzaDAO, avec les messages privés des membres du serveur activés, pour recevoir le lien. Si le lien n'arrive pas, on te montre comment les activer.",
       "openDmsDesktopTitle": "Sur ordinateur",
       "openDmsMobileTitle": "Sur téléphone (appli Discord)",
       "openDmsMobile1": "Ouvre Discord et touche le serveur PizzaDAO",
@@ -887,7 +887,8 @@
       "step3Title": "Fais-toi parrainer",
       "step3Body": "Demande à un membre d'ouvrir ton profil et de toucher Vouch. Partage le lien de ton profil avec quelqu'un que tu connais.",
       "step3Done": "Un membre s'est porté garant pour toi.",
-      "step3Cta": "Ouvrir mon profil"
+      "step3Cta": "Ouvrir mon profil",
+      "step2BodyPending": "Tout est envoyé et en attente de relecture."
     }
   },
   "missionLinks": {
@@ -906,7 +907,8 @@
       "unchecked": "Pas encore vérifié. Touche Vérifier ma progression après avoir relié ton compte.",
       "honor": "Nous pouvons seulement vérifier que ton compte X est relié. Nous ne voyons pas qui tu suis : suivre @RarePizzas et @Pizza_DAO reste sur parole. Merci de suivre les deux.",
       "open": "Ouvrir @{handle} sur X",
-      "mobile": "Sur téléphone, ça ouvre l'appli X (ou le site X si tu ne l'as pas). Touche Suivre, puis reviens sur cette page."
+      "mobile": "Sur téléphone, ça ouvre l'appli X (ou le site X si tu ne l'as pas). Touche Suivre, puis reviens sur cette page.",
+      "connectLink": "Connecte X sur ton profil"
     }
   },
   "crewsPage": {

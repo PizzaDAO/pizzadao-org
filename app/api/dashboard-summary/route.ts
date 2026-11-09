@@ -25,6 +25,7 @@ import {
 import { getVouchCounts } from "@/app/lib/vouches";
 import { buildLevelInfo } from "@/app/lib/level-info";
 import { resolveToggle } from "@/app/lib/settings/toggles";
+import { startHereMission, type StartHereMission } from "@/app/dashboard/[id]/lib/start-here";
 import { getNotifications, getUnreadCount } from "@/app/lib/notifications";
 import { getCrewMappings, type CrewOption } from "@/app/lib/crew-mappings";
 import { fetchMyTasksForCrewOption } from "@/app/lib/my-tasks";
@@ -94,15 +95,21 @@ export interface DashboardSummary {
     };
     nextAction: NextAction;
     /**
+     * The first-run "Start here" card (setting dashboard.startHereMaxLevel, 0 = off):
+     * true while the member's level is at or below the max.
+     */
+    startHere: {
+        enabled: boolean;
+        /** Vouches RECEIVED from other members (not the ones the member gave). */
+        vouchesReceived: number;
+        /** todo = a mission is unsubmitted or was sent back; pending = all submitted, one in review; done = all approved. */
+        mission: StartHereMission;
+    };
+    /**
      * The dashboard level card (setting dashboard.levelCardEnabled). `enabled: false` (the default)
      * means the page renders nothing. The other fields are always filled from the same mission data
      * as `level`, so they cost no extra queries.
      */
-    /**
-     * The first-run "Start here" card (setting dashboard.startHereMaxLevel, 0 = off):
-     * true while the member's level is at or below the max.
-     */
-    startHere: { enabled: boolean };
     levelCard: {
         enabled: boolean;
         level: number;
@@ -423,6 +430,8 @@ export async function GET(request: NextRequest) {
 
         const startHere = {
             enabled: currentLevel <= incomeSettings.get("dashboard.startHereMaxLevel"),
+            vouchesReceived: vouchCounts.followers,
+            mission: startHereMission(levelInfo.missions),
         };
 
         const summary: DashboardSummary = {

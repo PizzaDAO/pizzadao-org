@@ -451,7 +451,7 @@
       "errorSomethingWrong": "Something went wrong",
       "errorNetwork": "Network error. Please check your connection and try again.",
       "sameBrowserHint": "Your signup details travel with this link. Open it on any device, then review your name and city.",
-      "dmHint": "You need to be in the PizzaDAO Discord, with direct messages from server members turned on, to get the link. Not sure? We'll show you how.",
+      "dmHint": "You need to be in the PizzaDAO Discord, with direct messages from server members turned on, to get the link. If the link doesn't arrive, we'll show you how to turn them on.",
       "openDmsDesktopTitle": "On a computer",
       "openDmsMobileTitle": "On your phone (Discord app)",
       "openDmsMobile1": "Open Discord and tap the PizzaDAO server",
@@ -887,7 +887,8 @@
       "step3Title": "Get vouched",
       "step3Body": "Ask a member to open your profile and tap Vouch. Share your profile link with someone you know.",
       "step3Done": "A member has vouched for you.",
-      "step3Cta": "Open my profile"
+      "step3Cta": "Open my profile",
+      "step2BodyPending": "Everything is submitted and waiting for review."
     }
   },
   "missionLinks": {
@@ -906,7 +907,8 @@
       "unchecked": "Not checked yet. Tap Check my progress after you link your account.",
       "honor": "We can only check that your X account is linked. We can't see who you follow, so following @RarePizzas and @Pizza_DAO is on the honor system. Please follow both.",
       "open": "Open @{handle} on X",
-      "mobile": "On a phone these open the X app (or the X website if you don't have it). Tap Follow, then come back to this page."
+      "mobile": "On a phone these open the X app (or the X website if you don't have it). Tap Follow, then come back to this page.",
+      "connectLink": "Connect X on your profile"
     }
   },
   "crewsPage": {

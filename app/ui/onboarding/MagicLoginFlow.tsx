@@ -9,7 +9,7 @@
 import { LS_KEY } from "./types";
 import { sanitizeSignupDraft } from "@/app/lib/signup-draft";
 import { trackActivation } from "@/app/lib/activation-client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { ArrowLeft, ArrowUpRight, Sparkles } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -19,6 +19,12 @@ const DISCORD_INVITE =
 
 /** Discord OAuth login: identifies the member without sending a DM. */
 const DISCORD_LOGIN_PATH = "/api/discord/login";
+
+/** The Discord login link, carrying this page's ?returnTo so the member lands where they were headed. */
+export function discordLoginHref(search: string): string {
+  const returnTo = new URLSearchParams(search).get("returnTo");
+  return returnTo ? `${DISCORD_LOGIN_PATH}?next=${encodeURIComponent(returnTo)}` : DISCORD_LOGIN_PATH;
+}
 
 type State =
   | { step: "form" }
@@ -40,6 +46,10 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
   const t = useTranslations("onboarding.magicLogin");
   const [username, setUsername] = useState("");
   const [state, setState] = useState<State>({ step: "form" });
+  // Read after mount so server and client markup match.
+  const [search, setSearch] = useState("");
+  useEffect(() => setSearch(window.location.search), []);
+  const discordHref = discordLoginHref(search);
 
   async function handleSubmit(retryUsername?: string) {
     const name = retryUsername || username.trim();
@@ -286,7 +296,7 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
             </button>
             <p className="text-sm text-foreground/70">{t("openDmsAltIntro")}</p>
             <a
-              href={DISCORD_LOGIN_PATH}
+              href={discordHref}
               className="btn-pill-lg no-underline"
               style={{
                 background: "transparent",
@@ -364,11 +374,20 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
         {t("tagline")}
       </p>
       <p className="max-w-md text-foreground/70" style={{ fontSize: "14px", lineHeight: 1.5 }}>
-        {t("dmHint")}{" "}
-        <a href={DISCORD_LOGIN_PATH} className="underline underline-offset-2">
-          {t("dmHintAlt")}
-        </a>
+        {t("dmHint")}
       </p>
+      <a
+        href={discordHref}
+        className="btn-pill-lg no-underline justify-self-start"
+        style={{
+          background: "transparent",
+          color: "hsl(var(--foreground))",
+          border: "1px solid hsl(var(--foreground) / 0.25)",
+          minHeight: 44,
+        }}
+      >
+        {t("dmHintAlt")}
+      </a>
 
       <div
         className="relative overflow-hidden rounded-[22px] transition-shadow"

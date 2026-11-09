@@ -250,8 +250,8 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         enabled={summary?.startHere?.enabled}
                         memberId={id}
                         level={missionLevel?.level ?? 1}
-                        nextMission={summary?.level?.nextMission ?? null}
-                        vouchTotal={summary?.vouches?.total ?? 0}
+                        mission={summary?.startHere?.mission}
+                        vouchesReceived={summary?.startHere?.vouchesReceived ?? 0}
                     />
 
                     {!splitTurtlesCell(data?.Turtles).length && (

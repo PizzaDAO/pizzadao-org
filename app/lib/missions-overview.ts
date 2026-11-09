@@ -80,6 +80,8 @@ export type MissionsOverview = {
   isAuthenticated: boolean;
   /** The viewer's personal invite link (/join?ref=<memberId>), when signed in and onboarded. */
   inviteUrl?: string | null;
+  /** The viewer's own profile edit page (where Connect X lives), when signed in and onboarded. */
+  profileEditHref?: string | null;
 };
 
 export async function getMissionsOverview(discordId: string | null | undefined): Promise<MissionsOverview> {
@@ -87,6 +89,7 @@ export async function getMissionsOverview(discordId: string | null | undefined):
   let currentLevel = 1;
   let levelTitle: string | null = null;
   let myInviteUrl: string | null = null;
+  let myProfileEditHref: string | null = null;
   let paidLevels: number[] = [];
   let earnedPep = 0;
 
@@ -99,6 +102,7 @@ export async function getMissionsOverview(discordId: string | null | undefined):
     earnedPep = paid.pep;
     const memberId = await fetchMemberIdByDiscordId(discordId).catch(() => null);
     myInviteUrl = memberId ? inviteUrl(memberId) : null;
+    myProfileEditHref = memberId ? `/profile/${encodeURIComponent(memberId)}/edit` : null;
     for (const p of progress) {
       progressMap[p.missionId] = {
         status: p.status,
@@ -138,5 +142,5 @@ export async function getMissionsOverview(discordId: string | null | undefined):
     if (!discordId) setCachedMissionsList(levels);
   }
 
-  return { levels, currentLevel, levelTitle, paidLevels, earnedPep, isAuthenticated: !!discordId, inviteUrl: myInviteUrl };
+  return { levels, currentLevel, levelTitle, paidLevels, earnedPep, isAuthenticated: !!discordId, inviteUrl: myInviteUrl, profileEditHref: myProfileEditHref };
 }

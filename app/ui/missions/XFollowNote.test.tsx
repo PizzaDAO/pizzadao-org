@@ -7,6 +7,7 @@ import { XFollowNote, xLinkState } from "./XFollowNote";
 describe("xLinkState", () => {
     it("maps the mission card state", () => {
         expect(xLinkState(true, undefined)).toBe("linked");
+        expect(xLinkState(false, "pass")).toBe("linked");
         expect(xLinkState(false, "fail")).toBe("notLinked");
         expect(xLinkState(false, undefined)).toBe("unchecked");
         expect(xLinkState(false, "unknown")).toBe("unchecked");
@@ -29,5 +30,13 @@ describe("<XFollowNote />", () => {
         cleanup();
         renderWithIntl(<XFollowNote state="linked" />);
         expect(screen.getByTestId("x-link-state")).toHaveTextContent("X account linked.");
+    });
+
+    it("links Connect X to the profile edit page unless already linked", () => {
+        renderWithIntl(<XFollowNote state="notLinked" profileEditHref="/profile/m1/edit" />);
+        expect(screen.getByRole("link", { name: "Connect X on your profile" })).toHaveAttribute("href", "/profile/m1/edit");
+        cleanup();
+        renderWithIntl(<XFollowNote state="linked" profileEditHref="/profile/m1/edit" />);
+        expect(screen.queryByRole("link", { name: "Connect X on your profile" })).toBeNull();
     });
 });

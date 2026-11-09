@@ -451,7 +451,7 @@
       "errorSomethingWrong": "Algo salió mal",
       "errorNetwork": "Error de red. Comprueba tu conexión e inténtalo de nuevo.",
       "sameBrowserHint": "Tus datos de registro acompañan este enlace. Ábrelo en cualquier dispositivo y revisa tu nombre y ciudad.",
-      "dmHint": "Debes estar en el Discord de PizzaDAO y tener activados los mensajes directos de miembros del servidor para recibir el enlace. ¿No estás seguro? Te mostramos cómo.",
+      "dmHint": "Debes estar en el Discord de PizzaDAO y tener activados los mensajes directos de miembros del servidor para recibir el enlace. Si no llega, te mostramos cómo activarlos.",
       "openDmsDesktopTitle": "En ordenador",
       "openDmsMobileTitle": "En el móvil (app de Discord)",
       "openDmsMobile1": "Abre Discord y toca el servidor de PizzaDAO",
@@ -887,7 +887,8 @@
       "step3Title": "Consigue un aval",
       "step3Body": "Pide a un miembro que abra tu perfil y toque Avalar. Comparte el enlace de tu perfil con alguien que conozcas.",
       "step3Done": "Un miembro te ha avalado.",
-      "step3Cta": "Abrir mi perfil"
+      "step3Cta": "Abrir mi perfil",
+      "step2BodyPending": "Todo está enviado y esperando revisión."
     }
   },
   "missionLinks": {
@@ -906,7 +907,8 @@
       "unchecked": "Aún sin comprobar. Toca Comprobar mi progreso después de vincular tu cuenta.",
       "honor": "Solo podemos comprobar que tu cuenta de X está vinculada. No vemos a quién sigues, así que seguir a @RarePizzas y @Pizza_DAO es de palabra. Por favor, sigue a ambas.",
       "open": "Abrir @{handle} en X",
-      "mobile": "En el móvil se abre la app de X (o la web de X si no la tienes). Toca Seguir y vuelve a esta página."
+      "mobile": "En el móvil se abre la app de X (o la web de X si no la tienes). Toca Seguir y vuelve a esta página.",
+      "connectLink": "Conecta X en tu perfil"
     }
   },
   "crewsPage": {
