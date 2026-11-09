@@ -330,7 +330,7 @@ export interface DetectInput {
 }
 
 const actionItemShape = summarySchema.shape.actionItems.element
-export const detectedItemSchema = actionItemShape.extend({
+export const detectedItemSchema = actionItemShape.omit({ suggestedBy: true }).extend({
   speaker: z.string().nullable().describe('Label (S1, S2, ...) of who said it, or null'),
 })
 export const detectionSchema = z.object({ items: z.array(detectedItemSchema).max(5) })
