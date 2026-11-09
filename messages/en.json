@@ -1038,6 +1038,8 @@
       "chatLine": "Written in the call chat",
       "unknownSpeaker": "Speaker",
       "speakerN": "Speaker {n}",
+      "attended": "{count} attended",
+      "attendedShowMore": "Show {count} more",
       "importedNote": "Originally a live video broadcast on X. The transcript was made automatically from its audio.",
       "qaTitle": "Questions from the call",
       "qaAnswered": "Answered",

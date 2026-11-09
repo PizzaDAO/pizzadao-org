@@ -1038,6 +1038,8 @@
       "chatLine": "Écrit dans le chat de l'appel",
       "unknownSpeaker": "Intervenant",
       "speakerN": "Intervenant {n}",
+      "attended": "{count} présents",
+      "attendedShowMore": "Afficher {count} de plus",
       "importedNote": "À l’origine une diffusion vidéo en direct sur X. La transcription a été générée automatiquement à partir de l’audio.",
       "qaTitle": "Questions de l'appel",
       "qaAnswered": "Répondues",
