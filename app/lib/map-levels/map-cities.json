@@ -1,0 +1,4215 @@
+{
+ "syncedAt": "2026-11-10",
+ "cities": [
+  {
+   "key": "abeokuta-566",
+   "name": "Abeokuta",
+   "country": "NG",
+   "isoNumeric": "566",
+   "coords": [
+    3.4520284,
+    7.2274007
+   ]
+  },
+  {
+   "key": "abia-566",
+   "name": "Abia",
+   "country": "NG",
+   "isoNumeric": "566",
+   "coords": [
+    7.3703984,
+    5.1174976
+   ]
+  },
+  {
+   "key": "abidjan-384",
+   "name": "Abidjan",
+   "country": "CI",
+   "isoNumeric": "384",
+   "coords": [
+    -3.9785237,
+    5.2881257
+   ]
+  },
+  {
+   "key": "abuja-566",
+   "name": "Abuja",
+   "country": "NG",
+   "isoNumeric": "566",
+   "coords": [
+    7.4133388,
+    9.0911771
+   ]
+  },
+  {
+   "key": "accra-288",
+   "name": "Accra",
+   "country": "GH",
+   "isoNumeric": "288",
+   "coords": [
+    -0.1733501,
+    5.6221003
+   ]
+  },
+  {
+   "key": "addis-ababa-231",
+   "name": "Addis Ababa",
+   "country": "ET",
+   "isoNumeric": "231",
+   "coords": [
+    38.7805625,
+    9.0004375
+   ]
+  },
+  {
+   "key": "agartala-356",
+   "name": "Agartala",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    91.2849213,
+    23.8358138
+   ]
+  },
+  {
+   "key": "agra-356",
+   "name": "Agra",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    77.9984852,
+    27.2074075
+   ]
+  },
+  {
+   "key": "ahmedabad-356",
+   "name": "Ahmedabad",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    72.4943592,
+    23.036465
+   ]
+  },
+  {
+   "key": "ahmednagar-356",
+   "name": "Ahmednagar",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    74.724146,
+    19.1310279
+   ]
+  },
+  {
+   "key": "aizawl-356",
+   "name": "Aizawl",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    92.7172213,
+    23.7390453
+   ]
+  },
+  {
+   "key": "aklan-608",
+   "name": "Aklan",
+   "country": "PH",
+   "isoNumeric": "608",
+   "coords": [
+    122.4770195,
+    11.6179261
+   ]
+  },
+  {
+   "key": "akure-566",
+   "name": "Akure",
+   "country": "NG",
+   "isoNumeric": "566",
+   "coords": [
+    5.1551377,
+    7.2899135
+   ]
+  },
+  {
+   "key": "akwa-ibom-566",
+   "name": "Akwa Ibom",
+   "country": "NG",
+   "isoNumeric": "566",
+   "coords": [
+    7.9459335,
+    5.0058529
+   ]
+  },
+  {
+   "key": "alexandria-818",
+   "name": "Alexandria",
+   "country": "EG",
+   "isoNumeric": "818",
+   "coords": [
+    29.9490617,
+    31.2186264
+   ]
+  },
+  {
+   "key": "aligarh-356",
+   "name": "Aligarh",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    78.0799048,
+    27.8926903
+   ]
+  },
+  {
+   "key": "almaty-398",
+   "name": "Almaty",
+   "country": "KZ",
+   "isoNumeric": "398",
+   "coords": [
+    76.9504935,
+    43.2450549
+   ]
+  },
+  {
+   "key": "ambala-356",
+   "name": "Ambala",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    76.7660062,
+    30.3671572
+   ]
+  },
+  {
+   "key": "amritsar-356",
+   "name": "Amritsar",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    74.8869978,
+    31.6177304
+   ]
+  },
+  {
+   "key": "amsterdam-528",
+   "name": "Amsterdam",
+   "country": "NL",
+   "isoNumeric": "528",
+   "coords": [
+    4.8906425,
+    52.3617125
+   ]
+  },
+  {
+   "key": "anambra-566",
+   "name": "Anambra",
+   "country": "NG",
+   "isoNumeric": "566",
+   "coords": [
+    7.0609554,
+    6.2171944
+   ]
+  },
+  {
+   "key": "antigua-028",
+   "name": "Antigua",
+   "country": "AG",
+   "isoNumeric": "028",
+   "coords": [
+    -61.8817001,
+    17.1184261
+   ]
+  },
+  {
+   "key": "antwerp-056",
+   "name": "Antwerp",
+   "country": "BE",
+   "isoNumeric": "056",
+   "coords": [
+    4.4077035,
+    51.2279206
+   ]
+  },
+  {
+   "key": "arua-800",
+   "name": "Arua",
+   "country": "UG",
+   "isoNumeric": "800",
+   "coords": [
+    30.9129422,
+    3.0108404
+   ]
+  },
+  {
+   "key": "arusha-834",
+   "name": "Arusha",
+   "country": "TZ",
+   "isoNumeric": "834",
+   "coords": [
+    36.6829927,
+    -3.3869254
+   ]
+  },
+  {
+   "key": "asaba-566",
+   "name": "Asaba",
+   "country": "NG",
+   "isoNumeric": "566",
+   "coords": [
+    6.6959317,
+    6.2060187
+   ]
+  },
+  {
+   "key": "asheville-840",
+   "name": "Asheville",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -82.585142,
+    35.5829141
+   ]
+  },
+  {
+   "key": "astana-398",
+   "name": "Astana",
+   "country": "KZ",
+   "isoNumeric": "398",
+   "coords": [
+    71.4271173,
+    51.0930708
+   ]
+  },
+  {
+   "key": "athens-300",
+   "name": "Athens",
+   "country": "GR",
+   "isoNumeric": "300",
+   "coords": [
+    23.729095,
+    37.978615
+   ]
+  },
+  {
+   "key": "atlanta-840",
+   "name": "Atlanta",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -84.3812136,
+    33.8541967
+   ]
+  },
+  {
+   "key": "atlantic-city-840",
+   "name": "Atlantic City",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -74.4125549,
+    39.3648549
+   ]
+  },
+  {
+   "key": "auburn-840",
+   "name": "Auburn",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -85.3788422,
+    32.6482138
+   ]
+  },
+  {
+   "key": "austin-840",
+   "name": "Austin",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -97.7070115,
+    30.2756409
+   ]
+  },
+  {
+   "key": "ayodhya-356",
+   "name": "Ayodhya",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    82.1234156,
+    26.7700444
+   ]
+  },
+  {
+   "key": "bali-360",
+   "name": "Bali",
+   "country": "ID",
+   "isoNumeric": "360",
+   "coords": [
+    115.1316781,
+    -8.6521294
+   ]
+  },
+  {
+   "key": "baltimore-840",
+   "name": "Baltimore",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -76.6117028,
+    39.2717594
+   ]
+  },
+  {
+   "key": "bangalore-356",
+   "name": "Bangalore",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    77.6345008,
+    12.9329578
+   ]
+  },
+  {
+   "key": "bangkok-764",
+   "name": "Bangkok",
+   "country": "TH",
+   "isoNumeric": "764",
+   "coords": [
+    100.5507585,
+    13.7382354
+   ]
+  },
+  {
+   "key": "bar-harbor-840",
+   "name": "Bar Harbor",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -68.4256456,
+    44.5421049
+   ]
+  },
+  {
+   "key": "barcelona-724",
+   "name": "Barcelona",
+   "country": "ES",
+   "isoNumeric": "724",
+   "coords": [
+    2.168568,
+    41.3873974
+   ]
+  },
+  {
+   "key": "beirut-422",
+   "name": "Beirut",
+   "country": "LB",
+   "isoNumeric": "422",
+   "coords": [
+    35.5155539,
+    33.8936991
+   ]
+  },
+  {
+   "key": "belize-city-084",
+   "name": "Belize City",
+   "country": "BZ",
+   "isoNumeric": "084",
+   "coords": [
+    -88.1966856,
+    17.5060973
+   ]
+  },
+  {
+   "key": "belo-horizonte-076",
+   "name": "Belo Horizonte",
+   "country": "BR",
+   "isoNumeric": "076",
+   "coords": [
+    -43.9359697,
+    -19.9205943
+   ]
+  },
+  {
+   "key": "benin-city-566",
+   "name": "Benin City",
+   "country": "NG",
+   "isoNumeric": "566",
+   "coords": [
+    5.6037465,
+    6.334986
+   ]
+  },
+  {
+   "key": "berlin-276",
+   "name": "Berlin",
+   "country": "DE",
+   "isoNumeric": "276",
+   "coords": [
+    13.404954,
+    52.5200066
+   ]
+  },
+  {
+   "key": "bhilai-356",
+   "name": "Bhilai",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    81.32,
+    21.2073756
+   ]
+  },
+  {
+   "key": "bhopal-356",
+   "name": "Bhopal",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    77.4369615,
+    23.2134493
+   ]
+  },
+  {
+   "key": "bhubnasewar-356",
+   "name": "Bhubnasewar",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    85.8415598,
+    20.2692588
+   ]
+  },
+  {
+   "key": "bogota-170",
+   "name": "Bogota",
+   "country": "CO",
+   "isoNumeric": "170",
+   "coords": [
+    -74.072092,
+    4.7109886
+   ]
+  },
+  {
+   "key": "boise-840",
+   "name": "Boise",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -116.2050799,
+    43.6136107
+   ]
+  },
+  {
+   "key": "bordeaux-250",
+   "name": "Bordeaux",
+   "country": "FR",
+   "isoNumeric": "250",
+   "coords": [
+    -0.5737706,
+    44.8436579
+   ]
+  },
+  {
+   "key": "boston-840",
+   "name": "Boston",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -71.1022758,
+    42.3441874
+   ]
+  },
+  {
+   "key": "boulder-840",
+   "name": "Boulder",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -105.2747406,
+    40.0189728
+   ]
+  },
+  {
+   "key": "bowie-840",
+   "name": "Bowie",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -76.7343528,
+    38.9804469
+   ]
+  },
+  {
+   "key": "brasilia-076",
+   "name": "Brasilia",
+   "country": "BR",
+   "isoNumeric": "076",
+   "coords": [
+    -48.0077075,
+    -15.8330139
+   ]
+  },
+  {
+   "key": "bratislava-703",
+   "name": "Bratislava",
+   "country": "SK",
+   "isoNumeric": "703",
+   "coords": [
+    17.1262059,
+    48.1435945
+   ]
+  },
+  {
+   "key": "brisbane-036",
+   "name": "Brisbane",
+   "country": "AU",
+   "isoNumeric": "036",
+   "coords": [
+    153.0361616,
+    -27.462407
+   ]
+  },
+  {
+   "key": "brno-203",
+   "name": "Brno",
+   "country": "CZ",
+   "isoNumeric": "203",
+   "coords": [
+    16.6037854,
+    49.2077077
+   ]
+  },
+  {
+   "key": "brussels-056",
+   "name": "Brussels",
+   "country": "BE",
+   "isoNumeric": "056",
+   "coords": [
+    4.3651416,
+    50.8255775
+   ]
+  },
+  {
+   "key": "bucharest-642",
+   "name": "Bucharest",
+   "country": "RO",
+   "isoNumeric": "642",
+   "coords": [
+    26.1075064,
+    44.424979
+   ]
+  },
+  {
+   "key": "budapest-348",
+   "name": "Budapest",
+   "country": "HU",
+   "isoNumeric": "348",
+   "coords": [
+    19.0424983,
+    47.4776346
+   ]
+  },
+  {
+   "key": "buenos-aires-032",
+   "name": "Buenos Aires",
+   "country": "AR",
+   "isoNumeric": "032",
+   "coords": [
+    -58.4334377,
+    -34.5974787
+   ]
+  },
+  {
+   "key": "buffalo-840",
+   "name": "Buffalo",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -78.1824829,
+    42.9972688
+   ]
+  },
+  {
+   "key": "bulawayo-716",
+   "name": "Bulawayo",
+   "country": "ZW",
+   "isoNumeric": "716",
+   "coords": [
+    28.5954099,
+    -20.1990579
+   ]
+  },
+  {
+   "key": "butwal-524",
+   "name": "Butwal",
+   "country": "NP",
+   "isoNumeric": "524",
+   "coords": [
+    83.4621997,
+    27.6784517
+   ]
+  },
+  {
+   "key": "buzios-076",
+   "name": "Búzios",
+   "country": "BR",
+   "isoNumeric": "076",
+   "coords": [
+    -41.9435137,
+    -22.7577602
+   ]
+  },
+  {
+   "key": "cairo-818",
+   "name": "Cairo",
+   "country": "EG",
+   "isoNumeric": "818",
+   "coords": [
+    31.2751326,
+    29.9698068
+   ]
+  },
+  {
+   "key": "calabar-566",
+   "name": "Calabar",
+   "country": "NG",
+   "isoNumeric": "566",
+   "coords": [
+    8.338034,
+    4.949974
+   ]
+  },
+  {
+   "key": "calavi-204",
+   "name": "Calavi",
+   "country": "BJ",
+   "isoNumeric": "204",
+   "coords": [
+    2.3468195,
+    6.4503024
+   ]
+  },
+  {
+   "key": "calgary-124",
+   "name": "Calgary",
+   "country": "CA",
+   "isoNumeric": "124",
+   "coords": [
+    -114.0359142,
+    51.042172
+   ]
+  },
+  {
+   "key": "cali-170",
+   "name": "Cali",
+   "country": "CO",
+   "isoNumeric": "170",
+   "coords": [
+    -76.5258443,
+    3.4546352
+   ]
+  },
+  {
+   "key": "campinas-076",
+   "name": "Campinas",
+   "country": "BR",
+   "isoNumeric": "076",
+   "coords": [
+    -47.0661904,
+    -22.8823419
+   ]
+  },
+  {
+   "key": "cannes-250",
+   "name": "Cannes",
+   "country": "FR",
+   "isoNumeric": "250",
+   "coords": [
+    7.0119269,
+    43.5504977
+   ]
+  },
+  {
+   "key": "cape-town-710",
+   "name": "Cape Town",
+   "country": "ZA",
+   "isoNumeric": "710",
+   "coords": [
+    18.4131011,
+    -33.9259257
+   ]
+  },
+  {
+   "key": "caracas-862",
+   "name": "Caracas",
+   "country": "VE",
+   "isoNumeric": "862",
+   "coords": [
+    -66.9016322,
+    10.504863
+   ]
+  },
+  {
+   "key": "cartagena-de-indias-170",
+   "name": "Cartagena de Indias",
+   "country": "CO",
+   "isoNumeric": "170",
+   "coords": [
+    -75.5487997,
+    10.4242298
+   ]
+  },
+  {
+   "key": "casablanca-504",
+   "name": "Casablanca",
+   "country": "MA",
+   "isoNumeric": "504",
+   "coords": [
+    -7.5898434,
+    33.5731104
+   ]
+  },
+  {
+   "key": "catania-380",
+   "name": "Catania",
+   "country": "IT",
+   "isoNumeric": "380",
+   "coords": [
+    15.0933662,
+    37.5006763
+   ]
+  },
+  {
+   "key": "cayman-islands-136",
+   "name": "Cayman Islands",
+   "country": "KY",
+   "isoNumeric": "136",
+   "coords": [
+    -81.3773325,
+    19.322021
+   ]
+  },
+  {
+   "key": "cedar-rapids-840",
+   "name": "Cedar Rapids",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -91.6987076,
+    42.021208
+   ]
+  },
+  {
+   "key": "chandigarh-356",
+   "name": "Chandigarh",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    76.6860888,
+    30.7074933
+   ]
+  },
+  {
+   "key": "charleston-840",
+   "name": "Charleston",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -79.9319664,
+    32.7833163
+   ]
+  },
+  {
+   "key": "charlotte-840",
+   "name": "Charlotte",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -80.8565581,
+    35.2223793
+   ]
+  },
+  {
+   "key": "chengdu-156",
+   "name": "Chengdu",
+   "country": "CN",
+   "isoNumeric": "156",
+   "coords": [
+    104.0665099,
+    30.5722599
+   ]
+  },
+  {
+   "key": "chennai-356",
+   "name": "Chennai",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    80.2249012,
+    13.0910814
+   ]
+  },
+  {
+   "key": "chiang-mai-764",
+   "name": "Chiang Mai",
+   "country": "TH",
+   "isoNumeric": "764",
+   "coords": [
+    98.9934344,
+    18.7937537
+   ]
+  },
+  {
+   "key": "chicago-840",
+   "name": "Chicago",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -87.6512054,
+    41.8892373
+   ]
+  },
+  {
+   "key": "chongqing-156",
+   "name": "Chongqing",
+   "country": "CN",
+   "isoNumeric": "156",
+   "coords": [
+    106.5511838,
+    29.5656843
+   ]
+  },
+  {
+   "key": "christchurch-554",
+   "name": "Christchurch",
+   "country": "NZ",
+   "isoNumeric": "554",
+   "coords": [
+    172.584499,
+    -43.52323
+   ]
+  },
+  {
+   "key": "cincinnati-840",
+   "name": "Cincinnati",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -84.5203323,
+    39.1181056
+   ]
+  },
+  {
+   "key": "cleveland-840",
+   "name": "Cleveland",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -81.690206,
+    41.499983
+   ]
+  },
+  {
+   "key": "cluj-642",
+   "name": "Cluj",
+   "country": "RO",
+   "isoNumeric": "642",
+   "coords": [
+    23.6236353,
+    46.7712101
+   ]
+  },
+  {
+   "key": "cochabamba-068",
+   "name": "Cochabamba",
+   "country": "BO",
+   "isoNumeric": "068",
+   "coords": [
+    -66.152316,
+    -17.378669
+   ]
+  },
+  {
+   "key": "coimbatore-356",
+   "name": "Coimbatore",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    76.9717074,
+    10.9283089
+   ]
+  },
+  {
+   "key": "colombo-144",
+   "name": "Colombo",
+   "country": "LK",
+   "isoNumeric": "144",
+   "coords": [
+    79.8588758,
+    6.9177326
+   ]
+  },
+  {
+   "key": "columbus-840",
+   "name": "Columbus",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -83.1098568,
+    40.1012163
+   ]
+  },
+  {
+   "key": "copenhagen-208",
+   "name": "Copenhagen",
+   "country": "DK",
+   "isoNumeric": "208",
+   "coords": [
+    12.567107,
+    55.678406
+   ]
+  },
+  {
+   "key": "cordoba-032",
+   "name": "Córdoba",
+   "country": "AR",
+   "isoNumeric": "032",
+   "coords": [
+    -64.1913065,
+    -31.4225101
+   ]
+  },
+  {
+   "key": "craiova-642",
+   "name": "Craiova",
+   "country": "RO",
+   "isoNumeric": "642",
+   "coords": [
+    23.7948807,
+    44.3301785
+   ]
+  },
+  {
+   "key": "cuenca-218",
+   "name": "Cuenca",
+   "country": "EC",
+   "isoNumeric": "218",
+   "coords": [
+    -79.0017371,
+    -2.9191939
+   ]
+  },
+  {
+   "key": "culiacan-484",
+   "name": "Culiacán",
+   "country": "MX",
+   "isoNumeric": "484",
+   "coords": [
+    -107.420605,
+    24.7988707
+   ]
+  },
+  {
+   "key": "curitiba-076",
+   "name": "Curitiba",
+   "country": "BR",
+   "isoNumeric": "076",
+   "coords": [
+    -49.243164,
+    -25.420216
+   ]
+  },
+  {
+   "key": "cuzco-604",
+   "name": "Cuzco",
+   "country": "PE",
+   "isoNumeric": "604",
+   "coords": [
+    -71.9783998,
+    -13.5175709
+   ]
+  },
+  {
+   "key": "da-nang-704",
+   "name": "Da Nang",
+   "country": "VN",
+   "isoNumeric": "704",
+   "coords": [
+    108.2021667,
+    16.0544068
+   ]
+  },
+  {
+   "key": "dali-156",
+   "name": "Dali",
+   "country": "CN",
+   "isoNumeric": "156",
+   "coords": [
+    100.26764,
+    25.6064799
+   ]
+  },
+  {
+   "key": "dallas-840",
+   "name": "Dallas",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -97.0632798,
+    32.9914905
+   ]
+  },
+  {
+   "key": "dar-es-salaam-834",
+   "name": "Dar es Salaam",
+   "country": "TZ",
+   "isoNumeric": "834",
+   "coords": [
+    39.2894367,
+    -6.8165054
+   ]
+  },
+  {
+   "key": "dehradun-356",
+   "name": "Dehradun",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    78.0468858,
+    30.3154217
+   ]
+  },
+  {
+   "key": "delhi-356",
+   "name": "Delhi",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    77.2188579,
+    28.6341813
+   ]
+  },
+  {
+   "key": "denver-840",
+   "name": "Denver",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -104.9872297,
+    39.7347116
+   ]
+  },
+  {
+   "key": "detroit-840",
+   "name": "Detroit",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -83.073206,
+    42.3694879
+   ]
+  },
+  {
+   "key": "diani-404",
+   "name": "Diani",
+   "country": "KE",
+   "isoNumeric": "404",
+   "coords": [
+    39.586991,
+    -4.287741
+   ]
+  },
+  {
+   "key": "doha-634",
+   "name": "Doha",
+   "country": "QA",
+   "isoNumeric": "634",
+   "coords": [
+    51.4953333,
+    25.3186996
+   ]
+  },
+  {
+   "key": "dubai-784",
+   "name": "Dubai",
+   "country": "AE",
+   "isoNumeric": "784",
+   "coords": [
+    55.2852632,
+    25.2245263
+   ]
+  },
+  {
+   "key": "dublin-372",
+   "name": "Dublin",
+   "country": "IE",
+   "isoNumeric": "372",
+   "coords": [
+    -6.2688237,
+    53.3491652
+   ]
+  },
+  {
+   "key": "durban-710",
+   "name": "Durban",
+   "country": "ZA",
+   "isoNumeric": "710",
+   "coords": [
+    30.9914354,
+    -29.8718348
+   ]
+  },
+  {
+   "key": "durham-840",
+   "name": "Durham",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -78.8952183,
+    35.9894948
+   ]
+  },
+  {
+   "key": "dusseldorf-276",
+   "name": "Dusseldorf",
+   "country": "DE",
+   "isoNumeric": "276",
+   "coords": [
+    6.7716371,
+    51.2245391
+   ]
+  },
+  {
+   "key": "ebonyi-566",
+   "name": "Ebonyi",
+   "country": "NG",
+   "isoNumeric": "566",
+   "coords": [
+    8.0962642,
+    6.3380092
+   ]
+  },
+  {
+   "key": "edmonton-124",
+   "name": "Edmonton",
+   "country": "CA",
+   "isoNumeric": "124",
+   "coords": [
+    -113.5839743,
+    53.5335996
+   ]
+  },
+  {
+   "key": "el-hatillo-862",
+   "name": "El Hatillo",
+   "country": "VE",
+   "isoNumeric": "862",
+   "coords": [
+    -66.8057195,
+    10.4063266
+   ]
+  },
+  {
+   "key": "entebbe-800",
+   "name": "Entebbe",
+   "country": "UG",
+   "isoNumeric": "800",
+   "coords": [
+    32.4239527,
+    0.1591738
+   ]
+  },
+  {
+   "key": "enugu-city-566",
+   "name": "Enugu City",
+   "country": "NG",
+   "isoNumeric": "566",
+   "coords": [
+    7.4905916,
+    6.4428705
+   ]
+  },
+  {
+   "key": "faridabad-356",
+   "name": "Faridabad",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    77.323582,
+    28.3952498
+   ]
+  },
+  {
+   "key": "faryab-004",
+   "name": "Faryab",
+   "country": "AF",
+   "isoNumeric": "004",
+   "coords": [
+    64.8644455,
+    36.2382799
+   ]
+  },
+  {
+   "key": "florence-380",
+   "name": "Florence",
+   "country": "IT",
+   "isoNumeric": "380",
+   "coords": [
+    11.2399589,
+    43.7649912
+   ]
+  },
+  {
+   "key": "florianopolis-076",
+   "name": "Florianopolis",
+   "country": "BR",
+   "isoNumeric": "076",
+   "coords": [
+    -48.4995384,
+    -27.4386827
+   ]
+  },
+  {
+   "key": "fort-lauderdale-840",
+   "name": "Fort Lauderdale",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -80.1289479,
+    26.0837197
+   ]
+  },
+  {
+   "key": "fortaleza-076",
+   "name": "Fortaleza",
+   "country": "BR",
+   "isoNumeric": "076",
+   "coords": [
+    -38.3946627,
+    -3.8435532
+   ]
+  },
+  {
+   "key": "francistown-072",
+   "name": "Francistown",
+   "country": "BW",
+   "isoNumeric": "072",
+   "coords": [
+    27.5143603,
+    -21.1661005
+   ]
+  },
+  {
+   "key": "frankfurt-276",
+   "name": "Frankfurt",
+   "country": "DE",
+   "isoNumeric": "276",
+   "coords": [
+    8.6897888,
+    50.1207675
+   ]
+  },
+  {
+   "key": "gaborone-072",
+   "name": "Gaborone",
+   "country": "BW",
+   "isoNumeric": "072",
+   "coords": [
+    25.9103281,
+    -24.6399625
+   ]
+  },
+  {
+   "key": "galle-144",
+   "name": "Galle",
+   "country": "LK",
+   "isoNumeric": "144",
+   "coords": [
+    80.2048328,
+    6.0568913
+   ]
+  },
+  {
+   "key": "gandhinagar-356",
+   "name": "Gandhinagar",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    72.6307728,
+    23.1850233
+   ]
+  },
+  {
+   "key": "gangtok-356",
+   "name": "Gangtok",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    88.621843,
+    27.3632048
+   ]
+  },
+  {
+   "key": "general-santos-608",
+   "name": "General Santos",
+   "country": "PH",
+   "isoNumeric": "608",
+   "coords": [
+    125.1913251,
+    6.1298536
+   ]
+  },
+  {
+   "key": "ghaziabad-356",
+   "name": "Ghaziabad",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    77.3686902,
+    28.6402307
+   ]
+  },
+  {
+   "key": "goa-356",
+   "name": "Goa",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    73.9577247,
+    15.284413
+   ]
+  },
+  {
+   "key": "gorakhpur-356",
+   "name": "Gorakhpur",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    83.3893477,
+    26.7974376
+   ]
+  },
+  {
+   "key": "goshen-840",
+   "name": "Goshen",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -85.8334748,
+    41.5866625
+   ]
+  },
+  {
+   "key": "goteborg-752",
+   "name": "Göteborg",
+   "country": "SE",
+   "isoNumeric": "752",
+   "coords": [
+    11.973819,
+    57.7006211
+   ]
+  },
+  {
+   "key": "gotemba-392",
+   "name": "Gotemba",
+   "country": "JP",
+   "isoNumeric": "392",
+   "coords": [
+    138.9338928,
+    35.3008647
+   ]
+  },
+  {
+   "key": "guadalajara-484",
+   "name": "Guadalajara",
+   "country": "MX",
+   "isoNumeric": "484",
+   "coords": [
+    -103.4036256,
+    20.6658578
+   ]
+  },
+  {
+   "key": "gualeguaychu-entre-rios-032",
+   "name": "Gualeguaychú Entre Ríos",
+   "country": "AR",
+   "isoNumeric": "032",
+   "coords": [
+    -58.5094879,
+    -33.0278221
+   ]
+  },
+  {
+   "key": "guangzhou-156",
+   "name": "Guangzhou",
+   "country": "CN",
+   "isoNumeric": "156",
+   "coords": [
+    113.3401572,
+    23.107481
+   ]
+  },
+  {
+   "key": "guatemala-city-320",
+   "name": "Guatemala City",
+   "country": "GT",
+   "isoNumeric": "320",
+   "coords": [
+    -90.5559264,
+    14.633098
+   ]
+  },
+  {
+   "key": "guayaquil-218",
+   "name": "Guayaquil",
+   "country": "EC",
+   "isoNumeric": "218",
+   "coords": [
+    -79.9188249,
+    -2.1619679
+   ]
+  },
+  {
+   "key": "guaynabo-630",
+   "name": "Guaynabo",
+   "country": "PR",
+   "isoNumeric": "630",
+   "coords": [
+    -66.1317816,
+    18.3744502
+   ]
+  },
+  {
+   "key": "gurgaon-356",
+   "name": "Gurgaon",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    77.039337,
+    28.4180177
+   ]
+  },
+  {
+   "key": "guwahati-356",
+   "name": "Guwahati",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    91.7984168,
+    26.1385675
+   ]
+  },
+  {
+   "key": "gwalior-356",
+   "name": "Gwalior",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    78.1876472,
+    26.2193778
+   ]
+  },
+  {
+   "key": "gyumri-051",
+   "name": "Gyumri",
+   "country": "AM",
+   "isoNumeric": "051",
+   "coords": [
+    43.8458252,
+    40.7836151
+   ]
+  },
+  {
+   "key": "haifa-376",
+   "name": "Haifa",
+   "country": "IL",
+   "isoNumeric": "376",
+   "coords": [
+    34.9983417,
+    32.8207003
+   ]
+  },
+  {
+   "key": "halifax-124",
+   "name": "Halifax",
+   "country": "CA",
+   "isoNumeric": "124",
+   "coords": [
+    -63.5757995,
+    44.6474006
+   ]
+  },
+  {
+   "key": "hamburg-276",
+   "name": "Hamburg",
+   "country": "DE",
+   "isoNumeric": "276",
+   "coords": [
+    10.0002985,
+    53.5675734
+   ]
+  },
+  {
+   "key": "hangzhou-156",
+   "name": "Hangzhou",
+   "country": "CN",
+   "isoNumeric": "156",
+   "coords": [
+    120.30812,
+    30.21908
+   ]
+  },
+  {
+   "key": "hanoi-704",
+   "name": "Hanoi",
+   "country": "VN",
+   "isoNumeric": "704",
+   "coords": [
+    105.82358,
+    21.009282
+   ]
+  },
+  {
+   "key": "harare-716",
+   "name": "Harare",
+   "country": "ZW",
+   "isoNumeric": "716",
+   "coords": [
+    31.0926105,
+    -17.7638552
+   ]
+  },
+  {
+   "key": "hardoi-356",
+   "name": "Hardoi",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    79.9637755,
+    27.2943253
+   ]
+  },
+  {
+   "key": "helsinki-246",
+   "name": "Helsinki",
+   "country": "FI",
+   "isoNumeric": "246",
+   "coords": [
+    24.9652824,
+    60.1665019
+   ]
+  },
+  {
+   "key": "ho-chi-minh-city-704",
+   "name": "Ho Chi Minh City",
+   "country": "VN",
+   "isoNumeric": "704",
+   "coords": [
+    106.6296638,
+    10.8230989
+   ]
+  },
+  {
+   "key": "hong-kong-344",
+   "name": "Hong Kong",
+   "country": "HK",
+   "isoNumeric": "344",
+   "coords": [
+    114.164897,
+    22.2775707
+   ]
+  },
+  {
+   "key": "honolulu-840",
+   "name": "Honolulu",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -157.7838828,
+    21.2790165
+   ]
+  },
+  {
+   "key": "houston-840",
+   "name": "Houston",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -95.5689387,
+    29.7955188
+   ]
+  },
+  {
+   "key": "huancayo-604",
+   "name": "Huancayo",
+   "country": "PE",
+   "isoNumeric": "604",
+   "coords": [
+    -75.2149596,
+    -12.0583253
+   ]
+  },
+  {
+   "key": "hue-city-704",
+   "name": "Hue City",
+   "country": "VN",
+   "isoNumeric": "704",
+   "coords": [
+    107.6088006,
+    16.4811451
+   ]
+  },
+  {
+   "key": "hyderabad-356",
+   "name": "Hyderabad",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    78.3762995,
+    17.4414533
+   ]
+  },
+  {
+   "key": "ibadan-566",
+   "name": "Ibadan",
+   "country": "NG",
+   "isoNumeric": "566",
+   "coords": [
+    3.9072107,
+    7.4516453
+   ]
+  },
+  {
+   "key": "idaho-falls-840",
+   "name": "Idaho Falls",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -112.0012825,
+    43.4808181
+   ]
+  },
+  {
+   "key": "ijoko-566",
+   "name": "Ijoko",
+   "country": "NG",
+   "isoNumeric": "566",
+   "coords": [
+    3.2783132,
+    6.7315738
+   ]
+  },
+  {
+   "key": "ilocos-608",
+   "name": "Ilocos",
+   "country": "PH",
+   "isoNumeric": "608",
+   "coords": [
+    120.3956408,
+    17.5798535
+   ]
+  },
+  {
+   "key": "imphal-356",
+   "name": "Imphal",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    93.9285662,
+    24.7933831
+   ]
+  },
+  {
+   "key": "indianapolis-840",
+   "name": "Indianapolis",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -86.1534673,
+    39.7714497
+   ]
+  },
+  {
+   "key": "indore-356",
+   "name": "Indore",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    75.8911285,
+    22.7337004
+   ]
+  },
+  {
+   "key": "isla-margarita-862",
+   "name": "Isla Margarita",
+   "country": "VE",
+   "isoNumeric": "862",
+   "coords": [
+    -63.8274533,
+    10.9519951
+   ]
+  },
+  {
+   "key": "islamabad-586",
+   "name": "Islamabad",
+   "country": "PK",
+   "isoNumeric": "586",
+   "coords": [
+    73.0362897,
+    33.6995086
+   ]
+  },
+  {
+   "key": "istanbul-792",
+   "name": "Istanbul",
+   "country": "TR",
+   "isoNumeric": "792",
+   "coords": [
+    29.0261952,
+    40.9896068
+   ]
+  },
+  {
+   "key": "itahari-524",
+   "name": "Itahari",
+   "country": "NP",
+   "isoNumeric": "524",
+   "coords": [
+    87.2614539,
+    26.6664207
+   ]
+  },
+  {
+   "key": "itanagar-356",
+   "name": "Itanagar",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    93.6160678,
+    27.0915464
+   ]
+  },
+  {
+   "key": "jabalpur-356",
+   "name": "Jabalpur",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    79.9357267,
+    23.147008
+   ]
+  },
+  {
+   "key": "jacksonville-840",
+   "name": "Jacksonville",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -81.5208382,
+    30.2441828
+   ]
+  },
+  {
+   "key": "jaipur-356",
+   "name": "Jaipur",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    75.8006803,
+    26.8492145
+   ]
+  },
+  {
+   "key": "jakarta-360",
+   "name": "Jakarta",
+   "country": "ID",
+   "isoNumeric": "360",
+   "coords": [
+    106.791869,
+    -6.2437987
+   ]
+  },
+  {
+   "key": "jalandhar-356",
+   "name": "Jalandhar",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    75.566024,
+    31.3211988
+   ]
+  },
+  {
+   "key": "jammu-356",
+   "name": "Jammu",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    74.8724867,
+    32.7052406
+   ]
+  },
+  {
+   "key": "jamshedpur-356",
+   "name": "Jamshedpur",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    86.2121667,
+    22.8372302
+   ]
+  },
+  {
+   "key": "janakpur-524",
+   "name": "Janakpur",
+   "country": "NP",
+   "isoNumeric": "524",
+   "coords": [
+    85.928968,
+    26.7294588
+   ]
+  },
+  {
+   "key": "jhansi-356",
+   "name": "Jhansi",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    78.5655487,
+    25.4438305
+   ]
+  },
+  {
+   "key": "jinja-800",
+   "name": "Jinja",
+   "country": "UG",
+   "isoNumeric": "800",
+   "coords": [
+    33.2100117,
+    0.4279492
+   ]
+  },
+  {
+   "key": "johannesberg-710",
+   "name": "Johannesberg",
+   "country": "ZA",
+   "isoNumeric": "710",
+   "coords": [
+    28.0225656,
+    -26.1143536
+   ]
+  },
+  {
+   "key": "kabul-004",
+   "name": "Kabul",
+   "country": "AF",
+   "isoNumeric": "004",
+   "coords": [
+    69.167156,
+    34.5407947
+   ]
+  },
+  {
+   "key": "kaduna-566",
+   "name": "Kaduna",
+   "country": "NG",
+   "isoNumeric": "566",
+   "coords": [
+    7.4336327,
+    10.4689473
+   ]
+  },
+  {
+   "key": "kampala-800",
+   "name": "Kampala",
+   "country": "UG",
+   "isoNumeric": "800",
+   "coords": [
+    32.622006,
+    0.3178246
+   ]
+  },
+  {
+   "key": "kandy-144",
+   "name": "Kandy",
+   "country": "LK",
+   "isoNumeric": "144",
+   "coords": [
+    80.6244448,
+    7.2846957
+   ]
+  },
+  {
+   "key": "kanpur-356",
+   "name": "Kanpur",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    80.3164557,
+    26.4810725
+   ]
+  },
+  {
+   "key": "kansas-city-840",
+   "name": "Kansas City",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -94.5974927,
+    39.0573858
+   ]
+  },
+  {
+   "key": "kara-768",
+   "name": "Kara",
+   "country": "TG",
+   "isoNumeric": "768",
+   "coords": [
+    1.1977158,
+    9.5486112
+   ]
+  },
+  {
+   "key": "karachi-586",
+   "name": "Karachi",
+   "country": "PK",
+   "isoNumeric": "586",
+   "coords": [
+    67.0951109,
+    24.8752942
+   ]
+  },
+  {
+   "key": "kathmandu-524",
+   "name": "Kathmandu",
+   "country": "NP",
+   "isoNumeric": "524",
+   "coords": [
+    85.3211928,
+    27.7179539
+   ]
+  },
+  {
+   "key": "keffi-566",
+   "name": "Keffi",
+   "country": "NG",
+   "isoNumeric": "566",
+   "coords": [
+    7.6996436,
+    8.9564876
+   ]
+  },
+  {
+   "key": "kelowna-124",
+   "name": "Kelowna",
+   "country": "CA",
+   "isoNumeric": "124",
+   "coords": [
+    -119.4956226,
+    49.8164925
+   ]
+  },
+  {
+   "key": "kigali-646",
+   "name": "Kigali",
+   "country": "RW",
+   "isoNumeric": "646",
+   "coords": [
+    30.1071327,
+    -2.0152949
+   ]
+  },
+  {
+   "key": "kilifi-404",
+   "name": "Kilifi",
+   "country": "KE",
+   "isoNumeric": "404",
+   "coords": [
+    39.834938,
+    -3.621596
+   ]
+  },
+  {
+   "key": "kisumu-404",
+   "name": "Kisumu",
+   "country": "KE",
+   "isoNumeric": "404",
+   "coords": [
+    34.7699371,
+    -0.1072075
+   ]
+  },
+  {
+   "key": "kitwe-894",
+   "name": "Kitwe",
+   "country": "ZM",
+   "isoNumeric": "894",
+   "coords": [
+    28.239582,
+    -12.8054705
+   ]
+  },
+  {
+   "key": "kochi-356",
+   "name": "Kochi",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    76.3075593,
+    9.9982971
+   ]
+  },
+  {
+   "key": "koh-phangan-764",
+   "name": "Koh Phangan",
+   "country": "TH",
+   "isoNumeric": "764",
+   "coords": [
+    99.9984736,
+    9.7126955
+   ]
+  },
+  {
+   "key": "kohima-356",
+   "name": "Kohima",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    94.0959615,
+    25.6572502
+   ]
+  },
+  {
+   "key": "kolkata-356",
+   "name": "Kolkata",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    88.3270388,
+    22.563838
+   ]
+  },
+  {
+   "key": "kollam-356",
+   "name": "Kollam",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    76.6081582,
+    8.8954122
+   ]
+  },
+  {
+   "key": "kosice-703",
+   "name": "Kosice",
+   "country": "SK",
+   "isoNumeric": "703",
+   "coords": [
+    21.2559752,
+    48.7289906
+   ]
+  },
+  {
+   "key": "kota-356",
+   "name": "Kota",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    75.8313793,
+    25.2059711
+   ]
+  },
+  {
+   "key": "kozhikode-356",
+   "name": "Kozhikode",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    75.787114,
+    11.2651518
+   ]
+  },
+  {
+   "key": "kuala-lumpur-458",
+   "name": "Kuala Lumpur",
+   "country": "MY",
+   "isoNumeric": "458",
+   "coords": [
+    101.6938055,
+    3.0700809
+   ]
+  },
+  {
+   "key": "kumamoto-392",
+   "name": "Kumamoto",
+   "country": "JP",
+   "isoNumeric": "392",
+   "coords": [
+    130.7079369,
+    32.8032164
+   ]
+  },
+  {
+   "key": "kwara-566",
+   "name": "Kwara",
+   "country": "NG",
+   "isoNumeric": "566",
+   "coords": [
+    4.3874051,
+    8.9668961
+   ]
+  },
+  {
+   "key": "kyiv-804",
+   "name": "Kyiv",
+   "country": "UA",
+   "isoNumeric": "804",
+   "coords": [
+    30.4135476,
+    50.4615108
+   ]
+  },
+  {
+   "key": "la-paz-068",
+   "name": "La Paz",
+   "country": "BO",
+   "isoNumeric": "068",
+   "coords": [
+    -68.1212091,
+    -16.494359
+   ]
+  },
+  {
+   "key": "la-plata-032",
+   "name": "La Plata",
+   "country": "AR",
+   "isoNumeric": "032",
+   "coords": [
+    -57.9503368,
+    -34.9239165
+   ]
+  },
+  {
+   "key": "laax-756",
+   "name": "Laax",
+   "country": "CH",
+   "isoNumeric": "756",
+   "coords": [
+    9.264986,
+    46.8189616
+   ]
+  },
+  {
+   "key": "lagos-566",
+   "name": "Lagos",
+   "country": "NG",
+   "isoNumeric": "566",
+   "coords": [
+    3.4174549,
+    6.4413507
+   ]
+  },
+  {
+   "key": "laguna-608",
+   "name": "Laguna",
+   "country": "PH",
+   "isoNumeric": "608",
+   "coords": [
+    121.1819133,
+    14.1809635
+   ]
+  },
+  {
+   "key": "lahore-586",
+   "name": "Lahore",
+   "country": "PK",
+   "isoNumeric": "586",
+   "coords": [
+    74.4694048,
+    31.4732702
+   ]
+  },
+  {
+   "key": "lamu-404",
+   "name": "Lamu",
+   "country": "KE",
+   "isoNumeric": "404",
+   "coords": [
+    40.90262,
+    -2.2683596
+   ]
+  },
+  {
+   "key": "las-palmas-de-gran-canaria-724",
+   "name": "Las Palmas de Gran Canaria",
+   "country": "ES",
+   "isoNumeric": "724",
+   "coords": [
+    -19.9249708,
+    11.641798
+   ]
+  },
+  {
+   "key": "las-pinas-608",
+   "name": "Las Pinas",
+   "country": "PH",
+   "isoNumeric": "608",
+   "coords": [
+    120.9820099,
+    14.4345932
+   ]
+  },
+  {
+   "key": "las-vegas-840",
+   "name": "Las Vegas",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -115.1785856,
+    36.068177
+   ]
+  },
+  {
+   "key": "leon-558",
+   "name": "León",
+   "country": "NI",
+   "isoNumeric": "558",
+   "coords": [
+    -86.8760037,
+    12.4368418
+   ]
+  },
+  {
+   "key": "lima-604",
+   "name": "Lima",
+   "country": "PE",
+   "isoNumeric": "604",
+   "coords": [
+    -77.0264497,
+    -12.1203231
+   ]
+  },
+  {
+   "key": "limassol-196",
+   "name": "Limassol",
+   "country": "CY",
+   "isoNumeric": "196",
+   "coords": [
+    33.0430537,
+    34.6766336
+   ]
+  },
+  {
+   "key": "lisbon-620",
+   "name": "Lisbon",
+   "country": "PT",
+   "isoNumeric": "620",
+   "coords": [
+    -9.1505422,
+    38.7476311
+   ]
+  },
+  {
+   "key": "lokoja-city-566",
+   "name": "Lokoja City",
+   "country": "NG",
+   "isoNumeric": "566",
+   "coords": [
+    6.7039912,
+    7.7930273
+   ]
+  },
+  {
+   "key": "lome-768",
+   "name": "Lomé",
+   "country": "TG",
+   "isoNumeric": "768",
+   "coords": [
+    1.1918594,
+    6.1940875
+   ]
+  },
+  {
+   "key": "london-826",
+   "name": "London",
+   "country": "GB",
+   "isoNumeric": "826",
+   "coords": [
+    -0.2030599,
+    51.5213649
+   ]
+  },
+  {
+   "key": "los-angeles-840",
+   "name": "Los Angeles",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -118.3465829,
+    34.0837044
+   ]
+  },
+  {
+   "key": "lucknow-356",
+   "name": "Lucknow",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    81.0120006,
+    26.8649612
+   ]
+  },
+  {
+   "key": "ludhiana-356",
+   "name": "Ludhiana",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    75.8035843,
+    30.8870302
+   ]
+  },
+  {
+   "key": "lusaka-894",
+   "name": "Lusaka",
+   "country": "ZM",
+   "isoNumeric": "894",
+   "coords": [
+    28.315071,
+    -15.3928488
+   ]
+  },
+  {
+   "key": "luxembourg-442",
+   "name": "Luxembourg",
+   "country": "LU",
+   "isoNumeric": "442",
+   "coords": [
+    6.1302604,
+    49.6049141
+   ]
+  },
+  {
+   "key": "lviv-804",
+   "name": "Lviv",
+   "country": "UA",
+   "isoNumeric": "804",
+   "coords": [
+    23.9832309,
+    49.811661
+   ]
+  },
+  {
+   "key": "macae-076",
+   "name": "Macaé",
+   "country": "BR",
+   "isoNumeric": "076",
+   "coords": [
+    -41.7901757,
+    -22.3957033
+   ]
+  },
+  {
+   "key": "madrid-724",
+   "name": "Madrid",
+   "country": "ES",
+   "isoNumeric": "724",
+   "coords": [
+    -3.6866274,
+    40.4461898
+   ]
+  },
+  {
+   "key": "madurai-356",
+   "name": "Madurai",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    78.1479601,
+    9.9325562
+   ]
+  },
+  {
+   "key": "malaga-724",
+   "name": "Málaga",
+   "country": "ES",
+   "isoNumeric": "724",
+   "coords": [
+    -4.3785555,
+    36.7220103
+   ]
+  },
+  {
+   "key": "manchester-826",
+   "name": "Manchester",
+   "country": "GB",
+   "isoNumeric": "826",
+   "coords": [
+    -2.2443473,
+    53.481169
+   ]
+  },
+  {
+   "key": "mangalore-356",
+   "name": "Mangalore",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    74.8468173,
+    12.8628
+   ]
+  },
+  {
+   "key": "manila-608",
+   "name": "Manila",
+   "country": "PH",
+   "isoNumeric": "608",
+   "coords": [
+    121.0319369,
+    14.5641625
+   ]
+  },
+  {
+   "key": "maracaibo-862",
+   "name": "Maracaibo",
+   "country": "VE",
+   "isoNumeric": "862",
+   "coords": [
+    -71.6274497,
+    10.6567598
+   ]
+  },
+  {
+   "key": "markudi-566",
+   "name": "Markudi",
+   "country": "NG",
+   "isoNumeric": "566",
+   "coords": [
+    8.5602245,
+    7.7258279
+   ]
+  },
+  {
+   "key": "mathura-356",
+   "name": "Mathura",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    77.5925465,
+    27.6046202
+   ]
+  },
+  {
+   "key": "maullin-152",
+   "name": "Maullin",
+   "country": "CL",
+   "isoNumeric": "152",
+   "coords": [
+    -73.6016737,
+    -41.6183881
+   ]
+  },
+  {
+   "key": "mazar-e-sharif-004",
+   "name": "Mazar-e-Sharif",
+   "country": "AF",
+   "isoNumeric": "004",
+   "coords": [
+    67.1109831,
+    36.7091602
+   ]
+  },
+  {
+   "key": "mbarara-800",
+   "name": "Mbarara",
+   "country": "UG",
+   "isoNumeric": "800",
+   "coords": [
+    30.6472789,
+    -0.5943867
+   ]
+  },
+  {
+   "key": "mechelen-056",
+   "name": "Mechelen",
+   "country": "BE",
+   "isoNumeric": "056",
+   "coords": [
+    4.4793443,
+    51.0279827
+   ]
+  },
+  {
+   "key": "medellin-170",
+   "name": "Medellin",
+   "country": "CO",
+   "isoNumeric": "170",
+   "coords": [
+    -75.5641844,
+    6.2077896
+   ]
+  },
+  {
+   "key": "melbourne-036",
+   "name": "Melbourne",
+   "country": "AU",
+   "isoNumeric": "036",
+   "coords": [
+    144.9932271,
+    -37.8270136
+   ]
+  },
+  {
+   "key": "memphis-840",
+   "name": "Memphis",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -90.05177,
+    35.1460383
+   ]
+  },
+  {
+   "key": "mendoza-032",
+   "name": "Mendoza",
+   "country": "AR",
+   "isoNumeric": "032",
+   "coords": [
+    -68.8526267,
+    -32.8925639
+   ]
+  },
+  {
+   "key": "merida-484",
+   "name": "Merida",
+   "country": "MX",
+   "isoNumeric": "484",
+   "coords": [
+    -89.60584,
+    20.9974112
+   ]
+  },
+  {
+   "key": "mexico-city-484",
+   "name": "Mexico City",
+   "country": "MX",
+   "isoNumeric": "484",
+   "coords": [
+    -99.2030612,
+    19.4462898
+   ]
+  },
+  {
+   "key": "miami-840",
+   "name": "Miami",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -80.1939746,
+    25.7624025
+   ]
+  },
+  {
+   "key": "milan-380",
+   "name": "Milan",
+   "country": "IT",
+   "isoNumeric": "380",
+   "coords": [
+    9.2332598,
+    45.486801
+   ]
+  },
+  {
+   "key": "milwaukee-840",
+   "name": "Milwaukee",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -87.9112601,
+    43.0121754
+   ]
+  },
+  {
+   "key": "minna-566",
+   "name": "Minna",
+   "country": "NG",
+   "isoNumeric": "566",
+   "coords": [
+    6.4528437,
+    9.5353015
+   ]
+  },
+  {
+   "key": "minneapolis-840",
+   "name": "Minneapolis",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -93.3866185,
+    45.0380201
+   ]
+  },
+  {
+   "key": "misiones-032",
+   "name": "Misiones",
+   "country": "AR",
+   "isoNumeric": "032",
+   "coords": [
+    -55.8910854,
+    -27.3580709
+   ]
+  },
+  {
+   "key": "mobile-840",
+   "name": "Mobile",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -88.0995747,
+    30.6913296
+   ]
+  },
+  {
+   "key": "mombasa-404",
+   "name": "Mombasa",
+   "country": "KE",
+   "isoNumeric": "404",
+   "coords": [
+    39.663709,
+    -4.0310307
+   ]
+  },
+  {
+   "key": "monaco-492",
+   "name": "Monaco",
+   "country": "MC",
+   "isoNumeric": "492",
+   "coords": [
+    7.4332049,
+    43.7461723
+   ]
+  },
+  {
+   "key": "monterrey-484",
+   "name": "Monterrey",
+   "country": "MX",
+   "isoNumeric": "484",
+   "coords": [
+    -100.4227627,
+    25.6698271
+   ]
+  },
+  {
+   "key": "montevideo-858",
+   "name": "Montevideo",
+   "country": "UY",
+   "isoNumeric": "858",
+   "coords": [
+    -56.1661267,
+    -34.8966888
+   ]
+  },
+  {
+   "key": "montgomery-al-840",
+   "name": "Montgomery, AL",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -86.3081585,
+    32.3778754
+   ]
+  },
+  {
+   "key": "montreal-124",
+   "name": "Montreal",
+   "country": "CA",
+   "isoNumeric": "124",
+   "coords": [
+    -73.5744414,
+    45.4995395
+   ]
+  },
+  {
+   "key": "moscow-643",
+   "name": "Moscow",
+   "country": "RU",
+   "isoNumeric": "643",
+   "coords": [
+    37.6632006,
+    55.7723362
+   ]
+  },
+  {
+   "key": "mt-rainier-840",
+   "name": "Mt. Rainier",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -76.9611139,
+    38.9358945
+   ]
+  },
+  {
+   "key": "mumbai-356",
+   "name": "Mumbai",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    72.8776559,
+    19.0759837
+   ]
+  },
+  {
+   "key": "munich-276",
+   "name": "Munich",
+   "country": "DE",
+   "isoNumeric": "276",
+   "coords": [
+    11.5502336,
+    48.1213828
+   ]
+  },
+  {
+   "key": "mwanza-834",
+   "name": "Mwanza",
+   "country": "TZ",
+   "isoNumeric": "834",
+   "coords": [
+    32.9409494,
+    -2.4764339
+   ]
+  },
+  {
+   "key": "mysore-356",
+   "name": "Mysore",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    76.6228453,
+    12.3228911
+   ]
+  },
+  {
+   "key": "nagpur-356",
+   "name": "Nagpur",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    79.070747,
+    21.1482445
+   ]
+  },
+  {
+   "key": "naples-380",
+   "name": "Naples",
+   "country": "IT",
+   "isoNumeric": "380",
+   "coords": [
+    14.2476744,
+    40.8416432
+   ]
+  },
+  {
+   "key": "nashik-356",
+   "name": "Nashik",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    73.7638187,
+    20.0038683
+   ]
+  },
+  {
+   "key": "nashville-840",
+   "name": "Nashville",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -86.76354,
+    36.1399265
+   ]
+  },
+  {
+   "key": "natal-076",
+   "name": "Natal",
+   "country": "BR",
+   "isoNumeric": "076",
+   "coords": [
+    -35.1801767,
+    -5.8739825
+   ]
+  },
+  {
+   "key": "neath-826",
+   "name": "Neath",
+   "country": "GB",
+   "isoNumeric": "826",
+   "coords": [
+    -3.8035579,
+    51.6644636
+   ]
+  },
+  {
+   "key": "network-state-458",
+   "name": "Network State",
+   "country": "MY",
+   "isoNumeric": "458",
+   "coords": [
+    103.5938319,
+    1.3359945
+   ]
+  },
+  {
+   "key": "new-haven-840",
+   "name": "New Haven",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -72.9564474,
+    41.3281905
+   ]
+  },
+  {
+   "key": "new-orleans-840",
+   "name": "New Orleans",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -90.0790581,
+    29.9343354
+   ]
+  },
+  {
+   "key": "new-york-city-840",
+   "name": "New York City",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -74.0057291,
+    40.7430869
+   ]
+  },
+  {
+   "key": "noida-356",
+   "name": "Noida",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    77.3634592,
+    28.6134206
+   ]
+  },
+  {
+   "key": "nsukka-566",
+   "name": "Nsukka",
+   "country": "NG",
+   "isoNumeric": "566",
+   "coords": [
+    7.4068594,
+    6.8628471
+   ]
+  },
+  {
+   "key": "numazu-392",
+   "name": "Numazu",
+   "country": "JP",
+   "isoNumeric": "392",
+   "coords": [
+    138.8582131,
+    35.1061054
+   ]
+  },
+  {
+   "key": "oakland-840",
+   "name": "Oakland",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -122.2745325,
+    37.8012082
+   ]
+  },
+  {
+   "key": "ojeda-862",
+   "name": "Ojeda",
+   "country": "VE",
+   "isoNumeric": "862",
+   "coords": [
+    -71.3196223,
+    10.2033069
+   ]
+  },
+  {
+   "key": "oklahoma-city-840",
+   "name": "Oklahoma City",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -97.4586773,
+    35.4912589
+   ]
+  },
+  {
+   "key": "olomouc-203",
+   "name": "Olomouc",
+   "country": "CZ",
+   "isoNumeric": "203",
+   "coords": [
+    17.2582576,
+    49.5978962
+   ]
+  },
+  {
+   "key": "omaha-840",
+   "name": "Omaha",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -96.1786168,
+    41.1890636
+   ]
+  },
+  {
+   "key": "orlando-840",
+   "name": "Orlando",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -81.377648,
+    28.540765
+   ]
+  },
+  {
+   "key": "oslo-578",
+   "name": "Oslo",
+   "country": "NO",
+   "isoNumeric": "578",
+   "coords": [
+    10.7575618,
+    59.9136992
+   ]
+  },
+  {
+   "key": "osogbo-566",
+   "name": "Osogbo",
+   "country": "NG",
+   "isoNumeric": "566",
+   "coords": [
+    4.5418141,
+    7.7826709
+   ]
+  },
+  {
+   "key": "ottawa-124",
+   "name": "Ottawa",
+   "country": "CA",
+   "isoNumeric": "124",
+   "coords": [
+    -75.6889807,
+    45.4159778
+   ]
+  },
+  {
+   "key": "ouagadougou-854",
+   "name": "Ouagadougou",
+   "country": "BF",
+   "isoNumeric": "854",
+   "coords": [
+    -1.4795418,
+    12.3931732
+   ]
+  },
+  {
+   "key": "owerri-566",
+   "name": "Owerri",
+   "country": "NG",
+   "isoNumeric": "566",
+   "coords": [
+    7.0254866,
+    5.496276
+   ]
+  },
+  {
+   "key": "pachuca-484",
+   "name": "Pachuca",
+   "country": "MX",
+   "isoNumeric": "484",
+   "coords": [
+    -98.7734285,
+    20.1142391
+   ]
+  },
+  {
+   "key": "palermo-380",
+   "name": "Palermo",
+   "country": "IT",
+   "isoNumeric": "380",
+   "coords": [
+    13.3726417,
+    38.115594
+   ]
+  },
+  {
+   "key": "palm-beach-840",
+   "name": "Palm Beach",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -80.0730631,
+    26.5591793
+   ]
+  },
+  {
+   "key": "palo-alto-840",
+   "name": "Palo Alto",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -122.1567263,
+    37.4444161
+   ]
+  },
+  {
+   "key": "panama-city-591",
+   "name": "Panama City",
+   "country": "PA",
+   "isoNumeric": "591",
+   "coords": [
+    -79.525751,
+    8.9784539
+   ]
+  },
+  {
+   "key": "papeete-258",
+   "name": "Papeete",
+   "country": "PF",
+   "isoNumeric": "258",
+   "coords": [
+    -149.5753998,
+    -17.5428967
+   ]
+  },
+  {
+   "key": "paris-250",
+   "name": "Paris",
+   "country": "FR",
+   "isoNumeric": "250",
+   "coords": [
+    2.3513765,
+    48.8575475
+   ]
+  },
+  {
+   "key": "patna-356",
+   "name": "Patna",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    85.1086817,
+    25.6219931
+   ]
+  },
+  {
+   "key": "pensacola-840",
+   "name": "Pensacola",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -87.1373569,
+    30.3345948
+   ]
+  },
+  {
+   "key": "petrozavodsk-643",
+   "name": "Petrozavodsk",
+   "country": "RU",
+   "isoNumeric": "643",
+   "coords": [
+    34.3757792,
+    61.7881509
+   ]
+  },
+  {
+   "key": "philadelphia-840",
+   "name": "Philadelphia",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -75.1409133,
+    39.9622373
+   ]
+  },
+  {
+   "key": "phnom-penh-116",
+   "name": "Phnom Penh",
+   "country": "KH",
+   "isoNumeric": "116",
+   "coords": [
+    104.9306996,
+    11.558466
+   ]
+  },
+  {
+   "key": "phoenix-840",
+   "name": "Phoenix",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -111.9407967,
+    33.4266296
+   ]
+  },
+  {
+   "key": "phuket-764",
+   "name": "Phuket",
+   "country": "TH",
+   "isoNumeric": "764",
+   "coords": [
+    98.3921388,
+    7.8812181
+   ]
+  },
+  {
+   "key": "piura-604",
+   "name": "Piura",
+   "country": "PE",
+   "isoNumeric": "604",
+   "coords": [
+    -80.6604727,
+    -5.168176
+   ]
+  },
+  {
+   "key": "port-harcourt-566",
+   "name": "Port Harcourt",
+   "country": "NG",
+   "isoNumeric": "566",
+   "coords": [
+    6.974604,
+    4.8472226
+   ]
+  },
+  {
+   "key": "portland-me-840",
+   "name": "Portland ME",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -70.248928,
+    43.6591401
+   ]
+  },
+  {
+   "key": "portland-oregon-840",
+   "name": "Portland Oregon",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -122.6611259,
+    45.5594196
+   ]
+  },
+  {
+   "key": "porto-alegre-076",
+   "name": "Porto Alegre",
+   "country": "BR",
+   "isoNumeric": "076",
+   "coords": [
+    -51.2167792,
+    -30.0429928
+   ]
+  },
+  {
+   "key": "portoviejo-218",
+   "name": "Portoviejo",
+   "country": "EC",
+   "isoNumeric": "218",
+   "coords": [
+    -80.4630165,
+    -1.0403158
+   ]
+  },
+  {
+   "key": "prague-203",
+   "name": "Prague",
+   "country": "CZ",
+   "isoNumeric": "203",
+   "coords": [
+    14.4433027,
+    50.1081734
+   ]
+  },
+  {
+   "key": "prayagraj-356",
+   "name": "Prayagraj",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    81.8636412,
+    25.3916093
+   ]
+  },
+  {
+   "key": "prilep-807",
+   "name": "Prilep",
+   "country": "MK",
+   "isoNumeric": "807",
+   "coords": [
+    21.5497213,
+    41.344502
+   ]
+  },
+  {
+   "key": "providence-840",
+   "name": "Providence",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -71.4501793,
+    41.6585215
+   ]
+  },
+  {
+   "key": "puebla-484",
+   "name": "Puebla",
+   "country": "MX",
+   "isoNumeric": "484",
+   "coords": [
+    -98.2365828,
+    19.0258812
+   ]
+  },
+  {
+   "key": "pune-356",
+   "name": "Pune",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    73.833697,
+    18.5178704
+   ]
+  },
+  {
+   "key": "punta-del-este-858",
+   "name": "Punta del Este",
+   "country": "UY",
+   "isoNumeric": "858",
+   "coords": [
+    -54.9411989,
+    -34.9286418
+   ]
+  },
+  {
+   "key": "quetzaltenango-320",
+   "name": "Quetzaltenango",
+   "country": "GT",
+   "isoNumeric": "320",
+   "coords": [
+    -91.5253458,
+    14.8494017
+   ]
+  },
+  {
+   "key": "quezon-608",
+   "name": "Quezon",
+   "country": "PH",
+   "isoNumeric": "608",
+   "coords": [
+    121.0597234,
+    14.6470271
+   ]
+  },
+  {
+   "key": "quito-218",
+   "name": "Quito",
+   "country": "EC",
+   "isoNumeric": "218",
+   "coords": [
+    -78.4811699,
+    -0.1788172
+   ]
+  },
+  {
+   "key": "raipur-356",
+   "name": "Raipur",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    81.6994135,
+    21.211191
+   ]
+  },
+  {
+   "key": "rajkot-356",
+   "name": "Rajkot",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    70.7763103,
+    22.2788408
+   ]
+  },
+  {
+   "key": "ranchi-356",
+   "name": "Ranchi",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    85.3253727,
+    23.3443301
+   ]
+  },
+  {
+   "key": "reading-826",
+   "name": "Reading",
+   "country": "GB",
+   "isoNumeric": "826",
+   "coords": [
+    -0.9697061,
+    51.3948166
+   ]
+  },
+  {
+   "key": "red-river-gorge-840",
+   "name": "Red River Gorge",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -83.6828738,
+    37.7830532
+   ]
+  },
+  {
+   "key": "richmond-virginia-840",
+   "name": "Richmond Virginia",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -77.4454642,
+    37.5473329
+   ]
+  },
+  {
+   "key": "rio-claro-076",
+   "name": "Rio Claro",
+   "country": "BR",
+   "isoNumeric": "076",
+   "coords": [
+    -47.565686,
+    -22.4366498
+   ]
+  },
+  {
+   "key": "rio-de-janeiro-076",
+   "name": "Rio de Janeiro",
+   "country": "BR",
+   "isoNumeric": "076",
+   "coords": [
+    -43.2039592,
+    -22.8980602
+   ]
+  },
+  {
+   "key": "rivera-858",
+   "name": "Rivera",
+   "country": "UY",
+   "isoNumeric": "858",
+   "coords": [
+    -55.5406398,
+    -30.9017976
+   ]
+  },
+  {
+   "key": "rome-380",
+   "name": "Rome",
+   "country": "IT",
+   "isoNumeric": "380",
+   "coords": [
+    12.4721642,
+    41.8743579
+   ]
+  },
+  {
+   "key": "roorkee-356",
+   "name": "Roorkee",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    77.8871471,
+    29.8689368
+   ]
+  },
+  {
+   "key": "rosario-032",
+   "name": "Rosario",
+   "country": "AR",
+   "isoNumeric": "032",
+   "coords": [
+    -60.651064,
+    -32.9356859
+   ]
+  },
+  {
+   "key": "rourkela-356",
+   "name": "Rourkela",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    84.8625107,
+    22.2247772
+   ]
+  },
+  {
+   "key": "sacramento-840",
+   "name": "Sacramento",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -121.430473,
+    38.5551526
+   ]
+  },
+  {
+   "key": "saint-petersburg-643",
+   "name": "Saint Petersburg",
+   "country": "RU",
+   "isoNumeric": "643",
+   "coords": [
+    30.3123668,
+    59.9284705
+   ]
+  },
+  {
+   "key": "salama-320",
+   "name": "Salamá",
+   "country": "GT",
+   "isoNumeric": "320",
+   "coords": [
+    -90.3174881,
+    15.1041633
+   ]
+  },
+  {
+   "key": "salt-lake-city-840",
+   "name": "Salt Lake City",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -111.9018061,
+    40.7636404
+   ]
+  },
+  {
+   "key": "salvador-bahia-076",
+   "name": "Salvador Bahia",
+   "country": "BR",
+   "isoNumeric": "076",
+   "coords": [
+    -38.4858752,
+    -13.0140475
+   ]
+  },
+  {
+   "key": "san-carlos-608",
+   "name": "San Carlos",
+   "country": "PH",
+   "isoNumeric": "608",
+   "coords": [
+    123.413646,
+    10.4837646
+   ]
+  },
+  {
+   "key": "san-diego-840",
+   "name": "San Diego",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -117.2431943,
+    32.7994321
+   ]
+  },
+  {
+   "key": "san-francisco-840",
+   "name": "San Francisco",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -122.4099607,
+    37.7822672
+   ]
+  },
+  {
+   "key": "san-juan-630",
+   "name": "San Juan",
+   "country": "PR",
+   "isoNumeric": "630",
+   "coords": [
+    -66.0833495,
+    18.4562249
+   ]
+  },
+  {
+   "key": "san-pedro-de-sula-340",
+   "name": "San Pedro de Sula",
+   "country": "HN",
+   "isoNumeric": "340",
+   "coords": [
+    -88.0423737,
+    15.5007417
+   ]
+  },
+  {
+   "key": "san-salvador-222",
+   "name": "San Salvador",
+   "country": "SV",
+   "isoNumeric": "222",
+   "coords": [
+    -89.2437251,
+    13.692928
+   ]
+  },
+  {
+   "key": "santa-barbara-840",
+   "name": "Santa Barbara",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -119.6984853,
+    34.417947
+   ]
+  },
+  {
+   "key": "santiago-152",
+   "name": "Santiago",
+   "country": "CL",
+   "isoNumeric": "152",
+   "coords": [
+    -70.6016955,
+    -33.5210961
+   ]
+  },
+  {
+   "key": "sao-paulo-076",
+   "name": "Sao Paulo",
+   "country": "BR",
+   "isoNumeric": "076",
+   "coords": [
+    -46.6234411,
+    -23.500052
+   ]
+  },
+  {
+   "key": "saskatoon-124",
+   "name": "Saskatoon",
+   "country": "CA",
+   "isoNumeric": "124",
+   "coords": [
+    -106.568746,
+    52.1508292
+   ]
+  },
+  {
+   "key": "seattle-840",
+   "name": "Seattle",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -122.3205222,
+    47.6127981
+   ]
+  },
+  {
+   "key": "seoul-410",
+   "name": "Seoul",
+   "country": "KR",
+   "isoNumeric": "410",
+   "coords": [
+    127.0323061,
+    37.4990532
+   ]
+  },
+  {
+   "key": "shahjahanpur-356",
+   "name": "Shahjahanpur",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    79.9112283,
+    27.8770174
+   ]
+  },
+  {
+   "key": "shanghai-156",
+   "name": "Shanghai",
+   "country": "CN",
+   "isoNumeric": "156",
+   "coords": [
+    121.46311,
+    31.21064
+   ]
+  },
+  {
+   "key": "sharjah-784",
+   "name": "Sharjah",
+   "country": "AE",
+   "isoNumeric": "784",
+   "coords": [
+    55.7157344,
+    24.9544532
+   ]
+  },
+  {
+   "key": "sheberghan-004",
+   "name": "Sheberghan",
+   "country": "AF",
+   "isoNumeric": "004",
+   "coords": [
+    65.7490624,
+    36.6817149
+   ]
+  },
+  {
+   "key": "shenzhen-156",
+   "name": "Shenzhen",
+   "country": "CN",
+   "isoNumeric": "156",
+   "coords": [
+    113.90172,
+    22.51806
+   ]
+  },
+  {
+   "key": "shillong-356",
+   "name": "Shillong",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    91.8868448,
+    25.5807491
+   ]
+  },
+  {
+   "key": "shimla-356",
+   "name": "Shimla",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    77.1763075,
+    31.1009306
+   ]
+  },
+  {
+   "key": "singapore-702",
+   "name": "Singapore",
+   "country": "SG",
+   "isoNumeric": "702",
+   "coords": [
+    103.8496329,
+    1.2952203
+   ]
+  },
+  {
+   "key": "siwan-356",
+   "name": "Siwan",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    84.3599953,
+    26.2243204
+   ]
+  },
+  {
+   "key": "sofia-100",
+   "name": "Sofia",
+   "country": "BG",
+   "isoNumeric": "100",
+   "coords": [
+    23.3179759,
+    42.6615715
+   ]
+  },
+  {
+   "key": "solukumbhu-524",
+   "name": "Solukumbhu",
+   "country": "NP",
+   "isoNumeric": "524",
+   "coords": [
+    86.7105281,
+    27.8045263
+   ]
+  },
+  {
+   "key": "split-191",
+   "name": "Split",
+   "country": "HR",
+   "isoNumeric": "191",
+   "coords": [
+    16.4568058,
+    43.5022921
+   ]
+  },
+  {
+   "key": "stockholm-752",
+   "name": "Stockholm",
+   "country": "SE",
+   "isoNumeric": "752",
+   "coords": [
+    18.0537108,
+    59.33724
+   ]
+  },
+  {
+   "key": "surat-356",
+   "name": "Surat",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    72.9028061,
+    21.2308476
+   ]
+  },
+  {
+   "key": "sydney-036",
+   "name": "Sydney",
+   "country": "AU",
+   "isoNumeric": "036",
+   "coords": [
+    151.2092955,
+    -33.8688197
+   ]
+  },
+  {
+   "key": "taipei-158",
+   "name": "Taipei",
+   "country": "TW",
+   "isoNumeric": "158",
+   "coords": [
+    121.5220462,
+    25.0700938
+   ]
+  },
+  {
+   "key": "tallinn-233",
+   "name": "Tallinn",
+   "country": "EE",
+   "isoNumeric": "233",
+   "coords": [
+    24.7558323,
+    59.4428714
+   ]
+  },
+  {
+   "key": "tamarindo-188",
+   "name": "Tamarindo",
+   "country": "CR",
+   "isoNumeric": "188",
+   "coords": [
+    -85.7697371,
+    10.4466332
+   ]
+  },
+  {
+   "key": "tangier-504",
+   "name": "Tangier",
+   "country": "MA",
+   "isoNumeric": "504",
+   "coords": [
+    -5.8202208,
+    35.7807602
+   ]
+  },
+  {
+   "key": "tatu-404",
+   "name": "Tatu",
+   "country": "KE",
+   "isoNumeric": "404",
+   "coords": [
+    36.9064839,
+    -1.152199
+   ]
+  },
+  {
+   "key": "tegucigalpa-340",
+   "name": "Tegucigalpa",
+   "country": "HN",
+   "isoNumeric": "340",
+   "coords": [
+    -87.1843211,
+    14.0961331
+   ]
+  },
+  {
+   "key": "tel-aviv-376",
+   "name": "Tel Aviv",
+   "country": "IL",
+   "isoNumeric": "376",
+   "coords": [
+    34.7817676,
+    32.0852999
+   ]
+  },
+  {
+   "key": "thiruvananthapuram-356",
+   "name": "Thiruvananthapuram",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    76.9600097,
+    8.5193947
+   ]
+  },
+  {
+   "key": "thrissur-356",
+   "name": "Thrissur",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    76.2097641,
+    10.5235714
+   ]
+  },
+  {
+   "key": "tirana-008",
+   "name": "Tirana",
+   "country": "AL",
+   "isoNumeric": "008",
+   "coords": [
+    19.809874,
+    41.3212284
+   ]
+  },
+  {
+   "key": "tokyo-392",
+   "name": "Tokyo",
+   "country": "JP",
+   "isoNumeric": "392",
+   "coords": [
+    139.7037819,
+    35.6461743
+   ]
+  },
+  {
+   "key": "tomas-morato-608",
+   "name": "Tomas Morato",
+   "country": "PH",
+   "isoNumeric": "608",
+   "coords": [
+    121.0355628,
+    14.634499
+   ]
+  },
+  {
+   "key": "toronto-124",
+   "name": "Toronto",
+   "country": "CA",
+   "isoNumeric": "124",
+   "coords": [
+    -79.4206753,
+    43.6645885
+   ]
+  },
+  {
+   "key": "trujillo-604",
+   "name": "Trujillo",
+   "country": "PE",
+   "isoNumeric": "604",
+   "coords": [
+    -79.0383399,
+    -8.1310285
+   ]
+  },
+  {
+   "key": "tucson-840",
+   "name": "Tucson",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -110.8513752,
+    32.2466051
+   ]
+  },
+  {
+   "key": "tucumcari-840",
+   "name": "Tucumcari",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -103.7721358,
+    35.2338349
+   ]
+  },
+  {
+   "key": "tulum-484",
+   "name": "Tulum",
+   "country": "MX",
+   "isoNumeric": "484",
+   "coords": [
+    -87.4522712,
+    20.2104845
+   ]
+  },
+  {
+   "key": "tunis-788",
+   "name": "Tunis",
+   "country": "TN",
+   "isoNumeric": "788",
+   "coords": [
+    10.1787644,
+    36.8253242
+   ]
+  },
+  {
+   "key": "udaipur-356",
+   "name": "Udaipur",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    73.6770176,
+    24.5914585
+   ]
+  },
+  {
+   "key": "ulaanbaatar-496",
+   "name": "Ulaanbaatar",
+   "country": "MN",
+   "isoNumeric": "496",
+   "coords": [
+    106.9157785,
+    47.9196533
+   ]
+  },
+  {
+   "key": "vadodara-356",
+   "name": "Vadodara",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    73.1716354,
+    22.3250471
+   ]
+  },
+  {
+   "key": "valencia-724",
+   "name": "Valencia",
+   "country": "ES",
+   "isoNumeric": "724",
+   "coords": [
+    -0.3290805,
+    39.4566529
+   ]
+  },
+  {
+   "key": "valencia-862",
+   "name": "Valencia",
+   "country": "VE",
+   "isoNumeric": "862",
+   "coords": [
+    -68.0125005,
+    10.2141517
+   ]
+  },
+  {
+   "key": "vanadzor-051",
+   "name": "Vanadzor",
+   "country": "AM",
+   "isoNumeric": "051",
+   "coords": [
+    44.4773223,
+    40.8123507
+   ]
+  },
+  {
+   "key": "vancouver-124",
+   "name": "Vancouver",
+   "country": "CA",
+   "isoNumeric": "124",
+   "coords": [
+    -123.0915527,
+    49.2671447
+   ]
+  },
+  {
+   "key": "varanasi-356",
+   "name": "Varanasi",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    83.0032861,
+    25.2812364
+   ]
+  },
+  {
+   "key": "veracruz-484",
+   "name": "Veracruz",
+   "country": "MX",
+   "isoNumeric": "484",
+   "coords": [
+    -96.1421,
+    19.1694941
+   ]
+  },
+  {
+   "key": "vienna-040",
+   "name": "Vienna",
+   "country": "AT",
+   "isoNumeric": "040",
+   "coords": [
+    16.3815476,
+    48.2076148
+   ]
+  },
+  {
+   "key": "vijayawada-356",
+   "name": "Vijayawada",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    80.6505825,
+    16.4951088
+   ]
+  },
+  {
+   "key": "vinnytsia-804",
+   "name": "Vinnytsia",
+   "country": "UA",
+   "isoNumeric": "804",
+   "coords": [
+    28.4905298,
+    49.2382211
+   ]
+  },
+  {
+   "key": "visakhapatnam-356",
+   "name": "Visakhapatnam",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    83.3181152,
+    17.7240938
+   ]
+  },
+  {
+   "key": "wa-288",
+   "name": "Wa",
+   "country": "GH",
+   "isoNumeric": "288",
+   "coords": [
+    -2.4987027,
+    10.0455938
+   ]
+  },
+  {
+   "key": "warri-566",
+   "name": "Warri",
+   "country": "NG",
+   "isoNumeric": "566",
+   "coords": [
+    5.7660534,
+    5.5628453
+   ]
+  },
+  {
+   "key": "warsaw-616",
+   "name": "Warsaw",
+   "country": "PL",
+   "isoNumeric": "616",
+   "coords": [
+    21.0137957,
+    52.2442561
+   ]
+  },
+  {
+   "key": "washington-dc-840",
+   "name": "Washington DC",
+   "country": "US",
+   "isoNumeric": "840",
+   "coords": [
+    -77.0054177,
+    38.9039902
+   ]
+  },
+  {
+   "key": "waterloo-124",
+   "name": "Waterloo",
+   "country": "CA",
+   "isoNumeric": "124",
+   "coords": [
+    -80.5260567,
+    43.4796084
+   ]
+  },
+  {
+   "key": "wayanad-356",
+   "name": "Wayanad",
+   "country": "IN",
+   "isoNumeric": "356",
+   "coords": [
+    76.10213,
+    11.6975847
+   ]
+  },
+  {
+   "key": "windhoek-516",
+   "name": "Windhoek",
+   "country": "NA",
+   "isoNumeric": "516",
+   "coords": [
+    17.0842147,
+    -22.5649344
+   ]
+  },
+  {
+   "key": "yangon-104",
+   "name": "Yangon",
+   "country": "MM",
+   "isoNumeric": "104",
+   "coords": [
+    96.1553514,
+    16.8380111
+   ]
+  },
+  {
+   "key": "yenagoa-566",
+   "name": "Yenagoa",
+   "country": "NG",
+   "isoNumeric": "566",
+   "coords": [
+    6.3158357,
+    4.9398577
+   ]
+  },
+  {
+   "key": "yerevan-051",
+   "name": "Yerevan",
+   "country": "AM",
+   "isoNumeric": "051",
+   "coords": [
+    44.5006263,
+    40.1672569
+   ]
+  },
+  {
+   "key": "zagreb-191",
+   "name": "Zagreb",
+   "country": "HR",
+   "isoNumeric": "191",
+   "coords": [
+    15.9699511,
+    45.7929353
+   ]
+  },
+  {
+   "key": "zug-756",
+   "name": "Zug",
+   "country": "CH",
+   "isoNumeric": "756",
+   "coords": [
+    8.5146765,
+    47.1757579
+   ]
+  }
+ ]
+}

@@ -27,6 +27,7 @@ export function num(o: {
   unit?: string
   /** Set for stricter-only knobs: which direction is looser. Omit for a two-way knob. */
   looserWhen?: 'higher' | 'lower'
+  confirm?: (from: number, to: number) => string | null
 }): SettingDef<number> {
   const strict = o.looserWhen
     ? `Can only be ${o.looserWhen === 'higher' ? 'lowered' : 'raised'} here; ${o.looserWhen === 'higher' ? 'raising it above' : 'lowering it below'} ${o.default}${o.unit ? ` ${o.unit}` : ''} needs a code change.`
@@ -42,6 +43,7 @@ export function num(o: {
     input: { type: 'int', min: o.min, max: o.max, ...(o.unit ? { unit: o.unit } : {}) },
     stricterOnly: o.looserWhen ? true : undefined,
     looserWhen: o.looserWhen,
+    confirm: o.confirm,
   }
 }
 

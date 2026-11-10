@@ -96,6 +96,8 @@ export const TOGGLES = {
   'telegram.hostMatchEnabled': { env: 'TELEGRAM_HOST_MATCH_ENABLED', legacy: ON_WORDS },
   // On unless the env var is an explicit off (plans/sheets-cutover.md: keep the archive current until the freeze).
   'sheets.mirror.members': { env: 'SHEETS_MIRROR_MEMBERS', legacy: (raw) => !envKillsToggle(raw) },
+  // Off unless turned on. The public reach map shows nothing and the endpoint answers 404 until then.
+  'map.levelsEnabled': { env: 'MAP_LEVELS_ENABLED', legacy: ON_WORDS },
 } as const satisfies Partial<Record<SettingKey, ToggleDef>>
 
 export type ToggleKey = keyof typeof TOGGLES
