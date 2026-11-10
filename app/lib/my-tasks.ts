@@ -6,9 +6,8 @@
 // `/api/dashboard-summary` without an internal HTTP round-trip (Vercel
 // deployment protection blocks self-fetches).
 //
-// The route handler in `app/api/my-tasks/[memberId]/route.ts` continues to
-// use its own in-file copy for now — extracting that fully is out of scope
-// for olive-83105; a follow-up can collapse the duplicate.
+// The route handler in `app/api/my-tasks/[memberId]/route.ts` uses
+// fetchMyTasksForCrewOption too (the duplicate copy was removed).
 
 import { fetchGviz } from "@/app/lib/sheets/gviz";
 import { getTaskLinks } from "@/app/api/lib/google-sheets";
