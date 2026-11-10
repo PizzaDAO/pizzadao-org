@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const getWebhookUrl = vi.fn();
-vi.mock("./discord-webhook", () => ({ getWebhookUrl: (...a: unknown[]) => getWebhookUrl(...a) }));
+const postToPurpose = vi.fn();
+vi.mock("./discord-webhook", () => ({ postToPurpose: (...a: unknown[]) => postToPurpose(...a) }));
 
 import {
     parseTicketInput,
@@ -95,29 +95,25 @@ describe("notifyNewTicket", () => {
     const fetchMock = global.fetch as unknown as ReturnType<typeof vi.fn>;
 
     beforeEach(() => {
-        getWebhookUrl.mockReset();
-        fetchMock.mockReset();
+        postToPurpose.mockReset();
         delete process.env.SUPPORT_DISCORD_CHANNEL;
     });
 
-    it("does nothing when no webhook is configured", async () => {
-        getWebhookUrl.mockResolvedValue(null);
+    it("returns false when nothing is configured", async () => {
+        postToPurpose.mockResolvedValue(false);
         expect(await notifyNewTicket(TICKET)).toBe(false);
-        expect(fetchMock).not.toHaveBeenCalled();
     });
 
     it("posts subject only (not body) with mentions disabled", async () => {
-        getWebhookUrl.mockResolvedValue("https://discord.test/webhook");
-        fetchMock.mockResolvedValue({ ok: true });
+        postToPurpose.mockResolvedValue(true);
         expect(await notifyNewTicket(TICKET)).toBe(true);
-        expect(getWebhookUrl).toHaveBeenCalledWith("Support");
-        const [url, init] = fetchMock.mock.calls[0];
-        expect(url).toBe("https://discord.test/webhook");
-        const payload = JSON.parse(init.body);
-        expect(payload.content).toContain("#7");
-        expect(payload.content).toContain("Can't claim");
-        expect(payload.content).not.toContain("secret details");
-        expect(payload.allowed_mentions).toEqual({ parse: [] });
+        const arg = postToPurpose.mock.calls[0][0];
+        expect(arg.settingKey).toBe("discord.supportChannelId");
+        expect(arg.sheetName).toBe("Support");
+        expect(arg.body.content).toContain("#7");
+        expect(arg.body.content).toContain("Can't claim");
+        expect(arg.body.content).not.toContain("secret details");
+        expect(arg.body.allowed_mentions).toEqual({ parse: [] });
     });
 
     it("uses SUPPORT_DISCORD_CHANNEL when set", () => {
@@ -125,9 +121,8 @@ describe("notifyNewTicket", () => {
         expect(supportWebhookChannel()).toBe("Tech");
     });
 
-    it("never throws on webhook failure", async () => {
-        getWebhookUrl.mockResolvedValue("https://discord.test/webhook");
-        fetchMock.mockRejectedValue(new Error("down"));
+    it("never throws on post failure", async () => {
+        postToPurpose.mockRejectedValue(new Error("down"));
         expect(await notifyNewTicket(TICKET)).toBe(false);
     });
 });
