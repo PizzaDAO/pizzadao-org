@@ -104,7 +104,7 @@ const aliases: SettingDef<PlaceAlias[]> = {
   key: 'map.placeAliases',
   area: 'map',
   label: 'Map place aliases',
-  help: 'Fix what members typed in City. "Typed as" is the text (case and accents do not matter; a Google-style "City, State, Country" matches whole, then by its first part). "Counts as" is a map city key (for example new-york-840), country:XX (a two-letter country code), or ignore (not a place, such as "nomadic").',
+  help: 'Fix what members typed in City. "Typed as" is the text (case and accents do not matter; a Google-style "City, State, Country" matches whole, then by its first part). "Counts as" is a map city key (for example new-york-city-840; the preview page lists every key), country:XX (a two-letter country code), or ignore (not a place, such as "nomadic").',
   schema: z
     .array(
       z.object({
