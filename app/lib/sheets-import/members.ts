@@ -9,7 +9,7 @@
 import { prisma } from '@/app/lib/db'
 import { cellText, getMembersTableFromDb, getMembersTableFromSheet, memberIdColumn, type MembersTable } from '@/app/lib/sheets/member-repository'
 import type { GvizCell } from '@/app/lib/types/gviz'
-import { memberIndexFields, type MemberCells } from '@/app/lib/members/upsert'
+import { headerColumn, memberIndexFields, type MemberCells } from '@/app/lib/members/upsert'
 import { compareKeyed, type Importer, type ParityReport, type ParseIssue } from './framework'
 import { stableEqual } from './plan'
 
@@ -75,15 +75,44 @@ export function memberRecords(table: MembersTable): { records: Array<{ key: stri
   return { records, issues, extra }
 }
 
+/** Drops sheet records for members that were merged away (the sheet may still list them). Pure. */
+export function dropMerged<T extends { key: string }>(records: T[], mergedIds: ReadonlySet<string>): T[] {
+  return records.filter((r) => !mergedIds.has(r.key))
+}
+
+/**
+ * The incoming row for a member that is the keeper of a merge: its Discord cell (and id) stay as the
+ * database has them, so a stale sheet cannot hand the merged-in Discord id back or blank it. Pure.
+ */
+export function protectMergedRow(headers: readonly string[], incoming: MemberCells, current: { discordId: string | null; cells: MemberCells } | undefined): { cells: MemberCells; discordId: string | null } {
+  const idx = headerColumn(headers, 'DiscordId')
+  const fromSheet = memberIndexFields(headers as string[], incoming).discordId
+  if (!current || idx == null || !current.discordId) return { cells: incoming, discordId: fromSheet }
+  const cells = [...incoming]
+  while (cells.length <= idx) cells.push(null)
+  cells[idx] = current.cells[idx] ?? { v: current.discordId }
+  return { cells, discordId: current.discordId }
+}
+
+async function mergedMemberIds(): Promise<{ tombstones: Set<string>; keepers: Set<string> }> {
+  const [tombs, merges] = await Promise.all([
+    prisma.member.findMany({ where: { mergedInto: { not: null } }, select: { id: true } }),
+    prisma.memberMerge.findMany({ where: { undoneAt: null }, select: { keepId: true } }),
+  ])
+  return { tombstones: new Set(tombs.map((t) => t.id)), keepers: new Set(merges.map((m) => m.keepId)) }
+}
+
 export const membersImporter: Importer<MemberRecord> = {
   key: 'members',
   async load() {
     const table = await getMembersTableFromSheet({ fresh: true })
     if (table.headerRowIndex === -1) throw new Error('Header row not found in the members sheet')
-    return memberRecords(table)
+    const loaded = memberRecords(table)
+    const { tombstones } = await mergedMemberIds()
+    return { ...loaded, records: dropMerged(loaded.records, tombstones) }
   },
   async existing() {
-    const [layout, rows] = await Promise.all([prisma.memberTableLayout.findUnique({ where: { id: 1 } }), prisma.member.findMany({ select: { id: true, cells: true, position: true } })])
+    const [layout, rows] = await Promise.all([prisma.memberTableLayout.findUnique({ where: { id: 1 } }), prisma.member.findMany({ where: { mergedInto: null }, select: { id: true, cells: true, position: true } })])
     const map = new Map<string, MemberRecord>()
     if (layout) map.set(LAYOUT_KEY, { kind: 'layout', headers: (layout.headers as string[]) ?? [] })
     for (const r of rows) map.set(r.id, { kind: 'member', cells: (r.cells as MemberCells) ?? [], position: r.position })
@@ -99,14 +128,19 @@ export const membersImporter: Importer<MemberRecord> = {
     const all = [...plan.create, ...plan.update]
     const layout = all.find((r) => r.value.kind === 'layout')?.value as { kind: 'layout'; headers: string[] } | undefined
     const headers = layout?.headers ?? ((await prisma.memberTableLayout.findUnique({ where: { id: 1 } }))?.headers as string[] | undefined) ?? []
+    const { tombstones, keepers } = await mergedMemberIds()
+    const keeperRows = new Map((await prisma.member.findMany({ where: { id: { in: [...keepers] } }, select: { id: true, discordId: true, cells: true } })).map((m) => [m.id, { discordId: m.discordId, cells: (m.cells as MemberCells) ?? [] }]))
     const ops: unknown[] = []
     if (layout) {
       ops.push(prisma.memberTableLayout.upsert({ where: { id: 1 }, create: { id: 1, headers: layout.headers as never, updatedBy: 'sheet-import' }, update: { headers: layout.headers as never, updatedBy: 'sheet-import' } }))
     }
     for (const r of all) {
       if (r.value.kind !== 'member') continue
-      const { discordId, name } = memberIndexFields(headers, r.value.cells)
-      const data = { cells: r.value.cells as never, position: r.value.position, discordId, name, updatedBy: 'sheet-import' }
+      if (tombstones.has(r.key)) continue
+      const protectedRow = keepers.has(r.key) ? protectMergedRow(headers, r.value.cells, keeperRows.get(r.key)) : { cells: r.value.cells, discordId: memberIndexFields(headers, r.value.cells).discordId }
+      const { name } = memberIndexFields(headers, protectedRow.cells)
+      const discordId = protectedRow.discordId
+      const data = { cells: protectedRow.cells as never, position: r.value.position, discordId, name, updatedBy: 'sheet-import' }
       ops.push(prisma.member.upsert({ where: { id: r.key }, create: { id: r.key, ...data }, update: data }))
     }
     // Chunked; progress is logged so a failure part-way shows how far it got. Orphans (members no

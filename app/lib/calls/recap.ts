@@ -282,7 +282,7 @@ export async function loadRecapPeople(rec: { id: string; source?: string | null;
   try {
     // Candidates by first word (the database cannot normalize); uniqueness is judged on the normalized names in memory.
     const rows = await prisma.member.findMany({
-      where: { discordId: { not: null }, OR: [...names].slice(0, 40).map((n) => ({ name: { contains: n, mode: 'insensitive' as const } })) },
+      where: { discordId: { not: null }, mergedInto: null, OR: [...names].slice(0, 40).map((n) => ({ name: { contains: n, mode: 'insensitive' as const } })) },
       select: { discordId: true, name: true },
       take: 400,
     })
