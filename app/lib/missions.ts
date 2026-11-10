@@ -136,6 +136,59 @@ export async function completedLevelBy(discordIds: readonly string[], level: num
   return done
 }
 
+/**
+ * Bulk current level and distinct approved-mission count for many members (the same rule as
+ * getCurrentLevel / computeCurrentLevel). Three queries per 1000 ids, plus one for the mission
+ * list. Ids with no rows get level 1 and 0 missions. Used by the public map levels.
+ */
+export async function missionStatsFor(
+  discordIds: readonly string[],
+): Promise<Map<string, { level: number; approvedMissions: number }>> {
+  const out = new Map<string, { level: number; approvedMissions: number }>()
+  if (discordIds.length === 0) return out
+  const missions = (await prisma.mission.findMany({ where: REQUIRED_MISSION_WHERE, select: { id: true, level: true } })) ?? []
+  // Fail closed: an empty mission list would make every member look maxed out.
+  if (missions.length === 0) throw new Error('missionStatsFor: no active missions')
+  for (let i = 0; i < discordIds.length; i += 1000) {
+    const ids = discordIds.slice(i, i + 1000)
+    const [approved, ledger] = await Promise.all([
+      prisma.missionCompletion.findMany({
+        where: { discordId: { in: ids }, status: 'APPROVED' },
+        select: { discordId: true, missionId: true },
+      }),
+      prisma.transaction.findMany({
+        where: { userId: { in: ids }, type: 'MISSION_REWARD' },
+        select: { userId: true, metadata: true, description: true },
+      }),
+    ])
+    const approvedBy = new Map<string, Set<number>>()
+    for (const c of approved ?? []) {
+      const s = approvedBy.get(c.discordId) ?? new Set<number>()
+      s.add(c.missionId)
+      approvedBy.set(c.discordId, s)
+    }
+    const paidBy = new Map<string, Set<number>>()
+    for (const row of ledger ?? []) {
+      const l = paidLevelOf(row)
+      if (l === null) continue
+      const s = paidBy.get(row.userId) ?? new Set<number>()
+      s.add(l)
+      paidBy.set(row.userId, s)
+    }
+    for (const id of ids) {
+      const done = approvedBy.get(id) ?? new Set<number>()
+      out.set(id, { level: computeCurrentLevel(missions, done, paidBy.get(id) ?? new Set()), approvedMissions: done.size })
+    }
+  }
+  return out
+}
+
+/** Bulk current level for many members (see missionStatsFor). */
+export async function currentLevelsFor(discordIds: readonly string[]): Promise<Map<string, number>> {
+  const stats = await missionStatsFor(discordIds)
+  return new Map([...stats].map(([id, s]) => [id, s.level]))
+}
+
 /** The level a MISSION_REWARD ledger row paid, or null if it can't be read. */
 export function paidLevelOf(row: { metadata?: unknown; description?: string | null }): number | null {
   const meta = row.metadata
