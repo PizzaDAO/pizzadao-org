@@ -133,7 +133,7 @@ const TIERS = [
 ]
 const CFG: MapLevelsConfig = { ...W, minMembersCity: 3, minMembersCountry: 3, tiers: TIERS, buckets: [3, 5, 10, 25, 50, 100], aliases: [] }
 const at = (key: string, country: string, score: number, n = 1): ScoredMember[] =>
-  Array.from({ length: n }, () => ({ place: { kind: 'city' as const, key, country }, score }))
+  Array.from({ length: n }, (_, i) => ({ place: { kind: 'city' as const, key, country }, score, discordId: `${key}-${i}` }))
 
 describe('aggregate', () => {
   it('tier boundaries are inclusive', () => {
@@ -160,9 +160,10 @@ describe('aggregate', () => {
     expect(p.countries).toHaveLength(1)
     expect(p.countries[0]).toMatchObject({ iso2: 'NG', isoNumeric: '566', level: 1, members: '3+' })
     // Country-only members count toward the country, not a city.
-    const co: ScoredMember[] = [{ place: { kind: 'countryOnly', country: 'BR' }, score: 300 }, { place: { kind: 'countryOnly', country: 'BR' }, score: 0 }]
+    const co: ScoredMember[] = [{ place: { kind: 'countryOnly', country: 'BR' }, score: 300, discordId: 'b1' }, { place: { kind: 'countryOnly', country: 'BR' }, score: 0, discordId: 'b2' }]
     expect(buildPublicPayload(co, [], CFG).countries).toEqual([])
-    expect(buildPublicPayload([...co, ...co], [], CFG).countries[0]).toMatchObject({ iso2: 'BR', level: 2 })
+    const co3: ScoredMember[] = [...co, { place: { kind: 'countryOnly', country: 'BR' }, score: 0, discordId: 'b3' }]
+    expect(buildPublicPayload(co3, [], CFG).countries[0]).toMatchObject({ iso2: 'BR', level: 2 })
   })
   it('an empty bucket list publishes no members field; unplaced members are ignored', () => {
     const members: ScoredMember[] = [...at('lagos-566', 'NG', 40, 4), { place: { kind: 'unplaced' }, score: 999 }]

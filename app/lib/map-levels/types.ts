@@ -63,6 +63,8 @@ export interface MemberSignals {
 export interface ScoredMember {
   place: PlaceResult
   score: number
+  /** Internal only (never published): the Discord id, for de-duplication. Absent when the member has none. */
+  discordId?: string
 }
 
 /** The whitelisted public payload. Built field by field in aggregate.ts, never by deleting fields. */

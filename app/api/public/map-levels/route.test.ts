@@ -43,7 +43,7 @@ describe('GET /api/public/map-levels', () => {
     const res = await GET()
     expect(res.status).toBe(200)
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*')
-    expect(res.headers.get('Cache-Control')).toBe('public, s-maxage=3600, stale-while-revalidate=86400')
+    expect(res.headers.get('Cache-Control')).toBe('public, s-maxage=300, stale-while-revalidate=600')
     expect((await res.json()).version).toBe(1)
   })
 

@@ -171,6 +171,6 @@ export const MAP_LEVELS_SETTINGS = {
   }),
   'map.tiers': tiers,
   'map.memberCountBuckets': buckets,
-  'map.cacheSeconds': num({ key: 'map.cacheSeconds', area: 'map', label: 'Public map data: cache time', help: 'How long the public endpoint may be served from the CDN before it is recomputed.', min: 300, max: 86_400, default: 3600, unit: 'seconds' }),
+  'map.cacheSeconds': num({ key: 'map.cacheSeconds', area: 'map', label: 'Public map data: cache time', help: 'How long the CDN may serve the public endpoint before it is recomputed. Capped at 300 seconds so that turning the switch off or raising a minimum reaches the public map within minutes; this can only shorten it.', min: 60, max: 300, default: 300, unit: 'seconds' }),
   'map.placeAliases': aliases,
 } as const satisfies Record<string, SettingDef>

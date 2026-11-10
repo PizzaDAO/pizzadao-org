@@ -23,12 +23,14 @@ export async function GET() {
   try {
     const settings = await loadSettings()
     if (!resolveToggle('map.levelsEnabled', settings)) {
-      return NextResponse.json({ enabled: false }, { status: 404, headers: { ...CORS, 'Cache-Control': 'public, s-maxage=300' } })
+      return NextResponse.json({ enabled: false }, { status: 404, headers: { ...CORS, 'Cache-Control': 'public, s-maxage=60' } })
     }
     const payload = await computePublicMapLevels(settings)
-    const maxAge = settings.get('map.cacheSeconds')
+    // Short on purpose: turning the switch off (or changing a minimum) is the privacy kill, so the CDN
+    // may hold a copy for at most 5 minutes (plus 10 minutes of stale-while-revalidate). The setting can only shorten it.
+    const maxAge = Math.min(settings.get('map.cacheSeconds'), 300)
     return NextResponse.json(payload, {
-      headers: { ...CORS, 'Cache-Control': `public, s-maxage=${maxAge}, stale-while-revalidate=86400` },
+      headers: { ...CORS, 'Cache-Control': `public, s-maxage=${maxAge}, stale-while-revalidate=600` },
     })
   } catch (e) {
     console.error('[map-levels] failed', e instanceof Error ? e.message : e)

@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('@/app/lib/db')
 
 import { prisma } from '@/app/lib/db'
-import { computeCurrentLevel, currentLevelsFor, missionStatsFor } from './missions'
+import { completedLevelBy, computeCurrentLevel, missionStatsFor } from './missions'
 
 const missions = [
   { id: 1, level: 1 },
@@ -22,7 +22,7 @@ beforeEach(() => {
   vi.mocked(prisma.transaction.findMany).mockReset().mockResolvedValue([{ userId: 'c', metadata: { level: 1 }, description: null }] as never)
 })
 
-describe('missionStatsFor / currentLevelsFor', () => {
+describe('missionStatsFor / completedLevelBy', () => {
   it('agrees with computeCurrentLevel and counts distinct approved missions', async () => {
     const stats = await missionStatsFor(['a', 'b', 'c', 'd'])
     expect(stats.get('a')).toEqual({ level: computeCurrentLevel(missions, new Set([1, 2])), approvedMissions: 2 })
@@ -33,8 +33,8 @@ describe('missionStatsFor / currentLevelsFor', () => {
     expect(stats.get('d')).toEqual({ level: 1, approvedMissions: 0 })
   })
 
-  it('currentLevelsFor returns just the levels; no ids means no queries', async () => {
-    expect((await currentLevelsFor(['a'])).get('a')).toBe(2)
+  it('completedLevelBy shares the rule; no ids means no queries', async () => {
+    expect([...(await completedLevelBy(['a', 'b'], 1))]).toEqual(['a'])
     vi.mocked(prisma.mission.findMany).mockClear()
     expect((await missionStatsFor([])).size).toBe(0)
     expect(prisma.mission.findMany).not.toHaveBeenCalled()

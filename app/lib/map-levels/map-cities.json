@@ -504,7 +504,7 @@
   {
    "key": "bordeaux-250",
    "name": "Bordeaux",
-   "country": "FX",
+   "country": "FR",
    "isoNumeric": "250",
    "coords": [
     -0.5737706,
@@ -684,7 +684,7 @@
   {
    "key": "calavi-204",
    "name": "Calavi",
-   "country": "DY",
+   "country": "BJ",
    "isoNumeric": "204",
    "coords": [
     2.3468195,
@@ -724,7 +724,7 @@
   {
    "key": "cannes-250",
    "name": "Cannes",
-   "country": "FX",
+   "country": "FR",
    "isoNumeric": "250",
    "coords": [
     7.0119269,
@@ -2334,7 +2334,7 @@
   {
    "key": "london-826",
    "name": "London",
-   "country": "UK",
+   "country": "GB",
    "isoNumeric": "826",
    "coords": [
     -0.2030599,
@@ -2444,7 +2444,7 @@
   {
    "key": "manchester-826",
    "name": "Manchester",
-   "country": "UK",
+   "country": "GB",
    "isoNumeric": "826",
    "coords": [
     -2.2443473,
@@ -2734,7 +2734,7 @@
   {
    "key": "moscow-643",
    "name": "Moscow",
-   "country": "SU",
+   "country": "RU",
    "isoNumeric": "643",
    "coords": [
     37.6632006,
@@ -2844,7 +2844,7 @@
   {
    "key": "neath-826",
    "name": "Neath",
-   "country": "UK",
+   "country": "GB",
    "isoNumeric": "826",
    "coords": [
     -3.8035579,
@@ -3014,7 +3014,7 @@
   {
    "key": "ouagadougou-854",
    "name": "Ouagadougou",
-   "country": "HV",
+   "country": "BF",
    "isoNumeric": "854",
    "coords": [
     -1.4795418,
@@ -3094,7 +3094,7 @@
   {
    "key": "paris-250",
    "name": "Paris",
-   "country": "FX",
+   "country": "FR",
    "isoNumeric": "250",
    "coords": [
     2.3513765,
@@ -3124,7 +3124,7 @@
   {
    "key": "petrozavodsk-643",
    "name": "Petrozavodsk",
-   "country": "SU",
+   "country": "RU",
    "isoNumeric": "643",
    "coords": [
     34.3757792,
@@ -3364,7 +3364,7 @@
   {
    "key": "reading-826",
    "name": "Reading",
-   "country": "UK",
+   "country": "GB",
    "isoNumeric": "826",
    "coords": [
     -0.9697061,
@@ -3474,7 +3474,7 @@
   {
    "key": "saint-petersburg-643",
    "name": "Saint Petersburg",
-   "country": "SU",
+   "country": "RU",
    "isoNumeric": "643",
    "coords": [
     30.3123668,

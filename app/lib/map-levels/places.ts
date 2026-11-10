@@ -21,6 +21,40 @@ export function normalizeAliasMatch(raw: string): string {
   return placeParts(raw).join(', ')
 }
 
+/**
+ * Common spellings of a map city's name (normalised first part -> map city key). These are facts,
+ * not tunables: the obvious ones match without admin work. Keys that are not on the map are skipped.
+ */
+export const BUILTIN_CITY_NAMES: Readonly<Record<string, string>> = {
+  'new york': 'new-york-city-840',
+  nyc: 'new-york-city-840',
+  manhattan: 'new-york-city-840',
+  brooklyn: 'new-york-city-840',
+  queens: 'new-york-city-840',
+  bronx: 'new-york-city-840',
+  'the bronx': 'new-york-city-840',
+  'staten island': 'new-york-city-840',
+  sf: 'san-francisco-840',
+  'san fran': 'san-francisco-840',
+  la: 'los-angeles-840',
+  dc: 'washington-dc-840',
+  washington: 'washington-dc-840',
+  'washington dc': 'washington-dc-840',
+  bombay: 'mumbai-356',
+  bengaluru: 'bangalore-356',
+  calcutta: 'kolkata-356',
+  'new delhi': 'delhi-356',
+  kiev: 'kyiv-804',
+  saigon: 'ho-chi-minh-city-704',
+  'ho chi minh': 'ho-chi-minh-city-704',
+  cdmx: 'mexico-city-484',
+  'ciudad de mexico': 'mexico-city-484',
+  rio: 'rio-de-janeiro-076',
+  'tel aviv-yafo': 'tel-aviv-376',
+  munchen: 'munich-276',
+  'frankfurt am main': 'frankfurt-276',
+}
+
 export interface PlaceIndex {
   cities: readonly MapCity[]
   byKey: Map<string, MapCity>
@@ -35,6 +69,10 @@ export function buildPlaceIndex(cities: readonly MapCity[], aliases: readonly Pl
     byKey.set(c.key, c)
     const n = normalizeText(c.name)
     byName.set(n, [...(byName.get(n) ?? []), c])
+  }
+  for (const [name, key] of Object.entries(BUILTIN_CITY_NAMES)) {
+    const c = byKey.get(key)
+    if (c && !(byName.get(name) ?? []).some((x) => x.key === c.key)) byName.set(name, [...(byName.get(name) ?? []), c])
   }
   return { cities, byKey, byName, aliases: new Map(aliases.map((a) => [normalizeAliasMatch(a.match), a.target])) }
 }
