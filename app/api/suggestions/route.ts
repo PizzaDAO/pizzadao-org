@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/app/lib/db'
 import { getSession } from '@/app/lib/session'
-import { getWebhookUrl } from '@/app/lib/discord-webhook'
+import { postToPurpose } from '@/app/lib/discord-webhook'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { ValidationError } from '@/app/lib/errors/api-errors'
 import { enforceRateLimit } from '@/app/lib/rate-limit'
@@ -90,22 +90,16 @@ const POST_HANDLER = async (request: NextRequest) => {
 
   // Best-effort Discord ping. A webhook failure must never fail the request.
   try {
-    const webhookUrl = await getWebhookUrl('General')
-    if (webhookUrl) {
-      const meta = [name, email, pageUrl].filter(Boolean).join(' • ')
-      const lines: string[] = ['**💡 New site suggestion**', body]
-      if (meta) lines.push(`_— ${meta}_`)
-      if (imageUrl) lines.push(imageUrl)
+    const meta = [name, email, pageUrl].filter(Boolean).join(' • ')
+    const lines: string[] = ['**💡 New site suggestion**', body]
+    if (meta) lines.push(`_— ${meta}_`)
+    if (imageUrl) lines.push(imageUrl)
 
-      await fetch(webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          content: lines.join('\n'),
-          allowed_mentions: { parse: [] },
-        }),
-      })
-    }
+    await postToPurpose({
+      settingKey: 'discord.suggestionsChannelId',
+      sheetName: 'General',
+      body: { content: lines.join('\n').slice(0, 2000), allowed_mentions: { parse: [] } },
+    })
   } catch {
     // Swallow webhook errors.
   }

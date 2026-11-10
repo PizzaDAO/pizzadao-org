@@ -4,7 +4,7 @@
 // Discord notification for new tickets.
 
 import type { SupportTicket, SupportTicketStatus } from "@prisma/client";
-import { getWebhookUrl } from "./discord-webhook";
+import { postToPurpose } from "./discord-webhook";
 
 import {
     ADMIN_NOTES_MAX_LEN,
@@ -96,7 +96,7 @@ export function toAdminTicket(t: SupportTicket) {
 export type AdminTicket = ReturnType<typeof toAdminTicket>;
 
 /**
- * Channel name looked up in the Discord webhooks sheet. Add a row with this
+ * Fallback channel name in the Discord webhooks sheet, used only while the support channel setting is empty. Add a row with this
  * name (default "Support") pointing at the admins' support channel.
  */
 export function supportWebhookChannel(): string {
@@ -112,8 +112,6 @@ export async function notifyNewTicket(
     ticket: Pick<SupportTicket, "id" | "subject" | "discordId" | "displayName">,
 ): Promise<boolean> {
     try {
-        const url = await getWebhookUrl(supportWebhookChannel());
-        if (!url) return false;
         const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://app.pizzadao.org";
         const who = ticket.displayName ? `${ticket.displayName} (<@${ticket.discordId}>)` : `<@${ticket.discordId}>`;
         const content = [
@@ -122,12 +120,11 @@ export async function notifyNewTicket(
             `From ${who}`,
             `${baseUrl}/admin/support`,
         ].join("\n");
-        const res = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ content, allowed_mentions: { parse: [] } }),
+        return await postToPurpose({
+            settingKey: "discord.supportChannelId",
+            sheetName: supportWebhookChannel(),
+            body: { content, allowed_mentions: { parse: [] } },
         });
-        return res.ok;
     } catch {
         return false;
     }

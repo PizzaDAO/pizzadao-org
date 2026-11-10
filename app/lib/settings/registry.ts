@@ -1857,6 +1857,26 @@ export const SETTINGS = {
     label: 'Proposals channel',
     help: 'Where each new proposal and its result are posted, with a link to vote and the proposal\'s voting-key fingerprint. There is no voting in Discord (votes are secret). Empty uses the PROPOSALS_CHANNEL_ID environment value, then the channel named "proposals". Checked against the server when saved.',
   }),
+  'discord.supportChannelId': channelSetting({
+    key: 'discord.supportChannelId',
+    label: 'Support ticket channel',
+    help: 'Where new support tickets are announced (subject only). Empty falls back to the old Discord webhook sheet row.',
+  }),
+  'discord.spotlightChannelId': channelSetting({
+    key: 'discord.spotlightChannelId',
+    label: 'Mafia Spotlight channel',
+    help: 'Where new Mafia Spotlight submissions are announced. Empty falls back to the old Discord webhook sheet row.',
+  }),
+  'discord.suggestionsChannelId': channelSetting({
+    key: 'discord.suggestionsChannelId',
+    label: 'Site suggestions channel',
+    help: 'Where new site suggestions are posted. Empty falls back to the old Discord webhook sheet row.',
+  }),
+  'discord.welcomeChannelId': channelSetting({
+    key: 'discord.welcomeChannelId',
+    label: 'Welcome channel',
+    help: 'Where welcome and profile-update posts go. Empty falls back to the old Discord webhook sheet row.',
+  }),
   'discord.proposalsPingRoleId': proposalsPingRole,
   'missions.slaPingRoleId': slaPingRole,
   'missions.reviewerRoleIds': reviewerRoles,

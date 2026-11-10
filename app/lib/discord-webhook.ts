@@ -3,6 +3,8 @@
 import { google } from "googleapis";
 import { getCrewMappings } from "./crew-mappings";
 import { SHEET_IDS } from "./sheets/config";
+import { postDiscordMessage, type DiscordMessageBody } from "./discord-rest";
+import { savedChannelId, type ChannelSettingKey } from "./settings/channels";
 import { getGoogleAuth, GOOGLE_SCOPES, hasServiceAccountCredentials } from "./google-auth";
 
 const WEBHOOK_SHEET_ID = SHEET_IDS.discordWebhooks;
@@ -85,6 +87,36 @@ export async function getWebhookUrl(channelName: string): Promise<string | null>
     }
 }
 
+const warned = new Set<string>();
+
+/**
+ * Post a message for one purpose. Preferred path: the bot posts to the channel saved in
+ * `settingKey`. When that setting is empty (or there is no bot token) the old sheet webhook
+ * named `sheetName` is used, with a one-time warning. Webhook username/avatar overrides are
+ * not carried over: bot posts use the bot's own identity. Returns true when a post succeeded.
+ */
+export async function postToPurpose(opts: {
+    settingKey: ChannelSettingKey;
+    sheetName: string;
+    body: DiscordMessageBody;
+}): Promise<boolean> {
+    const { settingKey, sheetName, body } = opts;
+    const botToken = process.env.DISCORD_BOT_TOKEN?.trim();
+    const channelId = await savedChannelId(settingKey);
+    if (channelId && botToken) {
+        await postDiscordMessage({ kind: "bot", channelId, botToken }, body);
+        return true;
+    }
+    if (!warned.has(settingKey)) {
+        warned.add(settingKey);
+        console.warn(`[discord] ${settingKey} is not set (or no bot token); falling back to the sheet webhook.`);
+    }
+    const url = await getWebhookUrl(sheetName);
+    if (!url) return false;
+    await postDiscordMessage({ kind: "webhook", url }, body);
+    return true;
+}
+
 /**
  * Send a welcome/update message for member signup or profile update
  */
@@ -101,11 +133,6 @@ export async function sendWelcomeMessage(opts: {
     isNewSignup?: boolean;
 }): Promise<{ ok: boolean; error?: string }> {
     try {
-        const webhookUrl = await getWebhookUrl("General");
-        if (!webhookUrl) {
-            return { ok: false, error: "Could not find General webhook URL" };
-        }
-
         const { discordId, memberId, city, topping, mafiaMovie, mediaType, turtles, crews, isNewSignup = true } = opts;
         const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://app.pizzadao.org";
         const profileUrl = `${baseUrl}/profile/${memberId}`;
@@ -145,20 +172,13 @@ export async function sendWelcomeMessage(opts: {
 
         const content = lines.join("\n");
 
-        const res = await fetch(webhookUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                content,
-                allowed_mentions: {
-                    users: [discordId],
-                },
-            }),
+        const posted = await postToPurpose({
+            settingKey: "discord.welcomeChannelId",
+            sheetName: "General",
+            body: { content, allowed_mentions: { users: [discordId] } },
         });
-
-        if (!res.ok) {
-            const text = await res.text();
-            return { ok: false, error: `Discord webhook failed: ${res.status}` };
+        if (!posted) {
+            return { ok: false, error: "No welcome channel or General webhook configured" };
         }
 
         return { ok: true };

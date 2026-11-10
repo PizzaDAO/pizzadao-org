@@ -1,10 +1,10 @@
 // @vitest-environment node
 import { describe, it, expect, afterEach, vi } from "vitest";
 
-vi.mock("./discord-webhook", () => ({ getWebhookUrl: vi.fn().mockResolvedValue(null) }));
+vi.mock("./discord-webhook", () => ({ postToPurpose: vi.fn().mockResolvedValue(false) }));
 
 import { parseSubmissionInput as parseWithId, parseAdminUpdate, toMemberSubmission, toAdminSubmission, notifyNewSubmission } from "./spotlight";
-import { getWebhookUrl } from "./discord-webhook";
+import { postToPurpose } from "./discord-webhook";
 import type { SpotlightSubmission } from "@prisma/client";
 
 const parseSubmissionInput = (payload: unknown, id = "d1") => parseWithId(payload, id);
@@ -145,23 +145,21 @@ describe("serializers", () => {
 });
 
 describe("notifyNewSubmission", () => {
-    it("returns false without a webhook row", async () => {
+    it("returns false when nothing is configured", async () => {
         expect(await notifyNewSubmission(row())).toBe(false);
     });
 
     it("posts a truncated pitch with mentions disabled and never throws", async () => {
-        vi.mocked(getWebhookUrl).mockResolvedValueOnce("https://discord.test/hook");
-        const fetchMock = vi.fn().mockResolvedValue({ ok: true });
-        vi.stubGlobal("fetch", fetchMock);
+        vi.mocked(postToPurpose).mockResolvedValueOnce(true);
         expect(await notifyNewSubmission(row())).toBe(true);
-        const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-        expect(body.allowed_mentions).toEqual({ parse: [] });
-        expect(body.content).toContain("Sal");
-        expect(body.content).not.toContain("p".repeat(400));
-        expect(body.content).toContain("/admin/spotlight");
+        const arg = vi.mocked(postToPurpose).mock.calls.at(-1)![0];
+        expect(arg.settingKey).toBe("discord.spotlightChannelId");
+        expect(arg.body.allowed_mentions).toEqual({ parse: [] });
+        expect(arg.body.content).toContain("Sal");
+        expect(arg.body.content).not.toContain("p".repeat(400));
+        expect(arg.body.content).toContain("/admin/spotlight");
 
-        vi.mocked(getWebhookUrl).mockResolvedValueOnce("https://discord.test/hook");
-        vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("boom")));
+        vi.mocked(postToPurpose).mockRejectedValueOnce(new Error("boom"));
         expect(await notifyNewSubmission(row())).toBe(false);
     });
 });

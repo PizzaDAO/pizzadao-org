@@ -4,7 +4,7 @@
 // serialization and the Discord notification for new submissions.
 
 import type { SpotlightSubmission, SpotlightStatus } from "@prisma/client";
-import { getWebhookUrl } from "./discord-webhook";
+import { postToPurpose } from "./discord-webhook";
 import { isOwnBlobUrl } from "./blob-url";
 import {
     ADMIN_NOTES_MAX_LEN,
@@ -188,7 +188,7 @@ export function toAdminSubmission(s: SpotlightSubmission) {
 export type AdminSubmission = ReturnType<typeof toAdminSubmission>;
 
 /**
- * Channel name looked up in the Discord webhooks sheet. Add a row with this
+ * Fallback channel name in the Discord webhooks sheet, used only while the spotlight channel setting is empty. Add a row with this
  * name (default "Mafia Spotlight") pointing at the hosts' channel.
  */
 export function spotlightWebhookChannel(): string {
@@ -204,8 +204,6 @@ export async function notifyNewSubmission(
     s: Pick<SpotlightSubmission, "id" | "nomineeName" | "pitch" | "submitterDiscordId" | "submitterName">,
 ): Promise<boolean> {
     try {
-        const url = await getWebhookUrl(spotlightWebhookChannel());
-        if (!url) return false;
         const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://app.pizzadao.org";
         const who = s.submitterName ? `${s.submitterName} (<@${s.submitterDiscordId}>)` : `<@${s.submitterDiscordId}>`;
         const pitch = s.pitch.length > 300 ? `${s.pitch.slice(0, 300)}…` : s.pitch;
@@ -216,13 +214,11 @@ export async function notifyNewSubmission(
             `From ${who}`,
             `${baseUrl}/admin/spotlight`,
         ].join("\n");
-        const res = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ content, allowed_mentions: { parse: [] } }),
-            signal: AbortSignal.timeout(5000),
+        return await postToPurpose({
+            settingKey: "discord.spotlightChannelId",
+            sheetName: spotlightWebhookChannel(),
+            body: { content, allowed_mentions: { parse: [] } },
         });
-        return res.ok;
     } catch {
         return false;
     }
