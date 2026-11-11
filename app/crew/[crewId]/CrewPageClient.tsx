@@ -1296,7 +1296,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
                       {isOpen && (
                         <div id={`goal-tasks-${i}`} style={{ marginTop: 8, display: 'grid', gap: 8 }}>
                           {goalTasks.length === 0 && (
-                            <div style={{ fontSize: 13, color: 'hsl(var(--muted-foreground))' }}>{t('goalNoTasks')}</div>
+                            <div style={{ fontSize: 13, color: 'hsl(var(--muted-foreground))' }}>{doneCount > 0 ? t('goalAllDone') : t('goalNoTasks')}</div>
                           )}
                           {goalTasks.map((task, ti) => (
                             <div key={ti} style={{ borderTop: '1px solid hsl(var(--rule-warm) / 0.4)', paddingTop: 8 }}>

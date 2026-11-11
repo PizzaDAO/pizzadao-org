@@ -1157,6 +1157,7 @@
     "joinUs": "únete",
     "goalTasks": "{count, plural, =0 {Sin tareas} one {# tarea} other {# tareas}}",
     "goalDone": "{count, plural, =0 {} one {# hecha} other {# hechas}}",
+    "goalAllDone": "Todas las tareas de este objetivo están hechas.",
     "goalNoTasks": "Todavía no hay tareas vinculadas a este objetivo.",
     "lead": "Responsable",
     "due": "Fecha límite"

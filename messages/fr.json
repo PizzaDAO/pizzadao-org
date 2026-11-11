@@ -1157,6 +1157,7 @@
     "joinUs": "rejoignez-nous",
     "goalTasks": "{count, plural, =0 {Aucune tâche} one {# tâche} other {# tâches}}",
     "goalDone": "{count, plural, =0 {} one {# terminée} other {# terminées}}",
+    "goalAllDone": "Toutes les tâches de cet objectif sont terminées.",
     "goalNoTasks": "Aucune tâche n'est encore liée à cet objectif.",
     "lead": "Responsable",
     "due": "Échéance"
