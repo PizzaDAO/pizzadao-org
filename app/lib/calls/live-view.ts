@@ -15,7 +15,7 @@ import { findLiveSessions, streamLinkFor, type LivePresence } from './live-state
 import { liveAccess } from './live-access'
 import { personRef, resolveMemberIds, resolveMemberNames, type PersonRef } from './live-members'
 import { memberQaView, SHARED_VIEW_TTL_MS, type PollView, type QuestionView } from './live-qa'
-import { loadPostFilter, mentionsBlockedTerm, type PostFilter } from './post-filters'
+import { isCrewExcluded, loadPostFilter, mentionsBlockedTerm, type PostFilter } from './post-filters'
 import { cleanSuggestedBy } from './summarize'
 import { excludedFromSettings } from './attendance-exclude'
 import { loadCrewContext, type CrewContext } from './crew-context'
@@ -202,7 +202,8 @@ export async function memberLiveView(
   const calls = await Promise.all(
     sessions.map(async (s): Promise<MemberCall> => {
       const sh = await sharedFor(s, filter, excluded, now)
-      const crew = s.crewId ? await loadCrewContext(s.crewId, s.crewLabel ?? s.crewId, settings, now).catch(() => null) : null
+      // No crew context for a crew the private post filter excludes, or when the filter cannot be read.
+      const crew = s.crewId && filter && !isCrewExcluded({ id: s.crewId, label: s.crewLabel }, filter) ? await loadCrewContext(s.crewId, s.crewLabel ?? s.crewId, settings, now).catch(() => null) : null
       const cur = parseCursor(cursors.get(s.sessionId))
       const canSeeItems = access.actionItems.visible && !!filter
       const fresh = canSeeItems

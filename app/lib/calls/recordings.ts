@@ -387,7 +387,7 @@ export async function generateAndStoreSummaryResult(id: string, opts: SummaryOpt
  * The summary's action items plus those confirmed during the call (live-items.ts), without duplicates
  * and respecting redactions. Any failure keeps the summary's own list.
  */
-async function withLiveItems(
+export async function withLiveItems(
   base: Array<{ text: string; owner: string | null; suggestedBy?: string | null }>,
   sessionId: string | null | undefined,
   segments: TranscriptSegment[],

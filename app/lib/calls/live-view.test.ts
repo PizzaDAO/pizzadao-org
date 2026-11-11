@@ -128,6 +128,11 @@ describe('member endpoint payload', () => {
     expect(pub.calls[0].presentCount).toBe(2)
   })
 
+  it('has no crew context when the post filter cannot be read', async () => {
+    const out = await view({ filter: (async () => { throw new Error('x') }) as never })
+    expect(out.calls[0].crew).toBeNull()
+  })
+
   it('carries the crew id for the crew page link', async () => {
     expect((await view()).calls[0].crewId).toBe('ops')
   })

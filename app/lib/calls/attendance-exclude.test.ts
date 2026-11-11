@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
 import { countedAttendees, DEFAULT_THRESHOLDS, measuredSeconds, type CountedRecording } from './attendance-from-recordings'
-import { excludedFromSettings, parseExcludeIds } from './attendance-exclude'
+import { excludedFromSettings, excludesKnown, parseExcludeIds } from './attendance-exclude'
 import { SETTINGS, type SettingKey } from '@/app/lib/settings/registry'
 import type { Settings } from '@/app/lib/settings'
 
@@ -11,7 +11,7 @@ const BOT = '222222222222222222'
 const settings = (value: string, readFailed = false): Settings => ({
   readFailed,
   invalidKeys: [],
-  isSet: () => true,
+  isSet: () => !readFailed,
   get: ((k: SettingKey) => (k === 'calls.attendanceExcludeIds' ? value : SETTINGS[k].default)) as Settings['get'],
 })
 
@@ -22,9 +22,13 @@ describe('calls.attendanceExcludeIds', () => {
   it('parses one id per line and skips junk', () => {
     expect([...parseExcludeIds(` ${BOT}\nnot-an-id\n\n${PERSON}\n${BOT}`)].sort()).toEqual([PERSON, BOT].sort())
   })
-  it('excludes nobody when settings cannot be read', () => {
-    expect(excludedFromSettings(settings(BOT, true)).size).toBe(0)
+  it('unreadable settings: the last list this instance saw (get() already resolves it) still applies', () => {
+    expect(excludedFromSettings(settings(BOT, true)).has(BOT)).toBe(true)
     expect(excludedFromSettings(settings(BOT)).has(BOT)).toBe(true)
+  })
+  it('the list counts as unknown only when unreadable and never seen', () => {
+    expect(excludesKnown(settings(BOT))).toBe(true)
+    expect(excludesKnown(settings('', true))).toBe(false)
   })
 })
 

@@ -157,6 +157,7 @@ export async function editAttendance(input: AttendanceEditInput): Promise<Attend
   const where = { crewId: { in: crewIds }, callDate: day, discordId: input.discordId }
 
   if (input.action === 'add') {
+    if ((await loadAttendanceExcludes()).has(input.discordId)) return { ok: false, status: 400, error: 'That account is excluded from attendance' }
     const existing = await prisma.callAttendance.findFirst({ where, select: { id: true } })
     if (existing) return { ok: false, status: 409, error: 'Already counted for that crew and day' }
     const [labelRow, nameRow] = await Promise.all([

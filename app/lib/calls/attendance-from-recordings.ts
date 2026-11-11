@@ -14,7 +14,7 @@ import { toggleEnabled } from '@/app/lib/settings/toggles'
 import { loadSettings } from '@/app/lib/settings'
 import { rebuildAttendanceSummaries } from '@/app/lib/attendance'
 import { attendanceCrewId, crewIdsFor, loadCrewAliases } from './crew-alias'
-import { loadAttendanceExcludes } from './attendance-exclude'
+import { loadAttendanceExcludesOrNull } from './attendance-exclude'
 import { isImportedSource } from './imported'
 
 const DISCORD_ID = /^\d{17,20}$/
@@ -153,7 +153,7 @@ export async function loadAttendanceThresholds(): Promise<AttendanceThresholds> 
 
 export interface RecordingAttendanceResult {
   recordingId: string
-  skipped?: 'no-crew' | 'no-attendees' | 'imported'
+  skipped?: 'no-crew' | 'no-attendees' | 'imported' | 'settings-unreadable'
   attendees: number
   /** Rows written (or, in a dry run, that would be written). */
   created: number
@@ -199,7 +199,9 @@ export async function recordAttendanceForRecording(
   })
   const sameDay = [rec, ...around.filter((r) => r.id !== rec.id)].filter((r) => callDay(r.startedAt).getTime() === day.getTime())
   const thresholds = opts.thresholds ?? (await loadAttendanceThresholds())
-  const exclude = await loadAttendanceExcludes()
+  // Settings unreadable and the list never seen: do not write rows that might be bots; a later run (or the backfill) does it.
+  const exclude = await loadAttendanceExcludesOrNull()
+  if (!exclude) return { ...base, skipped: 'settings-unreadable' }
   const counted = countedAttendees(sameDay, thresholds, exclude)
   if (counted.size === 0) return { ...base, skipped: isImportedSource(rec.source) ? 'imported' : 'no-attendees' }
 
