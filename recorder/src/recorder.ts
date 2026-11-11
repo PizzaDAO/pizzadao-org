@@ -37,7 +37,7 @@ import { StopTracker, type StopReason } from './stop-conditions.js'
 import { REMOTE_CONFIG_OFF, REMOTE_CONFIG_START_WAIT_MS, type RemoteConfig, type RemoteConfigClient } from './remote-config.js'
 import type { SessionMeta } from './types.js'
 import { LiveItems, postLive, type LiveRequest } from './live-items.js'
-import { PlayOutListener, postPlayOutCheck } from './play-out.js'
+import { PlayOutListener, postPlayOut, type PlayOutAnswer } from './play-out.js'
 import { LiveStatePusher, postLiveState, type LiveStateBody, type PostResult } from './live-state.js'
 
 const TICK_MS = 10_000
@@ -132,7 +132,7 @@ export class CallRecorder {
     /** Live-state heartbeat (tests inject it); default POSTs to the app. */
     private readonly liveStatePost: ((body: LiveStateBody) => Promise<PostResult>) | null = null,
     /** Play-out command check (tests inject it); default POSTs to the app. True = the command was given. */
-    private readonly playOutCheck: ((body: LiveRequest) => Promise<boolean>) | null = null,
+    private readonly playOutCheck: ((body: LiveRequest) => Promise<PlayOutAnswer | null>) | null = null,
   ) {
     this.slots = new SlotMemory(path.join(cfg.dataDir, 'slots.json'), (ch) => ch !== null && this.allowedNow().has(ch), log)
     this.limits = new CallLimits(path.join(cfg.dataDir, 'call-limits.json'), log)
@@ -453,7 +453,7 @@ export class CallRecorder {
       )
       tracker.observeHumans(await this.humanCount(g, channelId), Date.now())
       playOut = this.playOutFor(rc, endSong, { sessionId, eventId: event.id, eventName: event.name, dir, startedAtMs, channel })
-      live = this.liveFor(event, rc, { sessionId, dir, startedAtMs, channel, names, uploaded: playOut?.uploaded })
+      live = this.liveFor(event, rc, { sessionId, dir, startedAtMs, channel, names })
       capture.beginCapture()
       live?.start()
 
@@ -506,7 +506,7 @@ export class CallRecorder {
   private liveFor(
     event: EventInfo,
     rc: RemoteConfig,
-    o: { sessionId: string; dir: string; startedAtMs: number; channel: VoiceBasedChannel; names: Map<string, string>; uploaded?: ReadonlySet<string> },
+    o: { sessionId: string; dir: string; startedAtMs: number; channel: VoiceBasedChannel; names: Map<string, string> },
   ): LiveItems | null {
     const l = rc.liveItems
     if (!(l.audio || l.chat) || !l.eventIds.includes(event.id)) return null
@@ -522,7 +522,6 @@ export class CallRecorder {
       dir: o.dir,
       cfg,
       uploader: this.finalizeDeps.uploader,
-      uploaded: o.uploaded,
       post: this.livePost ?? ((body) => postLive(this.cfg.appBaseUrl, this.cfg.recorderApiKey, body, this.log)),
       send: (text) => this.send(o.channel, text),
       nameOf: (id) => o.names.get(id) ?? null,
@@ -648,7 +647,7 @@ export class CallRecorder {
       startedAtMs: o.startedAtMs,
       dir: o.dir,
       uploader: this.finalizeDeps.uploader,
-      check: (body) => (this.playOutCheck ?? ((b) => postPlayOutCheck(this.cfg.appBaseUrl, this.cfg.recorderApiKey, b, this.log)))(body),
+      post: (body) => (this.playOutCheck ?? ((b) => postPlayOut(this.cfg.appBaseUrl, this.cfg.recorderApiKey, b, this.log)))(body),
       onCommand: () => {
         const s = this.current
         if (s && s.playOut === listener && !s.stopping) this.fireEndSong(s, 0, 'voice command', true)
@@ -676,8 +675,8 @@ export class CallRecorder {
     void postPlayCrew(radio.url, radio.apiKey, e.crew, s.channelId, this.log)
       .then((outcome) => {
         if (outcome === 'failed') {
+          // Never re-armed (a timeout may have been received): no second song from the call's own end either.
           this.log('end song: pizza-radio unreachable; not marked as played')
-          if (spoken) e.fired = false // the call's own end may still try
         } else this.endSongMarker.mark(s.key, Date.now())
       })
       .catch((err) => this.log(`end song failed: ${err instanceof Error ? err.message : String(err)}`))

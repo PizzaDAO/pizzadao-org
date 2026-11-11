@@ -17,7 +17,7 @@ import { cleanSuggestedBy } from './summarize'
 const SNOWFLAKE = /^\d{5,25}$/
 const SESSION_ID = /^[A-Za-z0-9_-]{6,80}$/
 /** R2 key of a live segment: `calls/<sessionId>/live/<userId>/<startMs>.ogg` (checked against the session id in code). */
-const LIVE_KEY = /^calls\/[A-Za-z0-9_-]{6,80}\/live\/\d{5,25}\/\d{1,10}\.ogg$/
+const LIVE_KEY = /^calls\/[A-Za-z0-9_-]{6,80}\/(live|cmd)\/\d{5,25}\/\d{1,10}\.ogg$/
 const MAX_CALL_MS = 24 * 3600 * 1000
 
 /** Body of POST /api/calls/recorder/live-chunk. Keep in sync with recorder/src/live-items.ts. */
@@ -27,8 +27,10 @@ export const liveRequestSchema = z.object({
   eventName: z.string().max(200).nullable(),
   startedAt: z.string().datetime(),
   seq: z.number().int().min(1).max(10_000).optional(),
-  /** 'play-out': fast path for the spoken end-of-call command (play-out-run.ts); segments only, nothing is stored. */
-  command: z.literal('play-out').optional(),
+  /** 'play-out': fast path for the spoken end-of-call command (play-out-run.ts): burst check or speaker lookup. */
+  command: z.enum(['play-out', 'play-out-allowed']).optional(),
+  /** play-out-allowed: Discord ids to look up (at most 10). */
+  speakers: z.array(z.string().regex(SNOWFLAKE)).max(10).optional(),
   segments: z
     .array(
       z.object({

@@ -229,7 +229,7 @@ async function detectFromSpeech(req: LiveRequest, cfg: LiveConfig, settings: Set
   // The key must be exactly this session's live key for that speaker and start.
   const wanted = (req.segments ?? []).filter((s) => s.key === `calls/${req.sessionId}/live/${s.discordId}/${s.startMs}.ogg` && s.endMs > s.startMs)
   if (wanted.length === 0) return []
-  const done = await prisma.callLiveChunk.findMany({ where: { sessionId: req.sessionId }, select: { seq: true, audioMs: true, segmentKeys: true } })
+  const done = await prisma.callLiveChunk.findMany({ where: { sessionId: req.sessionId, seq: { gt: 0 } }, select: { seq: true, audioMs: true, segmentKeys: true } })
   if (done.length >= cfg.maxChunks) return capped(log, 'chunk cap reached')
   const seen = new Set(done.flatMap((c) => c.segmentKeys ?? []))
   let budgetMs = cfg.maxAudioMs - done.reduce((n, c) => n + (c.audioMs ?? 0), 0)

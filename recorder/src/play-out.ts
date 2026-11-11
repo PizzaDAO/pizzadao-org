@@ -1,15 +1,20 @@
 /**
  * Spoken play-out command ("That's the end of the call, Metalhead, play the song").
  *
- * Fast path, separate from the slow action-item chunks: every short speech burst is uploaded to R2
- * as soon as it finishes (the capture closes a burst after 1 s of silence) and the app is asked
- * whether it contains the command (POST /api/calls/recorder/live-chunk with command 'play-out').
- * The app does everything that needs secrets or the database: transcription, the fuzzy match and
- * the "who may give the command" check. This side only forwards bursts, one request at a time, and
- * calls `onCommand` once when the app says yes. Every failure is logged and dropped.
+ * Fast path, separate from the slow action-item chunks. For each short speech burst (the capture
+ * closes a burst after 1 s of silence):
+ *   1. the speaker must be allowed to give the command: the app is asked once per speaker
+ *      (POST live-chunk, command 'play-out-allowed') and the answer is cached for a couple of
+ *      minutes; bursts of anyone else are never uploaded;
+ *   2. the burst is uploaded under calls/<session>/cmd/ and the app is asked whether it contains
+ *      the command (command 'play-out');
+ *   3. the uploaded burst is deleted again right after the check.
+ * The app does everything that needs secrets or the database: transcription, the match and the
+ * role checks. This side forwards bursts one request at a time and calls `onCommand` once when
+ * the app says yes. Every failure is logged and dropped.
  *
  * Bounded cost: bursts outside MIN..MAX_BURST_MS are not sent, at most MAX_REQUESTS_PER_CALL
- * requests per call, at most MAX_QUEUED waiting (the newest win: a command is said right now).
+ * checks per call (the app enforces its own per-session cap too), at most MAX_QUEUED waiting.
  */
 import path from 'node:path'
 import { sessionKeys, type Uploader } from './storage.js'
@@ -21,15 +26,23 @@ export const MAX_BURST_MS = 15_000
 export const MAX_QUEUED = 3
 export const MAX_REQUESTS_PER_CALL = 150
 export const PLAY_OUT_REQUEST_TIMEOUT_MS = 25_000
+/** How long an "allowed / not allowed" answer for a speaker is kept. */
+export const SPEAKER_CACHE_MS = 2 * 60_000
 
-/** POST the bursts to the app; true only when it answers that the command was given. Never throws. */
-export async function postPlayOutCheck(
+export interface PlayOutAnswer {
+  playOut?: boolean
+  allowed?: string[]
+  denied?: string[]
+}
+
+/** POST to the app; null on any failure. Never throws. */
+export async function postPlayOut(
   appBaseUrl: string,
   apiKey: string,
   body: LiveRequest,
   log: (msg: string) => void,
   fetchImpl: typeof fetch = fetch,
-): Promise<boolean> {
+): Promise<PlayOutAnswer | null> {
   try {
     const res = await fetchImpl(`${appBaseUrl}/api/calls/recorder/live-chunk`, {
       method: 'POST',
@@ -39,12 +52,14 @@ export async function postPlayOutCheck(
     })
     if (!res.ok) {
       log(`play-out: app answered ${res.status}`)
-      return false
+      return null
     }
-    return ((await res.json()) as { playOut?: unknown }).playOut === true
+    const j = (await res.json()) as Record<string, unknown>
+    const ids = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : undefined)
+    return { playOut: j.playOut === true, allowed: ids(j.allowed), denied: ids(j.denied) }
   } catch (err) {
     log(`play-out: request failed (${err instanceof Error ? err.message : String(err)})`)
-    return false
+    return null
   }
 }
 
@@ -54,11 +69,12 @@ export interface PlayOutListenerDeps {
   eventName: string | null
   startedAtMs: number
   dir: string
-  uploader: Pick<Uploader, 'put'>
-  check: (body: LiveRequest) => Promise<boolean>
+  uploader: Pick<Uploader, 'put'> & { remove?: Uploader['remove'] }
+  post: (body: LiveRequest) => Promise<PlayOutAnswer | null>
   /** Called at most once per call, when the app confirms the command. */
   onCommand: () => void
   log: (msg: string) => void
+  now?: () => number
 }
 
 export class PlayOutListener {
@@ -67,19 +83,41 @@ export class PlayOutListener {
   private stopped = false
   private fired = false
   private requests = 0
-  /** Keys already uploaded (the regular live chunk can skip them). */
-  readonly uploaded = new Set<string>()
+  private speakers = new Map<string, { ok: boolean; at: number }>()
 
   constructor(private readonly d: PlayOutListenerDeps) {}
+
+  private now(): number {
+    return (this.d.now ?? Date.now)()
+  }
 
   /** A finished speech burst (from the capture). */
   onSegment(rec: SegmentRecord): void {
     if (this.stopped || this.fired || rec.bytes <= 0) return
     const len = rec.endMs - rec.startMs
     if (len < MIN_BURST_MS || len > MAX_BURST_MS) return
+    const known = this.speakers.get(rec.userId)
+    if (known && known.ok === false && this.now() - known.at < SPEAKER_CACHE_MS) return // not allowed: never uploaded
     this.queue.push(rec)
     if (this.queue.length > MAX_QUEUED) this.queue.splice(0, this.queue.length - MAX_QUEUED)
     void this.drain()
+  }
+
+  private base(): Pick<LiveRequest, 'sessionId' | 'eventId' | 'eventName' | 'startedAt'> {
+    return { sessionId: this.d.sessionId, eventId: this.d.eventId, eventName: this.d.eventName, startedAt: new Date(this.d.startedAtMs).toISOString() }
+  }
+
+  /** Ask the app about speakers not (or no longer) in the cache. A failed lookup is not cached: the burst is dropped. */
+  private async learnSpeakers(batch: SegmentRecord[]): Promise<void> {
+    const unknown = [...new Set(batch.map((r) => r.userId))].filter((id) => {
+      const k = this.speakers.get(id)
+      return !k || this.now() - k.at >= SPEAKER_CACHE_MS
+    })
+    if (unknown.length === 0) return
+    const a = await this.d.post({ ...this.base(), command: 'play-out-allowed', speakers: unknown.slice(0, 10) })
+    const at = this.now()
+    for (const id of a?.allowed ?? []) this.speakers.set(id, { ok: true, at })
+    for (const id of a?.denied ?? []) this.speakers.set(id, { ok: false, at })
   }
 
   private async drain(): Promise<void> {
@@ -88,28 +126,30 @@ export class PlayOutListener {
     try {
       while (!this.stopped && !this.fired && this.queue.length > 0 && this.requests < MAX_REQUESTS_PER_CALL) {
         const batch = this.queue.splice(0, this.queue.length)
+        await this.learnSpeakers(batch)
+        if (this.stopped) break
+        const allowed = batch.filter((r) => this.speakers.get(r.userId)?.ok === true)
+        if (allowed.length === 0) continue
         this.requests++
         const segments: LiveSegment[] = []
         const keys = sessionKeys(this.d.sessionId)
-        for (const rec of batch) {
-          const key = keys.live(rec.userId, rec.startMs)
+        for (const rec of allowed) {
+          const key = keys.cmd(rec.userId, rec.startMs)
           try {
             await this.d.uploader.put(key, path.join(this.d.dir, rec.file), 'audio/ogg')
-            this.uploaded.add(key)
             segments.push({ discordId: rec.userId, displayName: null, key, startMs: rec.startMs, endMs: rec.endMs })
           } catch (err) {
             this.d.log(`play-out: upload failed (${err instanceof Error ? err.message : String(err)})`)
           }
         }
         if (segments.length === 0 || this.stopped) continue
-        const yes = await this.d.check({
-          sessionId: this.d.sessionId,
-          eventId: this.d.eventId,
-          eventName: this.d.eventName,
-          startedAt: new Date(this.d.startedAtMs).toISOString(),
-          command: 'play-out',
-          segments,
-        })
+        let yes = false
+        try {
+          yes = (await this.d.post({ ...this.base(), command: 'play-out', segments }))?.playOut === true
+        } finally {
+          // The burst is not needed any more (finalize would prune it anyway).
+          for (const s of segments) void Promise.resolve(this.d.uploader.remove?.(s.key)).catch(() => undefined)
+        }
         if (yes && !this.stopped && !this.fired) {
           this.fired = true
           this.queue = []

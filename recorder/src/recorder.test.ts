@@ -98,7 +98,7 @@ function world(opts: { nickFails?: boolean; sendFails?: boolean; dataDir?: strin
     opts.remote ?? null,
     opts.livePost ?? null,
     opts.liveStatePost ?? null,
-    opts.playOutCheck ?? null,
+    opts.playOutCheck ? async (b: any) => (b.command === 'play-out-allowed' ? { allowed: b.speakers, denied: [] } : { playOut: await opts.playOutCheck!(b) }) : null,
   )
   return { rec, dataDir, me, nicknames, channel, guild, serialJobs, client, cfg, nick }
 }
@@ -1359,6 +1359,31 @@ describe('spoken play-out command (calls.playOutCommandEnabled)', () => {
     await w.rec.stop('event-ended')
     await new Promise((r) => setTimeout(r, 30))
     expect(played()).toBe(1)
+  })
+
+  it('a timed-out request (it may have been received) is never re-armed: no second song at the call end', async () => {
+    fetchMock.mockReset()
+    fetchMock.mockRejectedValue(Object.assign(new Error('timed out'), { name: 'TimeoutError' }))
+    const { w } = setup()
+    await begin(w)
+    fatal.seg(burst())
+    await vi.waitFor(() => expect(played()).toBe(1))
+    await new Promise((r) => setTimeout(r, 30))
+    await w.rec.stop('event-ended')
+    await new Promise((r) => setTimeout(r, 30))
+    expect(played()).toBe(1)
+  })
+
+  it('a definite failure (5xx after the retry) is not re-armed either', async () => {
+    fetchMock.mockReset()
+    fetchMock.mockResolvedValue({ ok: false, status: 503 } as Response)
+    const { w } = setup()
+    await begin(w)
+    fatal.seg(burst())
+    await vi.waitFor(() => expect(played()).toBe(2), { timeout: 4000 }) // the request and its one retry
+    await w.rec.stop('event-ended')
+    await new Promise((r) => setTimeout(r, 30))
+    expect(played()).toBe(2)
   })
 
   it('without the command the automatic end-of-call song still plays', async () => {

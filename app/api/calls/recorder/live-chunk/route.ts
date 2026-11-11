@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { isRecorderAuthorized } from '@/app/lib/calls/recorder-auth'
 import { liveRequestSchema } from '@/app/lib/calls/live-items'
 import { handleLiveRequest } from '@/app/lib/calls/live-run'
-import { handlePlayOutRequest } from '@/app/lib/calls/play-out-run'
+import { handlePlayOutAllowed, handlePlayOutRequest } from '@/app/lib/calls/play-out-run'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { ValidationError } from '@/app/lib/errors/api-errors'
 
@@ -30,6 +30,10 @@ export const POST = withErrorHandling(async (request: Request) => {
   }
   const parsed = liveRequestSchema.safeParse(body)
   if (!parsed.success) throw new ValidationError('Invalid live chunk')
+  if (parsed.data.command === 'play-out-allowed') {
+    const r = await handlePlayOutAllowed(parsed.data)
+    return NextResponse.json({ messages: [], allowed: r.allowed, denied: r.denied }, { headers: { 'Cache-Control': 'no-store' } })
+  }
   if (parsed.data.command === 'play-out') {
     const r = await handlePlayOutRequest(parsed.data)
     if (r.playOut) console.log(`[calls/live] ${parsed.data.sessionId} play-out command`)

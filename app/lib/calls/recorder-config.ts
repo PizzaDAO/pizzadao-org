@@ -32,9 +32,9 @@ export interface RecorderConfig {
    * The app re-checks everything (allowlist, private post filter) on each request.
    */
   liveItems: { audio: boolean; chunkSeconds: number; chat: boolean; prefixes: string[]; eventIds: string[] }
-  /** Longest a switch to the next crew's event waits while the current call still has people talking; 0 = never wait. */
   /** Spoken "play us out" command (calls.playOutCommandEnabled): the recorder sends short speech bursts and plays the song when the app says so. */
   playOut: { enabled: boolean }
+  /** Longest a switch to the next crew's event waits while the current call still has people talking; 0 = never wait. */
   supersedeMaxDeferMinutes: number
   /** Spellings for Deepgram to prefer (keyterm prompting); empty = none. */
   transcriptionKeyterms: string[]
