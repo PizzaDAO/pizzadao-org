@@ -45,16 +45,16 @@ export async function computeCollectionStats(memberId: string): Promise<Collecti
     return { poapCount: 0, nftCount: 0, nftCollections: 0, ticketCount, hasWallet: false };
   }
 
+  // Only 0x addresses can hold EVM NFTs (a sheet wallet may be Solana or an ENS name): the rest count as 0.
+  const evm = wallets.filter((w) => /^0x[0-9a-fA-F]{40}$/.test(w));
   const [poapResults, nftResults] = await Promise.all([
-    Promise.all(wallets.map((w) => fetchFilteredPOAPs(w))),
-    Promise.all(wallets.map((w) => fetchPizzaDAONFTs(w))),
+    Promise.all(evm.map((w) => fetchFilteredPOAPs(w))),
+    Promise.all(evm.map((w) => fetchPizzaDAONFTs(w))),
   ]);
 
-  // A partial NFT lookup (a chain failed) must not overwrite good counts with lower ones: throw so
-  // refreshCollectionStats writes nothing and the previous row stays. POAP lookups throw on failure.
-  for (const r of nftResults) {
-    if (r.error) throw new Error(`NFT lookup incomplete: ${r.error}`);
-  }
+  // A partial NFT lookup (a chain call failed) must not overwrite good counts with lower ones:
+  // throw so refreshCollectionStats writes nothing and the previous row stays. POAP lookups throw on failure.
+  if (nftResults.some((r) => r.incomplete)) throw new Error("NFT lookup incomplete");
 
   const poaps = new Set<string>();
   for (const r of poapResults) for (const p of r.poaps) poaps.add(String(p.tokenId));

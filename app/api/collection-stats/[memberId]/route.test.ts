@@ -33,6 +33,14 @@ describe("collection-stats route", () => {
     expect(afterMock).not.toHaveBeenCalled();
   });
 
+  it("503 no-store when the member lookup throws (not a cached 404)", async () => {
+    m(fetchMemberById).mockRejectedValue(new Error("sheet down"));
+    const res = await call("1");
+    expect(res.status).toBe(503);
+    expect(res.headers.get("Cache-Control")).toBe("no-store");
+    expect(afterMock).not.toHaveBeenCalled();
+  });
+
   it("400s a malformed id", async () => {
     const res = await call("a/../b%00");
     expect(res.status).toBe(400);

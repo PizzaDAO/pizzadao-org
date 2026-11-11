@@ -21,7 +21,7 @@ vi.mock("@/app/lib/wallet-lookup", () => ({
 }));
 vi.mock("@/app/lib/poap", () => ({
   fetchFilteredPOAPs: vi.fn(async (w: string) => ({
-    poaps: w === "0xa" ? [{ tokenId: 1 }, { tokenId: 2 }] : [{ tokenId: 2 }, { tokenId: 3 }],
+    poaps: w === "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" ? [{ tokenId: 1 }, { tokenId: 2 }] : [{ tokenId: 2 }, { tokenId: 3 }],
     totalCount: 2,
     fromCache: true,
   })),
@@ -49,10 +49,21 @@ import { runCollectionStatsPrecompute } from "./precompute";
 
 beforeEach(() => {
   vi.clearAllMocks();
-  wallets.mockResolvedValue(["0xa", "0xb"]);
+  wallets.mockResolvedValue([W1, W2]);
 });
 
+const W1 = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const W2 = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+
 describe("computeCollectionStats", () => {
+  it("a Solana-only member still gets a row: 0 NFTs/POAPs, tickets counted, no NFT call", async () => {
+    const { fetchPizzaDAONFTs } = await import("@/app/lib/nft");
+    wallets.mockResolvedValue(["7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU"]);
+    const s = await refreshCollectionStats("5");
+    expect(s).toEqual({ poapCount: 0, nftCount: 0, nftCollections: 0, ticketCount: 2, hasWallet: true });
+    expect(upsert).toHaveBeenCalledTimes(1);
+    expect(fetchPizzaDAONFTs).not.toHaveBeenCalled();
+  });
   it("dedupes POAPs and NFTs across wallets and counts collections", async () => {
     expect(await computeCollectionStats("1")).toEqual({
       poapCount: 3,
@@ -84,9 +95,9 @@ describe("refreshCollectionStats", () => {
 });
 
 describe("refresh safety", () => {
-  it("writes nothing when an NFT lookup reports an error", async () => {
+  it("writes nothing when an NFT lookup is incomplete (flag set by nft.ts on a non-OK response)", async () => {
     const { fetchPizzaDAONFTs } = await import("@/app/lib/nft");
-    (fetchPizzaDAONFTs as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ nfts: [], totalCount: 0, walletAddress: "x", error: "chain down" });
+    (fetchPizzaDAONFTs as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ nfts: [], totalCount: 0, walletAddress: W1, incomplete: true });
     await expect(refreshCollectionStats("1")).rejects.toThrow(/incomplete/);
     expect(upsert).not.toHaveBeenCalled();
   });

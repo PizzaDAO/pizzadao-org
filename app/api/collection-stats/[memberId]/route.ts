@@ -23,7 +23,12 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ mem
 
   // Unknown or malformed ids never reach the database (no junk rows, no refresh).
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(memberId)) return NextResponse.json({ error: 'Invalid memberId' }, { status: 400 })
-  const member = await fetchMemberById(memberId).catch(() => null)
+  let member: unknown
+  try {
+    member = await fetchMemberById(memberId)
+  } catch {
+    return NextResponse.json({ error: 'Member lookup unavailable' }, { status: 503, headers: { 'Cache-Control': 'no-store' } })
+  }
   if (!member) return NextResponse.json({ error: 'Member not found' }, { status: 404, headers: { 'Cache-Control': 'public, s-maxage=60' } })
 
   const stored = await readCollectionStats(memberId)
