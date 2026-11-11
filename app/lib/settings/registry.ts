@@ -125,6 +125,13 @@ const FOOTER_TELEGRAM_DEFAULT = "Replies to this bot aren't read. Use the button
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 
+/** An ISO-8601 instant with an explicit zone (Z or an offset), or empty (= unset). */
+function isoInstantValid(v: string): boolean {
+  if (v === '') return true
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/.test(v)) return false
+  return !Number.isNaN(Date.parse(v))
+}
+
 /** One line of calls.endSongCrewMap: `our crew label = pizza-radio crew`. */
 export const END_SONG_CREW_LINE = /^([^=\n]{1,60}?)\s*=\s*([^=\n]{1,60})$/
 export const END_SONG_CREW_MAP_DEFAULT = ['Ops', 'Tech', 'Comms', 'Biz Dev', 'Events', 'Art', 'Merch', 'Real Estate', 'Governance'].map((c) => `${c} = ${c}`).join('\n')
@@ -332,7 +339,7 @@ const proposalsPingRole: SettingDef<string> = {
   key: 'discord.proposalsPingRoleId',
   area: 'discord',
   label: 'Proposals ping role',
-  help: 'Optional role tagged when a new proposal is posted in the proposals channel. Empty tags nobody. Checked against the server when saved.',
+  help: 'Optional role tagged when a new proposal is posted in the proposals channel. The intended value at go-live is the Super Voter role, as the Sesh process did. Empty tags nobody (keep it empty during the pilot). Checked against the server when saved.',
   schema: optionalSnowflake,
   default: '',
   onReadFailure: { value: '' },
@@ -1859,6 +1866,10 @@ export const SETTINGS = {
     label: 'Proposals channel',
     help: 'Where each new proposal and its result are posted, with a link to vote and the proposal\'s voting-key fingerprint. There is no voting in Discord (votes are secret). Empty uses the PROPOSALS_CHANNEL_ID environment value, then the channel named "proposals". Checked against the server when saved.',
   }),
+  'discord.proposalsOpsChannelId': {
+    ...channelSetting({ key: 'discord.proposalsOpsChannelId', label: 'Proposals ops channel', help: '' }),
+    help: 'Where a short alert is posted (once) when a proposal has waited more than 2 hours to open for voting. Counts only, no titles. Empty posts nothing (the stuck proposals are always listed on /admin/proposals). Checked against the server when saved.',
+  },
   'discord.supportChannelId': channelSetting({
     key: 'discord.supportChannelId',
     label: 'Support ticket channel',
@@ -1902,8 +1913,8 @@ export const SETTINGS = {
     key: 'proposals.enabled',
     area: 'proposals',
     label: 'Proposals and voting',
-    help: 'The whole feature: proposal pages, secret ballots, the Discord posts, and the payments link to a passed proposal. Off: every page answers as if it does not exist and payments behave as before. The PROPOSALS_ENABLED env var set to off always wins.',
-    confirmOn: 'Proposals go live: payment requests above the on-approval cap will need a passed in-app proposal, and Sesh links stop being accepted.',
+    help: 'The whole feature: proposal pages, secret ballots, the Discord posts, and the payments link to a passed proposal. Off: every page answers as if it does not exist and payments behave as before. While the pilot list below is set, only the listed members see it and payments are NOT affected. The PROPOSALS_ENABLED env var set to off always wins.',
+    confirmOn: 'Proposals go live: payment requests above the on-approval cap will need a passed in-app proposal. Sesh links stop being accepted for polls posted after go-live (polls posted before it keep working until the Sesh grace date). While the pilot list is set, payments are not affected.',
   }),
   'proposals.voterRoleId': {
     key: 'proposals.voterRoleId',
@@ -1940,6 +1951,56 @@ export const SETTINGS = {
     default: 15,
     stricterOnly: true,
     looserWhen: 'lower',
+  }),
+  'proposals.pilotDiscordIds': {
+    key: 'proposals.pilotDiscordIds',
+    area: 'proposals',
+    label: 'Pilot testers (Discord ids)',
+    help: 'While this list is not empty the proposals feature is a pilot: only these members see the voting pages, can submit and get ballot tokens; the voter snapshot is limited to them; the payments gate stays OFF; and proposals submitted are test proposals (short window below, 1 aye needed, never shown in lists, totals or the payments picker). Point the proposals channel at a private test channel and leave the ping role empty while testing. Clearing the list (with the switch on) is the real go-live and records the go-live moment.',
+    schema: z.array(snowflake).max(20),
+    default: [] as string[],
+    onReadFailure: { value: [] as string[] },
+    input: { type: 'stringList', maxItems: 20, maxLength: 25 },
+    confirm: (from: string[], to: string[]) => (from.length > 0 && to.length === 0 ? 'Clearing the pilot list ends the pilot: the feature goes live for every voter and, with the switch on, payments start requiring in-app proposals.' : null),
+  } as SettingDef<string[]>,
+  'proposals.pilotWindowMinutes': intSetting({
+    key: 'proposals.pilotWindowMinutes',
+    area: 'proposals',
+    label: 'Pilot voting window',
+    help: 'How long a pilot (test) proposal stays open. Only applies to proposals submitted while the pilot list is set; real proposals always use the voting window above.',
+    min: 30,
+    max: 1440,
+    default: 60,
+    unit: 'minutes',
+    onReadFailure: { value: 60 },
+  }),
+  'proposals.liveSince': textSetting({
+    key: 'proposals.liveSince',
+    area: 'proposals',
+    label: 'Go-live moment',
+    help: 'ISO time (for example 2026-12-01T18:00:00Z). Written automatically the first time the switch is ON with an empty pilot list, in production. Discord polls posted before it may still back a payment request during the Sesh grace window; polls posted after it never can. Empty means go-live has not happened, and Sesh links are not accepted.',
+    maxLength: 40,
+    check: isoInstantValid,
+    checkMessage: 'Use an ISO time such as 2026-12-01T18:00:00Z, or leave empty',
+  }),
+  'proposals.seshLinksUntil': dateSetting({
+    key: 'proposals.seshLinksUntil',
+    area: 'proposals',
+    label: 'Sesh grace window ends',
+    help: 'Last day (UTC, inclusive) a payment request above the on-approval cap may still use a Sesh poll link plus the reviewer-confirmed ayes, for polls posted before the go-live moment. Empty means 30 days after the go-live moment. To close the window early, set a past date.',
+  }),
+  'proposals.maxOpenPerProposer': intSetting({
+    key: 'proposals.maxOpenPerProposer',
+    area: 'proposals',
+    label: 'Open proposals per member',
+    help: 'Most proposals one member may have waiting or open at once. Can only be lowered here; raising it needs a code change.',
+    min: 1,
+    max: 3,
+    default: 3,
+    unit: 'proposals',
+    onReadFailure: { value: 1 },
+    stricterOnly: true,
+    looserWhen: 'higher',
   }),
   // ---- Proposals history (plans/proposals-history-import.md): display only, no rule changes. ----
   'proposals.historyEnabled': boolSetting({

@@ -49,6 +49,47 @@ export function saveBallot(proposalId: string, ballot: Ballot): void {
   }
 }
 
+const UNSAVED_KEY = 'pizzadao:proposals-unsaved'
+export interface Unsaved {
+  id: string
+  title: string
+}
+
+/**
+ * Ballots this browser made whose vote code the member has not saved or dismissed yet. The "save your code" card
+ * (GlobalBallotPreparer) shows them on every page until saved or dismissed, also after a reload. Only ids and titles
+ * (public) are kept here; the ballot itself is in its own key.
+ */
+export function listUnsaved(): Unsaved[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(UNSAVED_KEY) || '[]') as unknown
+    if (!Array.isArray(raw)) return []
+    return raw
+      .filter((x): x is Unsaved => !!x && typeof (x as Unsaved).id === 'string' && /^[A-Za-z0-9_-]{8,60}$/.test((x as Unsaved).id) && typeof (x as Unsaved).title === 'string')
+      .filter((x) => loadBallot(x.id) !== null)
+      .slice(0, 20)
+  } catch {
+    return []
+  }
+}
+
+function writeUnsaved(list: Unsaved[]): void {
+  try {
+    localStorage.setItem(UNSAVED_KEY, JSON.stringify(list.slice(0, 20)))
+  } catch {
+    /* blocked storage: the card only lasts for this page then */
+  }
+}
+
+export function markUnsaved(id: string, title: string): void {
+  const rest = listUnsaved().filter((x) => x.id !== id)
+  writeUnsaved([...rest, { id, title: title.slice(0, 200) }])
+}
+
+export function markSaved(id: string): void {
+  writeUnsaved(listUnsaved().filter((x) => x.id !== id))
+}
+
 /** The ballot as a copyable string. base64url of {t, p, s}. */
 export function encodeVoteCode(b: Ballot): string {
   const json = JSON.stringify({ t: b.token, p: b.preparedMessage, s: b.signature })

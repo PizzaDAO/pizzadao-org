@@ -47,6 +47,8 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
         amountUsdCents: r.amountUsdCents,
         capUsdCents: Math.round(policy.onApprovalCapUsd * 100),
         excludeRequestId: id,
+        // Reviewers may link a pilot (test) proposal to a request under the cap, to try the link; never above it.
+        allowTest: true,
       }, tx)
       if (!link.ok) return { status: STATUS[link.error], error: link.error }
       await tx.paymentRequest.update({ where: { id }, data: { proposalId, proposalUrl: null } })

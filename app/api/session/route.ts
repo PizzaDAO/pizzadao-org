@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { proposalsEnabled } from "@/app/lib/proposals/constants";
+import { proposalsEnabledFor } from "@/app/lib/proposals/pilot";
 import { toggleEnabled } from "@/app/lib/settings/toggles";
 import { getSession } from "@/app/lib/session";
 import {
@@ -93,7 +93,7 @@ export async function GET() {
 
   // Proposals nav entry: shown while voting or the proposal history is switched on (fails closed).
   const [votingOn, historyOn] = await Promise.all([
-    proposalsEnabled().catch(() => false),
+    proposalsEnabledFor(session.discordId).catch(() => false),
     toggleEnabled("proposals.historyEnabled").catch(() => false),
   ]);
   const showProposals = votingOn || historyOn;

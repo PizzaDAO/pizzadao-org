@@ -4,7 +4,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { proposalsEnabled } from "@/app/lib/proposals/constants";
+import { proposalsEnabledFor } from "@/app/lib/proposals/pilot";
 import { getLocale, getTranslations } from "next-intl/server";
 import { getSession } from "@/app/lib/session";
 import { getProposalDetail, viewerStates, type ProposalDetail } from "@/app/lib/proposals/store";
@@ -16,6 +16,7 @@ import { resolvePeople } from "@/app/lib/people";
 import { resolveDiscordMentions } from "@/app/lib/discord-mention-resolve";
 import { EditorialMasthead, EditorialPage, paperCard } from "@/app/ui/shared/Editorial";
 import { VotePanel } from "../_components/VotePanel";
+import { WithdrawButton } from "../_components/WithdrawButton";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -188,9 +189,19 @@ export default async function ProposalPage({ params, searchParams }: { params: P
     // With the history switched off an imported record does not exist for members either.
     if (imported && !(await toggleEnabled("proposals.historyEnabled").catch(() => false))) notFound();
     // App-run proposals belong to voting: hidden while only the history is switched on.
-    if (!imported && !(await proposalsEnabled().catch(() => false))) notFound();
+    if (!imported && !(await proposalsEnabledFor(viewerId).catch(() => false))) notFound();
     const isOpen = p.status === "OPEN" && !imported;
     const viewer = isOpen ? (await viewerStates([p.id], viewerId))[p.id] : undefined;
+
+    // The member named to file the payment requests, by name (never the id).
+    let beneficiary: string | null = null;
+    if (!imported && p.beneficiaryDiscordId) {
+        const people = await resolvePeople([p.beneficiaryDiscordId]).catch(() => new Map());
+        const l = people.get(p.beneficiaryDiscordId);
+        beneficiary = l && l.source !== "id" ? l.name : null;
+    }
+    // The proposer can withdraw until voting is over: while it waits to open, or open and before the window ends.
+    const canWithdraw = !imported && p.withdrawable;
 
     let hist: HistoryDetail | null = null;
     let proposer: string | null = null;
@@ -233,6 +244,8 @@ export default async function ProposalPage({ params, searchParams }: { params: P
                         {p.eventDate && <p className="m-0">{t("detail.event", { date: day.format(new Date(p.eventDate)) })}</p>}
                         {p.city && <p className="m-0">{t("detail.city", { city: p.city })}</p>}
                         {p.sponsorLabel && <p className="m-0">{t("detail.sponsor", { sponsor: p.sponsorLabel })}</p>}
+                        {beneficiary && <p className="m-0">{t("detail.beneficiary", { name: beneficiary })}</p>}
+                        {p.isTest && <p className="m-0 font-semibold">{t("detail.test")}</p>}
                         {p.ayesNeeded != null && <p className="m-0">{t("detail.meta", { needed: p.ayesNeeded })}</p>}
                         {p.keyFingerprint && <p className="m-0 break-words font-mono text-xs">{t("detail.fingerprint", { fp: p.keyFingerprint })}</p>}
                         {p.eligibleCount != null && <p className="m-0">{t("detail.eligible", { count: p.eligibleCount })}</p>}
@@ -243,7 +256,12 @@ export default async function ProposalPage({ params, searchParams }: { params: P
                 {imported && hist && <HistoryCard p={p} h={hist} t={t} day={day} money={money} explorers={explorers} proposer={proposer} />}
                 {/* Plain text on purpose: the body is member-written, so it is never rendered as HTML or markdown. */}
                 <div className={`${paperCard} whitespace-pre-wrap break-words p-5`}>{body}</div>
-                {p.status === "DRAFT" && !imported && <p role="status" className="m-0">{t("detail.opening")}</p>}
+                {p.status === "DRAFT" && !imported && (
+                    <p role="status" className="m-0">
+                        {p.openDelayed ? t("detail.openingDelayed") : t("detail.opening")}
+                    </p>
+                )}
+                {canWithdraw && <WithdrawButton proposalId={p.id} />}
                 {isOpen && (
                     <VotePanel proposalId={p.id} title={p.title} fingerprint={p.keyFingerprint} open eligible={!!viewer?.eligible} tokenIssued={!!viewer?.tokenIssued} closesAt={p.closesAt} />
                 )}

@@ -2062,7 +2062,9 @@
     "fastNote": "La voie rapide accélère seulement l'examen. Une personne vérifie et approuve toujours chaque demande.",
     "fieldProposalPick": "Proposition adoptée (requise au-dessus du plafond d'approbation directe)",
     "proposalNone": "Aucune",
-    "proposalPickHelp": "Les demandes au-dessus du plafond doivent lier une proposition de financement que vous avez déposée et qui a été adoptée, pour au moins le montant demandé. Proposez d'abord, puis demandez le paiement."
+    "proposalPickHelp": "Les demandes au-dessus du plafond doivent lier une proposition de financement adoptée, d'au moins le montant demandé. Ce doit être une proposition que vous avez déposée, ou qui vous désigne comme la personne à payer. Proposez d'abord, demandez ensuite le paiement.",
+    "fieldProposalSesh": "Lien du sondage Sesh (uniquement pour un sondage publié avant l'ouverture des propositions)",
+    "proposalSeshHelp": "Jusqu'à la fin de la période de grâce, un lien de sondage Discord publié avant le lancement reste valable pour les demandes au-dessus du plafond. Pas ceux publiés après."
   },
   "proposals": {
     "metaTitle": "Propositions",
@@ -2122,20 +2124,32 @@
         "bad_amount": "Saisissez un montant supérieur à zéro.",
         "bad_date": "Utilisez une vraie date.",
         "too_long": "Le texte de la proposition est trop long.",
-        "rate_limited": "Trop de propositions. Réessayez plus tard."
-      }
+        "rate_limited": "Trop de propositions. Réessayez plus tard.",
+        "bad_beneficiary": "Ce membre est introuvable. Cherchez à nouveau, ou laissez vide.",
+        "too_many_open": "Vous avez déjà le maximum de propositions en attente ou ouvertes. Attendez qu'une se termine, ou retirez-en une."
+      },
+      "fieldBeneficiary": "Qui déposera la demande de paiement ? (facultatif)",
+      "beneficiarySearch": "Rechercher un membre par son nom",
+      "beneficiaryHelp": "Si quelqu'un d'autre organise l'événement et doit être payé, nommez-le ici. Il (et vous) pourra déposer la demande de paiement une fois la proposition adoptée. Non modifiable après l'envoi.",
+      "beneficiaryClear": "Retirer",
+      "tierNeeds": "Cette proposition nécessitera {count} votes pour plus les abstentions, et plus de votes pour que de votes contre.",
+      "tierList": "Jusqu'à ${cap} : {low} pour ; jusqu'à ${midMax} : {mid} ; au-delà : {high}.",
+      "tierNote": "Les montants et les nombres peuvent évoluer. Chaque proposition garde les nombres avec lesquels elle s'est ouverte."
     },
     "detail": {
       "back": "Toutes les propositions",
       "opening": "Le vote va bientôt s'ouvrir : la liste des votants est en préparation.",
       "meta": "Il faut {needed} pour plus abstentions, et plus de pour que de contre.",
       "eligible": "{count} membres peuvent voter.",
-      "hidden": "Les totaux s'affichent à la clôture du vote. Personne ne peut voir les votes individuels.",
+      "hidden": "Les totaux s'affichent à la clôture du vote (le résultat est publié environ une heure après la clôture). Personne ne peut voir les votes individuels.",
       "event": "Date de l'événement : {date}",
       "city": "Lieu : {city}",
       "sponsor": "Parrain : {sponsor}",
       "cancelled": "Cette proposition a été annulée.",
-      "fingerprint": "Empreinte de la clé de vote : {fp}"
+      "fingerprint": "Empreinte de la clé de vote : {fp}",
+      "openingDelayed": "L'ouverture est retardée. Les administrateurs ont été prévenus et elle s'ouvrira dès que le problème sera résolu. Inutile de la soumettre à nouveau.",
+      "beneficiary": "Les demandes de paiement peuvent être déposées par : {name}",
+      "test": "Proposition de test du pilote : elle ne compte nulle part."
     },
     "vote": {
       "heading": "Votre vote",
@@ -2151,7 +2165,7 @@
       "loginLink": "Se connecter",
       "error": "Impossible d'enregistrer votre vote. Réessayez.",
       "tokenError": "Impossible de préparer votre bulletin. Rechargez la page pour réessayer.",
-      "needsCode": "Votre bulletin a deja ete cree dans un autre navigateur. Collez ici votre code de vote pour voter ou changer votre vote depuis celui-ci.",
+      "needsCode": "Ouvrez cette proposition sur l'ordinateur où vous l'avez vue pour la première fois, ou collez ici votre code de vote. Votre bulletin a déjà été créé dans un autre navigateur et un second ne peut pas être créé.",
       "codeLabel": "Code de vote",
       "codeUse": "Utiliser ce code",
       "codeBad": "Ce code ne fonctionne pas pour cette proposition.",
@@ -2182,7 +2196,7 @@
     "banner": {
       "region": "Bulletin prêt",
       "ready": "Votre bulletin pour « {title} » est prêt.",
-      "save": "Enregistrez maintenant votre code de vote pour pouvoir changer votre vote plus tard ou depuis un autre appareil.",
+      "save": "Enregistrez maintenant votre code de vote. Un bulletin ne peut être créé qu'une fois : si vous ouvrez cette proposition sur un autre appareil (votre téléphone, depuis un lien Discord), le code est le seul moyen de voter depuis cet appareil. Ce rappel reste jusqu'à ce que vous enregistriez le code ou le fermiez.",
       "saveCode": "Enregistrer le code",
       "open": "Ouvrir la proposition",
       "dismiss": "Fermer",
@@ -2281,7 +2295,15 @@
       "other": "Lien"
     },
     "partlyPaidBadge": "Partiellement payée",
-    "partlyPaidLine": "Versé jusqu’ici {paid} sur {asked} demandés"
+    "partlyPaidLine": "Versé jusqu’ici {paid} sur {asked} demandés",
+    "withdraw": {
+      "button": "Retirer cette proposition",
+      "confirm": "Retirer cette proposition ? Le vote prend fin et aucun vote n'est compté. Cette action est irréversible.",
+      "yes": "Oui, la retirer",
+      "no": "La garder",
+      "working": "Retrait...",
+      "error": "Impossible de la retirer. Rechargez et réessayez."
+    }
   },
   "followupAction": {
     "overline": "§ Suivi",

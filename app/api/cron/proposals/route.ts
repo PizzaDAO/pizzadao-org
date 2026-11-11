@@ -6,11 +6,11 @@ import { runProposalsCron } from '@/app/lib/proposals/lifecycle'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-// A retried open takes the eligibility snapshot (one chain lookup per member with a wallet).
+// A retried open lists the voter-role holders (a full guild listing).
 export const maxDuration = 300
 
 /**
- * GET /api/cron/proposals — daily (Vercel Cron, Bearer CRON_SECRET). Counts and settles proposals past their
+ * GET /api/cron/proposals — hourly at :20 (Vercel Cron, Bearer CRON_SECRET). Counts and settles proposals past their
  * close time, posts results to Discord, opens drafts that never opened and retries missed posts.
  * Does nothing while proposals are off.
  */

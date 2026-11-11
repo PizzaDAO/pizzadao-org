@@ -2062,7 +2062,9 @@
     "fastNote": "La vía rápida solo acelera la revisión. Una persona sigue comprobando y aprobando cada solicitud.",
     "fieldProposalPick": "Propuesta aprobada (necesaria por encima del límite de aprobación directa)",
     "proposalNone": "Ninguna",
-    "proposalPickHelp": "Las solicitudes por encima del límite deben enlazar una propuesta de financiación tuya que haya sido aprobada, por al menos el importe que pides. Primero propón y luego pide el pago."
+    "proposalPickHelp": "Las solicitudes por encima del límite deben enlazar una propuesta de financiación aprobada, por al menos el importe que pides. Debe ser una que presentaste tú o que te nombra como la persona a pagar. Primero propón y luego pide el pago.",
+    "fieldProposalSesh": "Enlace de la encuesta de Sesh (solo para una encuesta publicada antes de que las propuestas estuvieran activas)",
+    "proposalSeshHelp": "Hasta que termine el periodo de gracia, un enlace de encuesta de Discord publicado antes del lanzamiento sigue valiendo para solicitudes por encima del límite. Las publicadas después, no."
   },
   "proposals": {
     "metaTitle": "Propuestas",
@@ -2122,20 +2124,32 @@
         "bad_amount": "Introduce un importe mayor que cero.",
         "bad_date": "Usa una fecha real.",
         "too_long": "El texto de la propuesta es demasiado largo.",
-        "rate_limited": "Demasiadas propuestas. Inténtalo más tarde."
-      }
+        "rate_limited": "Demasiadas propuestas. Inténtalo más tarde.",
+        "bad_beneficiary": "No se encontró a ese miembro. Busca de nuevo o déjalo vacío.",
+        "too_many_open": "Ya tienes el máximo de propuestas en espera o abiertas. Espera a que cierre una o retira una."
+      },
+      "fieldBeneficiary": "¿Quién presentará la solicitud de pago? (opcional)",
+      "beneficiarySearch": "Busca a un miembro por nombre",
+      "beneficiaryHelp": "Si otra persona organiza el evento y debe cobrar, nómbrala aquí. Ella (y tú) podrá presentar la solicitud de pago cuando se apruebe. No se puede cambiar después de enviarla.",
+      "beneficiaryClear": "Quitar",
+      "tierNeeds": "Esta propuesta necesitará {count} votos a favor más abstenciones, y más votos a favor que en contra.",
+      "tierList": "Hasta ${cap}: {low} a favor; hasta ${midMax}: {mid}; por encima: {high}.",
+      "tierNote": "Los importes y los números pueden cambiar con el tiempo. Cada propuesta conserva los números con los que se abrió."
     },
     "detail": {
       "back": "Todas las propuestas",
       "opening": "La votación está a punto de abrirse: se está preparando la lista de votantes.",
       "meta": "Necesita {needed} votos a favor más abstenciones, y más a favor que en contra.",
       "eligible": "{count} miembros pueden votar.",
-      "hidden": "Los recuentos se muestran cuando cierra la votación. Nadie puede ver los votos individuales.",
+      "hidden": "Los recuentos se muestran cuando cierra la votación (el resultado se publica en aproximadamente una hora tras el cierre). Nadie puede ver los votos individuales.",
       "event": "Fecha del evento: {date}",
       "city": "Lugar: {city}",
       "sponsor": "Patrocinador: {sponsor}",
       "cancelled": "Esta propuesta fue cancelada.",
-      "fingerprint": "Huella de la clave de votación: {fp}"
+      "fingerprint": "Huella de la clave de votación: {fp}",
+      "openingDelayed": "La apertura se ha retrasado. Los administradores ya lo saben y se abrirá en cuanto se resuelva el problema. No hace falta enviarla de nuevo.",
+      "beneficiary": "Las solicitudes de pago las puede presentar: {name}",
+      "test": "Propuesta de prueba del piloto: no cuenta en ningún sitio."
     },
     "vote": {
       "heading": "Tu voto",
@@ -2151,7 +2165,7 @@
       "loginLink": "Iniciar sesión",
       "error": "No se pudo registrar tu voto. Inténtalo de nuevo.",
       "tokenError": "No se pudo preparar tu papeleta. Recarga la página para intentarlo de nuevo.",
-      "needsCode": "Tu papeleta ya se creó en otro navegador. Pega aquí tu código de voto para votar o cambiar tu voto desde este.",
+      "needsCode": "Abre esta propuesta en el ordenador donde la viste por primera vez, o pega aquí tu código de voto. Tu papeleta ya se creó en otro navegador y no se puede crear una segunda.",
       "codeLabel": "Código de voto",
       "codeUse": "Usar este código",
       "codeBad": "Ese código no sirve para esta propuesta.",
@@ -2182,7 +2196,7 @@
     "banner": {
       "region": "Papeleta lista",
       "ready": "Tu papeleta para \"{title}\" está lista.",
-      "save": "Guarda ahora tu código de voto para poder cambiar tu voto más tarde o desde otro dispositivo.",
+      "save": "Guarda ahora tu código de voto. La papeleta se crea una sola vez: si abres esta propuesta en otro dispositivo (tu móvil, desde un enlace de Discord), el código es la única forma de votar desde allí. Este aviso se queda hasta que guardes el código o lo descartes.",
       "saveCode": "Guardar código",
       "open": "Abrir propuesta",
       "dismiss": "Cerrar",
@@ -2281,7 +2295,15 @@
       "other": "Enlace"
     },
     "partlyPaidBadge": "Pagada en parte",
-    "partlyPaidLine": "Pagado hasta ahora {paid} de {asked} solicitados"
+    "partlyPaidLine": "Pagado hasta ahora {paid} de {asked} solicitados",
+    "withdraw": {
+      "button": "Retirar esta propuesta",
+      "confirm": "¿Retirar esta propuesta? La votación termina y no se cuenta ningún voto. No se puede deshacer.",
+      "yes": "Sí, retirarla",
+      "no": "Mantenerla",
+      "working": "Retirando...",
+      "error": "No se pudo retirar. Recarga e inténtalo de nuevo."
+    }
   },
   "followupAction": {
     "overline": "§ Seguimiento",

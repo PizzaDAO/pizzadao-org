@@ -2062,7 +2062,9 @@
     "fastNote": "Fast track only speeds up the review. A person still checks and approves every request.",
     "fieldProposalPick": "Passed proposal (needed above the on-approval cap)",
     "proposalNone": "None",
-    "proposalPickHelp": "Requests above the cap must link a funding proposal you filed that has passed, for at least the amount you ask. Propose first, then ask for the payment."
+    "proposalPickHelp": "Requests above the cap must link a funding proposal that passed, for at least the amount you ask. It must be one you filed, or one that names you as the person to pay. Propose first, then ask for the payment.",
+    "fieldProposalSesh": "Sesh poll link (only for a poll posted before proposals went live)",
+    "proposalSeshHelp": "Until the grace window ends, a Discord poll link posted before go-live still works for requests above the cap. Polls posted after go-live do not."
   },
   "proposals": {
     "metaTitle": "Proposals",
@@ -2122,20 +2124,32 @@
         "bad_amount": "Enter an amount above zero.",
         "bad_date": "Use a real date.",
         "too_long": "The proposal text is too long.",
-        "rate_limited": "Too many proposals. Try again later."
-      }
+        "rate_limited": "Too many proposals. Try again later.",
+        "bad_beneficiary": "That member could not be found. Search again, or leave it empty.",
+        "too_many_open": "You already have the most proposals waiting or open that is allowed. Wait for one to close, or withdraw one."
+      },
+      "fieldBeneficiary": "Who will file the payment request? (optional)",
+      "beneficiarySearch": "Search a member by name",
+      "beneficiaryHelp": "If someone else runs the event and should be paid, name them here. They (and you) can then file the payment request when this passes. Fixed once submitted.",
+      "beneficiaryClear": "Remove",
+      "tierNeeds": "This proposal will need {count} ayes plus abstains, and more ayes than nays.",
+      "tierList": "Up to ${cap}: {low} ayes; up to ${midMax}: {mid}; above that: {high}.",
+      "tierNote": "The amounts and numbers can change over time. Each proposal keeps the numbers it opened with."
     },
     "detail": {
       "back": "All proposals",
       "opening": "Voting is about to open: the voter list is being prepared.",
       "meta": "Needs {needed} ayes plus abstains, and more ayes than nays.",
       "eligible": "{count} members can vote.",
-      "hidden": "Counts are shown when voting closes. Nobody can see individual votes.",
+      "hidden": "Counts are shown when voting closes (the result is posted within about an hour of the close). Nobody can see individual votes.",
       "event": "Event date: {date}",
       "city": "Location: {city}",
       "sponsor": "Sponsor: {sponsor}",
       "cancelled": "This proposal was cancelled.",
-      "fingerprint": "Voting key fingerprint: {fp}"
+      "fingerprint": "Voting key fingerprint: {fp}",
+      "openingDelayed": "Opening is delayed. The admins have been told and it will open as soon as the problem is fixed. You do not need to submit it again.",
+      "beneficiary": "Payment requests can be filed by: {name}",
+      "test": "Pilot test proposal: not counted anywhere."
     },
     "vote": {
       "heading": "Your vote",
@@ -2151,7 +2165,7 @@
       "loginLink": "Log in",
       "error": "Could not record your vote. Try again.",
       "tokenError": "Could not prepare your ballot. Reload the page to try again.",
-      "needsCode": "Your ballot was already created in another browser. Paste your vote code here to vote or change your vote from this one.",
+      "needsCode": "Open this proposal on the computer where you first saw it, or paste your vote code here. Your ballot was already created in another browser, and a second one cannot be made.",
       "codeLabel": "Vote code",
       "codeUse": "Use this code",
       "codeBad": "That code does not work for this proposal.",
@@ -2182,7 +2196,7 @@
     "banner": {
       "region": "Ballot ready",
       "ready": "Your ballot for \"{title}\" is ready.",
-      "save": "Save your vote code now so you can change your vote later or from another device.",
+      "save": "Save your vote code now. A ballot can be made only once: if you open this proposal on another device (your phone, from a Discord link), the code is the only way to vote from there. This reminder stays until you save the code or dismiss it.",
       "saveCode": "Save code",
       "open": "Open proposal",
       "dismiss": "Dismiss",
@@ -2281,7 +2295,15 @@
       "other": "Link"
     },
     "partlyPaidBadge": "Partly paid",
-    "partlyPaidLine": "Paid so far {paid} of {asked} asked"
+    "partlyPaidLine": "Paid so far {paid} of {asked} asked",
+    "withdraw": {
+      "button": "Withdraw this proposal",
+      "confirm": "Withdraw this proposal? Voting ends and no votes are counted. This cannot be undone.",
+      "yes": "Yes, withdraw it",
+      "no": "Keep it",
+      "working": "Withdrawing...",
+      "error": "Could not withdraw it. Reload and try again."
+    }
   },
   "followupAction": {
     "overline": "§ Follow-up",

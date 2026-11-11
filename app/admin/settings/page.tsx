@@ -96,6 +96,7 @@ export default async function AdminSettingsPage() {
                         <Link href="/admin/missions" className="underline">{t("linkMissions")}</Link>
                         <Link href="/admin/calls" className="underline">{t("linkCalls")}</Link>
                         <Link href="/admin/map-levels" className="underline">Map levels preview</Link>
+                        <Link href="/admin/proposals" className="underline">Proposals</Link>
                     </p>
                 </header>
                 <SettingsEditor labels={labels} />

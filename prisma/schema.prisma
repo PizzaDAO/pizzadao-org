@@ -2233,6 +2233,8 @@ model Proposal {
   city                String?
   proposerDiscordId   String? // null only for imported history rows
   sponsorLabel        String? // free text: a holder who sponsors a proposer without a box
+  beneficiaryDiscordId String? // optional member who may file the payment requests (set at creation, never changed)
+  isTest              Boolean        @default(false) // created during the pilot: short window, threshold 1, never in lists, totals or funding
   opensAt             DateTime?
   closesAt            DateTime?
   closedAt            DateTime?
@@ -2274,6 +2276,8 @@ model Proposal {
   @@index([status, closesAt])
   @@index([status, closedAt])
   @@index([proposerDiscordId])
+  @@index([beneficiaryDiscordId])
+  @@index([source, isTest, status])
 }
 
 // Where an imported proposal came from: the Discord poll, its thread, a sheet row, notes.
@@ -2340,7 +2344,7 @@ model ProposalBallot {
 model ProposalEvent {
   id             Int      @id @default(autoincrement())
   proposalId     String
-  type           String // CREATED | OPENED | POSTED | CLOSED | CANCELLED | RESULT_POSTED
+  type           String // CREATED | OPENED | OPEN_FAILED | POSTED | CLOSED | CANCELLED | RESULT_POSTED | STUCK_ALERTED
   actorDiscordId String?
   data           Json?
   createdAt      DateTime @default(now())

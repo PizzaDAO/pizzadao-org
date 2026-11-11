@@ -10,7 +10,7 @@ import { getSession } from "@/app/lib/session";
 import { getSetting } from "@/app/lib/settings";
 import { toggleEnabled } from "@/app/lib/settings/toggles";
 import { listOpenProposals, type ProposalSummary } from "@/app/lib/proposals/store";
-import { proposalsEnabled } from "@/app/lib/proposals/constants";
+import { loadPilotIds, proposalsEnabledFor } from "@/app/lib/proposals/pilot";
 import { listHistory, parseHistoryFilters, type HistoryFilters, type HistoryTotals } from "@/app/lib/proposals/history";
 import { EditorialMasthead, EditorialPage, EmptyState, paperCard, pillOutline, pillTomato } from "@/app/ui/shared/Editorial";
 
@@ -167,8 +167,10 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
     const money = new Intl.NumberFormat(locale, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
     const f = parseHistoryFilters(await searchParams);
     // Voting (open proposals, "New proposal") only shows while proposals.enabled is on; the history can be on alone.
-    const voting = signedIn && (await proposalsEnabled().catch(() => false));
-    const [open, size, withImported] = await Promise.all([voting ? listOpenProposals() : Promise.resolve([]), pageSize(), historyEnabled()]);
+    // While a pilot runs, only the listed members see voting, and they also see the test proposals.
+    const voting = signedIn && (await proposalsEnabledFor(session?.discordId).catch(() => false));
+    const pilot = voting ? (await loadPilotIds()).length > 0 : false;
+    const [open, size, withImported] = await Promise.all([voting ? listOpenProposals({ includeTest: pilot }) : Promise.resolve([]), pageSize(), historyEnabled()]);
     const history = await listHistory(f, size, withImported).catch(() => null);
     const thisYear = new Date().getUTCFullYear();
     const years = Array.from({ length: thisYear - 2020 }, (_, i) => thisYear - i);
