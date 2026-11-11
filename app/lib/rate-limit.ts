@@ -81,6 +81,7 @@ export const RATE_LIMITS = {
   // the secret vote endpoint has no session, so it is throttled per IP (the IP is hashed in the limiter and never stored).
   "proposals-create": { limit: 5, windowSec: 60 * 60 },
   "proposals-vote": { limit: 60, windowSec: 10 * 60 },
+  "proposals-member-search": { limit: 60, windowSec: 10 * 60 },
   // Follow-up action links (Telegram buttons): per token and per IP; possession of the link is the authority.
   "followup-link-token": { limit: 10, windowSec: 60 },
   "followup-link-ip": { limit: 30, windowSec: 60 },

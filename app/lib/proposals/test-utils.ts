@@ -64,12 +64,13 @@ export function makeFakeDb() {
   const db: any = {
     proposal: {
       create: async ({ data }: any) => {
-        const row = { id: `p${++state.seq}`, status: 'DRAFT', source: 'APP', votesRecorded: true, ayes: 0, nays: 0, abstains: 0, countAbstains: true, requireAyesOverNays: true, opensAt: null, closesAt: null, closedAt: null, ayesNeeded: null, eligibleCount: null, discordChannelId: null, discordMessageId: null, resultPostedAt: null, createdAt: new Date(0), ...data }
+        const row = { id: `p${++state.seq}`, status: 'DRAFT', source: 'APP', isTest: false, beneficiaryDiscordId: null, votesRecorded: true, ayes: 0, nays: 0, abstains: 0, countAbstains: true, requireAyesOverNays: true, opensAt: null, closesAt: null, closedAt: null, ayesNeeded: null, eligibleCount: null, discordChannelId: null, discordMessageId: null, resultPostedAt: null, createdAt: new Date(0), ...data }
         state.proposal.push(row)
         return row
       },
       findUnique: async ({ where }: any) => state.proposal.find((r) => matchWhere(r, where)) ?? null,
       findMany: async ({ where }: any) => state.proposal.filter((r) => matchWhere(r, where)),
+      count: async ({ where }: any) => state.proposal.filter((r) => matchWhere(r, where)).length,
       update: async ({ where, data }: any) => Object.assign(state.proposal.find((r) => matchWhere(r, where))!, data),
       updateMany: async ({ where, data }: any) => {
         const rows = state.proposal.filter((r) => matchWhere(r, where))
@@ -106,6 +107,12 @@ export function makeFakeDb() {
         rows.forEach((r) => Object.assign(r, data))
         return { count: rows.length }
       },
+      deleteMany: async ({ where }: any) => {
+        const keep = state.ballot.filter((r) => !matchWhere(r, where))
+        const count = state.ballot.length - keep.length
+        state.ballot.splice(0, state.ballot.length, ...keep)
+        return { count }
+      },
       upsert: async ({ where, create, update }: any) => {
         const hit = state.ballot.find((r) => matchWhere(r, where))
         if (hit) return Object.assign(hit, update)
@@ -114,7 +121,11 @@ export function makeFakeDb() {
         return row
       },
     },
-    proposalEvent: { create: async ({ data }: any) => { state.event.push(data); return data } },
+    proposalEvent: {
+      create: async ({ data }: any) => { const row = { id: ++state.seq, createdAt: new Date(), ...data }; state.event.push(row); return row },
+      findFirst: async ({ where }: any) => [...state.event].reverse().find((r) => matchWhere(r, where)) ?? null,
+      findMany: async ({ where }: any) => state.event.filter((r) => matchWhere(r, where)),
+    },
     $queryRaw: async () => [],
     // Transactions run one at a time, like row locks on one proposal would make them.
     $transaction: async (fn: any) => {
@@ -143,6 +154,10 @@ export function makeFakePending() {
       if (state.failRemove) throw new Error('redis down')
       const h = hashes.get(proposalId)
       for (const e of entries) if (h?.get(e.tokenHash) === e.choice) { h.delete(e.tokenHash); state.removed++ }
+    },
+    async clear(proposalId: string) {
+      if (state.failRemove) throw new Error('redis down')
+      hashes.delete(proposalId)
     },
   }
   return { store, hashes, state }

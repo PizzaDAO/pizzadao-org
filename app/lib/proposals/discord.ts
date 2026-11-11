@@ -2,19 +2,23 @@
  * Metalhead's posts for proposals: one when a proposal opens (with the Vote link) and one at close (the result).
  * There is no voting in Discord (Discord would see choices): the post only links to the site.
  *
- * Each post is claimed first with a conditional update (so the create route and the daily cron can never post
+ * Each post is claimed first with a conditional update (so the create route and the hourly cron can never post
  * twice) and un-claimed if Discord definitely did not post, so the next cron run retries. Best effort: a Discord
  * outage never blocks opening or closing a proposal. Counts appear only in the result post.
  */
 import { prisma } from '@/app/lib/db'
-import { DiscordPostError, postDiscordMessage, type DiscordMessageBody } from '@/app/lib/discord-rest'
+import { DiscordPostError, editDiscordMessage, postDiscordMessage, type DiscordMessageBody } from '@/app/lib/discord-rest'
 import { getSetting } from '@/app/lib/settings'
-import { resolveConfiguredChannel } from '@/app/lib/settings/channels'
+import { resolveConfiguredChannel, savedChannelId } from '@/app/lib/settings/channels'
 
 export interface PostDeps {
   channelId(): Promise<string | null>
   pingRoleId(): Promise<string>
   post(channelId: string, body: DiscordMessageBody): Promise<{ id: string | null }>
+  /** Edit a message the bot posted (the "withdrawn" update). */
+  edit?(channelId: string, messageId: string, body: Partial<DiscordMessageBody>): Promise<void>
+  /** The ops channel for stuck-proposal alerts; empty when none is set (the admin page still lists them). */
+  opsChannelId?(): Promise<string | null>
   appUrl(): string
 }
 
@@ -28,6 +32,8 @@ export const defaultPostDeps: PostDeps = {
     }
   },
   post: (channelId, body) => postDiscordMessage({ kind: 'bot', channelId, botToken: process.env.DISCORD_BOT_TOKEN?.trim() ?? '' }, body),
+  edit: (channelId, messageId, body) => editDiscordMessage({ channelId, messageId, botToken: process.env.DISCORD_BOT_TOKEN?.trim() ?? '' }, body),
+  opsChannelId: async () => (await savedChannelId('discord.proposalsOpsChannelId')) || null,
   appUrl: () => (process.env.NEXT_PUBLIC_APP_URL?.trim() || 'https://app.pizzadao.org').replace(/\/$/, ''),
 }
 
@@ -67,6 +73,22 @@ export function resultMessage(
       `${p.ayes} aye, ${p.nays} nay, ${p.abstains} abstain${p.ayesNeeded != null ? ` (needed ${p.ayesNeeded} ayes plus abstains, and more ayes than nays)` : ''}.`,
       `${url}/proposals/${p.id}`,
     ].join('\n'),
+    allowed_mentions: { parse: [] },
+  }
+}
+
+/** What an open post becomes when the proposal is withdrawn or cancelled: no link, no ping, no reason. Pure. */
+export function cancelledMessage(p: { title: string }): Partial<DiscordMessageBody> {
+  return {
+    content: `**Proposal withdrawn:** ${clip(p.title, 150)}\nVoting on it has ended and no votes were counted.`,
+    allowed_mentions: { parse: [] },
+  }
+}
+
+/** The ops alert for drafts that never opened. Counts only: no titles, no names. Pure. */
+export function stuckMessage(count: number, url: string): DiscordMessageBody {
+  return {
+    content: `${count} proposal${count === 1 ? ' has' : 's have'} been waiting more than 2 hours to open for voting. Check ${url}/admin/proposals (the latest failure code is shown there).`,
     allowed_mentions: { parse: [] },
   }
 }
@@ -116,5 +138,32 @@ export async function announceResult(id: string, now: Date = new Date(), deps: P
     console.error('[proposals] result post failed:', (e as Error)?.name)
     if (definitelyNotPosted(e)) await prisma.proposal.updateMany({ where: { id }, data: { resultPostedAt: null } })
     return 'failed'
+  }
+}
+
+/** Update the open post of a cancelled proposal in place (best effort: the cancel itself already happened). */
+export async function announceCancelled(id: string, deps: PostDeps = defaultPostDeps): Promise<PostOutcome> {
+  if (!deps.edit) return 'skipped'
+  const p = await prisma.proposal.findUnique({ where: { id }, select: { title: true, status: true, discordChannelId: true, discordMessageId: true } })
+  if (!p || p.status !== 'CANCELLED' || !p.discordChannelId || !p.discordMessageId) return 'skipped'
+  try {
+    await deps.edit(p.discordChannelId, p.discordMessageId, cancelledMessage(p))
+    return 'posted'
+  } catch (e) {
+    console.error('[proposals] cancel post failed:', (e as Error)?.name)
+    return 'failed'
+  }
+}
+
+/** One short alert to the ops channel. Returns false when there is no channel or the post failed. */
+export async function alertStuck(count: number, deps: PostDeps = defaultPostDeps): Promise<boolean> {
+  const channelId = await deps.opsChannelId?.().catch(() => null)
+  if (!channelId) return false
+  try {
+    await deps.post(channelId, stuckMessage(count, deps.appUrl()))
+    return true
+  } catch (e) {
+    console.error('[proposals] stuck alert failed:', (e as Error)?.name)
+    return false
   }
 }

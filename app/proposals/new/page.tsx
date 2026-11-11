@@ -2,7 +2,8 @@
 
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { proposalsEnabled } from "@/app/lib/proposals/constants";
+import { proposalsEnabledFor } from "@/app/lib/proposals/pilot";
+import { loadProposalRules } from "@/app/lib/proposals/rules";
 import { getTranslations } from "next-intl/server";
 import { getSession } from "@/app/lib/session";
 import { EditorialPage } from "@/app/ui/shared/Editorial";
@@ -18,12 +19,24 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function NewProposalPage() {
     // The area can be open for the history alone; creating proposals needs voting on.
-    if (!(await proposalsEnabled().catch(() => false))) notFound();
     const session = await getSession().catch(() => null);
+    if (!(await proposalsEnabledFor(session?.discordId).catch(() => false))) notFound();
     if (!session?.discordId) redirect("/login?returnTo=/proposals/new");
+    // The ayes tiers as they are today, for the preview under the amount. Unreadable settings: no preview.
+    const rules = await loadProposalRules().catch(() => null);
+    const tiers = rules
+        ? {
+              capUsd: rules.policy.onApprovalCapUsd,
+              midMaxUsd: rules.policy.voteMidMaxUsd,
+              low: rules.policy.voteAyesLow,
+              mid: rules.policy.voteAyesMid,
+              high: rules.policy.voteAyesHigh,
+              general: rules.generalAyes,
+          }
+        : null;
     return (
         <EditorialPage width="max-w-[720px]">
-            <NewProposalForm />
+            <NewProposalForm tiers={tiers} />
         </EditorialPage>
     );
 }

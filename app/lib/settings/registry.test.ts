@@ -217,6 +217,7 @@ describe('settings registry', () => {
       ['discord.callVoiceChannelId', ''],
       ['discord.dstFixChannelId', ''],
       ['discord.proposalsChannelId', ''],
+      ['discord.proposalsOpsChannelId', ''],
       ['discord.supportChannelId', ''],
       ['discord.spotlightChannelId', ''],
       ['discord.suggestionsChannelId', ''],
@@ -321,6 +322,38 @@ describe('settings registry', () => {
     expect(parseSetting('proposals.generalAyes', 20).ok).toBe(true)
     for (const k of ['proposals.windowDays', 'proposals.generalAyes'] as const) expect(SETTINGS[k].stricterOnly).toBe(true)
     expect(SETTINGS['proposals.windowDays'].onReadFailure).toEqual({ value: 14 })
+  })
+
+  it('go-live settings: pilot off, no go-live moment, the 30-day Sesh default, the strictest caps', () => {
+    expect(SETTINGS['proposals.pilotDiscordIds'].default).toEqual([])
+    expect(SETTINGS['proposals.pilotWindowMinutes'].default).toBe(60)
+    expect(parseSetting('proposals.pilotWindowMinutes', 29).ok).toBe(false)
+    expect(parseSetting('proposals.pilotWindowMinutes', 30).ok).toBe(true)
+    expect(parseSetting('proposals.pilotWindowMinutes', 1441).ok).toBe(false)
+    expect(parseSetting('proposals.pilotDiscordIds', ['100000000000000001']).ok).toBe(true)
+    expect(parseSetting('proposals.pilotDiscordIds', ['not an id']).ok).toBe(false)
+    expect(SETTINGS['proposals.liveSince'].default).toBe('')
+    expect(parseSetting('proposals.liveSince', '2026-12-01T18:00:00Z').ok).toBe(true)
+    expect(parseSetting('proposals.liveSince', '2026-12-01').ok).toBe(false)
+    expect(parseSetting('proposals.liveSince', 'yesterday').ok).toBe(false)
+    expect(parseSetting('proposals.liveSince', '').ok).toBe(true)
+    expect(SETTINGS['proposals.seshLinksUntil'].default).toBe('')
+    expect(parseSetting('proposals.seshLinksUntil', '2026-12-31').ok).toBe(true)
+    expect(parseSetting('proposals.seshLinksUntil', '2026-02-30').ok).toBe(false)
+    // open proposals per member: stricter-only, default 3, a failed read gives 1
+    expect(SETTINGS['proposals.maxOpenPerProposer'].default).toBe(3)
+    expect(SETTINGS['proposals.maxOpenPerProposer'].stricterOnly).toBe(true)
+    expect(SETTINGS['proposals.maxOpenPerProposer'].onReadFailure).toEqual({ value: 1 })
+    expect(parseSetting('proposals.maxOpenPerProposer', 4).ok).toBe(false)
+    expect(parseSetting('proposals.maxOpenPerProposer', 0).ok).toBe(false)
+    expect(parseSetting('proposals.maxOpenPerProposer', 1).ok).toBe(true)
+    // the cap's help names the tier coupling, and lowering it asks first
+    expect(SETTINGS['payments.onApprovalCapUsd'].help).toMatch(/second-tier ayes/)
+    expect(SETTINGS['payments.onApprovalCapUsd'].confirm?.(625, 500)).toMatch(/Lowering the cap/)
+    expect(SETTINGS['payments.onApprovalCapUsd'].confirm?.(500, 625)).toBeNull()
+    // the ping role's intended value is documented but never hard-coded
+    expect(SETTINGS['discord.proposalsPingRoleId'].help).toMatch(/Super Voter/)
+    expect(SETTINGS['discord.proposalsPingRoleId'].default).toBe('')
   })
 
   it('guide settings ship unset so unconfirmed handbook facts stay hidden', () => {

@@ -10,6 +10,8 @@ import { loadSettings } from '../settings'
 export interface ProposalRules {
   windowDays: number
   generalAyes: number
+  /** Window of a pilot (test) proposal. */
+  pilotWindowMinutes?: number
   policy: PaymentPolicy
 }
 
@@ -18,7 +20,7 @@ export async function loadProposalRules(): Promise<ProposalRules> {
   const policy = await loadPaymentPolicy()
   try {
     const s = await loadSettings()
-    return { windowDays: s.get('proposals.windowDays'), generalAyes: s.get('proposals.generalAyes'), policy }
+    return { windowDays: s.get('proposals.windowDays'), generalAyes: s.get('proposals.generalAyes'), pilotWindowMinutes: s.get('proposals.pilotWindowMinutes'), policy }
   } catch {
     return { windowDays: 14, generalAyes: 200, policy }
   }

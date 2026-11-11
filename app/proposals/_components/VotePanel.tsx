@@ -8,6 +8,8 @@ import {
     decodeVoteCode,
     encodeVoteCode,
     loadBallot,
+    markSaved,
+    markUnsaved,
     prepareBallot,
     saveBallot,
     shareVoteCode,
@@ -68,15 +70,18 @@ export function VotePanel({ proposalId, title, open, closesAt, eligible, tokenIs
         prepareBallot(proposalId, fingerprint)
             .then((b) => {
                 if (cancelled) return;
-                if (b) setBallot(b);
-                else setNeedsCode(true);
+                if (b) {
+                    setBallot(b);
+                    // A fresh ballot: the save card follows the member to other pages until the code is saved.
+                    markUnsaved(proposalId, title);
+                } else setNeedsCode(true);
             })
             .catch(() => !cancelled && setError(t("tokenError")))
             .finally(() => !cancelled && setReady(true));
         return () => {
             cancelled = true;
         };
-    }, [canVote, proposalId, tokenIssued, fingerprint, t]);
+    }, [canVote, proposalId, tokenIssued, fingerprint, title, t]);
 
     const when = closesAt ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(closesAt)) : "";
 
@@ -123,7 +128,10 @@ export function VotePanel({ proposalId, title, open, closesAt, eligible, tokenIs
     }
 
     async function saveCode() {
-        if (ballot) setSaved(await shareVoteCode(ballot, title));
+        if (!ballot) return;
+        const how = await shareVoteCode(ballot, title);
+        setSaved(how);
+        if (how !== "failed") markSaved(proposalId);
     }
 
     if (!open) return <p className="m-0 text-sm text-foreground/70">{t("closed")}</p>;

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireSession, type GuardResult } from '@/app/lib/auth-guards'
 import { NO_STORE_HEADERS } from '@/app/lib/no-store'
 import { proposalsEnabled } from './constants'
+import { loadPilotIds, pilotAllows } from './pilot'
 
 /** Every proposals response is `private, no-store`. */
 export function out(data: unknown, status = 200): NextResponse {
@@ -28,12 +29,13 @@ export async function requireEnabled(): Promise<NextResponse | null> {
   return (await proposalsEnabled()) ? null : out({ error: 'Not found' }, 404)
 }
 
-/** Enabled + signed in. */
+/** Enabled + signed in. During a pilot only the listed members get through (the rest see a 404, as if it did not exist). */
 export async function requireProposalsSession(): Promise<GuardResult> {
   const off = await requireEnabled()
   if (off) return { ok: false, response: off }
   const auth = await requireSession()
   if (!auth.ok) return { ok: false, response: out({ error: 'Not authenticated' }, 401) }
+  if (!pilotAllows(await loadPilotIds(), auth.session.discordId)) return { ok: false, response: out({ error: 'Not found' }, 404) }
   return auth
 }
 

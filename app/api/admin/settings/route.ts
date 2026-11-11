@@ -1,4 +1,5 @@
 import { requireDpr, rejectUnsafeWrite, json, isNonProductionDeploy } from '@/app/lib/admin-guard'
+import { LIVE_SINCE_TRIGGER_KEYS, maybeRecordLiveSince } from '@/app/lib/proposals/live-since'
 import { SETTINGS, isSettingKey, parseSetting } from '@/app/lib/settings/registry'
 import { confirmationFor, listChanges, listSettingViews, resetSetting, saveSetting, SettingError } from '@/app/lib/settings/store'
 
@@ -50,6 +51,8 @@ export async function PUT(request: Request) {
     if (ask && b.confirm !== true) return json({ error: 'Confirmation required', needsConfirm: ask }, 409)
     const expected = typeof b.expectedUpdatedAt === 'string' ? b.expectedUpdatedAt : b.expectedUpdatedAt === null ? null : undefined
     const saved = await saveSetting(key, parsed.value, auth.session.discordId, { note: b.note, expectedUpdatedAt: expected })
+    // Go-live (proposals ON with an empty pilot list) records its own moment, once.
+    if (LIVE_SINCE_TRIGGER_KEYS.includes(key)) await maybeRecordLiveSince(auth.session.discordId)
     return json({ ok: true, updatedAt: saved.updatedAt.toISOString() })
   } catch (e) {
     if (e instanceof SettingError) return json({ error: e.message }, e.status)
@@ -74,6 +77,7 @@ export async function DELETE(request: Request) {
       if (ask && b.confirm !== true) return json({ error: 'Confirmation required', needsConfirm: ask }, 409)
     }
     const removed = await resetSetting(b.key, auth.session.discordId, { note: b.note })
+    if (LIVE_SINCE_TRIGGER_KEYS.includes(b.key)) await maybeRecordLiveSince(auth.session.discordId)
     return json({ ok: true, removed })
   } catch (e) {
     if (e instanceof SettingError) return json({ error: e.message }, e.status)

@@ -33,6 +33,7 @@ function pay(o: {
   onReadFailure?: FailureMode<number>
   stricterOnly?: boolean
   looserWhen?: 'higher' | 'lower'
+  confirm?: (from: number, to: number) => string | null
 }): SettingDef<number> {
   return {
     key: o.key,
@@ -45,6 +46,7 @@ function pay(o: {
     input: { type: 'int', min: o.min, max: o.max, ...(o.unit ? { unit: o.unit } : {}) },
     stricterOnly: o.stricterOnly,
     looserWhen: o.looserWhen,
+    confirm: o.confirm,
   }
 }
 
@@ -55,9 +57,10 @@ export const PAYMENT_SETTINGS = {
   'payments.onApprovalCapUsd': pay({
     key: 'payments.onApprovalCapUsd',
     label: 'On-approval cap (USD)',
-    help: 'Requests above this amount need a passed community proposal. Can only be lowered here.',
+    help: 'Requests above this amount need a passed community proposal. Can only be lowered here. It is also the boundary between the first and second proposal tiers, so lowering it moves proposals between that boundary and the cap from the first-tier ayes (15) to the second-tier ayes (25). That is stricter, and it applies to proposals opened from then on; running votes keep the threshold they opened with.',
     min: 0, max: 625, default: 625, unit: 'USD',
     onReadFailure: { value: 0 }, stricterOnly: true, looserWhen: 'higher',
+    confirm: (from, to) => (to < from ? 'Lowering the cap also raises the ayes needed (first tier 15 to second tier 25) for proposals between the new cap and the old one, for proposals opened from now on.' : null),
   }),
   'payments.fastTrackMaxUsd': pay({
     key: 'payments.fastTrackMaxUsd',
@@ -122,17 +125,17 @@ export const PAYMENT_SETTINGS = {
   }),
   'payments.voteAyesLow': pay({
     key: 'payments.voteAyesLow', label: 'Proposal ayes, first tier',
-    help: 'Ayes for a proposal at or below the on-approval cap (shown for reference; no poll is required there). The poll itself is external. Can only be raised here.',
+    help: 'Ayes plus abstains (with more ayes than nays) for a funding proposal at or below the on-approval cap. No proposal is required for a payment request there, but a proposal may still be run. Applies to proposals opened from now on. Can only be raised here.',
     min: 15, max: 200, default: 15, stricterOnly: true, looserWhen: 'lower',
   }),
   'payments.voteAyesMid': pay({
     key: 'payments.voteAyesMid', label: 'Proposal ayes, second tier',
-    help: 'Ayes needed for a request above the on-approval cap, up to the second-tier limit. Can only be raised here.',
+    help: 'Ayes plus abstains (with more ayes than nays) needed for a funding proposal above the on-approval cap, up to the second-tier limit. Applies to proposals opened from now on. Can only be raised here.',
     min: 25, max: 200, default: 25, stricterOnly: true, looserWhen: 'lower',
   }),
   'payments.voteAyesHigh': pay({
     key: 'payments.voteAyesHigh', label: 'Proposal ayes, third tier',
-    help: 'Ayes needed for a request above the second-tier limit. Can only be raised here.',
+    help: 'Ayes plus abstains (with more ayes than nays) needed for a funding proposal above the second-tier limit. Applies to proposals opened from now on. Can only be raised here.',
     min: 35, max: 200, default: 35, stricterOnly: true, looserWhen: 'lower',
   }),
   'payments.voteMidMaxUsd': pay({

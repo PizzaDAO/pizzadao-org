@@ -5,7 +5,8 @@ import { listMyRequests } from '@/app/lib/payments/mine'
 import { loadPaymentPolicy } from '@/app/lib/payments/policy'
 import { createPaymentRequest } from '@/app/lib/payments/store'
 import { hostViewFor } from '@/app/lib/payments/trust-load'
-import { proposalsEnabled } from '@/app/lib/proposals/constants'
+import { proposalsGateOn } from '@/app/lib/proposals/constants'
+import { legacySeshAllowed, loadSeshWindow } from '@/app/lib/proposals/legacy-sesh'
 import { validatePaymentProposal } from '@/app/lib/proposals/payment-link'
 import { checkKeyedRateLimit, rateLimitResponse } from '@/app/lib/rate-limit'
 import { fetchMemberByDiscordId } from '@/app/lib/sheets/member-repository'
@@ -52,10 +53,15 @@ export async function POST(request: Request) {
 
   try {
     const discordId = auth.session.discordId
-    // Proposals on: Sesh links and typed counts are not accepted. A request above the on-approval cap links a passed
-    // in-app proposal of the requester's. Proposals off: the form behaves exactly as before.
+    // Proposals on: a request above the on-approval cap links a passed in-app proposal of the requester's (or of a
+    // proposal that names them as beneficiary). Sesh links count only inside the grace window, and only for a Discord
+    // poll posted before go-live. Proposals off (or a pilot running): the form behaves exactly as before.
     let data = parsed.data
-    if (await proposalsEnabled()) {
+    const gate = await proposalsGateOn()
+    const win = gate ? await loadSeshWindow() : null
+    if (gate && win && !data.proposalId && legacySeshAllowed(data.proposalUrl, win.liveSince, win.untilDate, new Date())) {
+      data = { ...data, proposalId: null }
+    } else if (gate) {
       const link = await validatePaymentProposal({
         proposalId: data.proposalId ?? null,
         requesterDiscordId: discordId,

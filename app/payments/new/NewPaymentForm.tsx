@@ -21,6 +21,8 @@ export function NewPaymentForm() {
     // Proposals on: a picker of the member's passed funding proposals replaces the poll link. null = proposals off.
     const [passedProposals, setPassedProposals] = useState<Array<{ id: string; title: string; amountUsd: number }> | null>(null);
     const [proposalId, setProposalId] = useState("");
+    // Sesh grace window: the poll link stays available next to the picker for polls posted before go-live.
+    const [seshOpen, setSeshOpen] = useState(false);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
     const [done, setDone] = useState(false);
@@ -30,7 +32,11 @@ export function NewPaymentForm() {
         fetch("/api/proposals/passed", { cache: "no-store" })
             .then((r) => (r.ok ? r.json() : null))
             .then((b) => {
-                if (!cancelled && b && Array.isArray(b.proposals)) setPassedProposals(b.proposals);
+                // gate false: a pilot is running, so payments still use the poll link.
+                if (!cancelled && b && Array.isArray(b.proposals) && b.gate !== false) {
+                    setPassedProposals(b.proposals);
+                    setSeshOpen(b.seshWindowOpen === true);
+                }
             })
             .catch(() => {});
         return () => {
@@ -46,7 +52,7 @@ export function NewPaymentForm() {
             const r = await fetch("/api/payments", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ kind, title, description, amount, eventDate, eventCity, proposalUrl: passedProposals ? "" : proposalUrl, proposalId: passedProposals ? proposalId : "", payee }),
+                body: JSON.stringify({ kind, title, description, amount, eventDate, eventCity, proposalUrl: passedProposals && !seshOpen ? "" : proposalUrl, proposalId: passedProposals ? proposalId : "", payee }),
             });
             const body = await r.json().catch(() => ({}));
             if (r.ok) {
@@ -108,6 +114,7 @@ export function NewPaymentForm() {
                         </label>
                     </div>
                     {passedProposals ? (
+                        <>
                         <label className="grid gap-1">
                             {t("fieldProposalPick")}
                             <select className={field} value={proposalId} onChange={(e) => setProposalId(e.target.value)}>
@@ -120,6 +127,14 @@ export function NewPaymentForm() {
                             </select>
                             <span className="text-sm text-foreground/70">{t("proposalPickHelp")}</span>
                         </label>
+                        {seshOpen && (
+                            <label className="grid gap-1">
+                                {t("fieldProposalSesh")}
+                                <input className={field} type="url" inputMode="url" value={proposalUrl} onChange={(e) => setProposalUrl(e.target.value)} maxLength={500} />
+                                <span className="text-sm text-foreground/70">{t("proposalSeshHelp")}</span>
+                            </label>
+                        )}
+                        </>
                     ) : (
                         <label className="grid gap-1">
                             {t("fieldProposal")}

@@ -2,6 +2,7 @@
  * Proposals and voting (plans/proposals-voting.md, with the 2026-10-29 decisions).
  * Rules that are NOT settings live here: the pass rule's shape and the text limits.
  */
+import { getSetting } from '../settings'
 import { toggleEnabled } from '../settings/toggles'
 
 export const DAY_MS = 24 * 60 * 60 * 1000
@@ -28,4 +29,17 @@ export const REQUIRE_AYES_OVER_NAYS = true
  */
 export function proposalsEnabled(env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
   return toggleEnabled('proposals.enabled', env)
+}
+
+/**
+ * The payments gate: proposals are on AND no pilot is running. Everything in payments that asks "are proposals on?"
+ * asks this, so a pilot (a few listed testers, test proposals) never changes how payment requests are judged.
+ */
+export async function proposalsGateOn(env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
+  if (!(await proposalsEnabled(env))) return false
+  try {
+    return (await getSetting('proposals.pilotDiscordIds')).length === 0
+  } catch {
+    return false
+  }
 }
