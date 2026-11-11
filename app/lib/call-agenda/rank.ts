@@ -35,6 +35,7 @@ export function agendaLeadMs(settings?: Settings): number {
 export interface ActionItem {
   text: string
   owner?: string | null
+  done?: boolean
 }
 
 export type AgendaKind = 'overdue' | 'priority' | 'active' | 'followup'
@@ -94,7 +95,7 @@ export function parseActionItems(raw: unknown): ActionItem[] {
   const out: ActionItem[] = []
   for (const it of raw) {
     if (typeof it === 'string' && it.trim()) out.push({ text: it })
-    else if (it && typeof it === 'object' && typeof (it as ActionItem).text === 'string' && (it as ActionItem).text.trim()) {
+    else if (it && typeof it === 'object' && (it as ActionItem).done !== true && typeof (it as ActionItem).text === 'string' && (it as ActionItem).text.trim()) {
       const o = (it as ActionItem).owner
       out.push({ text: (it as ActionItem).text, owner: typeof o === 'string' && o.trim() ? o : null })
     }
@@ -139,7 +140,7 @@ export function buildAgendaBullets(input: {
     if (s.overdue > 0) add({ kind: 'overdue', text: `Overdue ${s.overdue}d: ${label}`, url: s.t.url })
     else add({ kind: 'priority', text: `${s.pr === 0 ? 'Top' : 'High'} priority: ${label}`, url: s.t.url })
   }
-  for (const a of (input.actionItems ?? []).slice(0, limits.followups)) {
+  for (const a of (input.actionItems ?? []).filter((x) => x.done !== true).slice(0, limits.followups)) {
     add({ kind: 'followup', text: `From last call: ${clip(a.text)}${a.owner ? ` (${clip(a.owner).slice(0, 40)})` : ''}` })
   }
   // Pad toward 3 with in-progress tasks (highest priority first).

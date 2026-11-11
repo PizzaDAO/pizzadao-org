@@ -75,6 +75,12 @@ describe('helpers', () => {
     expect(parseActionItems(null)).toEqual([])
     expect(parseActionItems(['a', { text: 'b', owner: 'C' }, { nope: 1 }, 5])).toEqual([{ text: 'a' }, { text: 'b', owner: 'C' }])
   })
+  it('finished (done) action items do not come back as follow-ups', () => {
+    expect(parseActionItems([{ text: 'a', done: true }, { text: 'b', done: false }])).toEqual([{ text: 'b', owner: null }])
+    const b = buildAgendaBullets({ now: NOW, tasks: [], actionItems: [{ text: 'Closed', done: true }, { text: 'Open' }] })
+    expect(b.map((x) => x.text).join('\n')).toContain('From last call: Open')
+    expect(b.map((x) => x.text).join('\n')).not.toContain('Closed')
+  })
   it('formatAgendaMessage ends with the crew link', () => {
     const m = formatAgendaMessage({ crewLabel: 'Ops', startsAt: NOW, bullets: [{ kind: 'priority', text: 'Top priority: X' }], crewUrl: 'https://x/crew/ops' })
     expect(m.split('\n').at(-1)).toBe('Crew page: https://x/crew/ops')
