@@ -24,6 +24,7 @@ vi.mock('@/app/lib/slices/mint-queue', () => ({
 vi.mock('@/app/lib/passport/scrub', () => ({ scrubCoordinates: vi.fn(async () => 4) }))
 
 vi.mock('@/app/lib/followups/send', () => ({ processDue: vi.fn(async () => ({ held: 1 })) }))
+vi.mock('@/app/lib/reminders/run', () => ({ runCallRemindersNow: vi.fn(async () => ({ dryRun: true, occurrences: 0, due: 0, sent: 0 })) }))
 vi.mock('@/app/lib/followups/draft', () => ({ draftFollowUpsForRecording: vi.fn(), listNeedingFollowups: vi.fn(async () => []) }))
 vi.mock('@/app/lib/followups/config', () => ({ loadFollowUpConfig: vi.fn(async () => ({ draftEnabled: true, sendEnabled: false })) }))
 vi.mock('@/app/lib/telegram/city-posts', () => ({
@@ -55,6 +56,8 @@ import { GET as passportScrubGET } from './passport-scrub/route'
 import { scrubCoordinates } from '@/app/lib/passport/scrub'
 
 import { GET as followupsGET } from './followups/route'
+import { GET as remindersGET } from './reminders/route'
+import { runCallRemindersNow } from '@/app/lib/reminders/run'
 import { GET as telegramPostsGET } from './telegram-posts/route'
 import { GET as eventTimeSyncGET } from './event-time-sync/route'
 import { dstFixConfig, runEventTimeSync } from '@/app/lib/calls/event-time-sync'
@@ -89,6 +92,7 @@ describe.each([
   ['/api/cron/passport-scrub', passportScrubGET, () => scrubCoordinates],
 
   ['/api/cron/followups', followupsGET, () => processDue],
+  ['/api/cron/reminders', remindersGET, () => runCallRemindersNow],
   ['/api/cron/telegram-posts', telegramPostsGET, () => processOutbox],
   ['/api/cron/mafia-ranks', mafiaRanksGET, () => runMafiaRankPrecompute],
 ] as const)('%s auth', (path, GET, work) => {

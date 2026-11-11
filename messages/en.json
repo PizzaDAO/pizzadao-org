@@ -143,6 +143,7 @@
     },
     "languageOverline": "§ 05 · Language",
     "emailOverline": "§ 05b · Email",
+    "remindersOverline": "§ 05c · Reminders",
     "wallets": {
       "overline": "§ 06 · Wallets",
       "title": "Wallets",
@@ -1614,6 +1615,21 @@
     "nextNone": "You have finished every mission available to you. Nice work.",
     "nextCtaAll": "See all missions",
     "handbook": "Handbook"
+  },
+  "reminders": {
+    "prefs": {
+      "sectionTitle": "Reminders",
+      "description": "Get a short Discord DM before a call. Off unless you turn it on. Every DM has a Stop button.",
+      "legend": "Call reminders",
+      "none": "No reminders",
+      "community": "The Community Call",
+      "myCrews": "The Community Call and my crews",
+      "saved": "Saved",
+      "saveError": "Couldn't save your reminder settings. Try again?",
+      "loadError": "Couldn't load your reminder settings.",
+      "dmClosed": "We couldn't DM you on Discord. Allow direct messages from server members, then try again.",
+      "tryAgain": "Try again"
+    }
   },
   "reengage": {
     "subjectMission": "Your next mission: {title}",

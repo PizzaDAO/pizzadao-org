@@ -19,9 +19,10 @@ import { TELEGRAM_SETTINGS } from './telegram-settings'
 import { CALL_TIME_SETTINGS } from './call-time-settings'
 import { SHEETS_SETTINGS } from './sheets-settings'
 import { MAP_LEVELS_SETTINGS } from './map-levels-settings'
+import { REMINDERS_SETTINGS } from './reminders-settings'
 import { ADMIN_ROLE_IDS, DREAD_PIZZA_ROBERTS_ROLE_ID, MISSION_REVIEWER_ROLE_IDS } from '@/app/ui/constants'
 
-export type SettingArea = 'missions' | 'calls' | 'disavow' | 'passport' | 'guide' | 'followups' | 'discord' | 'features' | 'payments' | 'proposals' | 'economy' | 'mafia' | 'telegram' | 'sheets' | 'map'
+export type SettingArea = 'missions' | 'calls' | 'disavow' | 'passport' | 'guide' | 'followups' | 'discord' | 'features' | 'payments' | 'proposals' | 'economy' | 'mafia' | 'telegram' | 'sheets' | 'map' | 'reminders'
 
 /** Admin-only English group names (kept out of messages/*.json: the disavow feature must not leak into them). */
 export const AREA_LABELS: Record<SettingArea, string> = {
@@ -40,6 +41,7 @@ export const AREA_LABELS: Record<SettingArea, string> = {
   telegram: 'Telegram',
   sheets: 'Google Sheets cutover',
   map: 'Reach map levels',
+  reminders: 'Reminders',
 }
 
 /** What a reader gets when the stored value cannot be used (DB down, row fails its schema). */
@@ -2067,6 +2069,7 @@ export const SETTINGS = {
   ...CALL_TIME_SETTINGS,
   ...SHEETS_SETTINGS,
   ...MAP_LEVELS_SETTINGS,
+  ...REMINDERS_SETTINGS,
   // The Work Payment responses sheet. Empty = form ingest does nothing. Never committed to the repo, and
   // never sent anywhere except this admin settings page (private: true) and the ingest job.
   'payments.formSheetId': {

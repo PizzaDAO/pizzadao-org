@@ -21,6 +21,7 @@ import { authorFor, makeEmbed, numbered, roleLabel, type Embed, type EmbedAuthor
 import { handleReviewButton, handleReviewModal, type MissionReviewDeps } from './mission-review'
 import type { MemberCommandJob, MemberCommandName } from './member-commands'
 import { handleFollowUpInteraction, isFollowUpInteraction, type FollowUpInteractionDeps } from './followups'
+import { handleReminderInteraction, isReminderInteraction, type ReminderInteractionDeps } from './reminders'
 
 type Option = { name: string; type: number; value: unknown; focused?: boolean }
 type DiscordUser = { id: string; username?: string; global_name?: string | null; avatar?: string | null; bot?: boolean }
@@ -131,6 +132,8 @@ export interface HandlerDeps {
   missionReview?: MissionReviewDeps
   /** Follow-up DM buttons and Reply modal (./followups.ts). */
   followups?: FollowUpInteractionDeps
+  /** Reminder DM Stop button (./reminders.ts, custom ids `rm:`). */
+  reminders?: ReminderInteractionDeps
 }
 
 /** What the deferred /missions follow-up needs. */
@@ -224,6 +227,19 @@ export async function handleInteraction(i: Interaction, deps: HandlerDeps): Prom
       return await handleFollowUpInteraction(i, fuUser, deps.followups)
     } catch (err) {
       console.error('[discord/interactions] follow-up action failed:', err instanceof Error ? err.message.slice(0, 160) : 'error')
+      return out.error('Something went wrong. Please try again.')
+    }
+  }
+
+  // Reminder DM buttons (rm:) also live in direct messages. The actor is the invoking user only.
+  if (i.type === InteractionType.MESSAGE_COMPONENT && isReminderInteraction(i)) {
+    const rmUser = i.member?.user?.id ?? i.user?.id
+    if (!rmUser) return out.error('Could not identify you.')
+    if (!deps.reminders) return out.error('Unknown button.')
+    try {
+      return await handleReminderInteraction(i, rmUser, deps.reminders)
+    } catch (err) {
+      console.error('[discord/interactions] reminder action failed:', err instanceof Error ? err.message.slice(0, 160) : 'error')
       return out.error('Something went wrong. Please try again.')
     }
   }

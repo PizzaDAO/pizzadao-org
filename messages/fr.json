@@ -143,6 +143,7 @@
     },
     "languageOverline": "§ 05 · Langue",
     "emailOverline": "§ 05b · E-mail",
+    "remindersOverline": "§ 05c · Rappels",
     "wallets": {
       "overline": "§ 06 · Wallets",
       "title": "Wallets",
@@ -1614,6 +1615,21 @@
     "nextNone": "Vous avez terminé toutes les missions disponibles. Bravo.",
     "nextCtaAll": "Voir toutes les missions",
     "handbook": "Guide PizzaDAO"
+  },
+  "reminders": {
+    "prefs": {
+      "sectionTitle": "Rappels",
+      "description": "Recevez un court MP Discord avant un appel. Désactivé tant que vous ne l'activez pas. Chaque MP a un bouton Stop.",
+      "legend": "Rappels d'appels",
+      "none": "Aucun rappel",
+      "community": "La Community Call",
+      "myCrews": "La Community Call et mes crews",
+      "saved": "Enregistré",
+      "saveError": "Impossible d'enregistrer vos rappels. Réessayer ?",
+      "loadError": "Impossible de charger vos rappels.",
+      "dmClosed": "Nous n'avons pas pu vous envoyer de MP sur Discord. Autorisez les messages privés des membres du serveur, puis réessayez.",
+      "tryAgain": "Réessayer"
+    }
   },
   "reengage": {
     "subjectMission": "Ta prochaine mission : {title}",

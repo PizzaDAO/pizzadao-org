@@ -2838,3 +2838,66 @@ model MafiaRankCache {
 
   @@index([computedAt])
 }
+
+// ---- Reminders by DM (plans/voting-golive-and-reminders.md Part B). Opt-in; no row means no reminders. ----
+enum ReminderCalls {
+  NONE
+  COMMUNITY
+  MY_CREWS
+  SELECTED
+}
+
+enum ReminderChannel {
+  AUTO
+  DISCORD
+  TELEGRAM
+}
+
+enum ReminderKind {
+  CALL
+  CALL_MOVED
+  PROPOSAL_OPENED
+  PROPOSAL_CLOSING
+}
+
+model ReminderPref {
+  discordId       String          @id
+  calls           ReminderCalls   @default(NONE)
+  crewIds         String[]        @default([])
+  callLeadMinutes Int? // null = the reminders.callLeadMinutes setting
+  proposalOpened  Boolean         @default(false)
+  proposalClosing Boolean         @default(false)
+  channel         ReminderChannel @default(AUTO)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([calls])
+}
+
+// One row per (member, kind, occurrence), claimed BEFORE sending so overlapping runs never double-send.
+model ReminderSend {
+  id        String       @id @default(cuid())
+  discordId String
+  kind      ReminderKind
+  refKey    String // eventId:startsAt (calls) | proposalId
+  status    String // CLAIMED | SENT | RETRY | FAILED | SKIPPED
+  channel   String? // discord | telegram
+  code      String?
+  attempts  Int          @default(0)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@unique([discordId, kind, refKey])
+  @@index([kind, refKey])
+  @@index([discordId, createdAt])
+}
+
+// Whether a member's Discord DMs can be reached, remembered so a closed DM is tried once, then backed off.
+model DiscordDmReach {
+  discordId   String    @id
+  dmChannelId String?
+  state       String // OK | CLOSED
+  failures    Int       @default(0)
+  recheckAt   DateTime?
+  checkedAt   DateTime?
+}

@@ -26,6 +26,7 @@ vi.mock("../../../ui/telegram/TelegramLinker", () => ({ TelegramLinker: () => nu
 vi.mock("../../../dashboard/[id]/components/TaglineEditor", () => ({ TaglineEditor: () => null }));
 vi.mock("../../../ui/profile/LanguageEditor", () => ({ LanguageEditor: () => null }));
 vi.mock("./EmailPrefsEditor", () => ({ EmailPrefsEditor: () => null }));
+vi.mock("./ReminderPrefsEditor", () => ({ ReminderPrefsEditor: () => null }));
 
 import { EditClient } from "./EditClient";
 
