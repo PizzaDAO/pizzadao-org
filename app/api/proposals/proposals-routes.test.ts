@@ -16,6 +16,10 @@ const m = vi.hoisted(() => ({
 }))
 
 vi.mock('@/app/lib/db', () => ({ prisma: {} }))
+vi.mock('@/app/lib/settings', () => ({
+  getSetting: async (k: string) => (k === 'proposals.maxOpenPerProposer' ? 3 : ''),
+  loadSettings: async () => ({ readFailed: false, invalidKeys: [], isSet: () => false, get: (k: string) => (k === 'proposals.pilotDiscordIds' ? [] : '') }),
+}))
 vi.mock('next/server', async (importOriginal) => ({ ...(await importOriginal<typeof import('next/server')>()), after: vi.fn() }))
 vi.mock('@/app/lib/proposals/constants', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/app/lib/proposals/constants')>()),

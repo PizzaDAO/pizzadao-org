@@ -7,6 +7,9 @@ const BEN = '300000000000000001'
 const m = vi.hoisted(() => ({
   session: { discordId: '111111111111111111' } as { discordId: string } | null,
   pilot: [] as string[],
+  liveSince: '',
+  readFailed: false,
+  holder: true,
   maxOpen: 3,
   dpr: true,
   member: { memberId: 'M-9' } as { memberId: string } | null,
@@ -21,7 +24,7 @@ vi.mock('next/server', async (importOriginal) => ({ ...(await importOriginal<typ
 vi.mock('@/app/lib/proposals/constants', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/app/lib/proposals/constants')>()), proposalsEnabled: async () => true }))
 vi.mock('@/app/lib/settings', () => ({
   getSetting: async (k: string) => (k === 'proposals.maxOpenPerProposer' ? m.maxOpen : []),
-  loadSettings: async () => ({ get: (k: string) => (k === 'proposals.pilotDiscordIds' ? m.pilot : undefined) }),
+  loadSettings: async () => ({ readFailed: m.readFailed, invalidKeys: [], get: (k: string) => (k === 'proposals.pilotDiscordIds' ? m.pilot : k === 'proposals.liveSince' ? m.liveSince : undefined) }),
 }))
 vi.mock('@/app/lib/auth-guards', () => ({
   requireSession: async () => (m.session ? { ok: true, session: m.session } : { ok: false, response: new Response('{}', { status: 401 }) }),
@@ -31,15 +34,16 @@ vi.mock('@/app/lib/admin-guard', async (importOriginal) => ({
   requireDpr: async () => (m.dpr && m.session ? { ok: true, session: m.session } : { ok: false, response: new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 }) }),
 }))
 vi.mock('@/app/lib/rate-limit', () => ({ enforceRateLimit: async () => null, checkKeyedRateLimit: async () => ({ success: true }) }))
-vi.mock('@/app/lib/proposals/proposer', () => ({ canSubmitProposal: async () => true }))
+vi.mock('@/app/lib/proposals/proposer', () => ({ canSubmitProposal: async () => m.holder }))
+vi.mock('@/app/lib/proposals/store', () => ({ createProposal: m.create, countActiveFor: m.count, getPublicKey: async () => ({ publicKey: 'PEM', fingerprint: 'aa bb' }) }))
 vi.mock('@/app/lib/sheets/member-repository', () => ({ fetchMemberByDiscordId: async () => m.member }))
 vi.mock('@/app/lib/proposals/lifecycle', () => ({ openAndAnnounce: vi.fn(), cancelAndAnnounce: m.cancel }))
-vi.mock('@/app/lib/proposals/store', () => ({ createProposal: m.create, countActiveFor: m.count }))
 vi.mock('@/app/lib/followups/admin', () => ({ searchMembers: m.search }))
 
 import { POST as createPOST } from './route'
 import { POST as withdrawPOST } from './[id]/withdraw/route'
 import { GET as membersGET } from './members/route'
+import { GET as pubkeyGET } from './[id]/pubkey/route'
 import { POST as adminCancelPOST } from '../admin/proposals/[id]/cancel/route'
 
 const post = (body: unknown) => new Request('https://app.pizzadao.org/api/x', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
@@ -50,6 +54,9 @@ beforeEach(() => {
   vi.clearAllMocks()
   m.session = { discordId: ME }
   m.pilot = []
+  m.liveSince = ''
+  m.readFailed = false
+  m.holder = true
   m.maxOpen = 3
   m.dpr = true
   m.member = { memberId: 'M-9' }
@@ -92,6 +99,33 @@ describe('POST /api/proposals: beneficiary, cap and pilot', () => {
     m.pilot = ['999999999999999999']
     expect((await createPOST(post(form))).status).toBe(404)
     expect((await membersGET(new Request('https://app.pizzadao.org/api/proposals/members?q=te'))).status).toBe(404)
+  })
+})
+
+describe('pilot over and fail closed', () => {
+  it('a refilled tester list after go-live is ignored: everyone gets in and the proposal is real', async () => {
+    m.pilot = ['999999999999999999']
+    m.liveSince = '2026-12-01T18:00:00Z'
+    expect((await createPOST(post(form))).status).toBe(201)
+    expect(m.create).toHaveBeenLastCalledWith(expect.objectContaining({ isTest: false }))
+    expect((await withdrawPOST(post({}), ctx)).status).toBe(200)
+  })
+
+  it('an unreadable settings read counts as a pilot running: nobody gets in', async () => {
+    m.readFailed = true
+    expect((await createPOST(post(form))).status).toBe(404)
+    expect((await withdrawPOST(post({}), ctx)).status).toBe(404)
+  })
+
+  it('the public voting key is gated like the rest: testers only during a pilot, everyone otherwise', async () => {
+    const req = new Request('https://app.pizzadao.org/api/proposals/p1/pubkey')
+    expect((await pubkeyGET(req, ctx)).status).toBe(200)
+    m.pilot = ['999999999999999999']
+    expect((await pubkeyGET(req, ctx)).status).toBe(404)
+    m.pilot = [ME]
+    expect((await pubkeyGET(req, ctx)).status).toBe(200)
+    m.session = null
+    expect((await pubkeyGET(req, ctx)).status).toBe(404)
   })
 })
 
@@ -142,5 +176,9 @@ describe('GET /api/proposals/members', () => {
     expect(await r.json()).toEqual({ members: [{ name: 'Test Member', discordId: BEN }] })
     m.session = null
     expect((await membersGET(new Request('https://app.pizzadao.org/api/proposals/members?q=te'))).status).toBe(401)
+    m.session = { discordId: ME }
+    m.holder = false
+    expect((await membersGET(new Request('https://app.pizzadao.org/api/proposals/members?q=te'))).status).toBe(403)
+    expect(m.search).toHaveBeenCalledTimes(1)
   })
 })

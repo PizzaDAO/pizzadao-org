@@ -83,6 +83,30 @@ async function checkTogether(key: SettingKey, value: unknown): Promise<void> {
  * A `sheets.source.*` switch may only be set to read from the database once that data set has a
  * successful import apply on /admin/sheets (otherwise the app would read empty tables).
  */
+const LIVE_SINCE = 'proposals.liveSince'
+const PILOT = 'proposals.pilotDiscordIds'
+
+const liveTime = (v: unknown): number | null => (typeof v === 'string' && v !== '' && !Number.isNaN(Date.parse(v)) ? Date.parse(v) : null)
+
+/**
+ * Go-live rules. Once proposals.liveSince is set: it can only move EARLIER (never later, never cleared or reset),
+ * and a non-empty pilot list cannot be saved any more (a refilled list would loosen payments and lock voters out).
+ */
+async function checkGoLive(key: SettingKey, value: unknown): Promise<void> {
+  if (key !== LIVE_SINCE && key !== PILOT) return
+  const row = (await prisma.appSetting.findUnique({ where: { key: LIVE_SINCE } })) as { value: unknown } | null
+  const existing = liveTime(row?.value)
+  if (existing === null) return
+  if (key === PILOT && Array.isArray(value) && value.length > 0) {
+    throw new SettingError(400, `${key}: go-live already happened (proposals.liveSince is set), so a pilot cannot be started again`)
+  }
+  if (key === LIVE_SINCE) {
+    const next = liveTime(value)
+    if (next === null) throw new SettingError(400, `${key}: the go-live moment cannot be cleared once it is set`)
+    if (next > existing) throw new SettingError(400, `${key}: the go-live moment can only be moved earlier, never later`)
+  }
+}
+
 async function checkSheetSourceImported(key: SettingKey, value: unknown): Promise<void> {
   if (!key.startsWith('sheets.source.') || typeof value !== 'string' || !value.startsWith('db')) return
   const source = key.slice('sheets.source.'.length)
@@ -121,6 +145,7 @@ export async function saveSetting(
   const note = cleanNote(opts.note)
   await checkTogether(key, parsed.value)
   await checkSheetSourceImported(key, parsed.value)
+  await checkGoLive(key, parsed.value)
   // Channels and roles must exist in our server (rejected, not stored, when Discord cannot confirm).
   try {
     await checkTargets(key, parsed.value)
@@ -165,6 +190,7 @@ export async function resetSetting(key: SettingKey, actor: string, opts: { note?
   const note = cleanNote(opts.note)
   // Going back to the default must not break a rule that depends on another setting.
   await checkTogether(key, undefined)
+  if (key === LIVE_SINCE) await checkGoLive(key, '')
   const removed = await prisma.$transaction(async (tx) => {
     const existing = await tx.appSetting.findUnique({ where: { key } })
     if (!existing) return false

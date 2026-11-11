@@ -15,10 +15,10 @@ import { SETTINGS } from '@/app/lib/settings/registry'
 import { resolvePaymentPolicy } from '@/app/lib/payments/policy'
 import { announceCancelled, cancelledMessage, stuckMessage, type PostDeps } from './discord'
 import { cancelAndAnnounce, noteOpenFailure, openAndAnnounce, openFailureCode, runProposalsCron, STUCK_AFTER_MS } from './lifecycle'
-import { cancelProposal, countActiveFor, createProposal, listOpenProposals, openProposal, passedFundingProposalsFor, settleProposal } from './store'
+import { castBallot, cancelProposal, countActiveFor, createProposal, listOpenProposals, openProposal, passedFundingProposalsFor, settleProposal } from './store'
 import { KeyConfigError } from './keys'
 import { upstashPendingStore } from './pending'
-import { makeFakeDb, makeFakePending, testEnv } from './test-utils'
+import { makeFakeDb, makeFakePending, mintCredentials, testEnv } from './test-utils'
 import type { ProposalRules } from './rules'
 import type { RoleDeps } from './eligibility'
 
@@ -135,6 +135,29 @@ describe('cancel and withdraw', () => {
     row(id).status = 'PASSED'
     expect(await cancelProposal(id, { discordId: 'admin', admin: true }, 'too late now', { pending: null })).toEqual({ ok: false, code: 'not_cancellable' })
     expect(await cancelProposal('nope', { discordId: 'admin', admin: true }, 'whatever', { pending: null })).toEqual({ ok: false, code: 'not_found' })
+  })
+
+  it('nobody, admins included, can cancel once the window has ended (it settles instead)', async () => {
+    const id = await openOne()
+    const after = new Date(t0.getTime() + 7 * DAY + 1000)
+    expect(await cancelProposal(id, { discordId: 'admin', admin: true }, 'too late to cancel', { now: after, pending: null })).toEqual({ ok: false, code: 'not_cancellable' })
+    expect(row(id).status).toBe('OPEN')
+    // an admin can still cancel inside the window, and a draft at any time
+    expect(await cancelProposal(id, { discordId: 'admin', admin: true }, 'still inside window', { now: new Date(t0.getTime() + DAY), pending: null })).toMatchObject({ ok: true })
+  })
+
+  it('a vote racing a cancel leaves no orphan in Redis', async () => {
+    const pending = makeFakePending()
+    const id = await openOne({ pending: pending.store })
+    const creds = await mintCredentials({ id, ...row(id) }, env)
+    const realPut = pending.store.put
+    // the cancel lands right after the vote's Redis write
+    pending.store.put = async (...a: Parameters<typeof realPut>) => {
+      await realPut(...a)
+      row(id).status = 'CANCELLED'
+    }
+    expect(await castBallot(id, creds, 'AYE', { now: new Date(t0.getTime() + 1000), env, pending: pending.store })).toEqual({ ok: false, code: 'closed' })
+    expect(pending.hashes.has(id)).toBe(false)
   })
 
   it('imported history can never be cancelled', async () => {

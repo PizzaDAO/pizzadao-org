@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireSession, type GuardResult } from '@/app/lib/auth-guards'
 import { NO_STORE_HEADERS } from '@/app/lib/no-store'
 import { proposalsEnabled } from './constants'
-import { loadPilotIds, pilotAllows } from './pilot'
+import { loadPilotState, pilotAllows } from './pilot'
 
 /** Every proposals response is `private, no-store`. */
 export function out(data: unknown, status = 200): NextResponse {
@@ -35,8 +35,20 @@ export async function requireProposalsSession(): Promise<GuardResult> {
   if (off) return { ok: false, response: off }
   const auth = await requireSession()
   if (!auth.ok) return { ok: false, response: out({ error: 'Not authenticated' }, 401) }
-  if (!pilotAllows(await loadPilotIds(), auth.session.discordId)) return { ok: false, response: out({ error: 'Not found' }, 404) }
+  if (!pilotAllows(await loadPilotState(), auth.session.discordId)) return { ok: false, response: out({ error: 'Not found' }, 404) }
   return auth
+}
+
+/**
+ * For routes that need no session of their own (the public voting key): while a pilot runs, only a signed-in tester
+ * gets through (404 for everyone else). Outside a pilot it lets everyone through.
+ */
+export async function requirePilotAccess(): Promise<NextResponse | null> {
+  const state = await loadPilotState()
+  if (!state.running) return null
+  const auth = await requireSession()
+  if (!auth.ok || !pilotAllows(state, auth.session.discordId)) return out({ error: 'Not found' }, 404)
+  return null
 }
 
 export type RouteCtx = { params: Promise<{ id: string }> }

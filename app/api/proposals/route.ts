@@ -5,7 +5,7 @@ import { getSetting } from '@/app/lib/settings'
 import { fetchMemberByDiscordId } from '@/app/lib/sheets/member-repository'
 import { openAndAnnounce } from '@/app/lib/proposals/lifecycle'
 import { out, requireProposalsSession, safe } from '@/app/lib/proposals/http'
-import { loadPilotIds } from '@/app/lib/proposals/pilot'
+import { loadPilotState } from '@/app/lib/proposals/pilot'
 import { canSubmitProposal } from '@/app/lib/proposals/proposer'
 import { countActiveFor, createProposal } from '@/app/lib/proposals/store'
 import { parseNewProposal } from '@/app/lib/proposals/validate'
@@ -52,7 +52,7 @@ export const POST = safe('create', async (request: Request) => {
     if (!member?.memberId) return out({ error: 'bad_beneficiary' }, 400)
   }
 
-  const isTest = (await loadPilotIds()).length > 0
+  const isTest = (await loadPilotState()).running
   const { id } = await createProposal({ ...parsed.data, beneficiaryDiscordId, proposerDiscordId: discordId, isTest })
   after(() => openAndAnnounce(id))
   return out({ ok: true, id }, 201)

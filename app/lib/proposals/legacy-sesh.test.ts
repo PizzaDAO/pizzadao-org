@@ -1,15 +1,18 @@
 // @vitest-environment node
 // The Sesh grace window: only a Discord poll posted BEFORE go-live, only until the end date, never otherwise.
 import { describe, expect, it } from 'vitest'
-import { discordMessageLinkTime, graceEnd, legacySeshAllowed, seshWindowOpen, snowflakeTime } from './legacy-sesh'
+import { discordMessageLinkTime, graceEnd, legacySeshAllowed as allowed, seshWindowOpen, snowflakeTime } from './legacy-sesh'
 
 const DAY = 24 * 3600_000
 const EPOCH = 1420070400000
 /** A snowflake whose embedded time is `t` (synthetic ids only). */
 const flake = (t: Date) => (BigInt(t.getTime() - EPOCH) * BigInt(4194304)).toString()
-const link = (t: Date, host = 'discord.com') => `https://${host}/channels/123456789012345678/223456789012345678/${flake(t)}`
+const GUILD = '123456789012345678'
+const link = (t: Date, host = 'discord.com', guild = GUILD) => `https://${host}/channels/${guild}/223456789012345678/${flake(t)}`
 
 const live = new Date('2026-12-01T18:00:00Z')
+/** Our guild is passed explicitly (the real one comes from DISCORD_GUILD_ID). */
+const legacy = (url: string | null | undefined, l: Date | null, until: string, now: Date, guild: string | undefined = GUILD) => allowed(url, l, until, now, guild)
 
 describe('snowflakes and links', () => {
   it('decodes the creation time of a Discord id', () => {
@@ -32,6 +35,8 @@ describe('snowflakes and links', () => {
 describe('the window', () => {
   it('ends the saved date (inclusive), else 30 days after go-live; no go-live, no window', () => {
     expect(graceEnd(live, '2026-12-20')?.toISOString()).toBe('2026-12-21T00:00:00.000Z')
+    // a saved date can only shorten the window, never extend it past 30 days
+    expect(graceEnd(live, '2027-06-01')?.getTime()).toBe(live.getTime() + 30 * DAY)
     expect(graceEnd(live, '')?.getTime()).toBe(live.getTime() + 30 * DAY)
     expect(graceEnd(null, '')).toBeNull()
     expect(seshWindowOpen({ liveSince: null, untilDate: '' }, live)).toBe(false)
@@ -42,25 +47,33 @@ describe('the window', () => {
   const now = new Date(live.getTime() + 3 * DAY)
 
   it('allows a poll posted before go-live, inside the window', () => {
-    expect(legacySeshAllowed(link(new Date(live.getTime() - 2 * DAY)), live, '', now)).toBe(true)
+    expect(legacy(link(new Date(live.getTime() - 2 * DAY)), live, '', now)).toBe(true)
   })
 
   it('blocks a poll posted after go-live, whatever the dates', () => {
-    expect(legacySeshAllowed(link(new Date(live.getTime() + 1000)), live, '', now)).toBe(false)
-    expect(legacySeshAllowed(link(new Date(live.getTime() + DAY)), live, '2030-01-01', now)).toBe(false)
+    expect(legacy(link(new Date(live.getTime() + 1000)), live, '', now)).toBe(false)
+    expect(legacy(link(new Date(live.getTime() + DAY)), live, '2030-01-01', now)).toBe(false)
   })
 
   it('blocks everything once the window has closed (saved end date or 30 days)', () => {
     const old = link(new Date(live.getTime() - DAY))
-    expect(legacySeshAllowed(old, live, '', new Date(live.getTime() + 31 * DAY))).toBe(false)
-    expect(legacySeshAllowed(old, live, '2026-12-02', now)).toBe(false) // a past end date closes it early
-    expect(legacySeshAllowed(old, live, '2026-12-04', now)).toBe(true)
+    expect(legacy(old, live, '', new Date(live.getTime() + 31 * DAY))).toBe(false)
+    expect(legacy(old, live, '2026-12-02', now)).toBe(false) // a past end date closes it early
+    expect(legacy(old, live, '2026-12-04', now)).toBe(true)
+  })
+
+  it('rejects a poll from another server, and everything when no guild is configured', () => {
+    const old = new Date(live.getTime() - DAY)
+    expect(legacy(link(old, 'discord.com', '999999999999999999'), live, '', now)).toBe(false)
+    expect(legacy(link(old), live, '', now, '')).toBe(false)
+    expect(discordMessageLinkTime(link(old), GUILD)?.getTime()).toBe(old.getTime())
+    expect(discordMessageLinkTime(link(old), '1')).toBeNull()
   })
 
   it('fails closed: no go-live moment, a bad link, or a non-Discord link', () => {
     const old = link(new Date(live.getTime() - DAY))
-    expect(legacySeshAllowed(old, null, '', now)).toBe(false)
-    expect(legacySeshAllowed('https://example.com/poll', live, '', now)).toBe(false)
-    expect(legacySeshAllowed(null, live, '', now)).toBe(false)
+    expect(legacy(old, null, '', now)).toBe(false)
+    expect(legacy('https://example.com/poll', live, '', now)).toBe(false)
+    expect(legacy(null, live, '', now)).toBe(false)
   })
 })

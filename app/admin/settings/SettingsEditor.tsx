@@ -206,6 +206,8 @@ function Row({ s, labels, onChanged }: { s: SettingView; labels: SettingsLabels;
         setConfirm(null);
         setNote("");
         setState("saved");
+        // A saved change that could not finish a follow-up step (the go-live moment) says so.
+        if (typeof r.data.warning === "string") setError(r.data.warning);
         onChanged();
     }
 
@@ -227,6 +229,7 @@ function Row({ s, labels, onChanged }: { s: SettingView; labels: SettingsLabels;
         setNote("");
         setConfirm(null);
         setState("saved");
+        if (typeof r.data.warning === "string") setError(r.data.warning);
         onChanged();
     }
 

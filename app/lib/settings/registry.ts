@@ -1974,20 +1974,24 @@ export const SETTINGS = {
     unit: 'minutes',
     onReadFailure: { value: 60 },
   }),
-  'proposals.liveSince': textSetting({
+  'proposals.liveSince': {
+    ...textSetting({
     key: 'proposals.liveSince',
     area: 'proposals',
     label: 'Go-live moment',
-    help: 'ISO time (for example 2026-12-01T18:00:00Z). Written automatically the first time the switch is ON with an empty pilot list, in production. Discord polls posted before it may still back a payment request during the Sesh grace window; polls posted after it never can. Empty means go-live has not happened, and Sesh links are not accepted.',
+    help: 'ISO time (for example 2026-12-01T18:00:00Z). Written automatically the first time the switch is ON with an empty pilot list, in production. Discord polls posted before it may still back a payment request during the Sesh grace window; polls posted after it never can. Empty means go-live has not happened, and Sesh links are not accepted. Once set it can only be moved EARLIER (each edit is confirmed), and it ends any pilot: a tester list saved later is ignored. If proposals are switched on only through the PROPOSALS_ENABLED env var, nothing records it: save the switch in Settings (or set this by hand).',
     maxLength: 40,
     check: isoInstantValid,
     checkMessage: 'Use an ISO time such as 2026-12-01T18:00:00Z, or leave empty',
-  }),
+    }),
+    // Once set it is a stricter-only value: every edit is confirmed (and the store refuses a later time or a clear).
+    confirm: (from: string, to: string) => (from && to !== from ? 'The go-live moment is already set. Moving it earlier shortens the Sesh grace window; it can never be moved later.' : null),
+  } as SettingDef<string>,
   'proposals.seshLinksUntil': dateSetting({
     key: 'proposals.seshLinksUntil',
     area: 'proposals',
     label: 'Sesh grace window ends',
-    help: 'Last day (UTC, inclusive) a payment request above the on-approval cap may still use a Sesh poll link plus the reviewer-confirmed ayes, for polls posted before the go-live moment. Empty means 30 days after the go-live moment. To close the window early, set a past date.',
+    help: 'Last day (UTC, inclusive) a payment request above the on-approval cap may still use a Sesh poll link plus the reviewer-confirmed ayes, for polls posted before the go-live moment. The window can never run longer than 30 days after the go-live moment: this date can only shorten it. Empty means the full 30 days. To close the window early, set a past date.',
   }),
   'proposals.maxOpenPerProposer': intSetting({
     key: 'proposals.maxOpenPerProposer',

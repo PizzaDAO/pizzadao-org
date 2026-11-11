@@ -9,7 +9,10 @@ const m = vi.hoisted(() => ({ detail: null as any, hist: null as any, historyOn:
 vi.mock('next/navigation', () => ({ notFound: () => { throw new Error('notFound') }, redirect: () => { throw new Error('redirect') } }))
 vi.mock('next-intl/server', () => ({ getLocale: async () => 'en', getTranslations: async () => (k: string) => k }))
 vi.mock('@/app/lib/session', () => ({ getSession: async () => (m.viewer ? { discordId: m.viewer } : null) }))
-vi.mock('@/app/lib/settings', () => ({ getSetting: async () => '' }))
+vi.mock('@/app/lib/settings', () => ({
+  getSetting: async (k: string) => (k === 'proposals.maxOpenPerProposer' ? 3 : ''),
+  loadSettings: async () => ({ readFailed: false, invalidKeys: [], isSet: () => false, get: (k: string) => (k === 'proposals.pilotDiscordIds' ? [] : '') }),
+}))
 vi.mock('@/app/lib/settings/toggles', () => ({ toggleEnabled: async () => m.historyOn }))
 vi.mock('@/app/lib/proposals/constants', async (orig) => ({ ...(await orig<typeof import('@/app/lib/proposals/constants')>()), proposalsEnabled: async () => m.votingOn }))
 vi.mock('@/app/lib/people', () => ({ resolvePeople: async () => new Map() }))
