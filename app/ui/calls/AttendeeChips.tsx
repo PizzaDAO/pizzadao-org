@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MemberHoverCard } from "../profile/MemberHoverCard";
 import type { Attendee } from "@/app/lib/calls/attendees";
 
 /** Chips shown before the rest fold into a "show more" disclosure. */
@@ -21,9 +22,11 @@ function Chip({ a }: { a: Attendee }) {
         </>
     );
     return a.memberId ? (
-        <Link href={`/profile/${encodeURIComponent(a.memberId)}`} className={`${chip} hover:border-tomato-readable hover:text-tomato-readable`}>
-            {body}
-        </Link>
+        <MemberHoverCard memberId={a.memberId}>
+            <Link href={`/profile/${encodeURIComponent(a.memberId)}`} className={`${chip} hover:border-tomato-readable hover:text-tomato-readable`}>
+                {body}
+            </Link>
+        </MemberHoverCard>
     ) : (
         <span className={chip}>{body}</span>
     );

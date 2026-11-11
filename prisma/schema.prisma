@@ -2843,6 +2843,20 @@ model MafiaRankCache {
   @@index([computedAt])
 }
 
+/// Nightly precomputed collection counts per member (cron /api/cron/collection-stats). The profile
+/// renders these immediately and refreshes them in the background when stale.
+model MemberCollectionStats {
+  memberId       String   @id
+  poapCount      Int      @default(0)
+  nftCount       Int      @default(0)
+  nftCollections Int      @default(0)
+  ticketCount    Int      @default(0)
+  hasWallet      Boolean  @default(false)
+  computedAt     DateTime @default(now())
+
+  @@index([computedAt])
+}
+
 // ---- Reminders by DM (plans/voting-golive-and-reminders.md Part B). Opt-in; no row means no reminders. ----
 enum ReminderCalls {
   NONE

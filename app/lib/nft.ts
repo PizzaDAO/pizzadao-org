@@ -3,7 +3,7 @@
 
 import { getContractsByChain, ALCHEMY_CHAIN_URLS } from "./nft-config";
 import type { AlchemyNFT, NFTDisplayItem, NFTCollectionResponse, NFTContract } from "./nft-types";
-import { cacheGetOrSet } from "../api/lib/cache";
+import { cacheGet, cacheSet } from "../api/lib/cache";
 
 const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY;
 
@@ -13,14 +13,14 @@ const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY;
 async function fetchNFTsForContract(
   walletAddress: string,
   contract: NFTContract
-): Promise<AlchemyNFT[]> {
+): Promise<{ nfts: AlchemyNFT[]; incomplete: boolean }> {
   if (!ALCHEMY_API_KEY) {
-    return [];
+    return { nfts: [], incomplete: true }; // cannot check at all
   }
 
   const baseUrl = ALCHEMY_CHAIN_URLS[contract.chain];
   if (!baseUrl) {
-    return [];
+    return { nfts: [], incomplete: false }; // chain never supported here: nothing to miss
   }
 
   const allNfts: AlchemyNFT[] = [];
@@ -40,7 +40,7 @@ async function fetchNFTsForContract(
       });
 
       if (!res.ok) {
-        break;
+        return { nfts: allNfts, incomplete: true };
       }
 
       const data = await res.json();
@@ -54,9 +54,9 @@ async function fetchNFTsForContract(
       pageKey = data.pageKey;
     }
 
-    return allNfts;
+    return { nfts: allNfts, incomplete: false };
   } catch (error) {
-    return allNfts; // Return whatever we got so far
+    return { nfts: allNfts, incomplete: true }; // whatever we got so far, flagged as partial
   }
 }
 
@@ -93,10 +93,12 @@ export async function fetchPizzaDAONFTs(
   }
 
   const cacheKey = `nfts:${walletAddress.toLowerCase()}`;
+  const cached = await cacheGet<NFTCollectionResponse>(cacheKey);
+  if (cached !== null) return cached;
 
-  return cacheGetOrSet(
-    cacheKey,
+  const value = await (
     async () => {
+      let incomplete = false;
       const contractsByChain = await getContractsByChain();
       const allNFTs: NFTDisplayItem[] = [];
 
@@ -105,8 +107,9 @@ export async function fetchPizzaDAONFTs(
         async ([, contracts]) => {
           // Fetch all contracts for this chain in parallel
           const contractPromises = contracts.map(async (contract) => {
-            const nfts = await fetchNFTsForContract(walletAddress, contract);
-            return nfts.map((nft) => transformNFT(nft, contract));
+            const r = await fetchNFTsForContract(walletAddress, contract);
+            if (r.incomplete) incomplete = true;
+            return r.nfts.map((nft) => transformNFT(nft, contract));
           });
 
           const results = await Promise.all(contractPromises);
@@ -121,10 +124,13 @@ export async function fetchPizzaDAONFTs(
         nfts: allNFTs,
         totalCount: allNFTs.length,
         walletAddress,
-      };
-    },
-    2 * 60 * 60 // 2 hours — NFT holdings change rarely
-  );
+        ...(incomplete ? { incomplete: true } : {}),
+      } as NFTCollectionResponse;
+    }
+  )();
+  // A partial result (a chain call failed) is returned but never cached, so the next call retries.
+  if (!value.incomplete) await cacheSet(cacheKey, value, 2 * 60 * 60); // 2 hours: NFT holdings change rarely
+  return value;
 }
 
 /** The contract's chain has no Alchemy endpoint here: skip it (it can never be checked). */
