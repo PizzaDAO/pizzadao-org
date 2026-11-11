@@ -23,28 +23,36 @@ export function GlobalBallotPreparer() {
     const t = useTranslations("proposals.banner");
     const [ready, setReady] = useState<Ready[]>([]);
     const [note, setNote] = useState("");
+    // Cards show only for a signed-in member (the answer from /api/proposals/mine).
+    const [signedIn, setSignedIn] = useState(false);
     const pathname = usePathname();
-
-    // Ballots made earlier whose code was never saved: the card comes back until saved or dismissed.
-    useEffect(() => {
-        const earlier = listUnsaved();
-        if (earlier.length) setReady((s) => [...earlier.filter((e) => !s.some((x) => x.id === e.id)), ...s]);
-    }, []);
 
     useEffect(() => {
         let cancelled = false;
         // Nothing in here may throw or reject: this runs in the root layout on every page, and a failure must be silent.
         (async () => {
+            const earlier = listUnsaved();
+            // The token check runs at most every few minutes; the signed-in check for saved-code cards always runs.
+            let throttled = false;
             try {
                 const last = Number(sessionStorage.getItem(CHECKED_KEY) || 0);
-                if (Date.now() - last < CHECK_EVERY_MS) return;
-                sessionStorage.setItem(CHECKED_KEY, String(Date.now()));
+                throttled = Date.now() - last < CHECK_EVERY_MS;
             } catch {
                 /* no sessionStorage: check every time */
             }
-            if (typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches) return;
+            if (throttled && earlier.length === 0) return;
             const r = await fetch("/api/proposals/mine", { cache: "no-store" }).catch(() => null);
-            if (!r?.ok) return; // logged out, feature off or any error: do nothing
+            if (!r?.ok || cancelled) return; // logged out, feature off or any error: do nothing (and show no card)
+            setSignedIn(true);
+            // Ballots made earlier whose code was never saved: the card comes back until saved or dismissed.
+            if (earlier.length) setReady((s) => [...earlier.filter((e) => !s.some((x) => x.id === e.id)), ...s]);
+            if (throttled) return;
+            try {
+                sessionStorage.setItem(CHECKED_KEY, String(Date.now()));
+            } catch {
+                /* no sessionStorage */
+            }
+            if (typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches) return;
             // Only a well-formed answer from an enabled feature is used; anything else (HTML, {}, null, a mock) is ignored.
             const proposals = parseMine(await r.json().catch(() => null));
             for (const p of proposals) {
@@ -67,7 +75,7 @@ export function GlobalBallotPreparer() {
 
     // On the proposal's own page the vote panel has the same prompt.
     const shown = ready.filter((r) => pathname !== `/proposals/${r.id}`);
-    if (shown.length === 0) return null;
+    if (!signedIn || shown.length === 0) return null;
     return (
         <div className="fixed bottom-4 left-4 right-4 z-50 grid gap-2 sm:right-auto sm:max-w-sm" role="region" aria-label={t("region")}>
             {shown.map((r) => (

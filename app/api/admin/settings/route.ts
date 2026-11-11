@@ -52,8 +52,12 @@ export async function PUT(request: Request) {
     const expected = typeof b.expectedUpdatedAt === 'string' ? b.expectedUpdatedAt : b.expectedUpdatedAt === null ? null : undefined
     const saved = await saveSetting(key, parsed.value, auth.session.discordId, { note: b.note, expectedUpdatedAt: expected })
     // Go-live (proposals ON with an empty pilot list) records its own moment, once.
-    if (LIVE_SINCE_TRIGGER_KEYS.includes(key)) await maybeRecordLiveSince(auth.session.discordId)
-    return json({ ok: true, updatedAt: saved.updatedAt.toISOString() })
+    const live = LIVE_SINCE_TRIGGER_KEYS.includes(key) ? await maybeRecordLiveSince(auth.session.discordId) : 'skipped'
+    return json({
+      ok: true,
+      updatedAt: saved.updatedAt.toISOString(),
+      ...(live === 'error' ? { warning: 'Saved, but the go-live moment (proposals.liveSince) could not be recorded. Set it by hand in the Proposals settings.' } : {}),
+    })
   } catch (e) {
     if (e instanceof SettingError) return json({ error: e.message }, e.status)
     console.error('[admin settings] save failed:', e)
@@ -77,8 +81,12 @@ export async function DELETE(request: Request) {
       if (ask && b.confirm !== true) return json({ error: 'Confirmation required', needsConfirm: ask }, 409)
     }
     const removed = await resetSetting(b.key, auth.session.discordId, { note: b.note })
-    if (LIVE_SINCE_TRIGGER_KEYS.includes(b.key)) await maybeRecordLiveSince(auth.session.discordId)
-    return json({ ok: true, removed })
+    const live = LIVE_SINCE_TRIGGER_KEYS.includes(b.key) ? await maybeRecordLiveSince(auth.session.discordId) : 'skipped'
+    return json({
+      ok: true,
+      removed,
+      ...(live === 'error' ? { warning: 'Reset, but the go-live moment (proposals.liveSince) could not be recorded. Set it by hand in the Proposals settings.' } : {}),
+    })
   } catch (e) {
     if (e instanceof SettingError) return json({ error: e.message }, e.status)
     console.error('[admin settings] reset failed:', e)

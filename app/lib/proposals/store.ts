@@ -12,7 +12,7 @@
  */
 import { prisma } from '@/app/lib/db'
 import { CLOSE_MARGIN_MS, COUNT_ABSTAINS, DAY_MS, DRAFT_RETRY_MS, REQUIRE_AYES_OVER_NAYS } from './constants'
-import { loadPilotIds } from './pilot'
+import { loadPilotState } from './pilot'
 import { BACKUP_BLOB_LENGTH } from './backup'
 import { defaultRoleDeps, snapshotRoleHolders, type RoleDeps } from './eligibility'
 import { generateProposalKeyPair, wrapPrivateKey } from './keys'
@@ -112,7 +112,16 @@ export async function openProposal(
   const rules = opts.rules ?? (await loadProposalRules())
   // A pilot (test) proposal: only the listed testers vote, the window is short and one aye is enough.
   // If the pilot has ended meanwhile it never opens (it would have no sensible voter set): it is cancelled.
-  const pilot = p.isTest ? [...(opts.pilot ?? (await loadPilotIds()))] : []
+  let pilot: string[] = []
+  if (p.isTest) {
+    if (opts.pilot) pilot = [...opts.pilot]
+    else {
+      const st = await loadPilotState()
+      // An unreadable list must not cancel a test proposal: fail, and the cron retries.
+      if (st.unknown) throw new Error('pilot list unreadable')
+      pilot = st.ids
+    }
+  }
   if (p.isTest && pilot.length === 0) {
     await prisma.$transaction(async (tx) => {
       await lockProposal(tx, id)
@@ -171,8 +180,8 @@ export type CancelResult =
   | { ok: false; code: 'not_found' | 'not_cancellable' | 'not_allowed' | 'bad_reason' }
 
 /**
- * Cancel (admin) or withdraw (the proposer) a proposal that has not been counted. Admins: a DRAFT or an OPEN proposal,
- * any time before it settles. The proposer: their own DRAFT, or their own OPEN proposal until the window ends.
+ * Cancel (admin) or withdraw (the proposer) a proposal that has not been counted. Admins: a DRAFT, or an OPEN proposal
+ * until the window ends. The proposer: their own DRAFT, or their own OPEN proposal until the window ends.
  * Under the row lock it sets CANCELLED and closedAt, logs the actor and reason, and deletes the ballot rows; after the
  * commit it deletes the pending hash. A cancelled proposal is never counted, so nothing it held can matter.
  */
@@ -193,10 +202,9 @@ export async function cancelProposal(
     })
     if (!p || p.source !== 'APP') return { ok: false as const, code: 'not_found' as const }
     if (p.status !== 'DRAFT' && p.status !== 'OPEN') return { ok: false as const, code: 'not_cancellable' as const }
-    if (!actor.admin) {
-      if (!p.proposerDiscordId || p.proposerDiscordId !== actor.discordId) return { ok: false as const, code: 'not_allowed' as const }
-      if (p.status === 'OPEN' && (!p.closesAt || now >= p.closesAt)) return { ok: false as const, code: 'not_cancellable' as const }
-    }
+    // Once the window has ended the votes are in: nobody (admins included) can cancel it any more; it settles.
+    if (p.status === 'OPEN' && (!p.closesAt || now >= p.closesAt)) return { ok: false as const, code: 'not_cancellable' as const }
+    if (!actor.admin && (!p.proposerDiscordId || p.proposerDiscordId !== actor.discordId)) return { ok: false as const, code: 'not_allowed' as const }
     const wasOpen = p.status === 'OPEN'
     const { discordChannelId, discordMessageId } = p
     await tx.proposal.update({ where: { id }, data: { status: 'CANCELLED', closedAt: now } })
@@ -325,6 +333,13 @@ export async function castBallot(
       await store.put(proposalId, tokenHash, choice as Choice)
     } catch {
       return { ok: false, code: 'unavailable' }
+    }
+    // A cancel may have landed between the check above and the write: re-check, and clear the hash again if so, so
+    // a vote racing a cancel leaves no orphan in Redis.
+    const after = await prisma.proposal.findUnique({ where: { id: proposalId }, select: { status: true } })
+    if (!after || after.status !== 'OPEN') {
+      await store.clear(proposalId).catch(() => {})
+      return { ok: false, code: 'closed' }
     }
     return { ok: true }
   }

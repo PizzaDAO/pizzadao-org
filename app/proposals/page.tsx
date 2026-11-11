@@ -10,7 +10,7 @@ import { getSession } from "@/app/lib/session";
 import { getSetting } from "@/app/lib/settings";
 import { toggleEnabled } from "@/app/lib/settings/toggles";
 import { listOpenProposals, type ProposalSummary } from "@/app/lib/proposals/store";
-import { loadPilotIds, proposalsEnabledFor } from "@/app/lib/proposals/pilot";
+import { loadPilotState, proposalsEnabledFor } from "@/app/lib/proposals/pilot";
 import { listHistory, parseHistoryFilters, type HistoryFilters, type HistoryTotals } from "@/app/lib/proposals/history";
 import { EditorialMasthead, EditorialPage, EmptyState, paperCard, pillOutline, pillTomato } from "@/app/ui/shared/Editorial";
 
@@ -169,7 +169,7 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
     // Voting (open proposals, "New proposal") only shows while proposals.enabled is on; the history can be on alone.
     // While a pilot runs, only the listed members see voting, and they also see the test proposals.
     const voting = signedIn && (await proposalsEnabledFor(session?.discordId).catch(() => false));
-    const pilot = voting ? (await loadPilotIds()).length > 0 : false;
+    const pilot = voting ? (await loadPilotState()).running : false;
     const [open, size, withImported] = await Promise.all([voting ? listOpenProposals({ includeTest: pilot }) : Promise.resolve([]), pageSize(), historyEnabled()]);
     const history = await listHistory(f, size, withImported).catch(() => null);
     const thisYear = new Date().getUTCFullYear();

@@ -111,4 +111,11 @@ describe('the save card is sticky (H4)', () => {
     await new Promise((r) => setTimeout(r, 20))
     expect(container.innerHTML).toBe('')
   })
+
+  it('shows no card for a signed-out visitor (the saved ballot belongs to the browser, not to a login)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 401, json: async () => ({}) })))
+    const { container } = renderWithIntl(<GlobalBallotPreparer />)
+    await new Promise((r) => setTimeout(r, 20))
+    expect(container.innerHTML).toBe('')
+  })
 })

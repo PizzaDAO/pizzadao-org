@@ -23,27 +23,45 @@ export function snowflakeTime(id: string): Date | null {
   }
 }
 
-/** When the poll message in a Discord message link was posted, or null when the link is anything else. */
-export function discordMessageLinkTime(url: string | null | undefined): Date | null {
+/**
+ * When the poll message in a Discord message link was posted, or null when the link is anything else. With `guildId`
+ * the link must also be in that server (a poll from some other server never counts).
+ */
+export function discordMessageLinkTime(url: string | null | undefined, guildId?: string): Date | null {
   const m = typeof url === 'string' ? LINK.exec(url.trim()) : null
-  return m ? snowflakeTime(m[3]) : null
+  if (!m) return null
+  if (guildId !== undefined && m[1] !== guildId) return null
+  return snowflakeTime(m[3])
 }
 
-/** The end of the window: the saved date (inclusive, UTC), else 30 days after go-live. Null without a go-live moment. */
+/**
+ * The end of the window: 30 days after go-live at the latest. A saved date (inclusive, UTC) can only shorten it, never
+ * extend it (stricter-only). Null without a go-live moment.
+ */
 export function graceEnd(liveSince: Date | null, untilDate: string): Date | null {
+  if (!liveSince) return null
+  const cap = new Date(liveSince.getTime() + 30 * DAY_MS)
   if (untilDate && /^\d{4}-\d{2}-\d{2}$/.test(untilDate)) {
     const d = new Date(`${untilDate}T00:00:00Z`)
-    if (!Number.isNaN(d.getTime())) return new Date(d.getTime() + DAY_MS)
+    if (!Number.isNaN(d.getTime())) return new Date(Math.min(d.getTime() + DAY_MS, cap.getTime()))
   }
-  return liveSince ? new Date(liveSince.getTime() + 30 * DAY_MS) : null
+  return cap
 }
 
 /** Pure. True when a legacy Sesh link may still back an over-cap request right now. Fails closed. */
-export function legacySeshAllowed(url: string | null | undefined, liveSince: Date | null, untilDate: string, now: Date): boolean {
+export function legacySeshAllowed(
+  url: string | null | undefined,
+  liveSince: Date | null,
+  untilDate: string,
+  now: Date,
+  guildId: string | undefined = process.env.DISCORD_GUILD_ID?.trim(),
+): boolean {
+  // The poll must be in our own server; without a configured guild nothing qualifies.
+  if (!guildId) return false
   if (!liveSince || Number.isNaN(liveSince.getTime())) return false
   const end = graceEnd(liveSince, untilDate)
   if (!end || now.getTime() >= end.getTime()) return false
-  const posted = discordMessageLinkTime(url)
+  const posted = discordMessageLinkTime(url, guildId)
   return !!posted && posted.getTime() < liveSince.getTime()
 }
 
