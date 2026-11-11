@@ -9,3 +9,9 @@ export function tasksForGoal<T extends { goal?: string }>(goal: { description: s
   if (!key) return []
   return tasks.filter((t) => normalizeGoalText(t.goal) === key)
 }
+
+/** Done or skipped (the same stages the task list treats as closed). */
+export const isClosedTask = (t: { stage?: string }): boolean => {
+  const s = (t.stage ?? '').trim().toLowerCase()
+  return s === 'done' || s === 'complete' || s === 'completed' || s === 'skip' || s === 'skipped'
+}

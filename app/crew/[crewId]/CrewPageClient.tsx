@@ -18,7 +18,7 @@ import { CrewGettingStarted } from './CrewGettingStarted'
 import { CrewBounties } from './CrewBounties'
 import { CrewDrafts } from './CrewDrafts'
 import { CrewCallUpdates } from './CrewCallUpdates'
-import { tasksForGoal } from './goal-tasks'
+import { isClosedTask, tasksForGoal } from './goal-tasks'
 import { crewHasFeature } from '@/app/lib/crew-features'
 
 // Loading stages to show progress
@@ -1271,7 +1271,9 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
             {!collapsedSections.goals && (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))', gap: 12 }}>
                 {goals.map((goal, i) => {
-                  const goalTasks = tasksForGoal(goal, tasks)
+                  const allGoalTasks = tasksForGoal(goal, tasks)
+                  const goalTasks = allGoalTasks.filter((x) => !isClosedTask(x))
+                  const doneCount = allGoalTasks.length - goalTasks.length
                   const isOpen = !!openGoals[i]
                   return (
                     <div key={i} style={{ ...itemCard(goal.priority), gridColumn: isOpen ? '1 / -1' : undefined }}>
@@ -1280,14 +1282,15 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
                         onClick={() => setOpenGoals((prev) => ({ ...prev, [i]: !prev[i] }))}
                         aria-expanded={isOpen}
                         aria-controls={`goal-tasks-${i}`}
-                        style={{ all: 'unset', cursor: 'pointer', display: 'block', width: '100%', boxSizing: 'border-box', minHeight: 44 }}
+                        className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30"
+                        style={{ background: 'none', border: 0, padding: 0, margin: 0, font: 'inherit', color: 'inherit', textAlign: 'left', cursor: 'pointer', display: 'block', width: '100%', boxSizing: 'border-box', minHeight: 44 }}
                       >
                         {goal.priority && (
                           <span style={priorityBadge(goal.priority)}>{goal.priority}</span>
                         )}
                         <div style={{ fontWeight: 500, marginTop: goal.priority ? 8 : 0, overflowWrap: 'anywhere' }}>{goal.description}</div>
                         <div style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))', marginTop: 6 }}>
-                          {isOpen ? '▼' : '▶'} {t('goalTasks', { count: goalTasks.length })}
+                          {isOpen ? '▼' : '▶'} {t('goalTasks', { count: goalTasks.length })}{doneCount > 0 && ` · ${t('goalDone', { count: doneCount })}`}
                         </div>
                       </button>
                       {isOpen && (

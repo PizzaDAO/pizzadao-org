@@ -25,6 +25,8 @@ async function resolveDiscordUrl(crew: CrewOption): Promise<string | null> {
   const cell = crew.channel
   if (!cell) return null
   const guildId = process.env.DISCORD_GUILD_ID?.trim()
+  const direct = crewDiscordUrl(cell, guildId, null)
+  if (direct) return direct
   // The guild's channel list is only needed to turn a channel name into an id.
   const channels = await getGuildChannels().catch(() => null)
   return crewDiscordUrl(cell, guildId, channels)

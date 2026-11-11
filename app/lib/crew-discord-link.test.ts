@@ -27,6 +27,7 @@ describe('crewDiscordUrl', () => {
   })
   it('returns null without a guild id or channel list', () => {
     expect(crewDiscordUrl('111111', '')).toBeNull()
+    expect(crewDiscordUrl('https://discord.com/channels/999999/111111', '')).toBeNull()
     expect(crewDiscordUrl('education', '999999', null)).toBeNull()
   })
 })

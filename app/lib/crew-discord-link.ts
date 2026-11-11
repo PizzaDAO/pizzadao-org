@@ -19,14 +19,14 @@ export function crewDiscordUrl(
   const v = (cell ?? '').trim()
   if (!v) return null
   const guild = (guildId ?? '').trim()
+  if (!guild) return null
 
   const link = v.match(/^https:\/\/(?:ptb\.|canary\.)?discord(?:app)?\.com\/channels\/(\d{5,25})\/(\d{5,25})/i)
   if (link) {
     // A link into another server is not ours to promote.
-    if (guild && link[1] !== guild) return null
+    if (link[1] !== guild) return null
     return `https://discord.com/channels/${link[1]}/${link[2]}`
   }
-  if (!guild) return null
   if (SNOWFLAKE.test(v)) return `https://discord.com/channels/${guild}/${v}`
   const mention = v.match(/^<#(\d{5,25})>$/)
   if (mention) return `https://discord.com/channels/${guild}/${mention[1]}`
