@@ -64,10 +64,18 @@ export const MAX_LIST = 30;
 const BY = "by: ";
 /** A done item's line starts with this marker in the editor; the checkbox under the box toggles it. */
 export const DONE = "[x] ";
+/** An open item whose own text starts like a marker ("[x] ", "[ ] ", or already-escaped) gets a leading backslash so it is not read back as done. */
+const MARKER_LIKE = /^\\*\[[xX ]\]\s/;
+function escapeMarker(text: string): string {
+    return MARKER_LIKE.test(text) ? `\\${text}` : text;
+}
+function unescapeMarker(text: string): string {
+    return /^\\+\[[xX ]\]\s/.test(text) ? text.slice(1) : text;
+}
 /** "text | owner | by: suggester" per line; owner and suggester are optional. A final " | by: NAME" is the suggester, then whatever follows the last " | " is the owner. */
 export function formatActionItems(items: ActionItem[]): string {
     return items
-        .map((i) => (i.done ? DONE : "") + [i.text, i.owner, i.suggestedBy ? `${BY}${i.suggestedBy}` : ""].filter(Boolean).join(" | "))
+        .map((i) => (i.done ? DONE : "") + [escapeMarker(i.text), i.owner, i.suggestedBy ? `${BY}${i.suggestedBy}` : ""].filter(Boolean).join(" | "))
         .join("\n");
 }
 export function parseActionItems(raw: string): ActionItem[] {
@@ -88,7 +96,7 @@ export function parseActionItems(raw: string): ActionItem[] {
             }
             const at = rest.lastIndexOf(" | ");
             const owner = at === -1 ? "" : rest.slice(at + 3).trim();
-            const text = (at === -1 ? rest : rest.slice(0, at)).trim();
+            const text = unescapeMarker((at === -1 ? rest : rest.slice(0, at)).trim());
             return { text, ...(owner ? { owner } : {}), ...(suggestedBy ? { suggestedBy } : {}), ...(done ? { done: true } : {}) };
         })
         .filter((i) => i.text);
@@ -230,17 +238,17 @@ export function ReviewActions({
                 <span className="text-sm font-semibold">{labels.actionItems}</span>
                 <span className="text-xs text-foreground/60">{labels.actionItemsHint}</span>
                 <textarea value={actionItems} onChange={(e) => setActionItems(e.target.value)} rows={5} className={field} style={fieldStyle} />
-                {parseActionItems(actionItems).length > 0 && (
-                    <span className="grid gap-1 mt-1">
-                        {parseActionItems(actionItems).map((it, i) => (
-                            <span key={i} className="flex items-center gap-2 text-sm">
-                                <input type="checkbox" checked={!!it.done} onChange={() => toggleDone(i)} aria-label={`${labels.actionItemDone}: ${it.text}`} />
-                                <span className={it.done ? "text-foreground/60" : undefined}>{it.text}</span>
-                            </span>
-                        ))}
-                    </span>
-                )}
             </label>
+            {parseActionItems(actionItems).length > 0 && (
+                <div className="grid gap-1">
+                    {parseActionItems(actionItems).map((it, i) => (
+                        <label key={i} className="flex items-center gap-2 text-sm">
+                            <input type="checkbox" checked={!!it.done} onChange={() => toggleDone(i)} aria-label={`${labels.actionItemDone}: ${it.text}`} />
+                            <span className={it.done ? "text-foreground/60" : undefined}>{it.text}</span>
+                        </label>
+                    ))}
+                </div>
+            )}
             <label className="grid gap-1">
                 <span className="text-sm font-semibold">{labels.chapters}</span>
                 <span className="text-xs text-foreground/60">{labels.chaptersHint}</span>

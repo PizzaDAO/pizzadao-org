@@ -478,10 +478,12 @@ export async function updateRecordingText(id: string, edit: RecordingTextEdit): 
   const data: Prisma.CallRecordingUpdateInput = {}
   // A reviewer's words: automatic transcription/summary runs must never overwrite them.
   // Only a real change of the summary / action items / chapters text counts (a title-only or no-op save does not).
+  // `done` is a status flag, not reviewer text: toggling it alone does not freeze the summary against automatic reruns.
+  const stripDone = (v: unknown) => (Array.isArray(v) ? v.map((x) => { if (!x || typeof x !== 'object') return x; const { done: _d, ...rest } = x as Record<string, unknown>; return rest }) : v)
   const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
   const textChanged =
     (edit.summary !== undefined && !same(rec.summary, edit.summary)) ||
-    (edit.actionItems !== undefined && !same(rec.actionItems ?? [], edit.actionItems)) ||
+    (edit.actionItems !== undefined && !same(stripDone(rec.actionItems ?? []), stripDone(edit.actionItems))) ||
     (edit.chapters !== undefined && !same(rec.chapters ?? [], edit.chapters))
   if (textChanged) data.summaryEditedAt = new Date()
   if (edit.title !== undefined) data.title = edit.title

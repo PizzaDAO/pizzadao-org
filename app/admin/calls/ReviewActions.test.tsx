@@ -23,6 +23,12 @@ describe('review form text formats', () => {
     expect(parseActionItems(formatActionItems(items))).toEqual(items)
   })
 
+  it('does not turn an open item whose text starts like a marker into a done one', () => {
+    const items = [{ text: '[x] literal' }, { text: '[ ] box' }, { text: '\\[x] already', owner: 'Ann' }, { text: '[x] real', done: true }, { text: '[x] odd', done: true, suggestedBy: 'Bob' }]
+    expect(parseActionItems(formatActionItems(items))).toEqual(items)
+    expect(parseActionItems(formatActionItems([{ text: '[x] literal' }]))[0].done).toBeUndefined()
+  })
+
   it('keeps a "| by:" inside the text when more segments follow it', () => {
     const items = [{ text: 'Vote | by: Friday', owner: 'Ann' }, { text: 'Vote | by: Friday', owner: 'Ann', suggestedBy: 'Bob' }]
     expect(parseActionItems(formatActionItems(items))).toEqual(items)

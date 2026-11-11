@@ -351,7 +351,7 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                         <ul className="m-0 pl-5 grid gap-1">
                             {actionItems.map((item, i) => (
                                 <li key={i}>
-                                    {item.done ? <span>{"\u2705"} </span> : null}
+                                    {item.done ? <span role="img" aria-label={t("actionItemDone")}>{"\u2705"} </span> : null}
                                     {item.text}
                                     {item.owner ? <span className="text-foreground/60"> ({item.owner})</span> : null}
                                     {item.suggestedBy ? <span className="text-foreground/60"> {"\u2014"} {t("suggestedBy", { name: item.suggestedBy })}</span> : null}

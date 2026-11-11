@@ -102,7 +102,7 @@ export default async function PublishedCallPage({ params }: Params) {
                         <ul className={`m-0 grid gap-1 ${actionItems.some((a) => a.done) ? "list-none pl-0" : "pl-5"}`}>
                             {actionItems.map((item, i) => (
                                 <li key={i} className={actionItems.some((a) => a.done) && !item.done ? "pl-5" : undefined}>
-                                    {item.done ? <span aria-label={t("actionDone")}>{"\u2705"} </span> : null}
+                                    {item.done ? <span role="img" aria-label={t("actionDone")}>{"\u2705"} </span> : null}
                                     {item.text}
                                     {item.owner && item.suggestedBy && sameActionPerson(item.owner, item.suggestedBy) ? (
                                         <span className="text-foreground/60"> {"\u2014"} {t("suggestedAndOwns", { name: item.owner })}</span>

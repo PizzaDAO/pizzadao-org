@@ -598,6 +598,16 @@ describe('reviewer edits', () => {
     expect(db.callRecording.update.mock.calls[0][0].data.actionItems).toEqual([{ text: 'A', done: true }, { text: 'B' }, { text: 'C', owner: 'Ann' }, { text: 'D' }])
   })
 
+  it('toggling only done does not stamp summaryEditedAt, but still saves done', async () => {
+    asReviewer()
+    db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'IN_REVIEW', actionItems: [{ text: 'A', owner: 'Ann' }] })
+    await patch({ actionItems: [{ text: 'A', owner: 'Ann', done: true }] })
+    expect(db.callRecording.update.mock.calls[0][0].data).toEqual({ actionItems: [{ text: 'A', owner: 'Ann', done: true }] })
+    db.callRecording.update.mockClear()
+    await patch({ actionItems: [{ text: 'A changed', owner: 'Ann', done: true }] })
+    expect(db.callRecording.update.mock.calls[0][0].data.summaryEditedAt).toBeInstanceOf(Date)
+  })
+
   it('accepts action items and chapters, dropping blank entries', async () => {
     asReviewer()
     db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'IN_REVIEW' })
