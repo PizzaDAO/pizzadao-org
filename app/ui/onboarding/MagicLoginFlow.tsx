@@ -417,7 +417,7 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
             aria-label={t("usernameAriaLabel")}
             maxLength={32}
             autoComplete="username"
-            className="font-[family-name:var(--font-display)] w-full bg-transparent font-black leading-tight tracking-tight focus:outline-none focus-visible:ring-2 focus-visible:ring-tomato-readable rounded-md disabled:opacity-50"
+            className="font-[family-name:var(--font-display)] w-full bg-transparent font-black leading-tight tracking-tight focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 rounded-md disabled:opacity-50"
             style={{
               fontSize: "clamp(1.1rem, 2.2vw, 1.5rem)",
               color: "hsl(var(--foreground))",

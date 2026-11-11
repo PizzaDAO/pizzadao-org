@@ -7,6 +7,8 @@ import { CREW_SHEET_REVALIDATE_SECONDS, extractSheetId, parseCrewSheetRows, type
 import { internalError } from '@/app/lib/errors/error-response'
 import { usesDb } from '@/app/lib/sheets-import/source'
 import { crewContentFromDb } from '@/app/lib/crew-content'
+import { crewDiscordUrl } from '@/app/lib/crew-discord-link'
+import { getGuildChannels } from '@/app/lib/discord-channels'
 import { crewRolesFromDb, loadCrewRosterFromDb } from '@/app/lib/crew-roles'
 
 type Params = { params: Promise<{ crewId: string }> }
@@ -18,7 +20,19 @@ function pageTask({ sheetRow: _row, dueCell: _due, ...t }: CrewSheetTask) {
   return t
 }
 
-function crewHeader(crew: CrewOption, withSheet: boolean) {
+/** The crew's Discord channel link (null when the Channel cell cannot be resolved). */
+async function resolveDiscordUrl(crew: CrewOption): Promise<string | null> {
+  const cell = crew.channel
+  if (!cell) return null
+  const guildId = process.env.DISCORD_GUILD_ID?.trim()
+  const direct = crewDiscordUrl(cell, guildId, null)
+  if (direct) return direct
+  // The guild's channel list is only needed to turn a channel name into an id.
+  const channels = await getGuildChannels().catch(() => null)
+  return crewDiscordUrl(cell, guildId, channels)
+}
+
+function crewHeader(crew: CrewOption, withSheet: boolean, discordUrl: string | null = null) {
   return {
     id: crew.id,
     label: crew.label,
@@ -28,6 +42,7 @@ function crewHeader(crew: CrewOption, withSheet: boolean) {
     callLength: crew.callLength,
     channel: crew.channel,
     role: crew.role,
+    ...(discordUrl ? { discordUrl } : {}),
     ...(withSheet ? { sheet: crew.sheet } : {}),
   }
 }
@@ -131,6 +146,8 @@ export async function GET(req: Request, { params }: Params) {
       return NextResponse.json({ error: 'Crew not found' }, { status: 404 })
     }
 
+    const discordUrl = await resolveDiscordUrl(crew)
+
     const fallbackTasks = (crew.tasks || []).map(t => ({ task: t.label, url: t.url, priority: t.priority || '', stage: 'todo', lead: '', leadId: '', notes: '' }))
 
     const cacheHeaders = { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=1800' };
@@ -163,14 +180,14 @@ export async function GET(req: Request, { params }: Params) {
 
     // If crew has no sheet URL, return just the metadata
     if (!crew.sheet) {
-      return NextResponse.json({ crew: crewHeader(crew, false), ...(await withDbContent(empty)), ...source }, { headers: cacheHeaders })
+      return NextResponse.json({ crew: crewHeader(crew, false, discordUrl), ...(await withDbContent(empty)), ...source }, { headers: cacheHeaders })
     }
 
     // Extract sheet ID and fetch data
     const sheetId = extractSheetId(crew.sheet)
     if (!sheetId) {
       return NextResponse.json({
-        crew: crewHeader(crew, false),
+        crew: crewHeader(crew, false, discordUrl),
         ...(await withDbContent(empty)),
         error: 'Invalid sheet URL',
         ...source,
@@ -200,7 +217,7 @@ export async function GET(req: Request, { params }: Params) {
     const { taskDebugInfo, agendaDebugInfo } = sheet
 
     return NextResponse.json({
-      crew: crewHeader(crew, true),
+      crew: crewHeader(crew, true, discordUrl),
       ...(await withDbContent(sheet.data)),
       ...source,
       ...(taskDebugInfo || agendaDebugInfo ? { _debug: { tasks: taskDebugInfo, agenda: agendaDebugInfo } } : {}),
