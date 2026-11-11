@@ -98,6 +98,8 @@ export const TOGGLES = {
   'sheets.mirror.members': { env: 'SHEETS_MIRROR_MEMBERS', legacy: (raw) => !envKillsToggle(raw) },
   // Off unless turned on. The public reach map shows nothing and the endpoint answers 404 until then.
   'map.levelsEnabled': { env: 'MAP_LEVELS_ENABLED', legacy: ON_WORDS },
+  // Off unless turned on: opt-in call reminders by Discord DM (plans/voting-golive-and-reminders.md, B1).
+  'reminders.callsEnabled': { env: 'REMINDERS_CALLS_ENABLED', legacy: ON_WORDS },
 } as const satisfies Partial<Record<SettingKey, ToggleDef>>
 
 export type ToggleKey = keyof typeof TOGGLES

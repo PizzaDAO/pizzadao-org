@@ -20,6 +20,7 @@
     { "path": "/api/cron/telegram-posts", "schedule": "*/5 * * * *" },
     { "path": "/api/cron/event-time-sync", "schedule": "40 */6 * * *" },
     { "path": "/api/cron/mafia-ranks", "schedule": "30 3 * * *" },
-    { "path": "/api/cron/unlock-tickets", "schedule": "10 4 * * *" }
+    { "path": "/api/cron/unlock-tickets", "schedule": "10 4 * * *" },
+    { "path": "/api/cron/reminders", "schedule": "*/5 * * * *" }
   ]
 }

@@ -67,6 +67,9 @@ import type { MissionReviewDeps } from "@/app/lib/discord-interactions/mission-r
 import type { FollowUpInteractionDeps } from "@/app/lib/discord-interactions/followups";
 import { applyMemberAction } from "@/app/lib/followups/actions";
 import { notifyApprovers } from "@/app/lib/followups/notify";
+import type { ReminderInteractionDeps } from "@/app/lib/discord-interactions/reminders";
+import { stopCallReminders } from "@/app/lib/reminders/prefs";
+import { SITE_URL } from "@/app/lib/site-url";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -207,6 +210,14 @@ const followups: FollowUpInteractionDeps = {
   },
 };
 
+const reminders: ReminderInteractionDeps = {
+  stop: (discordId) => stopCallReminders(discordId),
+  settingsUrl: async (discordId) => {
+    const memberId = await fetchMemberIdByDiscordId(discordId);
+    return memberId ? `${SITE_URL}/profile/${encodeURIComponent(memberId)}/edit` : null;
+  },
+};
+
 function deps(guildId: string | undefined, settings: Settings): HandlerDeps {
   return {
     guildId,
@@ -238,6 +249,7 @@ function deps(guildId: string | undefined, settings: Settings): HandlerDeps {
     progress: { enabled: progressEnabled, rateLimit: progressRateLimit, defer: deferProgress, crewChoices: progressCrewChoices },
     missionReview,
     followups,
+    reminders,
   };
 }
 

@@ -38,6 +38,7 @@ import { TaglineEditor } from "../../../dashboard/[id]/components/TaglineEditor"
 import { useUserData, useXAccount } from "../../../lib/hooks/use-api";
 import { LanguageEditor } from "../../../ui/profile/LanguageEditor";
 import { EmailPrefsEditor } from "./EmailPrefsEditor";
+import { ReminderPrefsEditor } from "./ReminderPrefsEditor";
 
 const FONT_SANS = "var(--font-sans), system-ui, sans-serif";
 const FONT_DISPLAY =
@@ -489,6 +490,20 @@ function LanguageSection({ memberId }: { memberId: string }) {
     );
 }
 
+function RemindersSection() {
+    const t = useTranslations("reminders.prefs");
+    const tp = useTranslations("profileEdit");
+    return (
+        <EditorialSection
+            overline={tp("remindersOverline")}
+            title={t("sectionTitle")}
+            description={t("description")}
+        >
+            <ReminderPrefsEditor />
+        </EditorialSection>
+    );
+}
+
 function EmailSection() {
     const t = useTranslations("reengage.prefs");
     const tp = useTranslations("profileEdit");
@@ -729,6 +744,9 @@ export function EditClient({
 
                 {/* Weekly re-engagement email opt-out — /api/email-prefs */}
                 <EmailSection />
+
+                {/* Call reminders by Discord DM (opt-in) — /api/reminder-prefs */}
+                <RemindersSection />
 
                 {/* Wallets pointer */}
                 <EditorialSection

@@ -143,6 +143,7 @@
     },
     "languageOverline": "§ 05 · Idioma",
     "emailOverline": "§ 05b · Correo",
+    "remindersOverline": "§ 05c · Recordatorios",
     "wallets": {
       "overline": "§ 06 · Wallets",
       "title": "Wallets",
@@ -1614,6 +1615,21 @@
     "nextNone": "Terminaste todas las misiones disponibles. Buen trabajo.",
     "nextCtaAll": "Ver todas las misiones",
     "handbook": "Guía de PizzaDAO"
+  },
+  "reminders": {
+    "prefs": {
+      "sectionTitle": "Recordatorios",
+      "description": "Recibe un breve MD de Discord antes de una llamada. Desactivado salvo que lo actives. Cada MD tiene un botón para parar.",
+      "legend": "Recordatorios de llamadas",
+      "none": "Sin recordatorios",
+      "community": "La Community Call",
+      "myCrews": "La Community Call y mis crews",
+      "saved": "Guardado",
+      "saveError": "No se pudieron guardar tus recordatorios. ¿Intentar de nuevo?",
+      "loadError": "No se pudieron cargar tus recordatorios.",
+      "dmClosed": "No pudimos enviarte un MD en Discord. Permite mensajes directos de miembros del servidor y vuelve a intentarlo.",
+      "tryAgain": "Intentar de nuevo"
+    }
   },
   "reengage": {
     "subjectMission": "Tu próxima misión: {title}",
