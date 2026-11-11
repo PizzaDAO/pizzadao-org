@@ -4,7 +4,7 @@
 // row): id, name, pfp, level, mafia rank tier and crew labels. No Discord id, wallet, email,
 // Telegram or any other contact field. Cached in memory and at the CDN for 5 minutes.
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { fetchMemberById } from "@/app/lib/sheets/member-repository";
 import { getUserProgressSummary } from "@/app/lib/missions";
 import { getMafiaRank } from "@/app/lib/mafia-points";
@@ -28,7 +28,7 @@ export interface MemberCard {
 export const MEMBER_CARD_KEYS = ["memberId", "name", "pfpUrl", "level", "levelTitle", "mafiaRank", "crews"] as const;
 
 export const MEMBER_CARD_CACHE_HEADERS = {
-    "Cache-Control": "public, s-maxage=300, stale-while-revalidate=3600",
+    "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
 } as const;
 
 /** The cold mafia rank can take seconds; the card renders without it past this. */
@@ -66,10 +66,17 @@ export async function composeMemberCard(memberId: string): Promise<MemberCard | 
     const m = member as unknown as Record<string, unknown>;
 
     const discordId = text(m["discordId"]);
+    // Past the budget the lookup keeps running (and fills its cache) after the response is sent.
+    const rankPromise = getMafiaRank(memberId);
+    try {
+        after(() => rankPromise.then(() => undefined, () => undefined));
+    } catch {
+        // outside a request scope (tests): nothing to extend
+    }
     const [pfpUrl, mission, rank, crewMappings] = await Promise.all([
         safe(resolvePfpUrlAsync(memberId), null as string | null),
         discordId ? safe(getUserProgressSummary(discordId), null) : Promise.resolve(null),
-        withBudget(getMafiaRank(memberId), RANK_BUDGET_MS, null),
+        withBudget(rankPromise, RANK_BUDGET_MS, null),
         safe(getCrewMappings(), { crews: [], cached: false }),
     ]);
 

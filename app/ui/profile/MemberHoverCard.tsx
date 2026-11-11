@@ -129,6 +129,7 @@ export function MemberHoverCard({
             onTouchEnd={() => clear(pressTimer)}
             onTouchMove={() => clear(pressTimer)}
             onTouchCancel={() => clear(pressTimer)}
+            style={{ WebkitTouchCallout: "none" } as React.CSSProperties}
             onContextMenu={(e) => {
                 if (longPressed.current) e.preventDefault(); // no native link menu after a long-press
             }}
@@ -167,7 +168,8 @@ function CardPopover({ id, memberId }: { id: string; memberId: string }) {
     return (
         <span
             id={id}
-            role="tooltip"
+            role="dialog"
+            aria-label={t("viewProfile")}
             className="paper-soft absolute left-0 top-full z-50 mt-2 block w-64 max-w-[80vw] rounded-[16px] border p-3 text-left text-sm font-normal normal-case shadow-lg"
             style={{
                 background: "hsl(var(--card))",

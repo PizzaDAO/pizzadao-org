@@ -23,6 +23,7 @@ export async function withRecordingLinks<T extends { date: string; crewId: strin
         callDate: { in: recent.map((c) => new Date(c.date)) },
       },
       select: { recordingId: true, callDate: true, crewId: true },
+      orderBy: { createdAt: 'asc' }, // later rows win in the map below: the latest recording
     });
     const ids = [...new Set(rows.map((r) => r.recordingId).filter((x): x is string => !!x))];
     if (ids.length === 0) return recent;

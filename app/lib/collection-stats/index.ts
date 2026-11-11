@@ -50,6 +50,12 @@ export async function computeCollectionStats(memberId: string): Promise<Collecti
     Promise.all(wallets.map((w) => fetchPizzaDAONFTs(w))),
   ]);
 
+  // A partial NFT lookup (a chain failed) must not overwrite good counts with lower ones: throw so
+  // refreshCollectionStats writes nothing and the previous row stays. POAP lookups throw on failure.
+  for (const r of nftResults) {
+    if (r.error) throw new Error(`NFT lookup incomplete: ${r.error}`);
+  }
+
   const poaps = new Set<string>();
   for (const r of poapResults) for (const p of r.poaps) poaps.add(String(p.tokenId));
 
@@ -79,8 +85,23 @@ export async function readCollectionStats(memberId: string): Promise<StoredColle
   }
 }
 
-/** Recompute one member's counts and store them. Throws if the computation fails. */
-export async function refreshCollectionStats(memberId: string): Promise<CollectionStats> {
+const inFlight = new Set<string>();
+
+/**
+ * Recompute one member's counts and store them. Throws if the computation fails (nothing is
+ * written then). Single-flight: a concurrent call for the same member returns null at once.
+ */
+export async function refreshCollectionStats(memberId: string): Promise<CollectionStats | null> {
+  if (inFlight.has(memberId)) return null;
+  inFlight.add(memberId);
+  try {
+    return await refreshOnce(memberId);
+  } finally {
+    inFlight.delete(memberId);
+  }
+}
+
+async function refreshOnce(memberId: string): Promise<CollectionStats> {
   const stats = await computeCollectionStats(memberId);
   const data = { ...stats, computedAt: new Date() };
   try {
@@ -93,6 +114,10 @@ export async function refreshCollectionStats(memberId: string): Promise<Collecti
     // best effort: the caller still gets the fresh numbers
   }
   return stats;
+}
+
+export function isRefreshing(memberId: string): boolean {
+  return inFlight.has(memberId);
 }
 
 export function isStale(computedAt: Date, freshHours: number, now: number = Date.now()): boolean {

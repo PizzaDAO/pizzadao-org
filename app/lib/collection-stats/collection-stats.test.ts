@@ -78,8 +78,22 @@ describe("refreshCollectionStats", () => {
   it("upserts the computed numbers and returns them even if the write fails", async () => {
     upsert.mockRejectedValueOnce(new Error("no table"));
     const s = await refreshCollectionStats("1");
-    expect(s.poapCount).toBe(3);
+    expect(s?.poapCount).toBe(3);
     expect(upsert.mock.calls[0][0].where).toEqual({ memberId: "1" });
+  });
+});
+
+describe("refresh safety", () => {
+  it("writes nothing when an NFT lookup reports an error", async () => {
+    const { fetchPizzaDAONFTs } = await import("@/app/lib/nft");
+    (fetchPizzaDAONFTs as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ nfts: [], totalCount: 0, walletAddress: "x", error: "chain down" });
+    await expect(refreshCollectionStats("1")).rejects.toThrow(/incomplete/);
+    expect(upsert).not.toHaveBeenCalled();
+  });
+  it("is single-flight per member", async () => {
+    const [a, b] = await Promise.all([refreshCollectionStats("9"), refreshCollectionStats("9")]);
+    expect([a, b].filter((x) => x === null)).toHaveLength(1);
+    expect(upsert).toHaveBeenCalledTimes(1);
   });
 });
 

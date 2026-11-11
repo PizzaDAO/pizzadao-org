@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse, after } from 'next/server'
+import { fetchMemberById } from '@/app/lib/sheets/member-repository'
 import {
+  isRefreshing,
   collectionStatsFreshHours,
   isStale,
   readCollectionStats,
@@ -19,11 +21,16 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ mem
   const { memberId } = await params
   if (!memberId) return NextResponse.json({ error: 'Missing memberId' }, { status: 400 })
 
+  // Unknown or malformed ids never reach the database (no junk rows, no refresh).
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(memberId)) return NextResponse.json({ error: 'Invalid memberId' }, { status: 400 })
+  const member = await fetchMemberById(memberId).catch(() => null)
+  if (!member) return NextResponse.json({ error: 'Member not found' }, { status: 404, headers: { 'Cache-Control': 'public, s-maxage=60' } })
+
   const stored = await readCollectionStats(memberId)
   let refreshing = false
   try {
     const stale = !stored || isStale(stored.computedAt, await collectionStatsFreshHours())
-    if (stale) {
+    if (stale && !isRefreshing(memberId)) {
       refreshing = true
       after(async () => {
         try {
