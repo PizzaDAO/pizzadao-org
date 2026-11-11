@@ -13,7 +13,7 @@ import { prisma } from '@/app/lib/db'
 import type { Settings } from '@/app/lib/settings'
 import { findLiveSessions, streamLinkFor, type LivePresence } from './live-state'
 import { liveAccess } from './live-access'
-import { personRef, resolveMemberIds, type PersonRef } from './live-members'
+import { personRef, resolveMemberIds, resolveMemberNames, type PersonRef } from './live-members'
 import { memberQaView, SHARED_VIEW_TTL_MS, type PollView, type QuestionView } from './live-qa'
 import { loadPostFilter, mentionsBlockedTerm, type PostFilter } from './post-filters'
 import { cleanSuggestedBy } from './summarize'
@@ -120,12 +120,15 @@ async function buildShared(s: Session, filter: PostFilter | null): Promise<Share
       // no fallback names
     }
   }
+  // Still no name for a speaker (left early, no heartbeat name): use the member's name.
+  const stillUnnamed = rows.map((r) => r.speakerIds[0]).filter((id): id is string => !!id && !cleanSuggestedBy(names.get(id) ?? null))
+  if (stillUnnamed.length) for (const [id, n] of await resolveMemberNames(stillUnnamed)) names.set(id, n)
   const inChannel = presence.filter((p) => p.inChannel)
   const members = await resolveMemberIds([...rows.map((r) => r.speakerIds[0]).filter(Boolean), ...inChannel.map((p) => p.discordId)])
   return {
     items: rows.map((r) => {
-      const first = r.speakerIds[0]
-      // Same rule as the published suggestedBy: the first speaker's name; "Speaker N" is never shown.
+      // One known speaker is credited; several (unclear who) or none leave it empty. "Speaker N" is never shown.
+      const first = r.speakerIds.length === 1 ? r.speakerIds[0] : undefined
       const name = cleanSuggestedBy(first ? names.get(first) ?? null : null)
       return {
         id: r.id,

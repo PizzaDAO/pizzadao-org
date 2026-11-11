@@ -112,6 +112,13 @@ describe('member endpoint payload', () => {
     expect((await view()).calls[0].items[0].suggestedBy).toEqual({ name: 'Eli', memberId: null })
   })
 
+  it('uses the member name when the call has no name for the speaker, and credits nobody when several speakers are possible', async () => {
+    vi.mocked(prisma.callLiveItem.findMany).mockResolvedValue([item('a', { speakerIds: ['777777777777777'] }), item('b', { speakerIds: ['111111111111111', '222222222222222'] })] as never)
+    vi.mocked(prisma.member.findMany).mockResolvedValue([{ id: 'm-zed', discordId: '777777777777777', name: 'Zed' }] as never)
+    const out = await view()
+    expect(out.calls[0].items.map((i) => i.suggestedBy?.name ?? null)).toEqual(['Zed', null])
+  })
+
   it('cursor is (createdAt, id): only newer items, and same-millisecond rows are not skipped', async () => {
     const t = NOW - 1000
     vi.mocked(prisma.callLiveItem.findMany).mockResolvedValue([item('a', { createdAt: new Date(t - 5000) }), item('b', { createdAt: new Date(t) }), item('c', { createdAt: new Date(t) })] as never)
