@@ -88,6 +88,15 @@ describe('pilotStateFrom and pilotAllows', () => {
     expect(st({ 'proposals.pilotDiscordIds': ['a'], 'proposals.liveSince': '' }).running).toBe(true)
   })
 
+  it('a recorded go-live wins even when the tester list is invalid (voters allowed, gate on)', () => {
+    const s = st({ 'proposals.liveSince': '2026-12-01T18:00:00Z' }, { invalidKeys: ['proposals.pilotDiscordIds'] })
+    expect(s).toEqual({ running: false, unknown: false, ids: [] })
+    expect(pilotAllows(s, 'anyone')).toBe(true)
+    // but not when liveSince itself is invalid, or the whole read failed
+    expect(st({ 'proposals.liveSince': '2026-12-01T18:00:00Z' }, { invalidKeys: ['proposals.pilotDiscordIds', 'proposals.liveSince'] }).unknown).toBe(true)
+    expect(st({ 'proposals.liveSince': '2026-12-01T18:00:00Z' }, { readFailed: true }).unknown).toBe(true)
+  })
+
   it('an unreadable or invalid list counts as a pilot running with an unknown list: nobody is allowed', () => {
     for (const extra of [{ readFailed: true }, { invalidKeys: ['proposals.pilotDiscordIds'] }]) {
       const s = st({}, extra)

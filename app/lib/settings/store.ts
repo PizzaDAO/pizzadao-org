@@ -94,6 +94,11 @@ const liveTime = (v: unknown): number | null => (typeof v === 'string' && v !== 
  */
 async function checkGoLive(key: SettingKey, value: unknown): Promise<void> {
   if (key !== LIVE_SINCE && key !== PILOT) return
+  // A go-live moment in the future (beyond a little clock skew) is refused, first save or not.
+  if (key === LIVE_SINCE) {
+    const t = liveTime(value)
+    if (t !== null && t > Date.now() + 5 * 60_000) throw new SettingError(400, `${key}: the go-live moment cannot be in the future`)
+  }
   const row = (await prisma.appSetting.findUnique({ where: { key: LIVE_SINCE } })) as { value: unknown } | null
   const existing = liveTime(row?.value)
   if (existing === null) return

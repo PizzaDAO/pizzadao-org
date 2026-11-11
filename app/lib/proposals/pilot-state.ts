@@ -22,9 +22,11 @@ export function isLiveSet(raw: unknown): boolean {
 }
 
 export function pilotStateFrom(s: Pick<Settings, 'get' | 'readFailed' | 'invalidKeys'>): PilotState {
+  // Go-live wins: once a valid liveSince is set the tester list is irrelevant, even if it cannot be read.
+  if (!s.readFailed && !s.invalidKeys.includes('proposals.liveSince') && isLiveSet(s.get('proposals.liveSince'))) return NO_PILOT
   if (s.readFailed || s.invalidKeys.includes('proposals.pilotDiscordIds')) return { running: true, unknown: true, ids: [] }
   const ids = [...s.get('proposals.pilotDiscordIds')]
-  if (ids.length === 0 || isLiveSet(s.get('proposals.liveSince'))) return NO_PILOT
+  if (ids.length === 0) return NO_PILOT
   return { running: true, unknown: false, ids }
 }
 
