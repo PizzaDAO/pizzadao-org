@@ -13,7 +13,7 @@ const { calls, captureState, finalizeSession, fatal } = vi.hoisted(() => ({
   calls: [] as string[],
   captureState: { startFails: false, stopThrows: false },
   finalizeSession: vi.fn(async () => 'uploaded' as const),
-  fatal: { fn: (_r: string) => {} },
+  fatal: { fn: (_r: string) => {}, seg: (_r: unknown) => {} },
 }))
 
 vi.mock('./capture.js', () => ({
@@ -23,7 +23,8 @@ vi.mock('./capture.js', () => ({
     decryptFailures = 0
     rejoins = 0
     speakingNow: string[] = []
-    constructor(readonly deps: { onFatal: (r: string) => void }) {
+    constructor(readonly deps: { onFatal: (r: string) => void; onSegment?: (r: unknown) => void }) {
+      fatal.seg = (r) => deps.onSegment?.(r)
       fatal.fn = deps.onFatal
     }
     async start() {
@@ -57,7 +58,7 @@ const ev = (over: Partial<EventInfo> = {}): EventInfo => ({
   ...over,
 })
 
-function world(opts: { nickFails?: boolean; sendFails?: boolean; dataDir?: string; remote?: RemoteConfigClient; bots?: string[]; livePost?: (b: unknown) => Promise<string[]>; liveStatePost?: (b: any) => Promise<'ok' | 'off' | 'error'>; captureVoiceChat?: boolean } = {}) {
+function world(opts: { nickFails?: boolean; sendFails?: boolean; dataDir?: string; remote?: RemoteConfigClient; bots?: string[]; livePost?: (b: unknown) => Promise<string[]>; playOutCheck?: (b: any) => Promise<boolean>; liveStatePost?: (b: any) => Promise<'ok' | 'off' | 'error'>; captureVoiceChat?: boolean } = {}) {
   const dataDir = opts.dataDir ?? mkdtempSync(path.join(os.tmpdir(), 'orch-'))
   const nicknames: Array<string | null> = []
   const me = {
@@ -91,12 +92,13 @@ function world(opts: { nickFails?: boolean; sendFails?: boolean; dataDir?: strin
     client as never,
     cfg,
     nick,
-    { appBaseUrl: 'x', apiKey: 'k', uploader: {} as never, log: () => {} },
+    { appBaseUrl: 'x', apiKey: 'k', uploader: { put: async () => 1 } as never, log: () => {} },
     () => {},
     (fn) => void serialJobs.push(fn),
     opts.remote ?? null,
     opts.livePost ?? null,
     opts.liveStatePost ?? null,
+    opts.playOutCheck ?? null,
   )
   return { rec, dataDir, me, nicknames, channel, guild, serialJobs, client, cfg, nick }
 }
@@ -262,7 +264,7 @@ describe('CallRecorder event limits', () => {
   const crew = (id: string, startMs: number) => ev({ id, name: 'Ops Crew', scheduledStartMs: startMs, status: EventStatus.Scheduled })
   const at = (ms: number) => vi.spyOn(Date, 'now').mockImplementation(() => ms)
   const restart = (w: ReturnType<typeof world>) =>
-    new CallRecorder(w.client as never, w.cfg, w.nick, { appBaseUrl: 'x', apiKey: 'k', uploader: {} as never, log: () => {} }, () => {}, () => {})
+    new CallRecorder(w.client as never, w.cfg, w.nick, { appBaseUrl: 'x', apiKey: 'k', uploader: { put: async () => 1 } as never, log: () => {} }, () => {}, () => {})
   const tick = (r: CallRecorder) => (r as unknown as { onTick: () => Promise<void> }).onTick()
   /** Record the Community Call from T until it hits its limit at T+31. */
   const hitLimit = async (w: ReturnType<typeof world>, extra: EventInfo[] = []) => {
@@ -1291,6 +1293,112 @@ describe('end-of-call song trigger (calls.endSongTriggerEnabled)', () => {
     await expect(w.rec.stop('event-ended')).resolves.toBeUndefined()
     await w.rec.drain()
     expect(finalizeSession).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('spoken play-out command (calls.playOutCommandEnabled)', () => {
+  const remoteWith = (o: { playOut?: boolean; endSong?: boolean } = {}) => {
+    const rc = parseRemoteConfig({
+      playOut: { enabled: o.playOut ?? true },
+      endSong: { enabled: o.endSong ?? true, minHumans: 1, crewMap: [{ crew: 'Ops Crew', radio: 'Ops' }] },
+      crews: [{ eventId: '100', label: 'Ops Crew', callMinutes: 60 }],
+    })
+    return { get: () => rc, refresh: async () => rc } as unknown as RemoteConfigClient
+  }
+  const radio = { url: 'https://radio.example', apiKey: 'radio-secret' }
+  const fetchMock = vi.fn(async (_u: string, _i?: RequestInit) => ({ ok: true, status: 200 }) as Response)
+  const played = () => fetchMock.mock.calls.length
+  const burst = (startMs = 1000) => ({ t: 'segment', userId: '555555555555555555', startMs, endMs: startMs + 3000, file: `seg/x/${startMs}.ogg`, bytes: 900 })
+  const setup = (o: { playOut?: boolean; endSong?: boolean; answer?: boolean | (() => boolean) } = {}) => {
+    const check = vi.fn(async (_b: unknown) => (typeof o.answer === 'function' ? o.answer() : (o.answer ?? true)))
+    const w = world({ remote: remoteWith(o), playOutCheck: check })
+    ;(w.cfg as unknown as { pizzaRadio: unknown }).pizzaRadio = radio
+    return { w, check }
+  }
+
+  beforeEach(() => {
+    fetchMock.mockReset()
+    fetchMock.mockResolvedValue({ ok: true, status: 200 } as Response)
+    vi.stubGlobal('fetch', fetchMock)
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('plays the crew song through pizza-radio when the app confirms the command, and sends the burst as a command check', async () => {
+    const { w, check } = setup()
+    await begin(w)
+    fatal.seg(burst())
+    await vi.waitFor(() => expect(played()).toBe(1))
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('https://radio.example/play-crew')
+    expect(JSON.parse(String(init?.body))).toEqual({ crew: 'Ops', channelId: CHANNEL })
+    const body = check.mock.calls[0][0] as { command: string; segments: Array<{ discordId: string }> }
+    expect(body.command).toBe('play-out')
+    expect(body.segments[0].discordId).toBe('555555555555555555')
+  })
+
+  it('plays only once per call, however many commands follow', async () => {
+    const { w, check } = setup()
+    await begin(w)
+    fatal.seg(burst(1000))
+    await vi.waitFor(() => expect(played()).toBe(1))
+    fatal.seg(burst(9000))
+    fatal.seg(burst(20000))
+    await new Promise((r) => setTimeout(r, 30))
+    expect(played()).toBe(1)
+    expect(check).toHaveBeenCalledTimes(1) // after the command, no more bursts are even sent
+  })
+
+  it('does not play a second time at the end of the call (no double play with the automatic song)', async () => {
+    const { w } = setup()
+    await begin(w)
+    fatal.seg(burst())
+    await vi.waitFor(() => expect(played()).toBe(1))
+    await w.rec.stop('event-ended')
+    await new Promise((r) => setTimeout(r, 30))
+    expect(played()).toBe(1)
+  })
+
+  it('without the command the automatic end-of-call song still plays', async () => {
+    const { w } = setup({ answer: false })
+    await begin(w)
+    fatal.seg(burst())
+    await new Promise((r) => setTimeout(r, 30))
+    expect(played()).toBe(0)
+    await w.rec.stop('event-ended')
+    await vi.waitFor(() => expect(played()).toBe(1))
+  })
+
+  it('is off by default: no burst is sent and nothing plays', async () => {
+    const { w, check } = setup({ playOut: false })
+    await begin(w)
+    fatal.seg(burst())
+    await new Promise((r) => setTimeout(r, 30))
+    expect(check).not.toHaveBeenCalled()
+    expect(played()).toBe(0)
+  })
+
+  it('needs the end-of-call song to be set up (it reuses that path)', async () => {
+    const { w, check } = setup({ endSong: false })
+    await begin(w)
+    fatal.seg(burst())
+    await new Promise((r) => setTimeout(r, 30))
+    expect(check).not.toHaveBeenCalled()
+    expect(played()).toBe(0)
+  })
+
+  it('ignores coughs and monologues, and nothing is sent after the call stopped', async () => {
+    const { w, check } = setup()
+    await begin(w)
+    fatal.seg({ ...burst(), endMs: 1500 })
+    fatal.seg({ ...burst(), endMs: 120_000 })
+    await w.rec.stop('empty')
+    fatal.seg(burst(50_000))
+    await new Promise((r) => setTimeout(r, 30))
+    expect(check).not.toHaveBeenCalled()
+    expect(played()).toBe(0)
   })
 })
 

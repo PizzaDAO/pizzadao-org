@@ -27,6 +27,8 @@ export const liveRequestSchema = z.object({
   eventName: z.string().max(200).nullable(),
   startedAt: z.string().datetime(),
   seq: z.number().int().min(1).max(10_000).optional(),
+  /** 'play-out': fast path for the spoken end-of-call command (play-out-run.ts); segments only, nothing is stored. */
+  command: z.literal('play-out').optional(),
   segments: z
     .array(
       z.object({

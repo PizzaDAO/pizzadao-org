@@ -43,6 +43,8 @@ export interface LiveRequest {
   startedAt: string
   /** Speech chunk number (idempotency on the app side); absent for chat-only requests. */
   seq?: number
+  /** 'play-out': the app only checks the bursts for the spoken play-out command (play-out.ts). */
+  command?: 'play-out'
   segments?: LiveSegment[]
   chat?: LiveChat[]
 }
@@ -106,6 +108,8 @@ export interface LiveItemsDeps {
   dir: string
   cfg: RemoteConfig['liveItems']
   uploader: Pick<Uploader, 'put'>
+  /** Keys already in R2 (uploaded by the play-out fast path): not uploaded again. */
+  uploaded?: ReadonlySet<string>
   post: (body: LiveRequest) => Promise<string[]>
   send: (text: string) => Promise<boolean>
   nameOf: (userId: string) => string | null
@@ -197,7 +201,7 @@ export class LiveItems {
         if (this.stopped) return
         const key = keys.live(rec.userId, rec.startMs)
         try {
-          await this.d.uploader.put(key, path.join(this.d.dir, rec.file), 'audio/ogg')
+          if (!this.d.uploaded?.has(key)) await this.d.uploader.put(key, path.join(this.d.dir, rec.file), 'audio/ogg')
           segments.push({ discordId: rec.userId, displayName: this.d.nameOf(rec.userId), key, startMs: rec.startMs, endMs: rec.endMs })
         } catch (err) {
           this.d.log(`live items: upload failed (${err instanceof Error ? err.message : String(err)}); skipping one segment`)

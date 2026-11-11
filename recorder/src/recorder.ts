@@ -37,6 +37,7 @@ import { StopTracker, type StopReason } from './stop-conditions.js'
 import { REMOTE_CONFIG_OFF, REMOTE_CONFIG_START_WAIT_MS, type RemoteConfig, type RemoteConfigClient } from './remote-config.js'
 import type { SessionMeta } from './types.js'
 import { LiveItems, postLive, type LiveRequest } from './live-items.js'
+import { PlayOutListener, postPlayOutCheck } from './play-out.js'
 import { LiveStatePusher, postLiveState, type LiveStateBody, type PostResult } from './live-state.js'
 
 const TICK_MS = 10_000
@@ -90,6 +91,8 @@ interface ActiveSession {
   deferTarget: string | null
   /** Live action items (settings snapshot at session start); null: off for this call. */
   live: LiveItems | null
+  /** Spoken play-out command (settings snapshot at session start); null: off. */
+  playOut: PlayOutListener | null
   /** Heartbeat for the app's live call view (settings snapshot at session start); null: off. */
   liveState: LiveStatePusher | null
 }
@@ -128,6 +131,8 @@ export class CallRecorder {
     private readonly livePost: ((body: LiveRequest) => Promise<string[]>) | null = null,
     /** Live-state heartbeat (tests inject it); default POSTs to the app. */
     private readonly liveStatePost: ((body: LiveStateBody) => Promise<PostResult>) | null = null,
+    /** Play-out command check (tests inject it); default POSTs to the app. True = the command was given. */
+    private readonly playOutCheck: ((body: LiveRequest) => Promise<boolean>) | null = null,
   ) {
     this.slots = new SlotMemory(path.join(cfg.dataDir, 'slots.json'), (ch) => ch !== null && this.allowedNow().has(ch), log)
     this.limits = new CallLimits(path.join(cfg.dataDir, 'call-limits.json'), log)
@@ -358,6 +363,7 @@ export class CallRecorder {
 
     let capture: VoiceCapture | null = null
     let live: LiveItems | null = null
+    let playOut: PlayOutListener | null = null
     const names = new Map<string, string>()
     let nickAcquired = false
     let guild: Guild | null = null
@@ -393,7 +399,10 @@ export class CallRecorder {
         },
         log: (m) => this.log(`[${sessionId}] ${m}`),
         onFatal: (reason) => this.serial(() => this.stop(reason as StopReason)),
-        onSegment: (rec) => live?.onSegment(rec),
+        onSegment: (rec) => {
+          live?.onSegment(rec)
+          playOut?.onSegment(rec)
+        },
       })
 
       // 1. join (subscribes to nothing yet)
@@ -443,7 +452,8 @@ export class CallRecorder {
         event.scheduledStartMs === null ? null : event.scheduledStartMs + NO_SHOW_GRACE_MS,
       )
       tracker.observeHumans(await this.humanCount(g, channelId), Date.now())
-      live = this.liveFor(event, rc, { sessionId, dir, startedAtMs, channel, names })
+      playOut = this.playOutFor(rc, endSong, { sessionId, eventId: event.id, eventName: event.name, dir, startedAtMs, channel })
+      live = this.liveFor(event, rc, { sessionId, dir, startedAtMs, channel, names, uploaded: playOut?.uploaded })
       capture.beginCapture()
       live?.start()
 
@@ -466,6 +476,7 @@ export class CallRecorder {
         startPresent: new Set(),
         deferTarget: null,
         live,
+        playOut,
         liveState: this.liveStateFor(rc, { sessionId, eventId: event.id, eventName: event.name, channelId, startedAtMs }),
         tick: setInterval(() => this.serial(() => this.onTick()), TICK_MS),
       }
@@ -476,6 +487,7 @@ export class CallRecorder {
       this.fireStartBand(this.current, event, rc, startedAtMs)
     } catch (err) {
       live?.stop()
+      playOut?.stop()
       await abort(`start failed: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
@@ -494,7 +506,7 @@ export class CallRecorder {
   private liveFor(
     event: EventInfo,
     rc: RemoteConfig,
-    o: { sessionId: string; dir: string; startedAtMs: number; channel: VoiceBasedChannel; names: Map<string, string> },
+    o: { sessionId: string; dir: string; startedAtMs: number; channel: VoiceBasedChannel; names: Map<string, string>; uploaded?: ReadonlySet<string> },
   ): LiveItems | null {
     const l = rc.liveItems
     if (!(l.audio || l.chat) || !l.eventIds.includes(event.id)) return null
@@ -510,6 +522,7 @@ export class CallRecorder {
       dir: o.dir,
       cfg,
       uploader: this.finalizeDeps.uploader,
+      uploaded: o.uploaded,
       post: this.livePost ?? ((body) => postLive(this.cfg.appBaseUrl, this.cfg.recorderApiKey, body, this.log)),
       send: (text) => this.send(o.channel, text),
       nameOf: (id) => o.names.get(id) ?? null,
@@ -549,6 +562,7 @@ export class CallRecorder {
     if (s.bandTimer) clearTimeout(s.bandTimer)
     this.cancelWelcome(s)
     s.live?.stop()
+    s.playOut?.stop()
     void s.liveState?.stop() // the end notice is fire and forget: it never delays the recording's finish
     this.log(`stopping ${s.meta.sessionId}: ${reason}`)
     if (s.endSong && isEndSongStop(reason)) {
@@ -615,12 +629,42 @@ export class CallRecorder {
     return { minHumans: rc.endSong.minHumans, crew: radio, endMs, fired: false }
   }
 
+  /**
+   * Listener for the spoken play-out command, or null (setting off, or no end-of-call song set up for this
+   * call: the command reuses that song path, crew map and radio included). Which members may give the
+   * command is the app's decision (calls.playOutAnyMember).
+   */
+  private playOutFor(
+    rc: RemoteConfig,
+    endSong: EndSongState | null,
+    o: { sessionId: string; eventId: string; eventName: string; dir: string; startedAtMs: number; channel: VoiceBasedChannel },
+  ): PlayOutListener | null {
+    if (!rc.playOut.enabled || !endSong) return null
+    this.log(`play-out command on for "${o.eventName}"`)
+    const listener: PlayOutListener = new PlayOutListener({
+      sessionId: o.sessionId,
+      eventId: o.eventId,
+      eventName: o.eventName,
+      startedAtMs: o.startedAtMs,
+      dir: o.dir,
+      uploader: this.finalizeDeps.uploader,
+      check: (body) => (this.playOutCheck ?? ((b) => postPlayOutCheck(this.cfg.appBaseUrl, this.cfg.recorderApiKey, b, this.log)))(body),
+      onCommand: () => {
+        const s = this.current
+        if (s && s.playOut === listener && !s.stopping) this.fireEndSong(s, 0, 'voice command', true)
+      },
+      log: (m) => this.log(`[${o.sessionId}] ${m}`),
+    })
+    return listener
+  }
+
   /** Ask pizza-radio to play the crew song, at most once per call occurrence. Never throws, never blocks. */
-  private fireEndSong(s: ActiveSession, humans: number, why: string): void {
+  private fireEndSong(s: ActiveSession, humans: number, why: string, spoken = false): void {
     const e = s.endSong
     const radio = this.cfg.pizzaRadio
     if (!e || e.fired || !radio) return
-    if (humans < e.minHumans) {
+    // A member asked for it out loud: someone is clearly there, so the head count does not apply.
+    if (!spoken && humans < e.minHumans) {
       if (isEndSongStop(why)) this.log(`end song skipped (${why}): ${humans} in the channel, needs ${e.minHumans}`)
       return
     }
@@ -631,8 +675,10 @@ export class CallRecorder {
     // not fix (logged once, marked so it does not loop). A network error or 5xx after the retry leaves it unmarked.
     void postPlayCrew(radio.url, radio.apiKey, e.crew, s.channelId, this.log)
       .then((outcome) => {
-        if (outcome === 'failed') this.log('end song: pizza-radio unreachable; not marked as played')
-        else this.endSongMarker.mark(s.key, Date.now())
+        if (outcome === 'failed') {
+          this.log('end song: pizza-radio unreachable; not marked as played')
+          if (spoken) e.fired = false // the call's own end may still try
+        } else this.endSongMarker.mark(s.key, Date.now())
       })
       .catch((err) => this.log(`end song failed: ${err instanceof Error ? err.message : String(err)}`))
   }
@@ -711,6 +757,7 @@ export class CallRecorder {
     if (s.bandTimer) clearTimeout(s.bandTimer)
     this.cancelWelcome(s)
     s.live?.stop()
+    s.playOut?.stop()
     void s.liveState?.stop() // fire and forget: never holds up the shutdown
     try {
       await this.step('stop capture', () => s.capture.stop())
