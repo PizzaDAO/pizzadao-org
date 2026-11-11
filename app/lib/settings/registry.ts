@@ -1705,6 +1705,16 @@ export const SETTINGS = {
     default: 26,
     unit: 'hours',
   }),
+  'profile.collectionStatsFreshHours': intSetting({
+    key: 'profile.collectionStatsFreshHours',
+    area: 'mafia',
+    label: 'Profile collection counts freshness (hours)',
+    help: 'POAP, NFT and ticket counts on profiles come from a nightly precompute. After this long a view still shows them but refreshes them in the background.',
+    min: 1,
+    max: 168,
+    default: 26,
+    unit: 'hours',
+  }),
   'mafia.rankPrecomputeConcurrency': intSetting({
     key: 'mafia.rankPrecomputeConcurrency',
     area: 'mafia',

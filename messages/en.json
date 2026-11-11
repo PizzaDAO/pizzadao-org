@@ -1036,6 +1036,7 @@
       "actionItemsRestricted": "The action items are available to members at level {level} and above.",
       "suggestedBy": "suggested by {name}",
       "suggestedAndOwns": "{name} · suggested & owns it",
+      "actionDone": "Done",
       "chaptersRestricted": "The chapters are available to members at level {level} and above.",
       "chatLine": "Written in the call chat",
       "unknownSpeaker": "Speaker",
@@ -1164,6 +1165,16 @@
     "missions": "Guided tasks that help you get involved in PizzaDAO.",
     "pep": "PEP is PizzaDAO’s community points. Earn them by contributing and explore what you can spend them on.",
     "poaps": "POAPs are digital badges collected at community events."
+  },
+  "crewPage": {
+    "joinDiscord": "Join on Discord",
+    "joinUs": "join us",
+    "goalTasks": "{count, plural, =0 {No tasks} one {# task} other {# tasks}}",
+    "goalDone": "{count, plural, =0 {} other {# done}}",
+    "goalAllDone": "All tasks for this goal are done.",
+    "goalNoTasks": "No tasks are linked to this goal yet.",
+    "lead": "Lead",
+    "due": "Due"
   },
   "crewGettingStarted": {
     "title": "Get involved",
@@ -1390,6 +1401,7 @@
     "redactConfirm": "Hide all of this speaker's lines from the public page and from summaries? Nothing is deleted and you can restore them. A published call goes back to review. The summary is not rewritten.",
     "processingNote": "The summary is being generated. Reload in a minute.",
     "actionItemsHint": "One per line. Optional owner after a vertical bar, then optional \"by: Name\" for who suggested it: Send the deck | Ann | by: Bob",
+    "actionItemDone": "Done",
     "suggestedBy": "suggested by {name}",
     "chaptersHint": "One per line: start time then title, like 12:30 Budget update",
     "restoreLines": "Restore their lines",
@@ -2548,5 +2560,24 @@
     "tooMany": "Too many tries. Wait a moment.",
     "dashLink": "Collect daily PEP",
     "getRoleEvery": "Get the {role} role to earn {amount} PEP every {hours} hours."
+  },
+  "memberCard": {
+    "loading": "Loading…",
+    "unavailable": "Profile unavailable",
+    "level": "Level {level}",
+    "crews": "Crews",
+    "viewProfile": "View profile"
+  },
+  "profileShare": {
+    "share": "Share profile",
+    "copyLink": "Copy link",
+    "copied": "Link copied",
+    "copyFailed": "Couldn't copy the link"
+  },
+  "collectionStats": {
+    "aria": "Collection totals",
+    "poaps": "{count, plural, one {# POAP} other {# POAPs}}",
+    "nfts": "{count, plural, one {# NFT} other {# NFTs}} in {collections, plural, one {# collection} other {# collections}}",
+    "tickets": "{count, plural, one {# ticket} other {# tickets}}"
   }
 }

@@ -18,6 +18,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { AddVouchButton } from "../vouches/AddVouchButton";
 import { SendPepModal } from "../economy/SendPepModal";
 
@@ -39,7 +40,8 @@ export function ProfileActions({
 }: ProfileActionsProps) {
     const [menuOpen, setMenuOpen] = useState(false);
     const [pepOpen, setPepOpen] = useState(false);
-    const [copied, setCopied] = useState(false);
+    const [toast, setToast] = useState<string | null>(null);
+    const t = useTranslations("profileShare");
     const menuRef = useRef<HTMLDivElement | null>(null);
 
     // Close menu on outside click / escape
@@ -64,14 +66,21 @@ export function ProfileActions({
     const profileUrl =
         typeof window !== "undefined" ? `${window.location.origin}/profile/${memberId}` : `/profile/${memberId}`;
 
+    function showToast(message: string) {
+        setToast(message);
+        setTimeout(() => setToast(null), 2200);
+    }
+
+    // Phones: the native share sheet when available. Otherwise (or if it is cancelled / fails) copy the link.
     async function handleShare() {
         setMenuOpen(false);
-        if (typeof navigator !== "undefined" && (navigator as any).share) {
+        const nav = typeof navigator !== "undefined" ? navigator : undefined;
+        if (nav && typeof nav.share === "function") {
             try {
-                await (navigator as any).share({ url: profileUrl });
+                await nav.share({ url: profileUrl });
                 return;
-            } catch {
-                // user cancelled or share unsupported — fall back to copy
+            } catch (e) {
+                if (e instanceof DOMException && e.name === "AbortError") return; // the member closed the sheet
             }
         }
         await handleCopy();
@@ -82,12 +91,13 @@ export function ProfileActions({
         try {
             if (typeof navigator !== "undefined" && navigator.clipboard) {
                 await navigator.clipboard.writeText(profileUrl);
-                setCopied(true);
-                setTimeout(() => setCopied(false), 1800);
+                showToast(t("copied"));
+                return;
             }
         } catch {
-            // ignore — clipboard may be blocked
+            // clipboard blocked: fall through to the message below
         }
+        showToast(t("copyFailed"));
     }
 
     // Primary CTA
@@ -126,6 +136,19 @@ export function ProfileActions({
     return (
         <div className="flex items-center gap-2 shrink-0" ref={menuRef}>
             {primary}
+
+            <button
+                type="button"
+                onClick={handleShare}
+                className="inline-flex h-11 items-center justify-center rounded-full px-4 text-sm font-semibold transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-tomato focus-visible:ring-offset-2 focus-visible:ring-offset-ink"
+                style={{
+                    background: "transparent",
+                    color: "hsl(var(--cream) / 0.9)",
+                    border: "1px solid hsl(var(--cream) / 0.28)",
+                }}
+            >
+                {t("share")}
+            </button>
 
             {/* Kebab — pill-shaped to match the editorial vocabulary */}
             <div className="relative">
@@ -174,18 +197,10 @@ export function ProfileActions({
                         <button
                             type="button"
                             role="menuitem"
-                            onClick={handleShare}
-                            className="block w-full text-left px-3 py-3 min-h-11 text-sm hover:bg-tomato/10 cursor-pointer"
-                        >
-                            Share
-                        </button>
-                        <button
-                            type="button"
-                            role="menuitem"
                             onClick={handleCopy}
                             className="block w-full text-left px-3 py-3 min-h-11 text-sm hover:bg-tomato/10 cursor-pointer"
                         >
-                            {copied ? "Copied!" : "Copy link"}
+                            {t("copyLink")}
                         </button>
                         {!hideSendPep && viewerId && !isSelf && (
                             <button
@@ -213,6 +228,17 @@ export function ProfileActions({
                     </div>
                 )}
             </div>
+
+            {toast && (
+                <div
+                    role="status"
+                    aria-live="polite"
+                    className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-full px-4 py-2 text-sm font-semibold shadow-lg"
+                    style={{ background: "hsl(var(--ink))", color: "hsl(var(--cream))" }}
+                >
+                    {toast}
+                </div>
+            )}
 
             <SendPepModal
                 open={pepOpen}

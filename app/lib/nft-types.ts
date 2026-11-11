@@ -54,5 +54,7 @@ export interface NFTCollectionResponse {
   walletAddress: string | null;
   noWallet?: boolean;
   error?: string;
+  /** A chain/contract lookup failed, so the list may be missing items. Never cached. */
+  incomplete?: boolean;
   groups?: NFTGroupInfo[];
 }
