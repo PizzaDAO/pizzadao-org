@@ -4,7 +4,8 @@
 // varies by mode and viewer state per plan §6.4.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
+import { renderWithIntl as render } from "@/app/lib/i18n/test-utils";
 
 // Mock SendPepModal — its query client + form aren't relevant to hero tests.
 vi.mock("../../economy/SendPepModal", () => ({

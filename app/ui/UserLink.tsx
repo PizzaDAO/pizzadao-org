@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { MemberHoverCard } from "./profile/MemberHoverCard";
 
 type UserLinkProps = {
   discordId: string;
@@ -103,6 +104,7 @@ export function UserLink({ discordId, memberId: providedMemberId, style }: UserL
   }
 
   return (
+    <MemberHoverCard memberId={profileId}>
     <a
       href={`/profile/${profileId}`}
       style={{
@@ -124,5 +126,6 @@ export function UserLink({ discordId, memberId: providedMemberId, style }: UserL
     >
       {displayName}
     </a>
+    </MemberHoverCard>
   );
 }

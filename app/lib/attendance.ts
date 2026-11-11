@@ -52,7 +52,7 @@ export interface AttendanceResult {
     string,
     { crewLabel: string; count: number; lastAttended?: string }
   >;
-  recentCalls: { date: string; crew: string; crewId: string }[];
+  recentCalls: { date: string; crew: string; crewId: string; /** set by the attendance API when a published recording exists */ recordingId?: string }[];
 }
 
 export interface SyncStats {

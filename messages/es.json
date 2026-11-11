@@ -2535,5 +2535,24 @@
     "tooMany": "Demasiados intentos. Espera un momento.",
     "dashLink": "Cobra tu PEP diario",
     "getRoleEvery": "Consigue el rol {role} para ganar {amount} PEP cada {hours} horas."
+  },
+  "memberCard": {
+    "loading": "Cargando…",
+    "unavailable": "Perfil no disponible",
+    "level": "Nivel {level}",
+    "crews": "Crews",
+    "viewProfile": "Ver perfil"
+  },
+  "profileShare": {
+    "share": "Compartir perfil",
+    "copyLink": "Copiar enlace",
+    "copied": "Enlace copiado",
+    "copyFailed": "No se pudo copiar el enlace"
+  },
+  "collectionStats": {
+    "aria": "Totales de la colección",
+    "poaps": "{count, plural, one {# POAP} other {# POAPs}}",
+    "nfts": "{count, plural, one {# NFT} other {# NFTs}} en {collections, plural, one {# colección} other {# colecciones}}",
+    "tickets": "{count, plural, one {# boleto} other {# boletos}}"
   }
 }
