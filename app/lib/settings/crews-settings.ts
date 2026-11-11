@@ -23,7 +23,7 @@ const enabled: SettingDef<boolean> = {
   key: 'crews.rosterAutoAddEnabled',
   area: 'crews',
   label: 'Add regular call attendees to the crew roster',
-  help: "Nightly: a signed-up member who attended enough of a crew's recent calls is added to that crew (their Crews cell, and the crew Discord role). Nobody is ever removed and nothing is announced. Off: the job only counts what it would add. The CREWS_ROSTER_AUTOADD_ENABLED env var set to off always wins; previews never write.",
+  help: "Nightly: a signed-up member who attended enough of a crew's recent calls is added to that crew: their Crews cell, the crew page roster (when it reads from the database) and the crew Discord role. A member already on the crew who misses one of these gets it filled in. Nobody is ever removed and nothing is announced. Off: the job only counts what it would add. The CREWS_ROSTER_AUTOADD_ENABLED env var set to off always wins; previews never write.",
   schema: z.boolean(),
   default: false,
   onReadFailure: { value: false },

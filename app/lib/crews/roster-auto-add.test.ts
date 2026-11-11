@@ -33,8 +33,8 @@ describe('planRosterAdds', () => {
   it('adds a member who attended 2 of the last 4 calls', () => {
     const rows = [row(1, 'ops', 1), row(1, 'ops', 8), row(2, 'ops', 15), row(2, 'ops', 22)]
     expect(plan(rows, [member(1), member(2)])).toEqual([
-      { crewId: 'ops', memberId: 'm1', discordId: id(1) },
-      { crewId: 'ops', memberId: 'm2', discordId: id(2) },
+      { crewId: 'ops', memberId: 'm1', discordId: id(1), cell: true, page: false, role: false },
+      { crewId: 'ops', memberId: 'm2', discordId: id(2), cell: true, page: false, role: false },
     ])
   })
 
@@ -72,6 +72,31 @@ describe('planRosterAdds', () => {
   })
 })
 
+describe('planRosterAdds: crew page and role', () => {
+  const rows = [row(1, 'ops', 1), row(1, 'ops', 8)]
+  it('plans a page row and a role for a member already in the Crews cell (heal, additive)', () => {
+    const p = plan(rows, [member(1, ['ops'])], {
+      pageRosters: new Map([['ops', new Set<string>()]]),
+      roleIds: new Map([['ops', '555']]),
+      heldRoles: new Map([[id(1), new Set<string>()]]),
+    })
+    expect(p).toEqual([{ crewId: 'ops', memberId: 'm1', discordId: id(1), cell: false, page: true, role: true }])
+  })
+  it('plans nothing once cell, page and role are all there', () => {
+    expect(
+      plan(rows, [member(1, ['ops'])], {
+        pageRosters: new Map([['ops', new Set(['m1'])]]),
+        roleIds: new Map([['ops', '555']]),
+        heldRoles: new Map([[id(1), new Set(['555'])]]),
+      }),
+    ).toEqual([])
+  })
+  it('sheet-sourced crews (absent from pageRosters) get no page row; unknown roles plan no role grant', () => {
+    const p = plan(rows, [member(1, ['ops'])], { roleIds: new Map([['ops', '555']]), heldRoles: null })
+    expect(p).toEqual([])
+  })
+})
+
 describe('parseExcludeIds', () => {
   it('reads ids separated by spaces, commas and lines and drops junk', () => {
     expect([...parseExcludeIds(`${id(1)}, ${id(2)}\n${id(3)} nope 123`)]).toEqual([id(1), id(2), id(3)])
@@ -81,23 +106,35 @@ describe('parseExcludeIds', () => {
 
 function makeDeps(over: Partial<RosterAutoAddDeps> = {}) {
   const cells = new Map<string, string[]>([['m1', []], ['m2', ['ops']]])
+  const page = new Set<string>(['m2'])
+  const roles = new Map<string, Set<string>>([[id(1), new Set()], [id(2), new Set(['555'])]])
   const deps: RosterAutoAddDeps = {
     loadRows: async () => [row(1, 'ops', 1), row(1, 'ops', 8), row(2, 'ops', 1), row(2, 'ops', 8)],
     loadMembers: async () => [member(1, cells.get('m1')), member(2, cells.get('m2'))],
     loadCrews: async () => [{ id: 'ops', role: '<@&555>' }],
     botIds: async () => new Set(),
+    loadPageRosters: async () => ({ rosters: new Map([['ops', new Set(page)]]), sheetSourced: [] }),
+    addToCrewPage: vi.fn(async ({ memberId }) => {
+      if (page.has(memberId)) return 'exists' as const
+      page.add(memberId)
+      return 'created' as const
+    }),
+    loadHeldRoles: async () => new Map([...roles].map(([k, v]) => [k, new Set(v)])),
     updateCrews: vi.fn(async (i) => {
       const cur = cells.get(i.memberId)!
       const has = cur.includes(i.crewId)
       if (i.mode === 'apply' && !has) cur.push(i.crewId)
       return { mode: i.mode ?? 'dry-run', applied: i.mode === 'apply' && !has, changed: !has, range: '', before: cur.join(','), after: '', crews: cur }
     }),
-    writeRole: vi.fn(async () => ({ status: 204, remaining: 5, resetAfterMs: 100, retryAfterMs: null, blocked: false })),
+    writeRole: vi.fn(async (op) => {
+      roles.get((op as { userId: string }).userId)?.add((op as { roleId: string }).roleId)
+      return { status: 204, remaining: 5, resetAfterMs: 100, retryAfterMs: null, blocked: false }
+    }),
     sleep: async () => {},
     now: () => new Date('2026-10-30T00:00:00Z'),
     ...over,
   }
-  return { deps, cells }
+  return { deps, cells, page }
 }
 
 beforeEach(() => {
@@ -114,30 +151,50 @@ describe('runRosterAutoAdd', () => {
     toggle.mockResolvedValue(false)
     const { deps } = makeDeps()
     const r = await runRosterAutoAdd({}, deps)
-    expect(r).toMatchObject({ dryRun: true, switchOff: true, planned: 1, perCrew: { ops: 1 } })
+    expect(r).toMatchObject({ dryRun: true, switchOff: true, planned: 1, perCrew: { crewsCell: { ops: 1 }, crewPage: { ops: 1 }, role: { ops: 1 } } })
     expect(r.adds).toBeUndefined()
     expect(deps.updateCrews).not.toHaveBeenCalled()
+    expect(deps.addToCrewPage).not.toHaveBeenCalled()
     expect(deps.writeRole).not.toHaveBeenCalled()
   })
 
-  it('dryRun with the switch on returns ids per crew and writes nothing', async () => {
+  it('dryRun with the switch on returns ids and per-piece counts per crew and writes nothing', async () => {
     const { deps } = makeDeps()
     const r = await runRosterAutoAdd({ dryRun: true }, deps)
-    expect(r.adds).toEqual([{ crewId: 'ops', memberId: 'm1' }])
-    expect(r.perCrew).toEqual({ ops: 1 })
+    expect(r.adds).toEqual([{ crewId: 'ops', memberId: 'm1', crewsCell: true, crewPage: true, role: true }])
+    expect(r.perCrew).toEqual({ crewsCell: { ops: 1 }, crewPage: { ops: 1 }, role: { ops: 1 } })
     expect(deps.updateCrews).not.toHaveBeenCalled()
+    expect(deps.addToCrewPage).not.toHaveBeenCalled()
     expect(deps.writeRole).not.toHaveBeenCalled()
   })
 
-  it('on: adds to the roster and grants the crew role; a rerun does nothing (idempotent)', async () => {
-    const { deps, cells } = makeDeps()
+  it('reports sheet-sourced crews and writes no page row for them', async () => {
+    const { deps } = makeDeps({ loadPageRosters: async () => ({ rosters: new Map(), sheetSourced: ['ops'] }) })
+    const r = await runRosterAutoAdd({}, deps)
+    expect(r).toMatchObject({ pageSkippedSheetCrews: 1, added: 1, pageAdded: 0 })
+    expect(deps.addToCrewPage).not.toHaveBeenCalled()
+  })
+
+  it('on: cell, page row and role, with a distinct actor; a rerun does nothing (idempotent)', async () => {
+    const { deps, cells, page } = makeDeps()
     const first = await runRosterAutoAdd({}, deps)
-    expect(first).toMatchObject({ dryRun: false, added: 1, roleGranted: 1, planned: 1 })
+    expect(first).toMatchObject({ dryRun: false, added: 1, pageAdded: 1, roleGranted: 1, planned: 1 })
     expect(cells.get('m1')).toEqual(['ops'])
+    expect(page.has('m1')).toBe(true)
     expect(deps.writeRole).toHaveBeenCalledWith({ kind: 'addRole', userId: id(1), roleId: '555' }, expect.any(String))
+    for (const [input] of (deps.updateCrews as ReturnType<typeof vi.fn>).mock.calls) expect(input.actor).toBe('roster-auto-add')
     const second = await runRosterAutoAdd({}, deps)
-    expect(second).toMatchObject({ planned: 0, added: 0, roleGranted: 0 })
+    expect(second).toMatchObject({ planned: 0, added: 0, pageAdded: 0, roleGranted: 0 })
     expect(deps.writeRole).toHaveBeenCalledTimes(1)
+    expect(deps.addToCrewPage).toHaveBeenCalledTimes(1)
+  })
+
+  it('heals a missing page row and role for a member already in the Crews cell, without a cell write', async () => {
+    const { deps, cells } = makeDeps()
+    cells.set('m1', ['ops'])
+    const r = await runRosterAutoAdd({}, deps)
+    expect(r).toMatchObject({ added: 0, pageAdded: 1, roleGranted: 1 })
+    expect(deps.updateCrews).not.toHaveBeenCalled()
   })
 
   it('never removes: no remove action is ever sent', async () => {
@@ -157,16 +214,18 @@ describe('runRosterAutoAdd', () => {
     const { deps } = makeDeps({
       loadRows: async () => [1, 3].flatMap((n) => [row(n, 'ops', 1), row(n, 'ops', 8)]),
       loadMembers: async () => [member(1), member(3)],
+      loadHeldRoles: async () => new Map(),
     })
     expect(await runRosterAutoAdd({}, deps)).toMatchObject({ planned: 2, added: 1, deferred: 1 })
   })
 
-  it('stops granting roles when Discord rate limits, but the roster change stands', async () => {
-    const { deps, cells } = makeDeps({
-      writeRole: vi.fn(async () => ({ status: 429, remaining: 0, resetAfterMs: null, retryAfterMs: 60_000, blocked: false })),
-    })
+  it('a rate-limited role grant stops further grants but the roster changes stand; the role is retried next night', async () => {
+    const limited = vi.fn(async () => ({ status: 429, remaining: 0, resetAfterMs: null, retryAfterMs: 60_000, blocked: false }))
+    const { deps, cells } = makeDeps({ writeRole: limited })
     const r = await runRosterAutoAdd({}, deps)
-    expect(r).toMatchObject({ added: 1, roleFailed: 1, stoppedReason: 'discord rate limited' })
+    expect(r).toMatchObject({ added: 1, pageAdded: 1, roleFailed: 1, stoppedReason: 'discord rate limited' })
     expect(cells.get('m1')).toEqual(['ops'])
+    // Tomorrow: cell and page are there, only the role is still planned.
+    expect(await runRosterAutoAdd({ dryRun: true }, deps)).toMatchObject({ perCrew: { crewsCell: {}, crewPage: {}, role: { ops: 1 } } })
   })
 })

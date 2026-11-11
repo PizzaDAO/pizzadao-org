@@ -43,6 +43,8 @@ export interface UpdateMemberCrewsInput {
   mode?: WritebackMode;
   /** Required for mode "apply": the `before` value returned by the dry run. */
   expectedBefore?: string;
+  /** Who is writing, recorded as `updatedBy` on the Member row (DB path). Default "roster-writeback". */
+  actor?: string;
 }
 
 export interface UpdateMemberCrewsResult {
@@ -331,7 +333,7 @@ export async function updateMemberCrewsInDb(
     }
     while (cells.length <= crewsCol) cells.push(null);
     cells[crewsCol] = { v: plan.after };
-    await tx.member.update({ where: { id: memberId }, data: { cells: cells as never, updatedBy: "roster-writeback" } });
+    await tx.member.update({ where: { id: memberId }, data: { cells: cells as never, updatedBy: input.actor?.slice(0, 60) || "roster-writeback" } });
     return { ...out, applied: true };
   });
   if (result.applied) {
