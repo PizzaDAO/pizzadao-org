@@ -28,11 +28,16 @@ export const MAX_REQUESTS_PER_CALL = 150
 export const PLAY_OUT_REQUEST_TIMEOUT_MS = 25_000
 /** How long an "allowed / not allowed" answer for a speaker is kept. */
 export const SPEAKER_CACHE_MS = 2 * 60_000
+/** After a failed lookup POST the next lookup waits this long, doubling per failure up to the max. */
+export const LOOKUP_BACKOFF_MS = 5_000
+export const LOOKUP_BACKOFF_MAX_MS = 5 * 60_000
 
 export interface PlayOutAnswer {
   playOut?: boolean
   allowed?: string[]
   denied?: string[]
+  /** Set when the app's gate refused (switch off, crew unknown or excluded): the listener turns itself off. */
+  reason?: string
 }
 
 /** POST to the app; null on any failure. Never throws. */
@@ -56,7 +61,7 @@ export async function postPlayOut(
     }
     const j = (await res.json()) as Record<string, unknown>
     const ids = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : undefined)
-    return { playOut: j.playOut === true, allowed: ids(j.allowed), denied: ids(j.denied) }
+    return { playOut: j.playOut === true, allowed: ids(j.allowed), denied: ids(j.denied), reason: typeof j.reason === 'string' ? j.reason : undefined }
   } catch (err) {
     log(`play-out: request failed (${err instanceof Error ? err.message : String(err)})`)
     return null
@@ -83,6 +88,8 @@ export class PlayOutListener {
   private stopped = false
   private fired = false
   private requests = 0
+  private lookupFailures = 0
+  private lookupRetryAt = 0
   private speakers = new Map<string, { ok: boolean; at: number }>()
 
   constructor(private readonly d: PlayOutListenerDeps) {}
@@ -114,10 +121,24 @@ export class PlayOutListener {
       return !k || this.now() - k.at >= SPEAKER_CACHE_MS
     })
     if (unknown.length === 0) return
+    if (this.now() < this.lookupRetryAt) return // backing off after a failed lookup: the burst is dropped
+    this.requests++ // lookups count toward the per-call cap
     const a = await this.d.post({ ...this.base(), command: 'play-out-allowed', speakers: unknown.slice(0, 10) })
+    if (!a) {
+      this.lookupFailures++
+      this.lookupRetryAt = this.now() + Math.min(LOOKUP_BACKOFF_MAX_MS, LOOKUP_BACKOFF_MS * 2 ** (this.lookupFailures - 1))
+      return
+    }
+    this.lookupFailures = 0
+    if (a.reason) {
+      // The app's gate refused (switch off, crew unknown or excluded): off for this call.
+      this.d.log(`play-out: the app refused (${a.reason}); off for this call`)
+      this.stop()
+      return
+    }
     const at = this.now()
-    for (const id of a?.allowed ?? []) this.speakers.set(id, { ok: true, at })
-    for (const id of a?.denied ?? []) this.speakers.set(id, { ok: false, at })
+    for (const id of a.allowed ?? []) this.speakers.set(id, { ok: true, at })
+    for (const id of a.denied ?? []) this.speakers.set(id, { ok: false, at })
   }
 
   private async drain(): Promise<void> {

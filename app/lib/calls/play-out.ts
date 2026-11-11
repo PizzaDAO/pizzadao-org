@@ -25,6 +25,8 @@ const HEDGES = new Set([
 const TALK_BEFORE = new Set([
   'is', 'are', 'was', 'were', 'be', 'going', 'gonna', 'would', 'will', 'did', 'does', 'do', 'why', 'say', 'says', 'said', 'saying', 'just', 'can', 'could', 'when', 'if', 'how', 'what', 'whether', 'let', 'lets',
 ])
+/** Words that introduce the command as an example or quotation; they count across clause breaks. */
+const QUOTING = new Set(['say', 'says', 'said', 'saying', 'example', 'command', 'like', 'type', 'tell'])
 const OBJECTS = new Set(['song', 'songs', 'music', 'tune', 'outro', 'theme', 'jingle', 'track', 'anthem'])
 /** How many words before the command are looked at for talk-about words. */
 const LOOKBEHIND = 3
@@ -105,9 +107,12 @@ export function isPlayOutCommand(text: string): boolean {
   const { words, clause } = clauses(text)
   if (words.length < 3 || words.length > MAX_COMMAND_WORDS) return false
   if (words.some((w) => HEDGES.has(w))) return false
-  // Words of the same clause just before `i` that show the speaker is talking about the command.
+  // Words just before `i` that show the speaker is talking about the command.
   const talksBefore = (i: number) => {
-    for (let k = Math.max(0, i - LOOKBEHIND); k < i; k++) if (clause[k] === clause[i] && TALK_BEFORE.has(words[k])) return true
+    for (let k = Math.max(0, i - LOOKBEHIND); k < i; k++) {
+      if (QUOTING.has(words[k])) return true // quoting the command, even across a comma ("you say, Metalhead, play ...")
+      if (clause[k] === clause[i] && TALK_BEFORE.has(words[k])) return true
+    }
     return false
   }
   for (const n of nameAt(words)) {

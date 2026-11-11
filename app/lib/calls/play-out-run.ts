@@ -118,7 +118,7 @@ async function gate(req: LiveRequest, deps: PlayOutDeps): Promise<Gate> {
 /** Which of these speakers may give the command. Ids it could not check are in neither list. */
 export async function handlePlayOutAllowed(req: LiveRequest, deps: PlayOutDeps = {}): Promise<{ allowed: string[]; denied: string[]; reason?: string }> {
   const g = await gate(req, deps)
-  if (!g.ok) return { allowed: [], denied: [], reason: g.reason }
+  if (!g.ok) return { allowed: [], denied: [...new Set(req.speakers ?? [])].slice(0, 10), reason: g.reason }
   const now = deps.now ?? Date.now
   const check = deps.allowed ?? ((id: string, c: string, s: Settings) => mayPlayOut(id, c, s, now(), g.env))
   const allowed: string[] = []

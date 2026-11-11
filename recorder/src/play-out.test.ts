@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { MAX_REQUESTS_PER_CALL, PlayOutListener, postPlayOut, SPEAKER_CACHE_MS, type PlayOutAnswer } from './play-out.js'
+import { LOOKUP_BACKOFF_MS, MAX_REQUESTS_PER_CALL, PlayOutListener, postPlayOut, SPEAKER_CACHE_MS, type PlayOutAnswer } from './play-out.js'
 import { parseRemoteConfig, REMOTE_CONFIG_OFF } from './remote-config.js'
 import type { SegmentRecord } from './types.js'
 
@@ -61,10 +61,51 @@ describe('PlayOutListener', () => {
     b.post.mockImplementation(async () => null)
     b.l.onSegment(seg(1000, 3000, '333'))
     await settle()
+    b.advance(LOOKUP_BACKOFF_MS + 1) // past the back-off
     b.l.onSegment(seg(9000, 3000, '333'))
     await settle()
     expect(b.put).not.toHaveBeenCalled()
     expect(b.post).toHaveBeenCalledTimes(2) // asked again: the failure was not remembered
+  })
+  it('turns itself off for the call when the app refuses at the gate', async () => {
+    const { l, post, put } = make(() => true)
+    post.mockImplementation(async () => ({ allowed: [], denied: ['111'], reason: 'off' }))
+    l.onSegment(seg(1000))
+    await settle()
+    l.onSegment(seg(9000))
+    l.onSegment(seg(20000))
+    await settle()
+    expect(post).toHaveBeenCalledTimes(1)
+    expect(put).not.toHaveBeenCalled()
+  })
+  it('backs off exponentially after failed lookups', async () => {
+    const { l, post, advance } = make(() => true)
+    post.mockImplementation(async () => null)
+    const tryOnce = async (id: number) => {
+      l.onSegment(seg(id * 10_000))
+      await settle()
+    }
+    await tryOnce(1) // fails: next try after 5 s
+    await tryOnce(2) // inside the back-off: no request
+    expect(post).toHaveBeenCalledTimes(1)
+    advance(LOOKUP_BACKOFF_MS + 1)
+    await tryOnce(3) // fails again: next try after 10 s
+    expect(post).toHaveBeenCalledTimes(2)
+    advance(LOOKUP_BACKOFF_MS + 1)
+    await tryOnce(4)
+    expect(post).toHaveBeenCalledTimes(2) // 5 s is no longer enough
+    advance(LOOKUP_BACKOFF_MS + 1)
+    await tryOnce(5)
+    expect(post).toHaveBeenCalledTimes(3)
+  })
+  it('counts lookups toward the per-call cap', async () => {
+    const { l, post, advance } = make(() => false)
+    for (let i = 0; i < MAX_REQUESTS_PER_CALL + 20; i++) {
+      advance(SPEAKER_CACHE_MS + 1) // every burst needs a fresh lookup
+      l.onSegment(seg(i * 10_000))
+      await settle()
+    }
+    expect(post.mock.calls.length).toBeLessThanOrEqual(MAX_REQUESTS_PER_CALL)
   })
   it('keeps listening after a no', async () => {
     const { l, onCommand, post } = make((n) => n === 2)
@@ -90,7 +131,7 @@ describe('PlayOutListener', () => {
       l.onSegment(seg(i * 10_000))
       await settle()
     }
-    expect(checks(post)).toBe(MAX_REQUESTS_PER_CALL)
+    expect(post.mock.calls.length).toBe(MAX_REQUESTS_PER_CALL) // the first lookup and the checks together
   })
 })
 

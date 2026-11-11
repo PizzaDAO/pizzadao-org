@@ -32,7 +32,7 @@ export const POST = withErrorHandling(async (request: Request) => {
   if (!parsed.success) throw new ValidationError('Invalid live chunk')
   if (parsed.data.command === 'play-out-allowed') {
     const r = await handlePlayOutAllowed(parsed.data)
-    return NextResponse.json({ messages: [], allowed: r.allowed, denied: r.denied }, { headers: { 'Cache-Control': 'no-store' } })
+    return NextResponse.json({ messages: [], allowed: r.allowed, denied: r.denied, reason: r.reason }, { headers: { 'Cache-Control': 'no-store' } })
   }
   if (parsed.data.command === 'play-out') {
     const r = await handlePlayOutRequest(parsed.data)

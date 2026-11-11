@@ -54,6 +54,11 @@ describe('isPlayOutCommand', () => {
     'did Metalhead play the song',
     'why did metalhead play the song',
     'Metalhead would play the song',
+    'So you just say, Metalhead, play the song.',
+    'To end the call you say, Metalhead, play us out.',
+    'The command is: Metalhead, play the song.',
+    'For example, Metalhead, play the song.',
+    'You say, "Metalhead, play the song", and it plays.',
     'Metalhead is gonna play us out',
     'when Metalhead plays the song it is loud',
     'how does Metalhead play the song',
@@ -169,8 +174,8 @@ describe('handlePlayOutAllowed', () => {
     const d = deps('', { allowed: async (id: string) => (id === '1' ? true : id === '2' ? false : null) })
     expect(await ask(['1', '2', '3'], d)).toEqual({ allowed: ['1'], denied: ['2'] })
   })
-  it('answers nothing when the switch is off', async () => {
-    expect(await ask(['1'], deps('', { settings: settings() }))).toMatchObject({ allowed: [], denied: [] })
+  it('refuses everyone, with the reason, when the switch is off', async () => {
+    expect(await ask(['1'], deps('', { settings: settings() }))).toEqual({ allowed: [], denied: ['1'], reason: 'off' })
   })
 })
 
