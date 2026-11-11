@@ -17,6 +17,12 @@ describe('review form text formats', () => {
     expect(parseActionItems(formatActionItems(items))).toEqual(items)
   })
 
+  it('round-trips the done marker', () => {
+    const items = [{ text: 'A', owner: 'Ann', suggestedBy: 'Bob', done: true }, { text: 'B' }, { text: 'C', done: true }]
+    expect(formatActionItems(items)).toBe('[x] A | Ann | by: Bob\nB\n[x] C')
+    expect(parseActionItems(formatActionItems(items))).toEqual(items)
+  })
+
   it('keeps a "| by:" inside the text when more segments follow it', () => {
     const items = [{ text: 'Vote | by: Friday', owner: 'Ann' }, { text: 'Vote | by: Friday', owner: 'Ann', suggestedBy: 'Bob' }]
     expect(parseActionItems(formatActionItems(items))).toEqual(items)

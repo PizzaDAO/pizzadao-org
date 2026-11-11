@@ -17,6 +17,7 @@ export interface ReviewLabels {
     summary: string;
     actionItems: string;
     actionItemsHint: string;
+    actionItemDone: string;
     chapters: string;
     chaptersHint: string;
     tooManyItems: string;
@@ -42,6 +43,7 @@ export interface ActionItem {
     text: string;
     owner?: string;
     suggestedBy?: string;
+    done?: boolean;
 }
 export interface Chapter {
     startMs: number;
@@ -60,10 +62,12 @@ function clock(ms: number): string {
 export const MAX_LIST = 30;
 
 const BY = "by: ";
+/** A done item's line starts with this marker in the editor; the checkbox under the box toggles it. */
+export const DONE = "[x] ";
 /** "text | owner | by: suggester" per line; owner and suggester are optional. A final " | by: NAME" is the suggester, then whatever follows the last " | " is the owner. */
 export function formatActionItems(items: ActionItem[]): string {
     return items
-        .map((i) => [i.text, i.owner, i.suggestedBy ? `${BY}${i.suggestedBy}` : ""].filter(Boolean).join(" | "))
+        .map((i) => (i.done ? DONE : "") + [i.text, i.owner, i.suggestedBy ? `${BY}${i.suggestedBy}` : ""].filter(Boolean).join(" | "))
         .join("\n");
 }
 export function parseActionItems(raw: string): ActionItem[] {
@@ -73,6 +77,8 @@ export function parseActionItems(raw: string): ActionItem[] {
         .filter(Boolean)
         .map((l) => {
             let rest = l;
+            const done = /^\[x\]\s/i.test(rest);
+            if (done) rest = rest.slice(DONE.length).trim();
             let suggestedBy = "";
             const byAt = rest.lastIndexOf(` | ${BY}`);
             // Only the FINAL segment counts as the suggester; a " | by: " followed by more segments is part of the text.
@@ -83,7 +89,7 @@ export function parseActionItems(raw: string): ActionItem[] {
             const at = rest.lastIndexOf(" | ");
             const owner = at === -1 ? "" : rest.slice(at + 3).trim();
             const text = (at === -1 ? rest : rest.slice(0, at)).trim();
-            return { text, ...(owner ? { owner } : {}), ...(suggestedBy ? { suggestedBy } : {}) };
+            return { text, ...(owner ? { owner } : {}), ...(suggestedBy ? { suggestedBy } : {}), ...(done ? { done: true } : {}) };
         })
         .filter((i) => i.text);
 }
@@ -149,6 +155,14 @@ export function ReviewActions({
         setReviewDirty(dirty);
         return () => setReviewDirty(false);
     }, [dirty]);
+
+    /** Flip the done marker on line i of the action-items box (the checkboxes under it). */
+    function toggleDone(i: number) {
+        const lines = actionItems.split("\n").filter((l) => l.trim());
+        const l = lines[i].trim();
+        lines[i] = /^\[x\]\s/i.test(l) ? l.slice(DONE.length).trim() : DONE + l;
+        setActionItems(lines.join("\n"));
+    }
 
     /** A clear message for input we can see is invalid, instead of a generic failure. */
     function validate(): string | null {
@@ -216,6 +230,16 @@ export function ReviewActions({
                 <span className="text-sm font-semibold">{labels.actionItems}</span>
                 <span className="text-xs text-foreground/60">{labels.actionItemsHint}</span>
                 <textarea value={actionItems} onChange={(e) => setActionItems(e.target.value)} rows={5} className={field} style={fieldStyle} />
+                {parseActionItems(actionItems).length > 0 && (
+                    <span className="grid gap-1 mt-1">
+                        {parseActionItems(actionItems).map((it, i) => (
+                            <span key={i} className="flex items-center gap-2 text-sm">
+                                <input type="checkbox" checked={!!it.done} onChange={() => toggleDone(i)} aria-label={`${labels.actionItemDone}: ${it.text}`} />
+                                <span className={it.done ? "text-foreground/60" : undefined}>{it.text}</span>
+                            </span>
+                        ))}
+                    </span>
+                )}
             </label>
             <label className="grid gap-1">
                 <span className="text-sm font-semibold">{labels.chapters}</span>

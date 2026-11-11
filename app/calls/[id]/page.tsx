@@ -56,7 +56,7 @@ export default async function PublishedCallPage({ params }: Params) {
     const names = new Map(rec.speakers.map((s) => [s.discordId, displaySpeakerName(s.discordId, s.displayName, speakerText)]));
     const attendees = await loadCallAttendees(rec, speakerText);
     const segments = showTranscript ? asSegments(rec.transcript) : [];
-    const actionItems = (!showActionItems ? [] : Array.isArray(rec.actionItems) ? rec.actionItems : []) as Array<{ text?: string; owner?: string; suggestedBy?: string }>;
+    const actionItems = (!showActionItems ? [] : Array.isArray(rec.actionItems) ? rec.actionItems : []) as Array<{ text?: string; owner?: string; suggestedBy?: string; done?: boolean }>;
     // Live Q&A and poll results of the call: gated like the action items (anonymous askers are never named).
     const qa = showActionItems ? await publishedQaForRecording(id) : null;
     const chapters = (!showChapters ? [] : Array.isArray(rec.chapters) ? rec.chapters : []) as Array<{ startMs?: number; title?: string }>;
@@ -99,9 +99,10 @@ export default async function PublishedCallPage({ params }: Params) {
                 {actionItems.length > 0 && (
                     <section className="grid gap-2">
                         <h2 className="font-display text-xl font-black m-0">{t("actionItems")}</h2>
-                        <ul className="m-0 pl-5 grid gap-1">
+                        <ul className={`m-0 grid gap-1 ${actionItems.some((a) => a.done) ? "list-none pl-0" : "pl-5"}`}>
                             {actionItems.map((item, i) => (
-                                <li key={i}>
+                                <li key={i} className={actionItems.some((a) => a.done) && !item.done ? "pl-5" : undefined}>
+                                    {item.done ? <span aria-label={t("actionDone")}>{"\u2705"} </span> : null}
                                     {item.text}
                                     {item.owner && item.suggestedBy && sameActionPerson(item.owner, item.suggestedBy) ? (
                                         <span className="text-foreground/60"> {"\u2014"} {t("suggestedAndOwns", { name: item.owner })}</span>

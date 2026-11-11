@@ -25,7 +25,7 @@ import { parseIngestPayload } from './ingest-schema'
 import { buildSpeakerNames, buildTranscriptText, DEFAULT_SUMMARY_FALLBACK_MODEL, DEFAULT_SUMMARY_MODEL, summaryFallbackModel, generateCallSummary, isFallbackWorthy, summaryModel, SUMMARY_SYSTEM_PROMPT, spellingsHint } from './summarize'
 import { normalizeKeyterms } from './keyterms'
 import { TRANSCRIPTION_KEYTERMS_DEFAULT } from '@/app/lib/settings/registry'
-import { sanitizeSummaryError, generateAndStoreSummary, generateAndStoreSummaryResult, getPublishedRecording, listPublishedRecordings, publishRecording, setSpeakerRedacted, unpublishRecording, updateRecordingText } from './recordings'
+import { carryDone, sanitizeSummaryError, generateAndStoreSummary, generateAndStoreSummaryResult, getPublishedRecording, listPublishedRecordings, publishRecording, setSpeakerRedacted, unpublishRecording, updateRecordingText } from './recordings'
 import { POST as ingestPOST } from '@/app/api/calls/recorder/ingest/route'
 import { POST as publishPOST } from '@/app/api/admin/calls/[id]/publish/route'
 import { PATCH as summaryPATCH } from '@/app/api/admin/calls/[id]/summary/route'
@@ -591,6 +591,13 @@ describe('reviewer edits', () => {
     expect((await patch({ actionItems: [{ text: 'A', suggestedBy: 5 }] })).status).toBe(400)
   })
 
+  it('keeps done on action items (only a real true) and round-trips into the stored value', async () => {
+    asReviewer()
+    db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'IN_REVIEW' })
+    expect((await patch({ actionItems: [{ text: 'A', done: true }, { text: 'B', done: false }, { text: 'C', owner: 'Ann', done: 'yes' }, { text: 'D' }] })).status).toBe(200)
+    expect(db.callRecording.update.mock.calls[0][0].data.actionItems).toEqual([{ text: 'A', done: true }, { text: 'B' }, { text: 'C', owner: 'Ann' }, { text: 'D' }])
+  })
+
   it('accepts action items and chapters, dropping blank entries', async () => {
     asReviewer()
     db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'IN_REVIEW' })
@@ -728,5 +735,14 @@ describe('redact a speaker (non-destructive)', () => {
   it('cannot publish when only redacted speakers have lines', async () => {
     db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'IN_REVIEW', summary: 'S', transcript: [seg(BOB, 'b')], redactedSpeakerIds: [BOB] })
     expect(await publishRecording('rec1', '9')).toBe('incomplete')
+  })
+})
+
+describe('carryDone', () => {
+  it('keeps done only for items whose text is unchanged', () => {
+    const prev = [{ text: 'Send the deck', done: true }, { text: 'Old', done: true }, { text: 'Open' }]
+    const next = [{ text: ' send  the DECK ', owner: null }, { text: 'Open', owner: null }, { text: 'New', owner: null }]
+    expect(carryDone(prev, next)).toEqual([{ text: ' send  the DECK ', owner: null, done: true }, { text: 'Open', owner: null }, { text: 'New', owner: null }])
+    expect(carryDone(null, next)).toEqual(next)
   })
 })

@@ -71,7 +71,7 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
     const labelsNewerThanSummary =
         imported && !!rec.speakerLabelsUpdatedAt && !!rec.summary && rec.speakerLabelsUpdatedAt.getTime() > Math.max(rec.summaryGeneratedAt?.getTime() ?? 0, rec.summaryEditedAt?.getTime() ?? 0);
     const canLabel = imported && rec.status !== "REJECTED" && rec.status !== "PROCESSING";
-    const actionItems = (Array.isArray(rec.actionItems) ? rec.actionItems : []) as Array<{ text?: string; owner?: string; suggestedBy?: string }>;
+    const actionItems = (Array.isArray(rec.actionItems) ? rec.actionItems : []) as Array<{ text?: string; owner?: string; suggestedBy?: string; done?: boolean }>;
     const chapters = (Array.isArray(rec.chapters) ? rec.chapters : []) as Array<{ startMs?: number; title?: string }>;
     // Preview of the Discord recap that publishing triggers (text from the saved title/summary/action items).
     const postFilter = await loadPostFilter().catch(() => null);
@@ -280,12 +280,13 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                                 status={rec.status}
                                 initialTitle={rec.title ?? ""}
                                 initialSummary={rec.summary ?? ""}
-                                initialActionItems={actionItems.filter((i): i is { text: string; owner?: string; suggestedBy?: string } => !!i.text)}
+                                initialActionItems={actionItems.filter((i): i is { text: string; owner?: string; suggestedBy?: string; done?: boolean } => !!i.text)}
                                 initialChapters={chapters.filter((c): c is { startMs: number; title: string } => !!c.title && typeof c.startMs === "number")}
                                 labels={{
                                     title: t("fieldTitle"),
                                     actionItems: t("actionItemsHeading"),
                                     actionItemsHint: t("actionItemsHint"),
+                                    actionItemDone: t("actionItemDone"),
                                     tooManyItems: t("tooManyItems"),
                                     tooManyChapters: t("tooManyChapters"),
                                     badChapter: t("badChapter"),
@@ -350,6 +351,7 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                         <ul className="m-0 pl-5 grid gap-1">
                             {actionItems.map((item, i) => (
                                 <li key={i}>
+                                    {item.done ? <span>{"\u2705"} </span> : null}
                                     {item.text}
                                     {item.owner ? <span className="text-foreground/60"> ({item.owner})</span> : null}
                                     {item.suggestedBy ? <span className="text-foreground/60"> {"\u2014"} {t("suggestedBy", { name: item.suggestedBy })}</span> : null}
