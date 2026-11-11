@@ -15,7 +15,7 @@ import type { PollView, QuestionView } from "@/app/lib/calls/live-qa";
 const MAX_QUESTION = 280;
 
 type PublicResponse = { calls: PublicLive[]; pollSeconds: number };
-type CallState = PublicLive & Partial<Pick<MemberCall, "present" | "itemsLocked" | "questions" | "polls">>;
+type CallState = PublicLive & Partial<Pick<MemberCall, "present" | "itemsLocked" | "questions" | "polls" | "crew">>;
 
 interface State {
     signedIn: boolean;
@@ -173,6 +173,11 @@ function LiveCall({ live, state, items, onChanged, locale }: { live: CallState; 
                         {t("watchStream")}
                     </a>
                 )}
+                {live.crewId && (
+                    <Link href={`/crew/${encodeURIComponent(live.crewId)}`} className={`${pillOutline} mt-4 ml-0 block w-fit max-w-full`}>
+                        {t("crewPage", { crew: live.crewLabel ?? live.crewId })}
+                    </Link>
+                )}
                 {state.isHost && <StreamLinkEditor sessionId={live.sessionId} current={live.streamLink} onChanged={onChanged} />}
             </section>
 
@@ -183,13 +188,116 @@ function LiveCall({ live, state, items, onChanged, locale }: { live: CallState; 
                 </section>
             ) : (
                 <>
+                    {live.crew && <CrewSection crew={live.crew} />}
                     <PresentSection present={live.present ?? []} />
                     <ItemsSection items={items} locked={live.itemsLocked ?? null} />
                     <PollsSection sessionId={live.sessionId} polls={live.polls ?? []} isHost={state.isHost} onChanged={onChanged} />
                     <QaSection sessionId={live.sessionId} questions={live.questions ?? []} isHost={state.isHost} onChanged={onChanged} />
                 </>
             )}
+            <InviteSection />
+            <HowItWorks />
         </div>
+    );
+}
+
+function InviteSection() {
+    const t = useTranslations("callsPage.live");
+    const [copied, setCopied] = useState(false);
+    const url = () => `${window.location.origin}/calls/live`;
+    return (
+        <Section title={t("inviteTitle")}>
+            <p className="m-0 text-foreground/80">{t("inviteBody")}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                    type="button"
+                    className={pillInk}
+                    onClick={async () => {
+                        try {
+                            await navigator.clipboard.writeText(url());
+                            setCopied(true);
+                            setTimeout(() => setCopied(false), 2500);
+                        } catch {
+                            // clipboard blocked: nothing to do
+                        }
+                    }}
+                >
+                    {copied ? t("inviteCopied") : t("inviteCopy")}
+                </button>
+                {typeof navigator !== "undefined" && "share" in navigator && (
+                    <button type="button" className={smallBtn} onClick={() => void navigator.share({ title: t("title"), url: url() }).catch(() => {})}>
+                        {t("inviteShare")}
+                    </button>
+                )}
+            </div>
+        </Section>
+    );
+}
+
+function HowItWorks() {
+    const t = useTranslations("callsPage.live");
+    return (
+        <details className="min-w-0 text-sm text-foreground/70">
+            <summary className="inline-flex min-h-11 cursor-pointer items-center font-semibold text-tomato-readable underline underline-offset-4">{t("howTitle")}</summary>
+            <p className="mt-1 mb-0 max-w-prose">{t("howBody")}</p>
+        </details>
+    );
+}
+
+function CrewSection({ crew }: { crew: NonNullable<MemberCall["crew"]> }) {
+    const t = useTranslations("callsPage.live");
+    const empty = crew.goals.length === 0 && crew.tasks.length === 0 && crew.leads.length === 0 && !crew.link;
+    return (
+        <Section title={t("crewTitle")}>
+            {empty && <p className="m-0 text-foreground/70">{t("crewNone")}</p>}
+            {crew.goals.length > 0 && (
+                <div className="mb-4">
+                    <h3 className="m-0 mb-1 text-sm font-semibold uppercase tracking-wide text-foreground/60">{t("crewGoals")}</h3>
+                    <ul className="m-0 grid list-disc gap-1 pl-5">
+                        {crew.goals.map((g, i) => (
+                            <li key={i} className="min-w-0 break-words">{g}</li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+            {crew.tasks.length > 0 && (
+                <div className="mb-4">
+                    <h3 className="m-0 mb-1 text-sm font-semibold uppercase tracking-wide text-foreground/60">{t("crewTasks", { count: crew.openTaskCount })}</h3>
+                    <ul className="m-0 grid list-disc gap-1 pl-5">
+                        {crew.tasks.map((k, i) => (
+                            <li key={i} className="min-w-0 break-words">
+                                {k.url ? (
+                                    <a href={k.url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-tomato-readable">{k.label}</a>
+                                ) : (
+                                    k.label
+                                )}
+                                {k.lead && <span className="text-foreground/60"> · {k.lead}</span>}
+                            </li>
+                        ))}
+                    </ul>
+                    {crew.openTaskCount > crew.tasks.length && <p className="mt-1 mb-0 text-sm text-foreground/60">{t("crewMoreTasks", { count: crew.openTaskCount - crew.tasks.length })}</p>}
+                </div>
+            )}
+            {crew.leads.length > 0 && (
+                <div className="mb-4">
+                    <h3 className="m-0 mb-1 text-sm font-semibold uppercase tracking-wide text-foreground/60">{t("crewLeads")}</h3>
+                    <p className="m-0">
+                        {crew.leads.map((l, i) => (
+                            <span key={i}>
+                                {i > 0 && ", "}
+                                <PersonLink name={l.name ?? ""} memberId={l.memberId} />
+                            </span>
+                        ))}
+                    </p>
+                </div>
+            )}
+            <div className="flex flex-wrap gap-2">
+                <Link href={crew.pagePath} className={pillOutline}>{t("crewPage", { crew: crew.label })}</Link>
+                {crew.link && (
+                    <a href={crew.link.url} target="_blank" rel="noopener noreferrer" className={pillOutline}>{crew.link.label}</a>
+                )}
+            </div>
+        </Section>
     );
 }
 
@@ -264,6 +372,17 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 // ---- present -----------------------------------------------------------------------------------
 
+function Avatar({ name, url }: { name: string; url: string | null }) {
+    return url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={url} alt="" width={32} height={32} loading="lazy" className="h-8 w-8 shrink-0 rounded-full object-cover" />
+    ) : (
+        <span aria-hidden className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-foreground/10 text-xs font-bold">
+            {Array.from(name)[0]?.toUpperCase() ?? "?"}
+        </span>
+    );
+}
+
 function PresentSection({ present }: { present: NonNullable<MemberCall["present"]> }) {
     const t = useTranslations("callsPage.live");
     return (
@@ -271,10 +390,11 @@ function PresentSection({ present }: { present: NonNullable<MemberCall["present"
             {present.length === 0 ? (
                 <p className="m-0 text-foreground/70">{t("nobodyListed")}</p>
             ) : (
-                <ul className="m-0 grid list-none grid-cols-1 gap-x-4 gap-y-1 p-0 sm:grid-cols-2">
+                <ul className="m-0 grid list-none grid-cols-1 gap-x-4 gap-y-2 p-0 sm:grid-cols-2">
                     {present.map((p, i) => (
-                        <li key={`${p.memberId ?? p.name}-${i}`} className="flex min-w-0 items-baseline justify-between gap-3">
-                            <PersonLink name={p.name ?? t("memberAsker")} memberId={p.memberId} className="min-w-0 break-words" />
+                        <li key={`${p.memberId ?? p.name}-${i}`} className="flex min-w-0 items-center gap-3">
+                            <Avatar name={p.name ?? t("memberAsker")} url={p.pfpUrl} />
+                            <PersonLink name={p.name ?? t("memberAsker")} memberId={p.memberId} className="min-w-0 flex-1 break-words" />
                             <span className="shrink-0 text-sm text-foreground/60">{t("minutes", { count: p.minutes })}</span>
                         </li>
                     ))}

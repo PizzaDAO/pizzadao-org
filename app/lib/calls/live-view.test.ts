@@ -59,7 +59,7 @@ const view = (over: { settings?: Settings; cursors?: Map<string, string>; filter
 describe('public endpoint payload', () => {
   it('has title, crew, start, stream link and head count only: no names or member ids', async () => {
     const out = await publicLiveView(ON, NOW)
-    expect(out.calls).toEqual([{ sessionId: 'evt-1', title: 'Ops call', crewLabel: 'Ops', startedAt: session.startedAt.toISOString(), streamLink: 'https://x.com/i/broadcasts/fallback', presentCount: 3 }])
+    expect(out.calls).toEqual([{ sessionId: 'evt-1', title: 'Ops call', crewLabel: 'Ops', crewId: 'ops', startedAt: session.startedAt.toISOString(), streamLink: 'https://x.com/i/broadcasts/fallback', presentCount: 3 }])
     const json = JSON.stringify(out)
     for (const leak of ['Ann', 'Bob', 'Cy', '111111111111111', 'presence', 'm-ann']) expect(json).not.toContain(leak)
   })
@@ -86,7 +86,7 @@ describe('member endpoint payload', () => {
     const out = await view()
     const call = out.calls[0]
     expect(call.present.map((p) => p.name)).toEqual(['Ann', 'Bob', 'Speaker 3'])
-    expect(call.present[0]).toEqual({ name: 'Ann', memberId: 'm-ann', minutes: 10 })
+    expect(call.present[0]).toEqual({ name: 'Ann', memberId: 'm-ann', minutes: 10, pfpUrl: null })
     expect(call.present[1].memberId).toBeNull()
     expect(call.present.some((p) => p.name === 'Cy')).toBe(false) // left the call
     expect(call.presentCount).toBe(3)
@@ -117,6 +117,19 @@ describe('member endpoint payload', () => {
     vi.mocked(prisma.member.findMany).mockResolvedValue([{ id: 'm-zed', discordId: '777777777777777', name: 'Zed' }] as never)
     const out = await view()
     expect(out.calls[0].items.map((i) => i.suggestedBy?.name ?? null)).toEqual(['Zed', null])
+  })
+
+  it('leaves excluded accounts (bots) out of the present list and every head count', async () => {
+    const withBot = fakeSettings({ 'calls.liveViewEnabled': true, 'calls.attendanceExcludeIds': '444444444444444' })
+    const out = await view({ settings: withBot })
+    expect(out.calls[0].present.map((p) => p.name)).toEqual(['Ann', 'Bob'])
+    expect(out.calls[0].presentCount).toBe(2)
+    const pub = await publicLiveView(withBot, NOW)
+    expect(pub.calls[0].presentCount).toBe(2)
+  })
+
+  it('carries the crew id for the crew page link', async () => {
+    expect((await view()).calls[0].crewId).toBe('ops')
   })
 
   it('cursor is (createdAt, id): only newer items, and same-millisecond rows are not skipped', async () => {

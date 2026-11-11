@@ -14,6 +14,7 @@ import { toggleEnabled } from '@/app/lib/settings/toggles'
 import { loadSettings } from '@/app/lib/settings'
 import { rebuildAttendanceSummaries } from '@/app/lib/attendance'
 import { attendanceCrewId, crewIdsFor, loadCrewAliases } from './crew-alias'
+import { loadAttendanceExcludes } from './attendance-exclude'
 import { isImportedSource } from './imported'
 
 const DISCORD_ID = /^\d{17,20}$/
@@ -89,7 +90,7 @@ export function thresholdSec(scheduledSec: number | null | undefined, t: Attenda
  * discordId -> { name, presentSec }. Recordings with presence data are measured against the threshold;
  * recordings without it use the old rule (everyone seen plus every speaker).
  */
-export function countedAttendees(recordings: CountedRecording[], t: AttendanceThresholds): Map<string, CountedAttendee> {
+export function countedAttendees(recordings: CountedRecording[], t: AttendanceThresholds, exclude?: ReadonlySet<string>): Map<string, CountedAttendee> {
   const out = new Map<string, CountedAttendee>()
   const measured = new Map<string, number>()
   const names = new Map<string, string | null>()
@@ -126,13 +127,14 @@ export function countedAttendees(recordings: CountedRecording[], t: AttendanceTh
   if (t.speakersAlwaysCount) {
     for (const id of speakers) if (!out.has(id)) out.set(id, { name: names.get(id) ?? null, presentSec: measured.get(id) ?? 0 })
   }
+  if (exclude) for (const id of exclude) out.delete(id)
   return out
 }
 
 /** Pure: summed measured seconds per person across the recordings that have presence data. */
-export function measuredSeconds(recordings: Array<{ presence: Array<{ discordId: string; presentSec: number }> }>): Map<string, number> {
+export function measuredSeconds(recordings: Array<{ presence: Array<{ discordId: string; presentSec: number }> }>, exclude?: ReadonlySet<string>): Map<string, number> {
   const out = new Map<string, number>()
-  for (const r of recordings) for (const p of r.presence) out.set(p.discordId, (out.get(p.discordId) ?? 0) + p.presentSec)
+  for (const r of recordings) for (const p of r.presence) if (!exclude?.has(p.discordId)) out.set(p.discordId, (out.get(p.discordId) ?? 0) + p.presentSec)
   return out
 }
 
@@ -197,7 +199,8 @@ export async function recordAttendanceForRecording(
   })
   const sameDay = [rec, ...around.filter((r) => r.id !== rec.id)].filter((r) => callDay(r.startedAt).getTime() === day.getTime())
   const thresholds = opts.thresholds ?? (await loadAttendanceThresholds())
-  const counted = countedAttendees(sameDay, thresholds)
+  const exclude = await loadAttendanceExcludes()
+  const counted = countedAttendees(sameDay, thresholds, exclude)
   if (counted.size === 0) return { ...base, skipped: isImportedSource(rec.source) ? 'imported' : 'no-attendees' }
 
   const ids = [...counted.keys()]
@@ -218,7 +221,7 @@ export async function recordAttendanceForRecording(
   const fresh = ids.filter((id) => !have.has(id) && latest.get(id) !== 'remove' && !opts.planned?.has(`${key}|${id}`))
   // Minutes on existing recording rows follow the whole day's total.
   // Every existing recording row of the day, whether or not the person is still over the threshold (rows are never removed).
-  const dayTotals = measuredSeconds(sameDay)
+  const dayTotals = measuredSeconds(sameDay, exclude)
   const refresh = existing.filter((e) => e.source === 'recording' && dayTotals.has(e.discordId) && dayTotals.get(e.discordId) !== e.presentSec)
   if (opts.dryRun) {
     for (const id of fresh) opts.planned?.add(`${key}|${id}`)

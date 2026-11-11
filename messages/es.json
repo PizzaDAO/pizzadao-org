@@ -1049,7 +1049,8 @@
       "qaVotes": "{count, plural, one {# voto} other {# votos}}",
       "qaBy": "Pregunta de {name}",
       "pollsTitle": "Resultados de encuestas",
-      "pollTotal": "{count, plural, one {# voto} other {# votos}}"
+      "pollTotal": "{count, plural, one {# voto} other {# votos}}",
+      "crewPage": "Abrir la página de la crew {crew}"
     },
     "readRecordings": "Lee resúmenes y transcripciones de llamadas anteriores.",
     "live": {
@@ -1144,7 +1145,21 @@
       "streamLabel": "Enlace de transmisión (x.com)",
       "streamSave": "Guardar",
       "streamCancel": "Cancelar",
-      "bannerMore": "En vivo ahora: {title} y {count, plural, one {# llamada más} other {# llamadas más}}"
+      "bannerMore": "En vivo ahora: {title} y {count, plural, one {# llamada más} other {# llamadas más}}",
+      "crewPage": "Abrir la página de la crew {crew}",
+      "crewTitle": "Sobre esta crew",
+      "crewGoals": "Objetivos",
+      "crewTasks": "Tareas abiertas ({count})",
+      "crewMoreTasks": "y {count} más en la página de la crew",
+      "crewLeads": "Líderes",
+      "crewNone": "Todavía no hay nada listado para esta crew.",
+      "inviteTitle": "Trae a alguien",
+      "inviteBody": "¿Conoces a alguien a quien le interese esto? Envíale el enlace en vivo.",
+      "inviteCopy": "Copiar enlace",
+      "inviteCopied": "Enlace copiado",
+      "inviteShare": "Compartir",
+      "howTitle": "Cómo funciona",
+      "howBody": "El bot grabador (Metalhead) corre en un servidor y entra solo al canal de voz. Nadie necesita dejar una laptop abierta ni ejecutar nada para que la llamada se grabe, se resuma y aparezca aquí."
     }
   },
   "communityTerms": {
