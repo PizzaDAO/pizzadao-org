@@ -1157,9 +1157,7 @@
       "inviteBody": "Vous connaissez quelqu'un que ça intéresserait ? Envoyez-lui le lien du direct.",
       "inviteCopy": "Copier le lien",
       "inviteCopied": "Lien copié",
-      "inviteShare": "Partager",
-      "howTitle": "Comment ça marche",
-      "howBody": "Le bot d'enregistrement (Metalhead) tourne sur un serveur et rejoint seul le salon vocal. Personne n'a besoin de laisser un ordinateur ouvert ni de lancer quoi que ce soit pour que l'appel soit enregistré, résumé et listé ici."
+      "inviteShare": "Partager"
     }
   },
   "communityTerms": {

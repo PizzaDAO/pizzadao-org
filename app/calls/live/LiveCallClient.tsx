@@ -196,7 +196,6 @@ function LiveCall({ live, state, items, onChanged, locale }: { live: CallState; 
                 </>
             )}
             <InviteSection />
-            <HowItWorks />
         </div>
     );
 }
@@ -231,16 +230,6 @@ function InviteSection() {
                 )}
             </div>
         </Section>
-    );
-}
-
-function HowItWorks() {
-    const t = useTranslations("callsPage.live");
-    return (
-        <details className="min-w-0 text-sm text-foreground/70">
-            <summary className="inline-flex min-h-11 cursor-pointer items-center font-semibold text-tomato-readable underline underline-offset-4">{t("howTitle")}</summary>
-            <p className="mt-1 mb-0 max-w-prose">{t("howBody")}</p>
-        </details>
     );
 }
 

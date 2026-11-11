@@ -1157,9 +1157,7 @@
       "inviteBody": "Know someone who would like to hear this? Send them the live link.",
       "inviteCopy": "Copy link",
       "inviteCopied": "Link copied",
-      "inviteShare": "Share",
-      "howTitle": "How this works",
-      "howBody": "The recorder bot (Metalhead) runs on a server and joins the voice channel by itself. Nobody needs to keep a laptop open or run anything for the call to be recorded, summarised and listed here."
+      "inviteShare": "Share"
     }
   },
   "communityTerms": {

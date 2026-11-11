@@ -1157,9 +1157,7 @@
       "inviteBody": "¿Conoces a alguien a quien le interese esto? Envíale el enlace en vivo.",
       "inviteCopy": "Copiar enlace",
       "inviteCopied": "Enlace copiado",
-      "inviteShare": "Compartir",
-      "howTitle": "Cómo funciona",
-      "howBody": "El bot grabador (Metalhead) corre en un servidor y entra solo al canal de voz. Nadie necesita dejar una laptop abierta ni ejecutar nada para que la llamada se grabe, se resuma y aparezca aquí."
+      "inviteShare": "Compartir"
     }
   },
   "communityTerms": {
