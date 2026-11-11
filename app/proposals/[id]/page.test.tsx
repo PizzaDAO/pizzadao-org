@@ -9,7 +9,10 @@ const m = vi.hoisted(() => ({ detail: null as any, hist: null as any, historyOn:
 vi.mock('next/navigation', () => ({ notFound: () => { throw new Error('notFound') }, redirect: () => { throw new Error('redirect') } }))
 vi.mock('next-intl/server', () => ({ getLocale: async () => 'en', getTranslations: async () => (k: string) => k }))
 vi.mock('@/app/lib/session', () => ({ getSession: async () => (m.viewer ? { discordId: m.viewer } : null) }))
-vi.mock('@/app/lib/settings', () => ({ getSetting: async () => '' }))
+vi.mock('@/app/lib/settings', () => ({
+  getSetting: async (k: string) => (k === 'proposals.maxOpenPerProposer' ? 3 : ''),
+  loadSettings: async () => ({ readFailed: false, invalidKeys: [], isSet: () => false, get: (k: string) => (k === 'proposals.pilotDiscordIds' ? [] : '') }),
+}))
 vi.mock('@/app/lib/settings/toggles', () => ({ toggleEnabled: async () => m.historyOn }))
 vi.mock('@/app/lib/proposals/constants', async (orig) => ({ ...(await orig<typeof import('@/app/lib/proposals/constants')>()), proposalsEnabled: async () => m.votingOn }))
 vi.mock('@/app/lib/people', () => ({ resolvePeople: async () => new Map() }))
@@ -17,6 +20,7 @@ vi.mock('@/app/lib/discord-mention-resolve', () => ({ resolveDiscordMentions: as
 vi.mock('@/app/lib/proposals/store', () => ({ getProposalDetail: async () => m.detail, viewerStates: async () => ({}) }))
 vi.mock('@/app/lib/proposals/history', async (orig) => ({ ...(await orig<typeof import('@/app/lib/proposals/history')>()), getHistoryDetail: async () => m.hist }))
 vi.mock('../_components/VotePanel', () => ({ VotePanel: function VotePanel() { return null } }))
+vi.mock('../_components/WithdrawButton', () => ({ WithdrawButton: function WithdrawButton() { return null } }))
 vi.mock('@/app/ui/shared/Editorial', () => ({
   EditorialPage: function EditorialPage(p: { children: ReactNode }) { return p.children },
   EditorialMasthead: function EditorialMasthead() { return null },
@@ -119,5 +123,31 @@ describe('proposal detail page', () => {
     const links = find(await render(), (n) => n.type === 'a').map((n) => n.props.href)
     expect(links).toContain(`https://etherscan.io/tx/${h}`)
     expect(links.some((l: string) => l.includes('cdcd'))).toBe(false)
+  })
+
+  const hasWithdraw = (tree: any) => find(tree, (n) => typeof n.type === 'function' && n.type.name === 'WithdrawButton').length > 0
+
+  it('lets the proposer withdraw a draft or an open proposal, nobody else, and not a closed one', async () => {
+    m.detail = { ...base, status: 'OPEN', source: 'APP', isProposer: true, withdrawable: true, isTest: false, openDelayed: false, beneficiaryDiscordId: null }
+    expect(hasWithdraw(await render())).toBe(true)
+    m.detail = { ...base, status: 'DRAFT', source: 'APP', isProposer: true, withdrawable: true, isTest: false, openDelayed: false, beneficiaryDiscordId: null }
+    expect(hasWithdraw(await render())).toBe(true)
+    m.detail = { ...base, status: 'OPEN', source: 'APP', isProposer: false, isTest: false, openDelayed: false, beneficiaryDiscordId: null }
+    expect(hasWithdraw(await render())).toBe(false)
+    m.detail = { ...base, status: 'PASSED', source: 'APP', isProposer: true, isTest: false, openDelayed: false, beneficiaryDiscordId: null }
+    expect(hasWithdraw(await render())).toBe(false)
+    // the window already ended (the store says so): no withdrawing
+    m.detail = { ...base, closesAt: '2020-01-01T00:00:00Z', status: 'OPEN', source: 'APP', isProposer: true, withdrawable: false, isTest: false, openDelayed: false, beneficiaryDiscordId: null }
+    expect(hasWithdraw(await render())).toBe(false)
+  })
+
+  it('says so when opening is delayed, and marks a pilot test proposal', async () => {
+    m.detail = { ...base, status: 'DRAFT', source: 'APP', isProposer: true, isTest: true, openDelayed: true, beneficiaryDiscordId: null }
+    const all = texts(await render()).join('|')
+    expect(all).toContain('detail.openingDelayed')
+    expect(all).not.toContain('detail.opening|')
+    expect(all).toContain('detail.test')
+    m.detail = { ...base, status: 'DRAFT', source: 'APP', isProposer: true, isTest: false, openDelayed: false, beneficiaryDiscordId: null }
+    expect(texts(await render()).join('|')).toContain('detail.opening')
   })
 })

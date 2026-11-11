@@ -19,7 +19,7 @@ vi.mock('@/app/lib/db', () => {
 vi.mock('./signals', () => ({ signalsFor: vi.fn(async () => ({ rsvFlagged: false, fastEligible: false })) }))
 vi.mock('@/app/lib/settings', () => ({ getSetting: vi.fn(async () => 30) }))
 vi.mock('@/app/lib/disavow/constants', () => ({ disavowEnabled: vi.fn(async () => true) }))
-vi.mock('@/app/lib/proposals/constants', () => ({ proposalsEnabled: vi.fn(async () => false) }))
+vi.mock('@/app/lib/proposals/constants', () => ({ proposalsEnabled: vi.fn(async () => false), proposalsGateOn: vi.fn(async () => false) }))
 vi.mock('@/app/lib/disavow/match', () => ({
   viewerIdentifiers: vi.fn(async () => [{ kind: 'DISCORD_ID', value: '1' }]),
   identifiersForMember: vi.fn(async () => []),

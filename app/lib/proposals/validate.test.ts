@@ -30,4 +30,14 @@ describe('parseNewProposal', () => {
     expect(parseNewProposal({ ...base, amount: 2_000_000 })).toEqual({ ok: false, error: 'bad_amount' })
     expect(parseNewProposal({ ...base, eventDate: '2027-02-30' })).toEqual({ ok: false, error: 'bad_date' })
   })
+
+  it('takes an optional beneficiary Discord id, and refuses anything that is not one', () => {
+    const ok = parseNewProposal({ ...base, beneficiary: '300000000000000001' })
+    expect(ok.ok && ok.data.beneficiaryDiscordId).toBe('300000000000000001')
+    const none = parseNewProposal({ ...base })
+    expect(none.ok && none.data.beneficiaryDiscordId).toBeNull()
+    expect(parseNewProposal({ ...base, beneficiary: '' }).ok).toBe(true)
+    expect(parseNewProposal({ ...base, beneficiary: 'Some Name' })).toEqual({ ok: false, error: 'bad_beneficiary' })
+    expect(parseNewProposal({ ...base, beneficiary: '12345' })).toEqual({ ok: false, error: 'bad_beneficiary' })
+  })
 })

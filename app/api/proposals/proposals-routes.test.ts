@@ -8,6 +8,7 @@ const m = vi.hoisted(() => ({
   issue: vi.fn(),
   cast: vi.fn(),
   create: vi.fn(),
+  count: vi.fn(),
   getSession: vi.fn(),
   pubkey: vi.fn(),
   saveBlob: vi.fn(),
@@ -15,6 +16,10 @@ const m = vi.hoisted(() => ({
 }))
 
 vi.mock('@/app/lib/db', () => ({ prisma: {} }))
+vi.mock('@/app/lib/settings', () => ({
+  getSetting: async (k: string) => (k === 'proposals.maxOpenPerProposer' ? 3 : ''),
+  loadSettings: async () => ({ readFailed: false, invalidKeys: [], isSet: () => false, get: (k: string) => (k === 'proposals.pilotDiscordIds' ? [] : '') }),
+}))
 vi.mock('next/server', async (importOriginal) => ({ ...(await importOriginal<typeof import('next/server')>()), after: vi.fn() }))
 vi.mock('@/app/lib/proposals/constants', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/app/lib/proposals/constants')>()),
@@ -31,7 +36,7 @@ vi.mock('@/app/lib/rate-limit', () => ({
 }))
 vi.mock('@/app/lib/proposals/proposer', () => ({ canSubmitProposal: async () => m.holder }))
 vi.mock('@/app/lib/proposals/lifecycle', () => ({ openAndAnnounce: vi.fn() }))
-vi.mock('@/app/lib/proposals/store', () => ({ issueToken: m.issue, castBallot: m.cast, createProposal: m.create, getPublicKey: m.pubkey, saveBallotBlob: m.saveBlob, getBallotBlob: m.getBlob }))
+vi.mock('@/app/lib/proposals/store', () => ({ issueToken: m.issue, castBallot: m.cast, createProposal: m.create, countActiveFor: m.count, getPublicKey: m.pubkey, saveBallotBlob: m.saveBlob, getBallotBlob: m.getBlob }))
 
 import { POST as createPOST } from './route'
 import { POST as tokenPOST } from './[id]/token/route'
@@ -55,6 +60,7 @@ beforeEach(() => {
   m.cast.mockResolvedValue({ ok: true })
   m.issue.mockResolvedValue({ ok: true, blindSignature: 'sig' })
   m.create.mockResolvedValue({ id: 'new1' })
+  m.count.mockResolvedValue(0)
   m.pubkey.mockResolvedValue({ publicKey: 'PEM', fingerprint: 'aaaa bbbb' })
   m.saveBlob.mockResolvedValue('ok')
   m.getBlob.mockResolvedValue({ eligible: true, blob: 'ciphertext' })

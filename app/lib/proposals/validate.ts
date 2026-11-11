@@ -13,9 +13,11 @@ export interface NewProposal {
   eventDate: Date | null
   city: string | null
   sponsorLabel: string | null
+  /** Optional member (Discord id) who may file the payment requests for this proposal. */
+  beneficiaryDiscordId?: string | null
 }
 
-export type ProposalFormError = 'invalid' | 'bad_kind' | 'bad_title' | 'bad_description' | 'bad_amount' | 'bad_date' | 'too_long'
+export type ProposalFormError = 'invalid' | 'bad_kind' | 'bad_title' | 'bad_description' | 'bad_amount' | 'bad_date' | 'bad_beneficiary' | 'too_long'
 
 const clean = (s: unknown, max: number) =>
   typeof s === 'string' ? s.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').trim().slice(0, max) : ''
@@ -48,6 +50,9 @@ export function parseNewProposal(raw: unknown): { ok: true; data: NewProposal } 
 
   const city = clean(o.city, PROPOSAL_MAX_CITY) || null
   const sponsorLabel = clean(o.sponsor, PROPOSAL_MAX_SPONSOR) || null
+  const beneficiaryRaw = clean(o.beneficiary, 30)
+  if (beneficiaryRaw && !/^\d{15,25}$/.test(beneficiaryRaw)) return { ok: false, error: 'bad_beneficiary' }
+  const beneficiaryDiscordId = beneficiaryRaw || null
   const attendance = clean(o.attendance, 60)
   const otherSponsors = clean(o.otherSponsors, 400)
   const pizzaFrom = clean(o.pizzaFrom, 200)
@@ -63,5 +68,5 @@ export function parseNewProposal(raw: unknown): { ok: true; data: NewProposal } 
   const body = parts.join('\n\n')
   if (body.length > PROPOSAL_MAX_BODY) return { ok: false, error: 'too_long' }
 
-  return { ok: true, data: { kind, title, body, amountUsdCents, eventDate, city, sponsorLabel } }
+  return { ok: true, data: { kind, title, body, amountUsdCents, eventDate, city, sponsorLabel, beneficiaryDiscordId } }
 }

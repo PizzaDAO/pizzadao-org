@@ -12,7 +12,8 @@ import { prisma } from '@/app/lib/db'
 import { disavowEnabled } from '@/app/lib/disavow/constants'
 import { identifierOr, identifiersForMember, viewerIdentifiers } from '@/app/lib/disavow/match'
 import { snowflakeCreatedAt } from '@/app/lib/mission-verify/policy'
-import { proposalsEnabled } from '@/app/lib/proposals/constants'
+import { proposalsGateOn } from '@/app/lib/proposals/constants'
+import { legacySeshAllowed, loadSeshWindow } from '@/app/lib/proposals/legacy-sesh'
 import { getSetting } from '@/app/lib/settings'
 import { attachmentMarker, countApprovals, linkedDiscordIds } from './decide'
 import { chooseLane } from './lane'
@@ -33,7 +34,7 @@ export interface EvalDeps {
 export type LoadedRequest = NonNullable<Awaited<ReturnType<typeof loadRequest>>>
 
 async function loadRequest(id: string) {
-  return prisma.paymentRequest.findUnique({ where: { id }, include: { attachments: { select: { kind: true, sha256: true, createdAt: true } }, proposal: { select: { status: true, source: true, amountUsdCents: true } } } })
+  return prisma.paymentRequest.findUnique({ where: { id }, include: { attachments: { select: { kind: true, sha256: true, createdAt: true } }, proposal: { select: { status: true, source: true, isTest: true, amountUsdCents: true } } } })
 }
 
 async function restrictedMatchesOne(discordId: string | null, memberId: string | null): Promise<string[]> {
@@ -112,7 +113,8 @@ async function evaluateOnce(id: string, deps: EvalDeps): Promise<EvalResult | nu
   if (!approved && req.status !== 'RECEIVED' && req.status !== 'NEEDS_INFO') return null
   const now = deps.now ?? new Date()
   const policy = deps.policy ?? (await loadPaymentPolicy())
-  const proposalsOn = await proposalsEnabled()
+  const proposalsOn = await proposalsGateOn()
+  const seshWindow = proposalsOn ? await loadSeshWindow() : null
 
   // `verified` is the signed-in requester (null for a form row). History that can sink a request (fraud
   // rejections, split and duplicate requests) counts ONLY verified rows of a verified requester. The id
@@ -182,6 +184,7 @@ async function evaluateOnce(id: string, deps: EvalDeps): Promise<EvalResult | nu
       title: req.title,
       proposalUrl: req.proposalUrl,
       proposalsOn,
+      legacySeshOk: !!seshWindow && !req.proposal && legacySeshAllowed(req.proposalUrl, seshWindow.liveSince, seshWindow.untilDate, now),
       proposal: proposalsOn ? req.proposal : null,
       // Verified identity only: a form row is always "unmatched", whatever was typed into it.
       requesterDiscordId: verified,

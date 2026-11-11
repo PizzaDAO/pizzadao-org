@@ -18,7 +18,8 @@
 import { prisma } from '@/app/lib/db'
 import type { PaymentActor } from './access'
 import { hashPayee } from './hash'
-import { proposalsEnabled } from '@/app/lib/proposals/constants'
+import { proposalsGateOn } from '@/app/lib/proposals/constants'
+import { legacySeshAllowed, loadSeshWindow } from '@/app/lib/proposals/legacy-sesh'
 import { isHighRisk, requiredAyes } from './lane'
 import type { PaymentPolicy } from './policy'
 import { isSelf, type DecisionAction, type DecisionRow, type PaymentFlag, type PaymentLane, type PaymentStatus } from './types'
@@ -47,7 +48,9 @@ export interface RequestSnapshot {
   proposalUrl: string | null
   /** Proposals are on: the in-app proposal replaces the poll link and the typed ayes. */
   proposalsOn?: boolean
-  proposal?: { id: string; status: string; amountUsdCents: number | null; ayes: number; source?: string } | null
+  /** Sesh grace window: a Sesh poll posted before go-live, inside the window. The legacy poll path applies to this request. */
+  legacySeshOk?: boolean
+  proposal?: { id: string; status: string; amountUsdCents: number | null; ayes: number; source?: string; isTest?: boolean } | null
   /** Cents of every non-rejected, non-withdrawn request linked to that proposal, THIS one included (re-summed under a lock at approval). */
   proposalFundedCents?: number
   amountUsdCents: number
@@ -191,12 +194,13 @@ export function evaluateDecision(
       if ((risky || overCap || heavyFlag || req.lane === 'HIGH_RISK' || req.lane === 'VOTE_REQUIRED') && note.length < 3) {
         return fail(400, 'note_required', 'A note is required for this request')
       }
-      if (overCap && req.proposalsOn) {
+      if (overCap && req.proposalsOn && !req.legacySeshOk) {
         // The vote is the in-app proposal's own count: nothing is typed or ticked by the reviewer.
         const p = req.proposal
         if (!p) return fail(400, 'proposal_missing', 'This amount needs a passed proposal linked to the request')
         // Imported history is a record, never a funding authority.
         if (p.source === 'IMPORTED') return fail(400, 'proposal_not_passed', 'The linked proposal is a historical record and cannot fund a request')
+        if (p.isTest) return fail(400, 'proposal_not_passed', 'The linked proposal is a pilot test and cannot fund a request')
         if (p.status !== 'PASSED') return fail(400, 'proposal_not_passed', 'The linked proposal has not passed')
         if (p.amountUsdCents != null && req.amountUsdCents > p.amountUsdCents) return fail(400, 'amount_over_proposal', 'The request asks for more than the proposal that passed')
         if (p.amountUsdCents != null && (req.proposalFundedCents ?? req.amountUsdCents) > p.amountUsdCents) {
@@ -312,14 +316,15 @@ export async function applyDecision(
   policy: PaymentPolicy,
   opts: { expectedUpdatedAt?: string | null; env?: NodeJS.ProcessEnv } = {},
 ): Promise<DecisionSuccess | DecisionFailure | { ok: false; status: 404; code: 'not_found'; message: string }> {
-  const proposalsOn = await proposalsEnabled()
+  const proposalsOn = await proposalsGateOn()
+  const seshWindow = proposalsOn ? await loadSeshWindow() : null
   return prisma.$transaction(async (tx) => {
     const row = await tx.paymentRequest.findUnique({
       where: { id: requestId },
       include: {
         decisions: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
         attachments: { select: { createdAt: true } },
-        proposal: { select: { id: true, status: true, source: true, amountUsdCents: true, ayes: true } },
+        proposal: { select: { id: true, status: true, source: true, isTest: true, amountUsdCents: true, ayes: true } },
         checks: { where: { kind: 'RULES' }, orderBy: { id: 'desc' }, take: 1, select: { result: true } },
       },
     })
@@ -362,6 +367,8 @@ export async function applyDecision(
       linkedDiscordIds: linked,
       proposalUrl: row.proposalUrl,
       proposalsOn,
+      // Sesh grace window: only a request that carries a Discord poll link posted before go-live, and no in-app proposal.
+      legacySeshOk: !!seshWindow && !row.proposal && legacySeshAllowed(row.proposalUrl, seshWindow.liveSince, seshWindow.untilDate, new Date()),
       proposal: proposalsOn ? row.proposal : null,
       proposalFundedCents,
       amountUsdCents: row.amountUsdCents,

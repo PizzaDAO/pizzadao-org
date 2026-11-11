@@ -2,7 +2,7 @@
 // The preparer runs in the root layout on every page: bad or surprising answers must never throw or reach the console.
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, waitFor } from '@testing-library/react'
 import { renderWithIntl } from '@/app/lib/i18n/test-utils'
 import { parseMine } from '@/app/lib/proposals/client'
 import { GlobalBallotPreparer } from './GlobalBallotPreparer'
@@ -74,4 +74,48 @@ describe('GlobalBallotPreparer', () => {
   })
   it('is silent when fetch rejects', () => run(() => Promise.reject(new Error('offline'))))
   it('is silent when the answer is null', () => run(() => res(null)))
+})
+
+describe('the save card is sticky (H4)', () => {
+  const id = 'abcdefgh12345678'
+  beforeEach(() => {
+    sessionStorage.clear()
+    localStorage.clear()
+    // the ballot is in this browser, but its code was never saved
+    localStorage.setItem(`pizzadao:proposal-ballot:${id}`, JSON.stringify({ token: `proposal-${id}-x`, preparedMessage: 'AA==', signature: 'AA==' }))
+    localStorage.setItem('pizzadao:proposals-unsaved', JSON.stringify([{ id, title: 'Party' }]))
+    // nothing new to prepare: the feature answers "off"
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ enabled: false, proposals: [] }) })))
+  })
+  afterEach(() => {
+    cleanup()
+    vi.unstubAllGlobals()
+    localStorage.clear()
+  })
+
+  it('shows the card again after a reload until the member dismisses it', async () => {
+    const { container, getByText } = renderWithIntl(<GlobalBallotPreparer />)
+    await waitFor(() => expect(container.textContent).toContain('Party'))
+    fireEvent.click(getByText('Dismiss'))
+    await waitFor(() => expect(container.innerHTML).toBe(''))
+    expect(localStorage.getItem('pizzadao:proposals-unsaved')).toBe('[]')
+    cleanup()
+    const again = renderWithIntl(<GlobalBallotPreparer />)
+    await new Promise((r) => setTimeout(r, 20))
+    expect(again.container.innerHTML).toBe('')
+  })
+
+  it('forgets a card whose ballot is no longer in this browser', async () => {
+    localStorage.removeItem(`pizzadao:proposal-ballot:${id}`)
+    const { container } = renderWithIntl(<GlobalBallotPreparer />)
+    await new Promise((r) => setTimeout(r, 20))
+    expect(container.innerHTML).toBe('')
+  })
+
+  it('shows no card for a signed-out visitor (the saved ballot belongs to the browser, not to a login)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 401, json: async () => ({}) })))
+    const { container } = renderWithIntl(<GlobalBallotPreparer />)
+    await new Promise((r) => setTimeout(r, 20))
+    expect(container.innerHTML).toBe('')
+  })
 })

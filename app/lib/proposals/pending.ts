@@ -23,6 +23,8 @@ export interface PendingStore {
   all(proposalId: string): Promise<Array<{ tokenHash: string; choice: Choice }>>
   /** Delete each field only if it still holds the given choice. */
   removeIfUnchanged(proposalId: string, entries: ReadonlyArray<{ tokenHash: string; choice: Choice }>): Promise<void>
+  /** Delete the whole pending hash (a cancelled proposal: its ballots are never counted). */
+  clear(proposalId: string): Promise<void>
 }
 
 export const pendingKey = (proposalId: string) => `proposal-pending:${proposalId}`
@@ -59,6 +61,9 @@ export function upstashPendingStore(redis: Redis): PendingStore {
         const args = entries.slice(i, i + 200).flatMap((e) => [e.tokenHash, e.choice])
         await redis.eval(DEL_IF_EQUAL, [pendingKey(proposalId)], args)
       }
+    },
+    async clear(proposalId) {
+      await redis.del(pendingKey(proposalId))
     },
   }
 }

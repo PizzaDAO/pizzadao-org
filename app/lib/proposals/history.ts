@@ -42,7 +42,8 @@ export function parseHistoryFilters(sp: SP): HistoryFilters {
 export function historyWhere(f: HistoryFilters, includeImported: boolean): Record<string, unknown> {
   const and: Record<string, unknown>[] = []
   const status = f.outcome === 'passed' ? ['PASSED'] : f.outcome === 'failed' ? ['FAILED'] : f.outcome === 'unresolved' ? ['UNRESOLVED'] : [...CLOSED_STATUSES]
-  const where: Record<string, unknown> = { status: { in: status }, AND: and }
+  // Test (pilot) proposals never reach history or its totals.
+  const where: Record<string, unknown> = { status: { in: status }, isTest: false, AND: and }
   if (!includeImported) where.source = 'APP'
   if (f.year) {
     const range = { gte: new Date(Date.UTC(f.year, 0, 1)), lt: new Date(Date.UTC(f.year + 1, 0, 1)) }

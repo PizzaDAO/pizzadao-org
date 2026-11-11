@@ -48,7 +48,7 @@ describe('cron ignores imported rows', () => {
     seedImported('OPEN', { closesAt: new Date(t0.getTime() - 86400_000) })
     const { d, post } = deps()
     const out = await runProposalsCron(t0, d, { pending: null })
-    expect(out).toEqual({ opened: 0, settled: 0, drained: 0, openPosts: 0, resultPosts: 0 })
+    expect(out).toEqual({ opened: 0, settled: 0, drained: 0, openPosts: 0, resultPosts: 0, stuckAlerted: 0 })
     expect(post).not.toHaveBeenCalled()
     expect(fake.current.state.proposal.every((r: any) => r.resultPostedAt === null && r.discordChannelId === null)).toBe(true)
   })
@@ -73,8 +73,8 @@ describe('cron ignores imported rows', () => {
 describe('the payment picker, link and approval', () => {
   it('passedFundingProposalsFor leaves imported rows out', async () => {
     seedImported('PASSED', { proposerDiscordId: 'me' })
-    fake.current.state.proposal.push({ id: 'app1', kind: 'FUNDING', status: 'PASSED', source: 'APP', proposerDiscordId: 'me', amountUsdCents: 1000, title: 't', closedAt: t0 })
-    fake.current.db.proposal.findMany = async ({ where }: any) => fake.current.state.proposal.filter((r: any) => Object.entries(where).every(([k, v]) => (typeof v === 'object' && v && 'not' in (v as any) ? r[k] !== (v as any).not : r[k] === v)))
+    fake.current.state.proposal.push({ id: 'app1', kind: 'FUNDING', status: 'PASSED', source: 'APP', isTest: false, proposerDiscordId: 'me', amountUsdCents: 1000, title: 't', closedAt: t0 })
+    fake.current.db.proposal.findMany = async ({ where }: any) => fake.current.state.proposal.filter((r: any) => Object.entries(where).every(([k, v]) => (k === 'OR' ? (v as any[]).some((o) => Object.entries(o).every(([kk, vv]) => r[kk] === vv)) : typeof v === 'object' && v && 'not' in (v as any) ? r[k] !== (v as any).not : r[k] === v)))
     const out = await passedFundingProposalsFor('me')
     expect(out.map((x) => x.id)).toEqual(['app1'])
   })

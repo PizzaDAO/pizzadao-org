@@ -2,12 +2,23 @@
 
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { EditorialMasthead, paperCard } from "@/app/ui/shared/Editorial";
 
 const field = "w-full min-h-11 px-3 text-base rounded border bg-card";
 
-export function NewProposalForm() {
+export type Tiers = { capUsd: number; midMaxUsd: number; low: number; mid: number; high: number; general: number };
+
+/** Ayes plus abstains a proposal needs today (the same tiers the server copies onto it when it opens). */
+function ayesFor(kind: "FUNDING" | "GENERAL", amountUsd: number, tiers: Tiers): number {
+    if (kind === "GENERAL" || !(amountUsd > 0)) return kind === "GENERAL" ? tiers.general : tiers.low;
+    if (amountUsd <= tiers.capUsd) return tiers.low;
+    return amountUsd <= tiers.midMaxUsd ? tiers.mid : tiers.high;
+}
+
+type Found = { name: string; discordId: string };
+
+export function NewProposalForm({ tiers = null }: { tiers?: Tiers | null }) {
     const t = useTranslations("proposals.form");
     const tp = useTranslations("proposals");
     const [kind, setKind] = useState<"FUNDING" | "GENERAL">("FUNDING");
@@ -15,6 +26,32 @@ export function NewProposalForm() {
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
     const [doneId, setDoneId] = useState("");
+    // Optional beneficiary: the member who will file the payment requests when the proposal passes.
+    const [who, setWho] = useState("");
+    const [found, setFound] = useState<Found[]>([]);
+    const [beneficiary, setBeneficiary] = useState<Found | null>(null);
+    const amountUsd = Number(v.amount.replace(/[$,\s]/g, ""));
+
+    useEffect(() => {
+        const q = who.trim();
+        if (q.length < 2) {
+            setFound([]);
+            return;
+        }
+        let cancelled = false;
+        const timer = setTimeout(() => {
+            fetch(`/api/proposals/members?q=${encodeURIComponent(q)}`, { cache: "no-store" })
+                .then((r) => (r.ok ? r.json() : null))
+                .then((b) => {
+                    if (!cancelled) setFound(b && Array.isArray(b.members) ? (b.members as Found[]).slice(0, 8) : []);
+                })
+                .catch(() => {});
+        }, 300);
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
+    }, [who]);
     const set = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setV((s) => ({ ...s, [k]: e.target.value }));
 
     async function submit(e: React.FormEvent) {
@@ -25,7 +62,7 @@ export function NewProposalForm() {
             const r = await fetch("/api/proposals", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ kind, ...v }),
+                body: JSON.stringify({ kind, ...v, beneficiary: beneficiary?.discordId ?? "" }),
             });
             const body = await r.json().catch(() => ({}));
             if (r.ok && typeof body.id === "string") {
@@ -70,6 +107,13 @@ export function NewProposalForm() {
                             <input className={field} inputMode="decimal" value={v.amount} onChange={set("amount")} required />
                         </label>
                     )}
+                    {tiers && (
+                        <p className="m-0 rounded border p-3 text-sm" role="note">
+                            {t("tierNeeds", { count: ayesFor(kind, amountUsd, tiers) })}{" "}
+                            {kind === "FUNDING" ? t("tierList", { cap: tiers.capUsd, low: tiers.low, mid: tiers.mid, midMax: tiers.midMaxUsd, high: tiers.high }) : ""}{" "}
+                            {t("tierNote")}
+                        </p>
+                    )}
                     <div className="grid gap-4 sm:grid-cols-2">
                         <label className="grid gap-1">
                             {t("fieldDate")}
@@ -85,6 +129,41 @@ export function NewProposalForm() {
                         <input className={field} value={v.sponsor} onChange={set("sponsor")} maxLength={120} />
                         <span className="text-sm text-foreground/70">{t("sponsorHelp")}</span>
                     </label>
+                    <div className="grid gap-1">
+                        <label htmlFor="beneficiary-search">{t("fieldBeneficiary")}</label>
+                        {beneficiary ? (
+                            <p className="m-0 flex flex-wrap items-center gap-2">
+                                <strong>{beneficiary.name}</strong>
+                                <button type="button" className="min-h-11 rounded border px-3" onClick={() => setBeneficiary(null)}>
+                                    {t("beneficiaryClear")}
+                                </button>
+                            </p>
+                        ) : (
+                            <>
+                                <input id="beneficiary-search" className={field} value={who} onChange={(e) => setWho(e.target.value)} maxLength={80} autoComplete="off" placeholder={t("beneficiarySearch")} />
+                                {found.length > 0 && (
+                                    <ul className="m-0 grid list-none gap-1 p-0">
+                                        {found.map((m) => (
+                                            <li key={m.discordId}>
+                                                <button
+                                                    type="button"
+                                                    className="min-h-11 w-full rounded border bg-card px-3 text-left"
+                                                    onClick={() => {
+                                                        setBeneficiary(m);
+                                                        setWho("");
+                                                        setFound([]);
+                                                    }}
+                                                >
+                                                    {m.name}
+                                                </button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </>
+                        )}
+                        <span className="text-sm text-foreground/70">{t("beneficiaryHelp")}</span>
+                    </div>
                     <label className="grid gap-1">
                         {t("fieldAttendance")}
                         <input className={field} value={v.attendance} onChange={set("attendance")} maxLength={60} />

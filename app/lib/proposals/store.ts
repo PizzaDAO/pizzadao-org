@@ -12,6 +12,7 @@
  */
 import { prisma } from '@/app/lib/db'
 import { CLOSE_MARGIN_MS, COUNT_ABSTAINS, DAY_MS, DRAFT_RETRY_MS, REQUIRE_AYES_OVER_NAYS } from './constants'
+import { loadPilotState } from './pilot'
 import { BACKUP_BLOB_LENGTH } from './backup'
 import { defaultRoleDeps, snapshotRoleHolders, type RoleDeps } from './eligibility'
 import { generateProposalKeyPair, wrapPrivateKey } from './keys'
@@ -54,7 +55,7 @@ export function dayStart(d: Date): Date {
 
 // ------------------------------------------------------------------ create
 
-export async function createProposal(input: NewProposal & { proposerDiscordId: string }): Promise<{ id: string }> {
+export async function createProposal(input: NewProposal & { proposerDiscordId: string; beneficiaryDiscordId?: string | null; isTest?: boolean }): Promise<{ id: string }> {
   return prisma.$transaction(async (tx) => {
     const row = await tx.proposal.create({
       data: {
@@ -66,12 +67,14 @@ export async function createProposal(input: NewProposal & { proposerDiscordId: s
         city: input.city,
         proposerDiscordId: input.proposerDiscordId,
         sponsorLabel: input.sponsorLabel,
+        beneficiaryDiscordId: input.beneficiaryDiscordId && input.beneficiaryDiscordId !== input.proposerDiscordId ? input.beneficiaryDiscordId : null,
+        isTest: input.isTest === true,
         countAbstains: COUNT_ABSTAINS,
         requireAyesOverNays: REQUIRE_AYES_OVER_NAYS,
       },
       select: { id: true },
     })
-    await logEvent(tx, row.id, 'CREATED', input.proposerDiscordId, { kind: input.kind })
+    await logEvent(tx, row.id, 'CREATED', input.proposerDiscordId, { kind: input.kind, ...(input.isTest ? { test: true } : {}) })
     return row
   })
 }
@@ -85,7 +88,7 @@ export function isProduction(env: NodeJS.ProcessEnv = process.env): boolean {
 
 export type OpenResult =
   | { ok: true; eligible: number }
-  | { ok: false; code: 'not_found' | 'not_draft' | 'not_production' | 'no_redis' }
+  | { ok: false; code: 'not_found' | 'not_draft' | 'not_production' | 'no_redis' | 'pilot_over' }
 
 /**
  * Open a DRAFT proposal: list the voter-role holders (strict: any Discord failure aborts), generate this proposal's
@@ -94,24 +97,48 @@ export type OpenResult =
  */
 export async function openProposal(
   id: string,
-  opts: { now?: Date; deps?: RoleDeps; rules?: ProposalRules; env?: NodeJS.ProcessEnv; keyBits?: number; pending?: PendingOpt } = {},
+  opts: { now?: Date; deps?: RoleDeps; rules?: ProposalRules; env?: NodeJS.ProcessEnv; keyBits?: number; pending?: PendingOpt; pilot?: readonly string[] } = {},
 ): Promise<OpenResult> {
   const env = opts.env ?? process.env
   if (!isProduction(env)) return { ok: false, code: 'not_production' }
   // Votes need the pending store in production: do not open a proposal that could not take them.
   if (!pendingFor(opts.pending, env) && !directWriteAllowed(env)) return { ok: false, code: 'no_redis' }
   const now = opts.now ?? new Date()
-  const p = await prisma.proposal.findUnique({ where: { id }, select: { status: true, kind: true, amountUsdCents: true, source: true } })
+  const p = await prisma.proposal.findUnique({ where: { id }, select: { status: true, kind: true, amountUsdCents: true, source: true, isTest: true } })
   if (!p) return { ok: false, code: 'not_found' }
   // Imported history is never opened: it has no voter snapshot and no key.
   if (p.source === 'IMPORTED') return { ok: false, code: 'not_draft' }
   if (p.status !== 'DRAFT') return { ok: false, code: 'not_draft' }
   const rules = opts.rules ?? (await loadProposalRules())
-  const snap = await snapshotRoleHolders(opts.deps ?? defaultRoleDeps)
+  // A pilot (test) proposal: only the listed testers vote, the window is short and one aye is enough.
+  // If the pilot has ended meanwhile it never opens (it would have no sensible voter set): it is cancelled.
+  let pilot: string[] = []
+  if (p.isTest) {
+    if (opts.pilot) pilot = [...opts.pilot]
+    else {
+      const st = await loadPilotState()
+      // An unreadable list must not cancel a test proposal: fail, and the cron retries.
+      if (st.unknown) throw new Error('pilot list unreadable')
+      pilot = st.ids
+    }
+  }
+  if (p.isTest && pilot.length === 0) {
+    await prisma.$transaction(async (tx) => {
+      await lockProposal(tx, id)
+      const fresh = await tx.proposal.findUnique({ where: { id }, select: { status: true } })
+      if (fresh?.status !== 'DRAFT') return
+      await tx.proposal.update({ where: { id }, data: { status: 'CANCELLED', closedAt: now } })
+      await logEvent(tx, id, 'CANCELLED', null, { reason: 'pilot_over' })
+    })
+    return { ok: false, code: 'pilot_over' }
+  }
+  const full = await snapshotRoleHolders(opts.deps ?? defaultRoleDeps)
+  const snap = p.isTest ? { ...full, discordIds: full.discordIds.filter((d) => pilot.includes(d)) } : full
   const pair = await generateProposalKeyPair(opts.keyBits)
   const keyPrivateEnc = await wrapPrivateKey(pair.privatePem, id, env)
-  const closesAt = new Date(now.getTime() + rules.windowDays * DAY_MS)
-  const ayesNeeded = ayesNeededFor(p.kind, p.amountUsdCents, rules)
+  const windowMs = p.isTest ? (rules.pilotWindowMinutes ?? 60) * 60 * 1000 : rules.windowDays * DAY_MS
+  const closesAt = new Date(now.getTime() + windowMs)
+  const ayesNeeded = p.isTest ? 1 : ayesNeededFor(p.kind, p.amountUsdCents, rules)
   return prisma.$transaction(async (tx) => {
     await lockProposal(tx, id)
     const fresh = await tx.proposal.findUnique({ where: { id }, select: { status: true } })
@@ -135,9 +162,61 @@ export async function openProposal(
         keyPrivateEnc,
       },
     })
-    await logEvent(tx, id, 'OPENED', null, { eligible: snap.discordIds.length, ayesNeeded, windowDays: rules.windowDays })
+    await logEvent(tx, id, 'OPENED', null, { eligible: snap.discordIds.length, ayesNeeded, ...(p.isTest ? { test: true, windowMinutes: windowMs / 60000 } : { windowDays: rules.windowDays }) })
     return { ok: true as const, eligible: snap.discordIds.length }
   })
+}
+
+/** Proposals a member has waiting or open right now (the per-proposer cap). */
+export async function countActiveFor(proposerDiscordId: string): Promise<number> {
+  return prisma.proposal.count({ where: { source: 'APP', proposerDiscordId, status: { in: ['DRAFT', 'OPEN'] } } })
+}
+
+// ------------------------------------------------------------------ cancel
+
+export type CancelActor = { discordId: string; admin: boolean }
+export type CancelResult =
+  | { ok: true; wasOpen: boolean; discordChannelId: string | null; discordMessageId: string | null }
+  | { ok: false; code: 'not_found' | 'not_cancellable' | 'not_allowed' | 'bad_reason' }
+
+/**
+ * Cancel (admin) or withdraw (the proposer) a proposal that has not been counted. Admins: a DRAFT, or an OPEN proposal
+ * until the window ends. The proposer: their own DRAFT, or their own OPEN proposal until the window ends.
+ * Under the row lock it sets CANCELLED and closedAt, logs the actor and reason, and deletes the ballot rows; after the
+ * commit it deletes the pending hash. A cancelled proposal is never counted, so nothing it held can matter.
+ */
+export async function cancelProposal(
+  id: string,
+  actor: CancelActor,
+  reason: unknown,
+  opts: { now?: Date; pending?: PendingOpt } = {},
+): Promise<CancelResult> {
+  const now = opts.now ?? new Date()
+  const text = typeof reason === 'string' ? reason.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').trim().slice(0, 300) : ''
+  if (actor.admin && text.length < 3) return { ok: false, code: 'bad_reason' }
+  const result = await prisma.$transaction(async (tx) => {
+    await lockProposal(tx, id)
+    const p = await tx.proposal.findUnique({
+      where: { id },
+      select: { status: true, source: true, proposerDiscordId: true, closesAt: true, discordChannelId: true, discordMessageId: true },
+    })
+    if (!p || p.source !== 'APP') return { ok: false as const, code: 'not_found' as const }
+    if (p.status !== 'DRAFT' && p.status !== 'OPEN') return { ok: false as const, code: 'not_cancellable' as const }
+    // Once the window has ended the votes are in: nobody (admins included) can cancel it any more; it settles.
+    if (p.status === 'OPEN' && (!p.closesAt || now >= p.closesAt)) return { ok: false as const, code: 'not_cancellable' as const }
+    if (!actor.admin && (!p.proposerDiscordId || p.proposerDiscordId !== actor.discordId)) return { ok: false as const, code: 'not_allowed' as const }
+    const wasOpen = p.status === 'OPEN'
+    const { discordChannelId, discordMessageId } = p
+    await tx.proposal.update({ where: { id }, data: { status: 'CANCELLED', closedAt: now } })
+    await tx.proposalBallot.deleteMany({ where: { proposalId: id } })
+    await logEvent(tx, id, 'CANCELLED', actor.discordId, { by: actor.admin ? 'admin' : 'proposer', reason: text || null, wasOpen })
+    return { ok: true as const, wasOpen, discordChannelId, discordMessageId }
+  })
+  if (result.ok) {
+    const store = pendingFor(opts.pending)
+    if (store) await store.clear(id).catch((e) => console.error('[proposals] pending clear failed:', (e as Error)?.name))
+  }
+  return result
 }
 
 /** The proposal's public voting key and fingerprint (null until it has opened). */
@@ -254,6 +333,13 @@ export async function castBallot(
       await store.put(proposalId, tokenHash, choice as Choice)
     } catch {
       return { ok: false, code: 'unavailable' }
+    }
+    // A cancel may have landed between the check above and the write: re-check, and clear the hash again if so, so
+    // a vote racing a cancel leaves no orphan in Redis.
+    const after = await prisma.proposal.findUnique({ where: { id: proposalId }, select: { status: true } })
+    if (!after || after.status !== 'OPEN') {
+      await store.clear(proposalId).catch(() => {})
+      return { ok: false, code: 'closed' }
     }
     return { ok: true }
   }
@@ -483,15 +569,23 @@ export async function viewerStates(proposalIds: string[], discordId: string): Pr
 
 export async function listProposals(recentLimit = 30): Promise<{ open: ProposalSummary[]; recent: ProposalSummary[] }> {
   const [open, recent] = await Promise.all([
-    prisma.proposal.findMany({ where: { source: 'APP', status: { in: ['DRAFT', 'OPEN'] } }, orderBy: { createdAt: 'desc' }, take: 100, select: SUMMARY_SELECT }),
-    prisma.proposal.findMany({ where: { source: 'APP', status: { in: ['PASSED', 'FAILED'] } }, orderBy: { closedAt: 'desc' }, take: recentLimit, select: SUMMARY_SELECT }),
+    prisma.proposal.findMany({ where: { source: 'APP', isTest: false, status: { in: ['DRAFT', 'OPEN'] } }, orderBy: { createdAt: 'desc' }, take: 100, select: SUMMARY_SELECT }),
+    prisma.proposal.findMany({ where: { source: 'APP', isTest: false, status: { in: ['PASSED', 'FAILED'] } }, orderBy: { closedAt: 'desc' }, take: recentLimit, select: SUMMARY_SELECT }),
   ])
   return { open: (open as ProposalRow[]).map(toSummary), recent: (recent as ProposalRow[]).map(toSummary) }
 }
 
-/** The proposals open for voting (and drafts about to open): app proposals only. */
-export async function listOpenProposals(): Promise<ProposalSummary[]> {
-  const rows = await prisma.proposal.findMany({ where: { source: 'APP', status: { in: ['DRAFT', 'OPEN'] } }, orderBy: { createdAt: 'desc' }, take: 100, select: SUMMARY_SELECT })
+/**
+ * The proposals open for voting (and drafts about to open): app proposals only. Test (pilot) proposals are left out
+ * unless `includeTest` (a pilot tester looking at the list); they never reach history, totals or the payments picker.
+ */
+export async function listOpenProposals(opts: { includeTest?: boolean } = {}): Promise<ProposalSummary[]> {
+  const rows = await prisma.proposal.findMany({
+    where: { source: 'APP', ...(opts.includeTest ? {} : { isTest: false }), status: { in: ['DRAFT', 'OPEN'] } },
+    orderBy: { createdAt: 'desc' },
+    take: 100,
+    select: SUMMARY_SELECT,
+  })
   return (rows as ProposalRow[]).map(toSummary)
 }
 
@@ -517,15 +611,30 @@ export interface ProposalDetail extends ProposalSummary {
   ayesNeeded: number | null
   eligibleCount: number | null
   isProposer: boolean
+  /** The viewer is the proposer and it is not over: waiting to open, or open and before the window ends. */
+  withdrawable: boolean
   outcomeSource: string | null
+  /** Optional member who may file the payment requests (named by the proposer). */
+  beneficiaryDiscordId: string | null
+  isTest: boolean
+  /** A DRAFT that should have opened by now: an open attempt failed, or it has waited a while. */
+  openDelayed: boolean
 }
+
+/** A draft that has waited this long without opening is shown as delayed. */
+export const OPEN_DELAYED_AFTER_MS = 10 * 60 * 1000
 
 export async function getProposalDetail(id: string, viewerDiscordId: string): Promise<ProposalDetail | null> {
   const r = await prisma.proposal.findUnique({
     where: { id },
-    select: { ...SUMMARY_SELECT, body: true, eventDate: true, sponsorLabel: true, eligibleCount: true, proposerDiscordId: true, keyFingerprint: true, outcomeSource: true },
+    select: { ...SUMMARY_SELECT, body: true, eventDate: true, sponsorLabel: true, eligibleCount: true, proposerDiscordId: true, keyFingerprint: true, outcomeSource: true, beneficiaryDiscordId: true, isTest: true },
   })
   if (!r) return null
+  let openDelayed = false
+  if (r.status === 'DRAFT' && r.source !== 'IMPORTED') {
+    const failed = await prisma.proposalEvent.findFirst({ where: { proposalId: id, type: 'OPEN_FAILED' }, select: { id: true } }).catch(() => null)
+    openDelayed = !!failed || (!!r.createdAt && Date.now() - new Date(r.createdAt).getTime() > OPEN_DELAYED_AFTER_MS)
+  }
   return {
     ...toSummary(r as ProposalRow),
     body: r.body,
@@ -535,14 +644,22 @@ export async function getProposalDetail(id: string, viewerDiscordId: string): Pr
     ayesNeeded: r.ayesNeeded,
     eligibleCount: r.eligibleCount,
     isProposer: !!r.proposerDiscordId && r.proposerDiscordId === viewerDiscordId,
+    withdrawable:
+      r.source !== 'IMPORTED' &&
+      !!r.proposerDiscordId &&
+      r.proposerDiscordId === viewerDiscordId &&
+      (r.status === 'DRAFT' || (r.status === 'OPEN' && !!r.closesAt && r.closesAt.getTime() > Date.now())),
     outcomeSource: r.outcomeSource ?? null,
+    beneficiaryDiscordId: r.beneficiaryDiscordId ?? null,
+    isTest: r.isTest === true,
+    openDelayed,
   }
 }
 
-/** Passed funding proposals the member filed, newest first: the ones a payment request can link to. */
+/** Passed funding proposals the member filed or is the named beneficiary of, newest first: the ones a payment request can link to. Never test proposals. */
 export async function passedFundingProposalsFor(discordId: string): Promise<Array<{ id: string; title: string; amountUsd: number }>> {
   const rows = await prisma.proposal.findMany({
-    where: { source: 'APP', kind: 'FUNDING', status: 'PASSED', proposerDiscordId: discordId, amountUsdCents: { not: null } },
+    where: { source: 'APP', isTest: false, kind: 'FUNDING', status: 'PASSED', OR: [{ proposerDiscordId: discordId }, { beneficiaryDiscordId: discordId }], amountUsdCents: { not: null } },
     orderBy: { closedAt: 'desc' },
     take: 50,
     select: { id: true, title: true, amountUsdCents: true },
@@ -551,3 +668,48 @@ export async function passedFundingProposalsFor(discordId: string): Promise<Arra
 }
 
 export { DRAFT_RETRY_MS }
+
+export interface AdminProposalRow {
+  id: string
+  title: string
+  kind: 'FUNDING' | 'GENERAL'
+  status: ProposalSummary['status']
+  isTest: boolean
+  createdAt: string
+  closesAt: string | null
+  /** A draft that has waited past the stuck threshold. */
+  stuck: boolean
+  /** The code of the latest OPEN_FAILED event of a draft (never a message). */
+  failureCode: string | null
+}
+
+/** The /admin/proposals list: waiting and open app proposals (test ones too), then the latest closed ones. */
+export async function listForAdmin(now: Date = new Date(), stuckAfterMs = 2 * 60 * 60 * 1000): Promise<{ active: AdminProposalRow[]; recent: AdminProposalRow[] }> {
+  const select = { id: true, title: true, kind: true, status: true, isTest: true, createdAt: true, closesAt: true } as const
+  const [active, recent] = await Promise.all([
+    prisma.proposal.findMany({ where: { source: 'APP', status: { in: ['DRAFT', 'OPEN'] } }, orderBy: { createdAt: 'asc' }, take: 200, select }),
+    prisma.proposal.findMany({ where: { source: 'APP', status: { in: ['PASSED', 'FAILED', 'CANCELLED'] } }, orderBy: { updatedAt: 'desc' }, take: 20, select }),
+  ])
+  type Row = { id: string; title: string; kind: 'FUNDING' | 'GENERAL'; status: ProposalSummary['status']; isTest: boolean; createdAt: Date; closesAt: Date | null }
+  const drafts = (active as Row[]).filter((r) => r.status === 'DRAFT').map((r) => r.id)
+  const failures = drafts.length
+    ? ((await prisma.proposalEvent.findMany({ where: { proposalId: { in: drafts }, type: 'OPEN_FAILED' }, orderBy: { createdAt: 'asc' }, select: { proposalId: true, data: true } })) as Array<{ proposalId: string; data: unknown }>)
+    : []
+  const lastCode = new Map<string, string>()
+  for (const f of failures) {
+    const code = (f.data as { code?: unknown } | null)?.code
+    if (typeof code === 'string') lastCode.set(f.proposalId, code.slice(0, 40))
+  }
+  const row = (r: Row): AdminProposalRow => ({
+    id: r.id,
+    title: r.title,
+    kind: r.kind,
+    status: r.status,
+    isTest: r.isTest,
+    createdAt: r.createdAt.toISOString(),
+    closesAt: r.closesAt?.toISOString() ?? null,
+    stuck: r.status === 'DRAFT' && now.getTime() - r.createdAt.getTime() > stuckAfterMs,
+    failureCode: r.status === 'DRAFT' ? (lastCode.get(r.id) ?? null) : null,
+  })
+  return { active: (active as Row[]).map(row), recent: (recent as Row[]).map(row) }
+}
