@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 import { TURTLES } from '@/app/ui/constants'
 import { useToast } from '@/app/ui/shared/Toast'
 import { LoginPrompt } from '@/app/ui/shared/LoginPrompt'
@@ -17,6 +18,7 @@ import { CrewGettingStarted } from './CrewGettingStarted'
 import { CrewBounties } from './CrewBounties'
 import { CrewDrafts } from './CrewDrafts'
 import { CrewCallUpdates } from './CrewCallUpdates'
+import { isClosedTask, tasksForGoal } from './goal-tasks'
 import { crewHasFeature } from '@/app/lib/crew-features'
 
 // Loading stages to show progress
@@ -40,6 +42,8 @@ type CrewData = {
     callTimeUrl?: string
     callLength?: string
     channel?: string
+    /** Link to the crew's Discord channel, resolved on the server. */
+    discordUrl?: string
     role?: string
     sheet?: string
   }
@@ -120,6 +124,8 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
   const [leaving, setLeaving] = useState(false)
   const [manuals, setManuals] = useState<Manual[]>([])
   const [shareCopied, setShareCopied] = useState(false)
+  const t = useTranslations('crewPage')
+  const [openGoals, setOpenGoals] = useState<Record<number, boolean>>({})
 
   // Collapsed section state
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
@@ -529,7 +535,13 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
                   <span style={badge()}>🕐 {crew.callTime}</span>
                 ))}
               {crew.callLength && <span style={badge()}>⏱ {crew.callLength}</span>}
-              {crew.channel && <span style={badge()}>💬 #{crew.channel}</span>}
+              {crew.discordUrl ? (
+                <a href={crew.discordUrl} target="_blank" rel="noopener noreferrer" style={{ ...badge(), textDecoration: 'none' }}>
+                  💬 {t('joinDiscord')}
+                </a>
+              ) : (
+                crew.channel && <span style={badge()}>💬 #{crew.channel.replace(/^#/, '')}</span>
+              )}
             </div>
 
             {/* Visitor CTAs: Join + Share — onion-15370 editorial pill CTAs */}
@@ -544,21 +556,25 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
                 position: 'relative',
               }}
             >
-              {/* handwritten margin annotation near the Join CTA */}
+              {/* The handwritten note hangs off the left edge of the Join CTA (wrapper-relative,
+                  hidden on narrow screens) so it can never sit on top of the button. */}
+              <span style={{ position: 'relative', display: 'inline-flex' }}>
               <span
                 aria-hidden
                 className="handwritten onion-join-margin"
                 style={{
                   position: 'absolute',
-                  left: '50%',
-                  transform: 'translate(-145px, -28px) rotate(-8deg)',
+                  right: '100%',
+                  top: '50%',
+                  marginRight: 12,
+                  transform: 'translateY(-50%) rotate(-8deg)',
                   fontSize: 18,
                   color: 'hsl(var(--tomato))',
                   pointerEvents: 'none',
                   whiteSpace: 'nowrap',
                 }}
               >
-                join us →
+                {t('joinUs')} →
               </span>
               {user ? (
                 <button
@@ -591,6 +607,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
                   Log in to join
                 </Link>
               )}
+              </span>
               <button
                 onClick={handleShare}
                 className="btn-pill"
@@ -607,7 +624,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
               </button>
               <style>{`
                 .onion-join-margin { display: none; }
-                @media (min-width: 640px) {
+                @media (min-width: 820px) {
                   .onion-join-margin { display: inline-block; }
                 }
               `}</style>
@@ -918,6 +935,13 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
             )}
             {crew.callLength && (
               <span style={badge()}>⏱ {crew.callLength}</span>
+            )}
+            {crew.discordUrl ? (
+              <a href={crew.discordUrl} target="_blank" rel="noopener noreferrer" style={{ ...badge(), textDecoration: 'none' }}>
+                💬 {t('joinDiscord')}
+              </a>
+            ) : (
+              crew.channel && <span style={badge()}>💬 #{crew.channel.replace(/^#/, '')}</span>
             )}
             {crew.sheet && (
               <a
@@ -1246,14 +1270,69 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
             </h2>
             {!collapsedSections.goals && (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))', gap: 12 }}>
-                {goals.map((goal, i) => (
-                  <div key={i} style={itemCard(goal.priority)}>
-                    {goal.priority && (
-                      <span style={priorityBadge(goal.priority)}>{goal.priority}</span>
-                    )}
-                    <div style={{ fontWeight: 500, marginTop: goal.priority ? 8 : 0 }}>{goal.description}</div>
-                  </div>
-                ))}
+                {goals.map((goal, i) => {
+                  const allGoalTasks = tasksForGoal(goal, tasks)
+                  const goalTasks = allGoalTasks.filter((x) => !isClosedTask(x))
+                  const doneCount = allGoalTasks.length - goalTasks.length
+                  const isOpen = !!openGoals[i]
+                  return (
+                    <div key={i} style={{ ...itemCard(goal.priority), gridColumn: isOpen ? '1 / -1' : undefined }}>
+                      <button
+                        type="button"
+                        onClick={() => setOpenGoals((prev) => ({ ...prev, [i]: !prev[i] }))}
+                        aria-expanded={isOpen}
+                        aria-controls={`goal-tasks-${i}`}
+                        className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30"
+                        style={{ background: 'none', border: 0, padding: 0, margin: 0, font: 'inherit', color: 'inherit', textAlign: 'left', cursor: 'pointer', display: 'block', width: '100%', boxSizing: 'border-box', minHeight: 44 }}
+                      >
+                        {goal.priority && (
+                          <span style={priorityBadge(goal.priority)}>{goal.priority}</span>
+                        )}
+                        <div style={{ fontWeight: 500, marginTop: goal.priority ? 8 : 0, overflowWrap: 'anywhere' }}>{goal.description}</div>
+                        <div style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))', marginTop: 6 }}>
+                          {isOpen ? '▼' : '▶'} {t('goalTasks', { count: goalTasks.length })}{doneCount > 0 && ` · ${t('goalDone', { count: doneCount })}`}
+                        </div>
+                      </button>
+                      {isOpen && (
+                        <div id={`goal-tasks-${i}`} style={{ marginTop: 8, display: 'grid', gap: 8 }}>
+                          {goalTasks.length === 0 && (
+                            <div style={{ fontSize: 13, color: 'hsl(var(--muted-foreground))' }}>{doneCount > 0 ? t('goalAllDone') : t('goalNoTasks')}</div>
+                          )}
+                          {goalTasks.map((task, ti) => (
+                            <div key={ti} style={{ borderTop: '1px solid hsl(var(--rule-warm) / 0.4)', paddingTop: 8 }}>
+                              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                                {task.priority && <span style={priorityBadge(task.priority)}>{task.priority}</span>}
+                                {task.stage && <span style={stageBadge(task.stage)}>{task.stage}</span>}
+                              </div>
+                              <div style={{ marginTop: 6, fontWeight: 600, overflowWrap: 'anywhere' }}>
+                                {task.url ? (
+                                  <a href={task.url} target="_blank" rel="noreferrer" style={inlineLink()}>{task.task}</a>
+                                ) : (
+                                  task.task
+                                )}
+                              </div>
+                              {((task.lead && task.lead !== '#N/A') || task.dueDate) && (
+                                <div style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))', marginTop: 4 }}>
+                                  {task.lead && task.lead !== '#N/A' && (
+                                    <span>
+                                      {t('lead')}:{' '}
+                                      {task.leadId ? <Link href={`/profile/${task.leadId}`} style={tomatoLink()}>{task.lead}</Link> : task.lead}
+                                    </span>
+                                  )}
+                                  {task.lead && task.lead !== '#N/A' && task.dueDate && <span> • </span>}
+                                  {task.dueDate && <span>{t('due')}: {task.dueDate}</span>}
+                                </div>
+                              )}
+                              {task.notes && (
+                                <div style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))', marginTop: 4, fontStyle: 'italic' }}>{task.notes}</div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>

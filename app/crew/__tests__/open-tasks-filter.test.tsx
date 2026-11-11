@@ -1,6 +1,8 @@
 import React, { Suspense } from 'react'
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { NextIntlClientProvider } from 'next-intl'
+import en from '@/messages/en.json'
 import CrewPage from '../[crewId]/CrewPageClient'
 
 vi.mock('../[crewId]/CrewGettingStarted', () => ({ CrewGettingStarted: () => null }))
@@ -156,7 +158,7 @@ async function renderCrewPage(
   await act(async () => {
     render(
       <Suspense fallback={<div>Loading...</div>}>
-        <CrewPage params={paramsPromise} />
+        <NextIntlClientProvider locale="en" messages={en}><CrewPage params={paramsPromise} /></NextIntlClientProvider>
       </Suspense>
     )
   })
@@ -395,7 +397,7 @@ describe('CrewPage open tasks filter', () => {
     await act(async () => {
       render(
         <Suspense fallback={<div>Loading...</div>}>
-          <CrewPage params={paramsPromise} />
+          <NextIntlClientProvider locale="en" messages={en}><CrewPage params={paramsPromise} /></NextIntlClientProvider>
         </Suspense>
       )
     })

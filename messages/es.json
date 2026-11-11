@@ -1153,6 +1153,16 @@
     "pep": "PEP son los puntos de la comunidad PizzaDAO. Gánalos contribuyendo y descubre en qué puedes gastarlos.",
     "poaps": "Los POAPs son insignias digitales que se coleccionan en eventos de la comunidad."
   },
+  "crewPage": {
+    "joinDiscord": "Unirse en Discord",
+    "joinUs": "únete",
+    "goalTasks": "{count, plural, =0 {Sin tareas} one {# tarea} other {# tareas}}",
+    "goalDone": "{count, plural, =0 {} one {# hecha} other {# hechas}}",
+    "goalAllDone": "Todas las tareas de este objetivo están hechas.",
+    "goalNoTasks": "Todavía no hay tareas vinculadas a este objetivo.",
+    "lead": "Responsable",
+    "due": "Fecha límite"
+  },
   "crewGettingStarted": {
     "title": "Participa",
     "focus": "Enfoque actual:",
