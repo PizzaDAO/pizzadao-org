@@ -17,7 +17,7 @@ vi.mock('@/app/lib/roster-writeback', () => ({
 vi.mock('@/app/lib/settings', () => ({ loadSettings: async () => ({ get: (k: string) => settingValues.get(k) }) }))
 vi.mock('@/app/lib/settings/toggles', () => ({ toggleEnabled: () => toggle() }))
 
-import { parseExcludeIds, planRosterAdds, runRosterAutoAdd, type AttendanceRow, type RosterAutoAddDeps, type RosterMember } from './roster-auto-add'
+import { parseExcludeIds, planRosterAdds, roundRobinByCrew, runRosterAutoAdd, type AttendanceRow, type PageRoster, type RosterAutoAddDeps, type RosterMember } from './roster-auto-add'
 
 const id = (n: number) => `1000000000000000${String(n).padStart(3, '0')}`
 const day = (n: number) => new Date(Date.UTC(2026, 9, n))
@@ -25,6 +25,12 @@ const row = (n: number, crewId: string, d: number): AttendanceRow => ({ discordI
 const member = (n: number, crews: string[] = []): RosterMember => ({ id: `m${n}`, discordId: id(n), crews: new Set(crews) })
 const rule = { minCalls: 2, windowCalls: 4 }
 const known = new Set(['ops', 'comms'])
+const pageOf = (ids: string[] = [], o: Partial<Record<'names' | 'removedMemberIds' | 'removedNames', string[]>> = {}): PageRoster => ({
+  memberIds: new Set(ids),
+  names: new Set(o.names),
+  removedMemberIds: new Set(o.removedMemberIds),
+  removedNames: new Set(o.removedNames),
+})
 
 const plan = (rows: AttendanceRow[], members: RosterMember[], extra: Partial<Parameters<typeof planRosterAdds>[0]> = {}) =>
   planRosterAdds({ rows, members, knownCrews: known, excluded: new Set(), rule, ...extra })
@@ -76,7 +82,7 @@ describe('planRosterAdds: crew page and role', () => {
   const rows = [row(1, 'ops', 1), row(1, 'ops', 8)]
   it('plans a page row and a role for a member already in the Crews cell (heal, additive)', () => {
     const p = plan(rows, [member(1, ['ops'])], {
-      pageRosters: new Map([['ops', new Set<string>()]]),
+      pageRosters: new Map([['ops', pageOf()]]),
       roleIds: new Map([['ops', '555']]),
       heldRoles: new Map([[id(1), new Set<string>()]]),
     })
@@ -85,11 +91,24 @@ describe('planRosterAdds: crew page and role', () => {
   it('plans nothing once cell, page and role are all there', () => {
     expect(
       plan(rows, [member(1, ['ops'])], {
-        pageRosters: new Map([['ops', new Set(['m1'])]]),
+        pageRosters: new Map([['ops', pageOf(['m1'])]]),
         roleIds: new Map([['ops', '555']]),
         heldRoles: new Map([[id(1), new Set(['555'])]]),
       }),
     ).toEqual([])
+  })
+  it('an archived page row means a deliberate removal: no cell, page or role is planned', () => {
+    const p = plan(rows, [member(1)], { pageRosters: new Map([['ops', pageOf([], { removedMemberIds: ['m1'] })]]), roleIds: new Map([['ops', '555']]), heldRoles: new Map([[id(1), new Set<string>()]]) })
+    expect(p).toEqual([])
+  })
+  it('an active row wins over an archived one for the same member', () => {
+    const p = plan(rows, [member(1, ['ops'])], { pageRosters: new Map([['ops', pageOf(['m1'], { removedMemberIds: ['m1'] })]]) })
+    expect(p).toEqual([])
+  })
+  it('a legacy name-keyed row counts as present (no duplicate page row); an archived one as removed', () => {
+    const named = { ...member(1, ['ops']), name: 'Tony  Pepperoni' }
+    expect(plan(rows, [named], { pageRosters: new Map([['ops', pageOf([], { names: ['tony pepperoni'] })]]) })).toEqual([])
+    expect(plan(rows, [{ ...named, crews: new Set<string>() }], { pageRosters: new Map([['ops', pageOf([], { removedNames: ['tony pepperoni'] })]]) })).toEqual([])
   })
   it('sheet-sourced crews (absent from pageRosters) get no page row; unknown roles plan no role grant', () => {
     const p = plan(rows, [member(1, ['ops'])], { roleIds: new Map([['ops', '555']]), heldRoles: null })
@@ -113,7 +132,7 @@ function makeDeps(over: Partial<RosterAutoAddDeps> = {}) {
     loadMembers: async () => [member(1, cells.get('m1')), member(2, cells.get('m2'))],
     loadCrews: async () => [{ id: 'ops', role: '<@&555>' }],
     botIds: async () => new Set(),
-    loadPageRosters: async () => ({ rosters: new Map([['ops', new Set(page)]]), sheetSourced: [] }),
+    loadPageRosters: async () => ({ rosters: new Map([['ops', pageOf([...page])]]), sheetSourced: [] }),
     addToCrewPage: vi.fn(async ({ memberId }) => {
       if (page.has(memberId)) return 'exists' as const
       page.add(memberId)
@@ -194,7 +213,18 @@ describe('runRosterAutoAdd', () => {
     cells.set('m1', ['ops'])
     const r = await runRosterAutoAdd({}, deps)
     expect(r).toMatchObject({ added: 0, pageAdded: 1, roleGranted: 1 })
-    expect(deps.updateCrews).not.toHaveBeenCalled()
+    // Only the live re-read before the role grant (a dry run), never an apply.
+    for (const [input] of (deps.updateCrews as ReturnType<typeof vi.fn>).mock.calls) expect(input.mode).toBe('dry-run')
+  })
+
+  it('does not grant the role when the live Crews cell no longer has the crew (a deliberate removal)', async () => {
+    const { deps, cells } = makeDeps()
+    cells.set('m1', ['ops'])
+    const live = deps.updateCrews as ReturnType<typeof vi.fn>
+    live.mockImplementation(async (i: { mode?: string }) => ({ mode: i.mode, applied: false, changed: true, range: '', before: '', after: '', crews: [] }))
+    const r = await runRosterAutoAdd({}, deps)
+    expect(deps.writeRole).not.toHaveBeenCalled()
+    expect(r).toMatchObject({ roleGranted: 0, roleSkipped: 1, pageAdded: 1 })
   })
 
   it('never removes: no remove action is ever sent', async () => {
@@ -227,5 +257,81 @@ describe('runRosterAutoAdd', () => {
     expect(cells.get('m1')).toEqual(['ops'])
     // Tomorrow: cell and page are there, only the role is still planned.
     expect(await runRosterAutoAdd({ dryRun: true }, deps)).toMatchObject({ perCrew: { crewsCell: {}, crewPage: {}, role: { ops: 1 } } })
+  })
+
+  const crewFixture = (crewIds: string[], perCrew: number) => {
+    const ms: RosterMember[] = []
+    const rows: AttendanceRow[] = []
+    let n = 10
+    for (const c of crewIds)
+      for (let k = 0; k < perCrew; k++) {
+        n++
+        ms.push(member(n))
+        rows.push(row(n, c, 1), row(n, c, 8))
+      }
+    return { ms, rows }
+  }
+
+  it('round-robins across crews so one crew cannot use the whole cap', async () => {
+    settingValues.set('crews.rosterAutoAddMaxPerRun', 2)
+    const { ms, rows } = crewFixture(['comms', 'ops'], 3)
+    const { deps, cells } = makeDeps({
+      loadRows: async () => rows,
+      loadMembers: async () => ms,
+      loadCrews: async () => [{ id: 'comms' }, { id: 'ops' }],
+      loadPageRosters: async () => ({ rosters: new Map(), sheetSourced: [] }),
+      loadHeldRoles: async () => new Map(),
+    })
+    for (const m of ms) cells.set(m.id, [])
+    const r = await runRosterAutoAdd({}, deps)
+    const crewsWritten = new Set((deps.updateCrews as ReturnType<typeof vi.fn>).mock.calls.filter(([i]) => i.mode === 'apply').map(([i]) => i.crewId))
+    expect(r).toMatchObject({ added: 2, deferred: 4 })
+    expect(crewsWritten).toEqual(new Set(['comms', 'ops']))
+  })
+
+  it('roundRobinByCrew interleaves', () => {
+    const mk = (crewId: string, n: number) => ({ crewId, memberId: `m${n}`, discordId: id(n), cell: true, page: false, role: false })
+    expect(roundRobinByCrew([mk('a', 1), mk('a', 2), mk('b', 3)]).map((p) => p.memberId)).toEqual(['m1', 'm3', 'm2'])
+  })
+
+  it('failures do not use up the cap: a broken member is skipped and others still get written', async () => {
+    settingValues.set('crews.rosterAutoAddMaxPerRun', 1)
+    const { ms, rows } = crewFixture(['ops'], 3)
+    const { RosterWritebackError } = await import('@/app/lib/roster-writeback')
+    const { deps, cells } = makeDeps({
+      loadRows: async () => rows,
+      loadMembers: async () => ms,
+      loadPageRosters: async () => ({ rosters: new Map(), sheetSourced: [] }),
+      loadHeldRoles: async () => new Map(),
+    })
+    for (const m of ms) cells.set(m.id, [])
+    const inner = deps.updateCrews
+    deps.updateCrews = vi.fn(async (i) => {
+      if (i.memberId === ms[0].id || i.memberId === ms[1].id) throw new RosterWritebackError('not found', 404)
+      return inner(i)
+    })
+    const r = await runRosterAutoAdd({}, deps)
+    expect(r).toMatchObject({ added: 1, failed: 2 })
+    expect(cells.get(ms[2].id)).toEqual(['ops'])
+  })
+
+  it('a 403 on a crew role stops that crew\'s grants for the run, other crews continue', async () => {
+    settingValues.set('crews.rosterAutoAddMaxPerRun', 10)
+    const { ms, rows } = crewFixture(['comms', 'ops'], 2)
+    const roleOf: Record<string, string> = { comms: '111', ops: '222' }
+    const { deps, cells } = makeDeps({
+      loadRows: async () => rows,
+      loadMembers: async () => ms,
+      loadCrews: async () => [{ id: 'comms', role: '111' }, { id: 'ops', role: '222' }],
+      loadPageRosters: async () => ({ rosters: new Map(), sheetSourced: [] }),
+      loadHeldRoles: async () => new Map(ms.map((m) => [m.discordId, new Set<string>()])),
+      writeRole: vi.fn(async (op) => ({ status: (op as { roleId: string }).roleId === roleOf.comms ? 403 : 204, remaining: 5, resetAfterMs: null, retryAfterMs: null, blocked: false })),
+    })
+    for (const m of ms) cells.set(m.id, [])
+    const r = await runRosterAutoAdd({}, deps)
+    const calls = (deps.writeRole as ReturnType<typeof vi.fn>).mock.calls.map(([op]) => op.roleId)
+    expect(calls.filter((c) => c === '111')).toHaveLength(1)
+    expect(calls.filter((c) => c === '222')).toHaveLength(2)
+    expect(r).toMatchObject({ crewsRoleBlocked: 1, roleFailed: 1, roleGranted: 2, added: 4 })
   })
 })

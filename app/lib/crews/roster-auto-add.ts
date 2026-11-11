@@ -28,6 +28,8 @@ import { toggleEnabled } from '@/app/lib/settings/toggles'
 export const LOOKBACK_DAYS = 180
 const DISCORD_ID = /^\d{17,20}$/
 const MAX_RESET_WAIT_MS = 5_000
+/** Stop starting new work after this long so one run stays inside the route's maxDuration. */
+const RUN_BUDGET_MS = 90_000
 const ACTOR = 'roster-auto-add'
 const AUDIT_REASON = 'Crew roster: added from call attendance'
 
@@ -49,6 +51,20 @@ export interface RosterRule {
   minCalls: number
   windowCalls: number
 }
+
+/** What the crew page roster (DB-sourced crews) holds, for one crew. */
+export interface PageRoster {
+  /** Active rows' member ids. */
+  memberIds: ReadonlySet<string>
+  /** Normalized names of active rows with no member id (legacy name-keyed rows). */
+  names: ReadonlySet<string>
+  /** Archived rows' member ids: someone deliberately took them off. */
+  removedMemberIds: ReadonlySet<string>
+  /** Normalized names of archived rows with no member id. */
+  removedNames: ReadonlySet<string>
+}
+
+export const normName = (v: unknown) => String(v ?? '').trim().replace(/\s+/g, ' ').toLowerCase()
 
 export interface PlannedAdd {
   crewId: string
@@ -78,15 +94,15 @@ export function planRosterAdds(input: {
   excluded: ReadonlySet<string>
   botIds?: ReadonlySet<string>
   rule: RosterRule
-  /** Crew id -> member ids already on the crew page roster (archived rows included). Only crews whose roster reads from the DB. */
-  pageRosters?: ReadonlyMap<string, ReadonlySet<string>>
+  /** Crew id -> the crew page roster. Only crews whose roster reads from the DB. */
+  pageRosters?: ReadonlyMap<string, PageRoster>
   /** Crew id -> Discord role id (absent or null: no role to grant). */
   roleIds?: ReadonlyMap<string, string | null>
   /** Discord id -> role ids held now; null/absent when unknown (then no role is planned). */
   heldRoles?: ReadonlyMap<string, ReadonlySet<string>> | null
 }): PlannedAdd[] {
   const { rows, members, knownCrews, excluded, rule } = input
-  const pageRosters = input.pageRosters ?? new Map<string, ReadonlySet<string>>()
+  const pageRosters = input.pageRosters ?? new Map<string, PageRoster>()
   const roleIds = input.roleIds ?? new Map<string, string | null>()
   const bots = input.botIds ?? new Set<string>()
   const byDiscord = new Map<string, RosterMember>()
@@ -116,8 +132,13 @@ export function planRosterAdds(input: {
       if (excluded.has(discordId) || bots.has(discordId) || discordId.startsWith('UNRESOLVED:')) continue
       const m = byDiscord.get(discordId)
       if (!m) continue
+      const pr = pageRosters.get(crewId)
+      const name = normName(m.name)
+      const onPage = !!pr && (pr.memberIds.has(m.id) || (!!name && pr.names.has(name)))
+      // An archived row means someone took them off on purpose: nothing is added back (cell, page or role).
+      if (pr && !onPage && (pr.removedMemberIds.has(m.id) || (!!name && pr.removedNames.has(name)))) continue
       const cell = !m.crews.has(crewId)
-      const page = pageRosters.has(crewId) && !pageRosters.get(crewId)!.has(m.id)
+      const page = !!pr && !onPage
       const roleId = roleIds.get(crewId)
       const held = input.heldRoles?.get(discordId)
       const role = !!roleId && !!held && !held.has(roleId)
@@ -161,7 +182,7 @@ export interface RosterAutoAddDeps {
   loadCrews: () => Promise<Array<{ id: string; role?: string }>>
   botIds: () => Promise<Set<string>>
   /** Crew page roster member ids for the crews whose roster reads from the DB; the other crew ids are listed in `sheetSourced`. */
-  loadPageRosters: (crewIds: string[]) => Promise<{ rosters: Map<string, Set<string>>; sheetSourced: string[] }>
+  loadPageRosters: (crewIds: string[]) => Promise<{ rosters: Map<string, PageRoster>; sheetSourced: string[] }>
   /** Insert a plain roster row; 'exists' when one is already there. */
   addToCrewPage: (input: { crewId: string; memberId: string; name: string; actor: string }) => Promise<'created' | 'exists'>
   /** Discord id -> role ids, or null when the guild member list cannot be read. */
@@ -182,7 +203,7 @@ export function defaultDeps(): RosterAutoAddDeps {
         })
       ).map((r) => ({ discordId: r.discordId, crewId: r.crewId, callDate: r.callDate })),
     loadMembers: async () => {
-      const all = await fetchAllMembers({ includeDiscordId: true, includeUnonboarded: true })
+      const all = await fetchAllMembers({ includeDiscordId: true })
       return all
         .filter((m) => m?.id && m.discordId)
         .map((m) => ({
@@ -203,9 +224,16 @@ export function defaultDeps(): RosterAutoAddDeps {
     loadPageRosters: async (crewIds) => {
       const { crewRolesFromDb } = await import('@/app/lib/crew-roles')
       if (!(await crewRolesFromDb())) return { rosters: new Map(), sheetSourced: crewIds }
-      const rows = await prisma.crewRole.findMany({ where: { crewId: { in: crewIds }, memberId: { not: null } }, select: { crewId: true, memberId: true } })
-      const rosters = new Map<string, Set<string>>(crewIds.map((c) => [c, new Set<string>()]))
-      for (const r of rows) rosters.get(r.crewId)?.add(String(r.memberId))
+      const rows = await prisma.crewRole.findMany({ where: { crewId: { in: crewIds } }, select: { crewId: true, memberId: true, name: true, archived: true } })
+      const rosters = new Map<string, PageRoster>(
+        crewIds.map((c) => [c, { memberIds: new Set<string>(), names: new Set<string>(), removedMemberIds: new Set<string>(), removedNames: new Set<string>() }]),
+      )
+      for (const r of rows) {
+        const pr = rosters.get(r.crewId) as { memberIds: Set<string>; names: Set<string>; removedMemberIds: Set<string>; removedNames: Set<string> } | undefined
+        if (!pr) continue
+        if (r.memberId) (r.archived ? pr.removedMemberIds : pr.memberIds).add(String(r.memberId))
+        else if (normName(r.name)) (r.archived ? pr.removedNames : pr.names).add(normName(r.name))
+      }
       return { rosters, sheetSourced: [] }
     },
     addToCrewPage: async ({ crewId, memberId, name, actor }) => {
@@ -245,6 +273,8 @@ export interface RosterAutoAddResult {
   perCrew: PlanCounts
   /** Crews whose page roster is sheet-sourced and so was left alone. */
   pageSkippedSheetCrews?: number
+  /** Crews whose role grants stopped this run after Discord answered 403 (role above the bot, or missing permission). */
+  crewsRoleBlocked?: number
   added?: number
   pageAdded?: number
   alreadyThere?: number
@@ -305,7 +335,9 @@ export async function runRosterAutoAdd(
   const base = { dryRun, switchOff: !on, planned: summary.total, perCrew: summary.perCrew, pageSkippedSheetCrews: sheetSourced.length }
   if (dryRun) return { ...base, ...(opts.dryRun ? { adds: summary.adds } : {}) }
 
-  const todo = plan.slice(0, maxPerRun)
+  // Round-robin across crews so one crew cannot use the whole cap. Only successful writes count against it.
+  const queue = roundRobinByCrew(plan)
+  const startedAt = deps.now().getTime()
   let added = 0
   let pageAdded = 0
   let alreadyThere = 0
@@ -314,11 +346,22 @@ export async function runRosterAutoAdd(
   let roleSkipped = 0
   let roleFailed = 0
   let stoppedReason: string | null = null
-  let done = 0
   let rateLimited = false
+  let charged = 0
+  let attempted = 0
+  const blockedRoleCrews = new Set<string>()
+  const brokenMembers = new Set<string>()
 
-  for (const p of todo) {
-    done++
+  for (const p of queue) {
+    if (charged >= maxPerRun) break
+    if (deps.now().getTime() - startedAt > RUN_BUDGET_MS) {
+      stoppedReason = stoppedReason ?? 'time budget'
+      break
+    }
+    if (brokenMembers.has(p.memberId)) continue
+    attempted++
+    let wrote = false
+    let cellOk = true
     if (p.cell) {
       try {
         // Preview first, then apply against what the preview saw (the write-back's own two-step).
@@ -326,60 +369,101 @@ export async function runRosterAutoAdd(
         if (!preview.changed) alreadyThere++
         else {
           const res = await deps.updateCrews({ memberId: p.memberId, crewId: p.crewId, action: 'add', mode: 'apply', expectedBefore: preview.before, actor: ACTOR })
-          if (res.applied) added++
-          else alreadyThere++
+          if (res.applied) {
+            added++
+            wrote = true
+          } else alreadyThere++
         }
       } catch (e) {
-        // 409 = the cell changed under us: the next run re-plans it. Anything else is counted too.
         failed++
-        if (!(e instanceof RosterWritebackError)) console.error('[crews/roster-auto-add] write failed:', e instanceof Error ? e.message : e)
-        continue
+        cellOk = false
+        if (e instanceof RosterWritebackError) {
+          // 400/404: this member will not work today, skip them everywhere. 409: the cell changed, the next run re-plans it.
+          if (e.status === 400 || e.status === 404) brokenMembers.add(p.memberId)
+        } else console.error('[crews/roster-auto-add] write failed:', e instanceof Error ? e.message : e)
       }
     }
+    if (!cellOk) continue
 
     if (p.page) {
       try {
-        if ((await deps.addToCrewPage({ crewId: p.crewId, memberId: p.memberId, name: nameOf.get(p.memberId) || p.memberId, actor: ACTOR })) === 'created') pageAdded++
+        if ((await deps.addToCrewPage({ crewId: p.crewId, memberId: p.memberId, name: nameOf.get(p.memberId) || p.memberId, actor: ACTOR })) === 'created') {
+          pageAdded++
+          wrote = true
+        }
       } catch (e) {
         failed++
         console.error('[crews/roster-auto-add] page roster write failed:', e instanceof Error ? e.message : e)
       }
     }
 
-    if (!p.role || rateLimited) continue
-    const roleId = roleByCrew.get(p.crewId)
-    if (!roleId) {
-      roleSkipped++
-      continue
-    }
-    try {
-      let r = await deps.writeRole({ kind: 'addRole', userId: p.discordId, roleId }, AUDIT_REASON)
-      if (r.status === 429) {
-        if (r.blocked || (r.retryAfterMs ?? Infinity) > 15_000) {
+    if (p.role && !rateLimited && !blockedRoleCrews.has(p.crewId)) {
+      const roleId = roleByCrew.get(p.crewId)
+      let grant = !!roleId
+      if (!roleId) roleSkipped++
+      // Not just added: the snapshot said they were on the crew, so confirm with the live Crews cell before granting.
+      if (grant && !p.cell) {
+        try {
+          const live = await deps.updateCrews({ memberId: p.memberId, crewId: p.crewId, action: 'add', mode: 'dry-run', actor: ACTOR })
+          if (live.changed) grant = false
+        } catch {
+          grant = false
+        }
+        if (!grant) roleSkipped++
+      }
+      if (grant && roleId) {
+        try {
+          let r = await deps.writeRole({ kind: 'addRole', userId: p.discordId, roleId }, AUDIT_REASON)
+          if (r.status === 429) {
+            if (r.blocked || (r.retryAfterMs ?? Infinity) > 15_000) {
+              rateLimited = true
+            } else {
+              await deps.sleep(r.retryAfterMs ?? 1000)
+              r = await deps.writeRole({ kind: 'addRole', userId: p.discordId, roleId }, AUDIT_REASON)
+              if (r.status === 429) rateLimited = true
+            }
+          }
+          if (rateLimited) {
+            roleFailed++
+            stoppedReason = 'discord rate limited'
+          } else if (r.status >= 200 && r.status < 300) {
+            roleGranted++
+            wrote = true
+          } else {
+            // A failed grant is retried tomorrow: the role is still missing then. A 403 will not get better within this run.
+            roleFailed++
+            if (r.status === 403) blockedRoleCrews.add(p.crewId)
+          }
+          if (!rateLimited && r.remaining === 0 && r.resetAfterMs) await deps.sleep(Math.min(r.resetAfterMs, MAX_RESET_WAIT_MS))
+        } catch {
           roleFailed++
-          rateLimited = true
-          stoppedReason = 'discord rate limited'
-          continue
-        }
-        await deps.sleep(r.retryAfterMs ?? 1000)
-        r = await deps.writeRole({ kind: 'addRole', userId: p.discordId, roleId }, AUDIT_REASON)
-      }
-      if (r.status >= 200 && r.status < 300) roleGranted++
-      else {
-        // A failed grant is retried tomorrow: the role is still missing then.
-        roleFailed++
-        if (r.status === 429) {
-          rateLimited = true
-          stoppedReason = 'discord rate limited'
-          continue
         }
       }
-      // Respect Discord's bucket: wait out an exhausted one (short waits only).
-      if (r.remaining === 0 && r.resetAfterMs) await deps.sleep(Math.min(r.resetAfterMs, MAX_RESET_WAIT_MS))
-    } catch {
-      roleFailed++
     }
+    if (wrote) charged++
   }
 
-  return { ...base, added, pageAdded, alreadyThere, failed, roleGranted, roleSkipped, roleFailed, deferred: plan.length - done, stoppedReason }
+  return {
+    ...base,
+    added,
+    pageAdded,
+    alreadyThere,
+    failed,
+    roleGranted,
+    roleSkipped,
+    roleFailed,
+    crewsRoleBlocked: blockedRoleCrews.size,
+    deferred: Math.max(0, queue.length - attempted),
+    stoppedReason,
+  }
+}
+
+/** One item per crew in turn, so no crew monopolises a capped run. Keeps each crew's own order. */
+export function roundRobinByCrew(plan: PlannedAdd[]): PlannedAdd[] {
+  const byCrew = new Map<string, PlannedAdd[]>()
+  for (const p of plan) byCrew.set(p.crewId, [...(byCrew.get(p.crewId) ?? []), p])
+  const lists = [...byCrew.values()]
+  const out: PlannedAdd[] = []
+  for (let i = 0; lists.some((l) => i < l.length); i++) for (const l of lists) if (i < l.length) out.push(l[i])
+  return out
 }
