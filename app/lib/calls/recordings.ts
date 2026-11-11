@@ -328,7 +328,7 @@ export async function generateAndStoreSummaryResult(id: string, opts: SummaryOpt
   const startedAt = new Date()
   const rec = await prisma.callRecording.findUnique({
     where: { id },
-    select: { id: true, sessionId: true, status: true, transcript: true, transcriptLanguage: true, redactedSpeakerIds: true, redactedSegmentIds: true, speakers: { select: { discordId: true, displayName: true } } },
+    select: { id: true, sessionId: true, status: true, actionItems: true, transcript: true, transcriptLanguage: true, redactedSpeakerIds: true, redactedSegmentIds: true, speakers: { select: { discordId: true, displayName: true } } },
   })
   if (!rec || rec.status === 'REJECTED') return 'skipped'
   // Never leave a fresh row stuck in PROCESSING/RECORDED; never touch a row rejected meanwhile.
@@ -347,7 +347,7 @@ export async function generateAndStoreSummaryResult(id: string, opts: SummaryOpt
     const data = {
       title: out.title,
       summary: out.summary,
-      actionItems: (await withLiveItems(out.actionItems, rec.sessionId, segments, rec.redactedSpeakerIds, buildSpeakerNames(rec.speakers, segments))) as unknown as Prisma.InputJsonValue,
+      actionItems: carryDone(rec.actionItems, await withLiveItems(out.actionItems, rec.sessionId, segments, rec.redactedSpeakerIds, buildSpeakerNames(rec.speakers, segments))) as unknown as Prisma.InputJsonValue,
       chapters: out.chapters as unknown as Prisma.InputJsonValue,
       status: 'IN_REVIEW' as const,
       publishedAt: null,
@@ -380,6 +380,17 @@ export async function generateAndStoreSummaryResult(id: string, opts: SummaryOpt
     await toReview()
     return 'failed'
   }
+}
+
+/** Keeps `done` on regenerated action items whose text is unchanged (case/whitespace-insensitive); everything else stays open. */
+export function carryDone<T extends { text: string }>(prev: unknown, next: T[]): Array<T & { done?: boolean }> {
+  const norm = (s: string) => s.replace(/\s+/g, ' ').trim().toLowerCase()
+  const done = new Set<string>()
+  for (const a of Array.isArray(prev) ? prev : []) {
+    const o = a as { text?: unknown; done?: unknown }
+    if (o?.done === true && typeof o.text === 'string') done.add(norm(o.text))
+  }
+  return next.map((a) => (done.has(norm(a.text)) ? { ...a, done: true } : a))
 }
 
 /**
@@ -449,7 +460,7 @@ export async function unpublishRecording(id: string, reviewerDiscordId: string, 
 export interface RecordingTextEdit {
   title?: string | null
   summary?: string | null
-  actionItems?: Array<{ text: string; owner?: string; suggestedBy?: string }>
+  actionItems?: Array<{ text: string; owner?: string; suggestedBy?: string; done?: boolean }>
   chapters?: Array<{ startMs: number; title: string }>
 }
 
@@ -467,10 +478,12 @@ export async function updateRecordingText(id: string, edit: RecordingTextEdit): 
   const data: Prisma.CallRecordingUpdateInput = {}
   // A reviewer's words: automatic transcription/summary runs must never overwrite them.
   // Only a real change of the summary / action items / chapters text counts (a title-only or no-op save does not).
+  // `done` is a status flag, not reviewer text: toggling it alone does not freeze the summary against automatic reruns.
+  const stripDone = (v: unknown) => (Array.isArray(v) ? v.map((x) => { if (!x || typeof x !== 'object') return x; const { done: _d, ...rest } = x as Record<string, unknown>; return rest }) : v)
   const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
   const textChanged =
     (edit.summary !== undefined && !same(rec.summary, edit.summary)) ||
-    (edit.actionItems !== undefined && !same(rec.actionItems ?? [], edit.actionItems)) ||
+    (edit.actionItems !== undefined && !same(stripDone(rec.actionItems ?? []), stripDone(edit.actionItems))) ||
     (edit.chapters !== undefined && !same(rec.chapters ?? [], edit.chapters))
   if (textChanged) data.summaryEditedAt = new Date()
   if (edit.title !== undefined) data.title = edit.title

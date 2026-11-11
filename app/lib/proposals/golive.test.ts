@@ -182,7 +182,7 @@ describe('cancel and withdraw', () => {
     const id = await openOne({ pending: pending.store })
     pending.state.failRemove = true
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    expect(await cancelProposal(id, { discordId: 'admin', admin: true }, 'spam proposal', { pending: pending.store })).toMatchObject({ ok: true })
+    expect(await cancelProposal(id, { discordId: 'admin', admin: true }, 'spam proposal', { now: new Date(t0.getTime() + 1000), pending: pending.store })).toMatchObject({ ok: true })
     expect(row(id).status).toBe('CANCELLED')
     spy.mockRestore()
   })
@@ -191,7 +191,7 @@ describe('cancel and withdraw', () => {
     const id = await openOne()
     Object.assign(row(id), { discordChannelId: '999999999999999999', discordMessageId: '555555555555555555' })
     const { d, edit } = deps()
-    expect(await cancelAndAnnounce(id, { discordId: 'admin', admin: true }, 'private reason text', d, { pending: null })).toMatchObject({ ok: true })
+    expect(await cancelAndAnnounce(id, { discordId: 'admin', admin: true }, 'private reason text', d, { now: new Date(t0.getTime() + 1000), pending: null })).toMatchObject({ ok: true })
     expect(edit).toHaveBeenCalledTimes(1)
     const [ch, msg, body] = (edit.mock.calls[0] as unknown) as [string, string, { content: string; allowed_mentions: unknown }]
     expect([ch, msg]).toEqual(['999999999999999999', '555555555555555555'])
@@ -206,7 +206,7 @@ describe('cancel and withdraw', () => {
     Object.assign(row(id), { discordChannelId: '999999999999999999', discordMessageId: '555555555555555555' })
     const { d } = deps({ edit: async () => { throw new Error('discord down') } })
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    expect((await cancelAndAnnounce(id, { discordId: 'admin', admin: true }, 'reason ok', d, { pending: null })).ok).toBe(true)
+    expect((await cancelAndAnnounce(id, { discordId: 'admin', admin: true }, 'reason ok', d, { now: new Date(t0.getTime() + 1000), pending: null })).ok).toBe(true)
     expect(await announceCancelled(id, d)).toBe('failed')
     spy.mockRestore()
   })

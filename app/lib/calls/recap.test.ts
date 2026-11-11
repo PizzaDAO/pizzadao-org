@@ -37,6 +37,20 @@ describe('recap text', () => {
     expect(t).not.toContain('suggested by null')
   })
 
+  it('marks done items with a check and keeps open ones as bullets, in stored order', () => {
+    const t = buildRecapText({ ...rec, actionItems: [{ text: 'Open one' }, { text: 'Finished', owner: 'Ann', done: true }, { text: 'Solo', owner: 'Ann', suggestedBy: 'Ann', done: true }, { text: 'Explicit open', done: false }] }, base)
+    expect(t).toContain('- Open one\n\u2705 Finished (Ann)\n\u2705 Solo \u2014 Ann (suggested, owner)\n- Explicit open')
+    expect(t).not.toContain('- Finished')
+  })
+
+  it('fit logic counts the check prefix when trimming', () => {
+    const items = Array.from({ length: 10 }, (_, i) => ({ text: `Item ${i} ${'x'.repeat(190)}`, owner: 'Ann', done: i % 2 === 0 }))
+    const t = buildRecapText({ ...rec, actionItems: items }, base, undefined, { bullets: 5, actions: 10, chars: 220 })
+    expect(t.length).toBeLessThanOrEqual(2000)
+    expect(t).toContain('\u2705 Item 0 ')
+    expect(t).toContain('Full summary and transcript')
+  })
+
   it('renders an item once when the owner is also the suggester', () => {
     const t = buildRecapText({ ...rec, actionItems: [{ text: 'Send the deck', owner: 'Ann', suggestedBy: 'ann' }, { text: 'Book it', owner: 'Ann', suggestedBy: 'Bob' }] }, base)
     expect(t).toContain('- Send the deck \u2014 Ann (suggested, owner)')
