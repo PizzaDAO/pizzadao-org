@@ -1,0 +1,172 @@
+import { describe, expect, it, vi, beforeEach } from 'vitest'
+
+const settingValues = new Map<string, unknown>()
+const toggle = vi.fn(async () => true)
+vi.mock('@/app/lib/db', () => ({ prisma: {} }))
+vi.mock('@/app/lib/crew-mappings', () => ({ getCrewMappings: vi.fn() }))
+vi.mock('@/app/lib/sheets/members-list', () => ({ fetchAllMembers: vi.fn() }))
+vi.mock('@/app/lib/discord', () => ({ writeGuildMember: vi.fn(), getBotUserId: vi.fn() }))
+vi.mock('@/app/lib/roster-writeback', () => ({
+  updateMemberCrews: vi.fn(),
+  RosterWritebackError: class extends Error {
+    constructor(m: string, readonly status: number) {
+      super(m)
+    }
+  },
+}))
+vi.mock('@/app/lib/settings', () => ({ loadSettings: async () => ({ get: (k: string) => settingValues.get(k) }) }))
+vi.mock('@/app/lib/settings/toggles', () => ({ toggleEnabled: () => toggle() }))
+
+import { parseExcludeIds, planRosterAdds, runRosterAutoAdd, type AttendanceRow, type RosterAutoAddDeps, type RosterMember } from './roster-auto-add'
+
+const id = (n: number) => `1000000000000000${String(n).padStart(3, '0')}`
+const day = (n: number) => new Date(Date.UTC(2026, 9, n))
+const row = (n: number, crewId: string, d: number): AttendanceRow => ({ discordId: id(n), crewId, callDate: day(d) })
+const member = (n: number, crews: string[] = []): RosterMember => ({ id: `m${n}`, discordId: id(n), crews: new Set(crews) })
+const rule = { minCalls: 2, windowCalls: 4 }
+const known = new Set(['ops', 'comms'])
+
+const plan = (rows: AttendanceRow[], members: RosterMember[], extra: Partial<Parameters<typeof planRosterAdds>[0]> = {}) =>
+  planRosterAdds({ rows, members, knownCrews: known, excluded: new Set(), rule, ...extra })
+
+describe('planRosterAdds', () => {
+  it('adds a member who attended 2 of the last 4 calls', () => {
+    const rows = [row(1, 'ops', 1), row(1, 'ops', 8), row(2, 'ops', 15), row(2, 'ops', 22)]
+    expect(plan(rows, [member(1), member(2)])).toEqual([
+      { crewId: 'ops', memberId: 'm1', discordId: id(1) },
+      { crewId: 'ops', memberId: 'm2', discordId: id(2) },
+    ])
+  })
+
+  it('does not add one attendance, or attendance outside the last 4 calls', () => {
+    const rows = [row(1, 'ops', 1), row(1, 'ops', 8), row(9, 'ops', 15), row(9, 'ops', 22), row(9, 'ops', 23), row(9, 'ops', 24), row(3, 'ops', 24)]
+    // Calls: days 1, 8, 15, 22, 23, 24 -> the last 4 are 15, 22, 23, 24. Member 1 only attended outside; member 3 once.
+    expect(plan(rows, [member(1), member(3), member(9)]).map((p) => p.memberId)).toEqual(['m9'])
+  })
+
+  it('counts a call once however many rows it has', () => {
+    expect(plan([row(1, 'ops', 1), row(1, 'ops', 1)], [member(1)])).toEqual([])
+  })
+
+  it('never touches a member already on the crew (and never removes anyone)', () => {
+    const rows = [row(1, 'ops', 1), row(1, 'ops', 8)]
+    expect(plan(rows, [member(1, ['ops'])])).toEqual([])
+    // Attendance elsewhere does not matter to the roster they have: only 'add' plans exist.
+    expect(plan(rows, [member(1, ['comms'])]).every((p) => p.crewId === 'ops')).toBe(true)
+  })
+
+  it('requires a member record', () => {
+    expect(plan([row(5, 'ops', 1), row(5, 'ops', 8)], [member(1)])).toEqual([])
+  })
+
+  it('skips excluded ids, bots and unknown or non-roster crews', () => {
+    const rows = [row(1, 'ops', 1), row(1, 'ops', 8), row(2, 'ops', 1), row(2, 'ops', 8), row(3, 'community_call', 1), row(3, 'community_call', 8), row(3, 'ghost', 1), row(3, 'ghost', 8)]
+    const members = [member(1), member(2), member(3)]
+    expect(plan(rows, members, { excluded: new Set([id(1)]), botIds: new Set([id(2)]) })).toEqual([])
+  })
+
+  it('applies the configured rule', () => {
+    const rows = [row(1, 'ops', 1), row(1, 'ops', 8), row(1, 'ops', 15)]
+    expect(plan(rows, [member(1)], { rule: { minCalls: 3, windowCalls: 4 } })).toHaveLength(1)
+    expect(plan(rows, [member(1)], { rule: { minCalls: 4, windowCalls: 4 } })).toHaveLength(0)
+  })
+})
+
+describe('parseExcludeIds', () => {
+  it('reads ids separated by spaces, commas and lines and drops junk', () => {
+    expect([...parseExcludeIds(`${id(1)}, ${id(2)}\n${id(3)} nope 123`)]).toEqual([id(1), id(2), id(3)])
+    expect(parseExcludeIds(undefined).size).toBe(0)
+  })
+})
+
+function makeDeps(over: Partial<RosterAutoAddDeps> = {}) {
+  const cells = new Map<string, string[]>([['m1', []], ['m2', ['ops']]])
+  const deps: RosterAutoAddDeps = {
+    loadRows: async () => [row(1, 'ops', 1), row(1, 'ops', 8), row(2, 'ops', 1), row(2, 'ops', 8)],
+    loadMembers: async () => [member(1, cells.get('m1')), member(2, cells.get('m2'))],
+    loadCrews: async () => [{ id: 'ops', role: '<@&555>' }],
+    botIds: async () => new Set(),
+    updateCrews: vi.fn(async (i) => {
+      const cur = cells.get(i.memberId)!
+      const has = cur.includes(i.crewId)
+      if (i.mode === 'apply' && !has) cur.push(i.crewId)
+      return { mode: i.mode ?? 'dry-run', applied: i.mode === 'apply' && !has, changed: !has, range: '', before: cur.join(','), after: '', crews: cur }
+    }),
+    writeRole: vi.fn(async () => ({ status: 204, remaining: 5, resetAfterMs: 100, retryAfterMs: null, blocked: false })),
+    sleep: async () => {},
+    now: () => new Date('2026-10-30T00:00:00Z'),
+    ...over,
+  }
+  return { deps, cells }
+}
+
+beforeEach(() => {
+  settingValues.clear()
+  settingValues.set('crews.rosterAutoAddMinCalls', 2)
+  settingValues.set('crews.rosterAutoAddWindowCalls', 4)
+  settingValues.set('crews.rosterAutoAddMaxPerRun', 25)
+  settingValues.set('crews.rosterAutoAddExcludeIds', '')
+  toggle.mockResolvedValue(true)
+})
+
+describe('runRosterAutoAdd', () => {
+  it('switch off: counts only and writes nothing, and the response carries no ids', async () => {
+    toggle.mockResolvedValue(false)
+    const { deps } = makeDeps()
+    const r = await runRosterAutoAdd({}, deps)
+    expect(r).toMatchObject({ dryRun: true, switchOff: true, planned: 1, perCrew: { ops: 1 } })
+    expect(r.adds).toBeUndefined()
+    expect(deps.updateCrews).not.toHaveBeenCalled()
+    expect(deps.writeRole).not.toHaveBeenCalled()
+  })
+
+  it('dryRun with the switch on returns ids per crew and writes nothing', async () => {
+    const { deps } = makeDeps()
+    const r = await runRosterAutoAdd({ dryRun: true }, deps)
+    expect(r.adds).toEqual([{ crewId: 'ops', memberId: 'm1' }])
+    expect(r.perCrew).toEqual({ ops: 1 })
+    expect(deps.updateCrews).not.toHaveBeenCalled()
+    expect(deps.writeRole).not.toHaveBeenCalled()
+  })
+
+  it('on: adds to the roster and grants the crew role; a rerun does nothing (idempotent)', async () => {
+    const { deps, cells } = makeDeps()
+    const first = await runRosterAutoAdd({}, deps)
+    expect(first).toMatchObject({ dryRun: false, added: 1, roleGranted: 1, planned: 1 })
+    expect(cells.get('m1')).toEqual(['ops'])
+    expect(deps.writeRole).toHaveBeenCalledWith({ kind: 'addRole', userId: id(1), roleId: '555' }, expect.any(String))
+    const second = await runRosterAutoAdd({}, deps)
+    expect(second).toMatchObject({ planned: 0, added: 0, roleGranted: 0 })
+    expect(deps.writeRole).toHaveBeenCalledTimes(1)
+  })
+
+  it('never removes: no remove action is ever sent', async () => {
+    const { deps } = makeDeps()
+    await runRosterAutoAdd({}, deps)
+    for (const [input] of (deps.updateCrews as ReturnType<typeof vi.fn>).mock.calls) expect(input.action).toBe('add')
+  })
+
+  it('skips ids in the exclusion setting', async () => {
+    settingValues.set('crews.rosterAutoAddExcludeIds', id(1))
+    const { deps } = makeDeps()
+    expect(await runRosterAutoAdd({ dryRun: true }, deps)).toMatchObject({ planned: 0 })
+  })
+
+  it('caps one run and reports the rest as deferred', async () => {
+    settingValues.set('crews.rosterAutoAddMaxPerRun', 1)
+    const { deps } = makeDeps({
+      loadRows: async () => [1, 3].flatMap((n) => [row(n, 'ops', 1), row(n, 'ops', 8)]),
+      loadMembers: async () => [member(1), member(3)],
+    })
+    expect(await runRosterAutoAdd({}, deps)).toMatchObject({ planned: 2, added: 1, deferred: 1 })
+  })
+
+  it('stops granting roles when Discord rate limits, but the roster change stands', async () => {
+    const { deps, cells } = makeDeps({
+      writeRole: vi.fn(async () => ({ status: 429, remaining: 0, resetAfterMs: null, retryAfterMs: 60_000, blocked: false })),
+    })
+    const r = await runRosterAutoAdd({}, deps)
+    expect(r).toMatchObject({ added: 1, roleFailed: 1, stoppedReason: 'discord rate limited' })
+    expect(cells.get('m1')).toEqual(['ops'])
+  })
+})
