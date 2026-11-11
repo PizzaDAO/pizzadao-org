@@ -10,7 +10,9 @@ export const unix = (d: Date): number => Math.floor(d.getTime() / 1000)
 export function callReminderText(o: { crewLabel: string; startsAt: Date; guildId: string | null; eventId: string }): string {
   const t = unix(o.startsAt)
   const join = o.guildId ? `\nJoin: https://discord.com/events/${o.guildId}/${o.eventId}` : ''
-  return `⏰ ${o.crewLabel} starts <t:${t}:R> (<t:${t}:t>).${join}`
+  // "Community Call" already ends in "Call": say "{crew} call starts" once.
+  const crew = o.crewLabel.replace(/\s+calls?$/i, '').trim() || o.crewLabel
+  return `⏰ ${crew} call starts <t:${t}:R> (<t:${t}:t>).${join}`
 }
 
 export function callReminderComponents(settingsUrl: string | null): unknown[] {

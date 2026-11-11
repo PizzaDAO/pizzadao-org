@@ -122,6 +122,17 @@ describe.each([
   })
 })
 
+describe('/api/cron/reminders dryRun', () => {
+  it('passes ?dryRun=1 through (auth still required) and defaults to a normal run', async () => {
+    expect((await remindersGET(req('/api/cron/reminders?dryRun=1'))).status).toBe(401)
+    expect(runCallRemindersNow).not.toHaveBeenCalled()
+    await remindersGET(req('/api/cron/reminders?dryRun=1', 'Bearer cron-secret'))
+    expect(vi.mocked(runCallRemindersNow).mock.calls[0][2]).toEqual({ dryRun: true })
+    await remindersGET(req('/api/cron/reminders', 'Bearer cron-secret'))
+    expect(vi.mocked(runCallRemindersNow).mock.calls[1][2]).toEqual({ dryRun: false })
+  })
+})
+
 describe('/api/cron/attendance', () => {
   it('returns the sync stats and re-checks the affected members in the background', async () => {
     const res = await attendanceGET(req('/api/cron/attendance', 'Bearer cron-secret'))

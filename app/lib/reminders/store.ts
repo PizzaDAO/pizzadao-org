@@ -13,8 +13,8 @@ export interface ReminderStore {
   listCallPrefs(): Promise<PrefLite[]>
   /** Sends in the last 24 hours that count against the daily cap, per member (one entry per DM). */
   sentSince(discordIds: readonly string[], since: Date): Promise<Map<string, Date[]>>
-  /** Whether a call reminder for this event (any start time) was already sent to the member since `since`. */
-  sentForEventSince(discordId: string, eventId: string, since: Date): Promise<boolean>
+  /** One query: the "<discordId>|<eventId>" pairs already sent a call reminder (any start time) since `since`. */
+  sentForEventsSince(discordIds: readonly string[], eventIds: readonly string[], since: Date): Promise<Set<string>>
   /** Claim (member, kind, refKey) before sending. False when it already exists (sent, claimed, skipped, failed) and is not due a retry. */
   claimCall(discordId: string, refKey: string): Promise<{ claimed: boolean; attempts: number }>
   markSent(discordId: string, refKey: string): Promise<void>
@@ -41,12 +41,21 @@ export const prismaStore: ReminderStore = {
     return out
   },
 
-  async sentForEventSince(discordId, eventId, since) {
-    const row = await prisma.reminderSend.findFirst({
-      where: { discordId, kind: 'CALL', status: 'SENT', refKey: { startsWith: `${eventId}:` }, updatedAt: { gte: since } },
-      select: { id: true },
+  async sentForEventsSince(discordIds, eventIds, since) {
+    const out = new Set<string>()
+    if (!discordIds.length || !eventIds.length) return out
+    const rows = await prisma.reminderSend.findMany({
+      where: {
+        discordId: { in: [...discordIds] },
+        kind: 'CALL',
+        status: 'SENT',
+        updatedAt: { gte: since },
+        OR: eventIds.map((e) => ({ refKey: { startsWith: `${e}:` } })),
+      },
+      select: { discordId: true, refKey: true },
     })
-    return !!row
+    for (const r of rows) out.add(`${r.discordId}|${r.refKey.split(':')[0]}`)
+    return out
   },
 
   async claimCall(discordId, refKey) {

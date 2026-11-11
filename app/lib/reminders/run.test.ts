@@ -28,8 +28,15 @@ function fakeStore(prefs: PrefLite[]) {
       }
       return out
     },
-    sentForEventSince: async (d, eventId, since) =>
-      [...rows].some(([k, v]) => k.startsWith(`${d}|${eventId}:`) && v.status === 'SENT' && v.at >= since),
+    sentForEventsSince: async (ids, eventIds, since) => {
+      const out = new Set<string>()
+      for (const [k, v] of rows) {
+        const [d, ref] = k.split('|')
+        const e = ref.split(':')[0]
+        if (v.status === 'SENT' && ids.includes(d) && eventIds.includes(e) && v.at >= since) out.add(`${d}|${e}`)
+      }
+      return out
+    },
     claimCall: async (d, r) => {
       const row = rows.get(key(d, r))
       if (!row) {
@@ -235,6 +242,8 @@ describe('message', () => {
   it('uses Discord timestamps, the join link and a Stop button', () => {
     const text = callReminderText({ crewLabel: 'Community Call', startsAt: start, guildId: 'g1', eventId: 'e1' })
     const t = Math.floor(start.getTime() / 1000)
+    expect(text).toMatch(/^⏰ Community call starts /)
+    expect(callReminderText({ crewLabel: 'Ops', startsAt: start, guildId: null, eventId: 'e1' })).toMatch(/^⏰ Ops call starts /)
     expect(text).toContain(`<t:${t}:R>`)
     expect(text).toContain(`<t:${t}:t>`)
     expect(text).toContain('https://discord.com/events/g1/e1')

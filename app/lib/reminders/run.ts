@@ -109,6 +109,11 @@ export async function runCallReminders(d: RunDeps): Promise<RunResult> {
   if (dryRun || !pairs.length) return res
 
   const sentToday = await d.store.sentSince([...new Set(pairs.map((p) => p.pref.discordId))], new Date(now.getTime() - DAY_MS))
+  const sameEvent = await d.store.sentForEventsSince(
+    [...new Set(pairs.map((p) => p.pref.discordId))],
+    [...new Set(pairs.map((p) => p.occ.eventId))],
+    new Date(now.getTime() - SAME_EVENT_WINDOW_MS),
+  )
   let first = true
 
   for (const { pref, occ } of pairs) {
@@ -131,7 +136,7 @@ export async function runCallReminders(d: RunDeps): Promise<RunResult> {
       continue
     }
     // A moved call already reminded for: one DM per event until the "time changed" correction exists.
-    if (await d.store.sentForEventSince(id, occ.eventId, new Date(now.getTime() - SAME_EVENT_WINDOW_MS))) {
+    if (sameEvent.has(`${id}|${occ.eventId}`)) {
       bump(res.skipped, 'same_event')
       continue
     }
@@ -184,10 +189,19 @@ export async function runCallReminders(d: RunDeps): Promise<RunResult> {
 }
 
 /** The real wiring, used by the cron route. */
-export async function runCallRemindersNow(now = new Date(), env: NodeJS.ProcessEnv = process.env): Promise<RunResult> {
+export async function runCallRemindersNow(
+  now = new Date(),
+  env: Record<string, string | undefined> = process.env,
+  opts: { dryRun?: boolean } = {},
+): Promise<RunResult | { skipped: 'disabled' }> {
+  // Off (switch, env kill, or any non-production deploy): no Discord fetch, no database reads. The
+  // preview check is first so a preview never even reads settings. `dryRun` (cron route ?dryRun=1)
+  // runs the full counting path on demand, still sending nothing.
+  const live = reminderSendAllowed(env) && (await toggleEnabled('reminders.callsEnabled', env))
+  if (!live && !opts.dryRun) return { skipped: 'disabled' }
   const settings = await loadSettings()
   const config: RunConfig = {
-    enabled: await toggleEnabled('reminders.callsEnabled', env),
+    enabled: live && !opts.dryRun,
     leadMinutes: settings.get('reminders.callLeadMinutes'),
     maxSendsPerRun: settings.get('reminders.maxSendsPerRun'),
     maxPerMemberPerDay: settings.get('reminders.maxPerMemberPerDay'),

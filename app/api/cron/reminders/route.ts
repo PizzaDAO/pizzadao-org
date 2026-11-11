@@ -10,14 +10,15 @@ export const maxDuration = 120
 /**
  * GET /api/cron/reminders — every 5 minutes (Vercel Cron, Bearer CRON_SECRET).
  * Call reminders by Discord DM to members who opted in. Off (reminders.callsEnabled, or any preview):
- * nothing is sent or claimed and only counts are logged ("dry run"). Counts only, never ids or names.
+ * answers {skipped:'disabled'} without touching Discord or the database. `?dryRun=1` (still needs the
+ * bearer token) runs the full counting path on demand, sending and claiming nothing. Counts only.
  */
 export async function GET(request: NextRequest) {
   if (!isCronAuthorized(request.headers.get('authorization'))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   try {
-    const result = await runCallRemindersNow()
+    const result = await runCallRemindersNow(new Date(), process.env, { dryRun: request.nextUrl.searchParams.get('dryRun') === '1' })
     console.log('[cron/reminders]', JSON.stringify(result))
     return NextResponse.json(result)
   } catch (err) {
