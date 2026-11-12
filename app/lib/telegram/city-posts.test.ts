@@ -311,10 +311,11 @@ describe('processOutbox', () => {
     rows({ ...ON, 'telegram.agendaMirrorEnabled': false })
     findMany.mockResolvedValue([])
     await processOutbox(deps(vi.fn()))
-    expect(findMany.mock.calls[0][0]!.where).toMatchObject({ kind: { in: ['recap', 'announce'] } })
+    expect(findMany.mock.calls[0][0]!.where).toMatchObject({ kind: { in: ['recap', 'announce', 'live', 'liverem'] } })
     rows({ ...ON, 'telegram.recapMirrorEnabled': false, 'telegram.agendaMirrorEnabled': false, 'telegram.announceMirrorEnabled': false })
     findMany.mockClear()
     await processOutbox(deps(vi.fn()))
-    expect(findMany).not.toHaveBeenCalled()
+    // Only the live kinds (they follow the master switch alone) are left.
+    expect(findMany.mock.calls[0][0]!.where).toMatchObject({ kind: { in: ['live', 'liverem'] } })
   })
 })

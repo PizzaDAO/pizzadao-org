@@ -143,6 +143,14 @@ export const PEP_COMMANDS = [
     options: [{ type: STRING, name: 'crew', description: 'Crew (default: the call that is running now)', required: false, autocomplete: true, max_length: 80 }],
     dm_permission: false,
   },
+  {
+    // Deferred and ephemeral: posts the "we're live" announcement once per call. Hosts, admins and the live host roles only.
+    // Answers "not enabled" until calls.liveAnnounceCommandEnabled.
+    name: 'live',
+    description: 'Announce that the community call is live (Discord, Telegram) and get the X post text',
+    options: [{ type: STRING, name: 'stream', description: 'X (Twitter) stream link to include', required: false, max_length: 300 }],
+    dm_permission: false,
+  },
 ] as const
 
 export type PepCommandName = (typeof PEP_COMMANDS)[number]['name']
