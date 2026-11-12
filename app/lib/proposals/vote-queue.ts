@@ -12,7 +12,7 @@
  *  - on pagehide (not a tab switch), only votes whose proposal closes within PAGEHIDE_SEND_WITHIN_MS are sent (keepalive);
  *  - nothing is dropped silently: a vote that cannot be sent leaves a "failed" record the vote panel shows.
  */
-import { castVote, loadBallot, saveBallot, serverNow, type Choice } from './client'
+import { castVote, listBallotIds, loadBallot, removeBallot, saveBallot, serverNow, type Choice } from './client'
 
 export const QUEUE_KEY = 'pizzadao:proposal-vote-queue'
 export const FAILED_KEY = 'pizzadao:proposal-vote-failed'
@@ -180,6 +180,17 @@ export function queueVote(
   clearFailed(id)
   writeAll([...list.filter((q) => q.id !== id), entry])
   return getQueued(id)
+}
+
+/**
+ * Housekeeping for proposals that are no longer open (the id list comes from /api/proposals/mine, which lists only open
+ * ones): their stored ballots are forgotten, and a still-queued vote becomes a "closed" failure so the member is told once
+ * (the failed record stays, with its dismiss, for up to 14 days).
+ */
+export function pruneClosedProposals(openIds: string[]): void {
+  const open = new Set(openIds)
+  for (const id of listBallotIds()) if (!open.has(id)) removeBallot(id)
+  for (const q of readAll()) if (!open.has(q.id)) fail(q, 'closed')
 }
 
 export function dropQueued(id: string): void {

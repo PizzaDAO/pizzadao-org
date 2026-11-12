@@ -59,10 +59,10 @@ describe('failed-vote banner and send timeout', () => {
     sessionStorage.clear()
     localStorage.setItem('pizzadao:proposal-vote-failed', JSON.stringify({ [id]: { choice: 'AYE', reason: 'closed', at: Date.now() } }))
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 401 })))
-    const { findByText, container } = renderWithIntl(<GlobalBallotPreparer />)
-    expect(await findByText('A vote could not be sent. Open the proposal.')).toBeTruthy()
+    const { findByText, findByLabelText, container } = renderWithIntl(<GlobalBallotPreparer />)
+    expect(await findByText('A vote could not be sent.')).toBeTruthy()
     expect(container.querySelector(`a[href="/proposals/${id}"]`)).toBeTruthy()
-    fireEvent.click(await findByText('Dismiss'))
+    fireEvent.click(await findByLabelText('Dismiss'))
     await waitFor(() => expect(localStorage.getItem('pizzadao:proposal-vote-failed')).toBe('{}'))
   })
 

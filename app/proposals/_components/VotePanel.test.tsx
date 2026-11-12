@@ -12,7 +12,7 @@ vi.mock('next/dynamic', () => ({ __esModule: true, default: () => () => null }))
 const ID = 'abcdefgh12345678'
 const closes = () => new Date(Date.now() + 7 * 86_400_000).toISOString()
 const panel = (over: Partial<React.ComponentProps<typeof VotePanel>> = {}) =>
-  renderWithIntl(<VotePanel proposalId={ID} title="Party" open eligible tokenIssued fingerprint={null} closesAt={closes()} delayMinSeconds={60} delayMaxSeconds={60} {...over} />)
+  renderWithIntl(<VotePanel proposalId={ID} open eligible tokenIssued fingerprint={null} closesAt={closes()} delayMinSeconds={60} delayMaxSeconds={60} {...over} />)
 
 let fetchMock: ReturnType<typeof vi.fn>
 beforeEach(() => {
@@ -72,5 +72,34 @@ describe('VotePanel with the send delay', () => {
     panel()
     fireEvent.click(await screen.findByRole('button', { name: 'Abstain' }))
     await waitFor(() => expect(voteCalls()).toHaveLength(1))
+  })
+})
+
+describe('VotePanel vote code line', () => {
+  it('shows a collapsed "another device" line with Copy, which says Copied', async () => {
+    const writeText = vi.fn(async () => {})
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    panel()
+    expect(await screen.findByText('Voting from another device too?')).toBeTruthy()
+    expect(screen.queryByText(/Your ballot lives in this browser/)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Copy vote code' }))
+    expect(await screen.findByRole('button', { name: 'Copied' })).toBeTruthy()
+    expect(writeText).toHaveBeenCalledTimes(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Why?' }))
+    expect(screen.getByText(/Your ballot lives in this browser\. Paste this code on your phone/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Back up with a wallet' })).toBeTruthy()
+  })
+
+  it('shows nothing about codes when voting is closed', () => {
+    panel({ open: false })
+    expect(screen.getByText('Voting is closed.')).toBeTruthy()
+    expect(screen.queryByText('Voting from another device too?')).toBeNull()
+  })
+
+  it('asks for a pasted code in one sentence when the ballot was issued elsewhere', async () => {
+    localStorage.clear()
+    panel()
+    expect(await screen.findByText('Already voted from another device? Paste your vote code to vote here.')).toBeTruthy()
+    expect(screen.getByLabelText('Vote code')).toBeTruthy()
   })
 })
