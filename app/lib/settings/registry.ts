@@ -161,6 +161,9 @@ export const CREW_VOICE_CHANNEL_LINE = /^([A-Za-z0-9_-]+)\s*=\s*(\d{15,25})$/
 /** One id per line of calls.recordableVoiceChannels. */
 export const VOICE_CHANNEL_ID_LINE = /^\d{15,25}$/
 
+/** One Discord user id per line of calls.attendanceExcludeIds. */
+export const ATTENDANCE_EXCLUDE_LINE = /^\d{15,25}$/
+
 /** Parse calls.crewVoiceChannels into lower-case crew id -> channel id. Bad lines are skipped. */
 export function parseCrewVoiceChannels(raw: string | null | undefined): Map<string, string> {
   const out = new Map<string, string>()
@@ -1009,6 +1012,19 @@ export const SETTINGS = {
     check: (v) => v.split('\n').every((line) => line.trim() === '' || AGENDA_LINK_LINE.test(line.trim())),
     checkMessage: 'Use one line per crew: crew-id = Label | https link',
   }),
+  'calls.attendanceExcludeIds': textSetting({
+    key: 'calls.attendanceExcludeIds',
+    area: 'calls',
+    label: 'Accounts left out of attendance',
+    help: 'One Discord user id per line (music bots such as the radio or jukebox, other bot accounts). These accounts are not listed or counted in call attendance, the live view, or the minutes. Empty: nobody is left out.',
+    maxLength: 2000,
+    multiline: true,
+    default: '',
+    onReadFailure: 'lastKnownGood',
+    placeholder: '123456789012345678',
+    check: (v) => v.split('\n').every((line) => line.trim() === '' || ATTENDANCE_EXCLUDE_LINE.test(line.trim())),
+    checkMessage: 'Use one Discord user id per line (digits only)',
+  }),
   'calls.attendanceCrewAliases': textSetting({
     key: 'calls.attendanceCrewAliases',
     area: 'calls',
@@ -1697,6 +1713,16 @@ export const SETTINGS = {
     area: 'mafia',
     label: 'Precomputed rank freshness (hours)',
     help: 'A member rank computed by the nightly job is shown on profiles for this long; after that the profile falls back to a live lookup.',
+    min: 1,
+    max: 168,
+    default: 26,
+    unit: 'hours',
+  }),
+  'profile.collectionStatsFreshHours': intSetting({
+    key: 'profile.collectionStatsFreshHours',
+    area: 'mafia',
+    label: 'Profile collection counts freshness (hours)',
+    help: 'POAP, NFT and ticket counts on profiles come from a nightly precompute. After this long a view still shows them but refreshes them in the background.',
     min: 1,
     max: 168,
     default: 26,

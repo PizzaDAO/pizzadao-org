@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import type { AttendanceResult } from "@/app/lib/attendance";
 
 /**
@@ -121,25 +122,39 @@ export function AttendanceCard({ memberId, variant = "standalone" }: AttendanceC
             Recent Calls
           </h4>
           <div className="grid gap-1">
-            {data.recentCalls.map((call, idx) => (
-              <div
-                key={idx}
-                className="flex justify-between items-center px-2.5 py-1.5 rounded-md text-sm"
-                style={{
-                  background:
-                    idx % 2 === 0 ? "transparent" : "hsl(var(--background))",
-                }}
-              >
-                <span className="font-medium text-foreground">{call.crew}</span>
-                <span className="text-xs text-muted-foreground">
-                  {new Date(call.date).toLocaleDateString("en-US", {
-                    year: "numeric",
-                    month: "short",
-                    day: "numeric",
-                  })}
-                </span>
-              </div>
-            ))}
+            {data.recentCalls.map((call, idx) => {
+              const rowClass = "flex justify-between items-center px-2.5 py-1.5 rounded-md text-sm";
+              const rowStyle = {
+                background: idx % 2 === 0 ? "transparent" : "hsl(var(--background))",
+              };
+              const row = (
+                <>
+                  <span className="font-medium text-foreground">{call.crew}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(call.date).toLocaleDateString("en-US", {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </span>
+                </>
+              );
+              // A published recording has a call page; link the row to it.
+              return call.recordingId ? (
+                <Link
+                  key={idx}
+                  href={`/calls/${encodeURIComponent(call.recordingId)}`}
+                  className={`${rowClass} no-underline hover:bg-tomato/10`}
+                  style={rowStyle}
+                >
+                  {row}
+                </Link>
+              ) : (
+                <div key={idx} className={rowClass} style={rowStyle}>
+                  {row}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

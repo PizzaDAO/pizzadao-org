@@ -15,6 +15,7 @@
 // the overline above and leave the title control as-is.
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { POAPCollection } from "../poap";
 import { NFTCollection } from "../nft";
 import { UnlockTicketCard } from "../unlock-ticket-card";
@@ -66,6 +67,7 @@ export function CollectionsLazy({ memberId }: CollectionsLazyProps) {
             }}
         >
             <p className="overline text-tomato mb-3">§ 06 · Collections</p>
+            <CollectionStatsBar memberId={memberId} />
             <ToggleAndMount memberId={memberId} onOpenChange={setOpened} shouldMount={shouldMount} />
         </section>
     );
@@ -98,6 +100,55 @@ function ToggleAndMount({
                 </div>
             )}
         </CollapsibleSection>
+    );
+}
+
+interface Stats {
+    poapCount: number;
+    nftCount: number;
+    nftCollections: number;
+    ticketCount: number;
+    hasWallet: boolean;
+    pending: boolean;
+}
+
+/**
+ * Counts from the nightly precompute (one cheap read), shown at once while the heavy lists below
+ * load lazily. Renders nothing until the numbers are in, while they are still being computed for
+ * the first time, or when there is nothing to count.
+ */
+function CollectionStatsBar({ memberId }: { memberId: string }) {
+    const t = useTranslations("collectionStats");
+    const [stats, setStats] = useState<Stats | null>(null);
+
+    useEffect(() => {
+        let alive = true;
+        fetch(`/api/collection-stats/${encodeURIComponent(memberId)}`)
+            .then((r) => (r.ok ? (r.json() as Promise<Stats>) : null))
+            .then((j) => {
+                if (alive) setStats(j);
+            })
+            .catch(() => undefined);
+        return () => {
+            alive = false;
+        };
+    }, [memberId]);
+
+    if (!stats || stats.pending) return null;
+    const items = [
+        { key: "poaps", n: stats.poapCount, label: t("poaps", { count: stats.poapCount }) },
+        { key: "nfts", n: stats.nftCount, label: t("nfts", { count: stats.nftCount, collections: stats.nftCollections }) },
+        { key: "tickets", n: stats.ticketCount, label: t("tickets", { count: stats.ticketCount }) },
+    ].filter((i) => i.n > 0);
+    if (items.length === 0) return null;
+    return (
+        <ul className="m-0 mb-3 flex list-none flex-wrap gap-2 p-0" aria-label={t("aria")}>
+            {items.map((i) => (
+                <li key={i.key} className="rounded-full border border-foreground/15 px-3 py-1 text-sm">
+                    {i.label}
+                </li>
+            ))}
+        </ul>
     );
 }
 

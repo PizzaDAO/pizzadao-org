@@ -128,7 +128,7 @@ export async function recordAndConfirm(sessionId: string, candidates: LiveCandid
   const existing = await prisma.callLiveItem.findMany({ where: { sessionId }, select: { text: true, posted: true } })
   let posted = existing.filter((e) => e.posted).length
   const known = existing.map((e) => e.text)
-  const toPost: Array<{ text: string; owner: string | null }> = []
+  const toPost: Array<{ text: string; owner: string | null; suggestedById: string | null }> = []
   for (const c of candidates) {
     const text = cleanItemText(c.text)
     const owner = cleanOwner(c.owner)
@@ -148,7 +148,7 @@ export async function recordAndConfirm(sessionId: string, candidates: LiveCandid
     known.push(text)
     if (post) {
       posted++
-      toPost.push({ text, owner })
+      toPost.push({ text, owner, suggestedById: c.speakerIds.length === 1 ? c.speakerIds[0] : null })
     }
   }
   const msg = formatConfirmation(toPost, cfg.note)

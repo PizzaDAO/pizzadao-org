@@ -180,10 +180,11 @@ export function isSameItem(a: string, b: string): boolean {
 export const MAX_ITEMS_PER_MESSAGE = 5
 
 /** The confirmation for the call chat, or null when there is nothing to post. */
-export function formatConfirmation(items: ReadonlyArray<{ text: string; owner: string | null }>, note: string): string | null {
+export function formatConfirmation(items: ReadonlyArray<{ text: string; owner: string | null; suggestedById?: string | null }>, note: string): string | null {
   const list = items.slice(0, MAX_ITEMS_PER_MESSAGE)
   if (list.length === 0) return null
-  const line = (i: { text: string; owner: string | null }) => `${i.text}${i.owner ? ` — ${i.owner}` : ''}`
+  const by = (id: string | null | undefined) => (id && SNOWFLAKE.test(id) ? ` (suggested by <@${id}>)` : '')
+  const line = (i: { text: string; owner: string | null; suggestedById?: string | null }) => `${i.text}${i.owner ? ` — ${i.owner}` : ''}${by(i.suggestedById)}`
   const head = list.length === 1 ? `📝 Action item recorded: ${line(list[0])}` : `📝 Action items recorded:\n${list.map((i) => `• ${line(i)}`).join('\n')}`
   const tail = cleanItemText(note, 120)
   return tail ? `${head}\n-# ${tail}` : head
@@ -238,7 +239,8 @@ export function mergeLiveActionItems(
       if (!spokenLineOverlaps(segments, it.speakerIds, it.startMs, it.endMs)) continue
     }
     if (out.some((o) => isSameItem(o.text, it.text))) continue
-    const by = cleanSuggestedBy(names[it.speakerIds[0]] ?? null)
+    // Only a single known speaker is credited; several (the speaker was unclear) leave it empty.
+    const by = it.speakerIds.length === 1 ? cleanSuggestedBy(names[it.speakerIds[0]] ?? null) : null
     out.push({ text: it.text, owner: it.owner, ...(by ? { suggestedBy: by } : {}) })
   }
   return out

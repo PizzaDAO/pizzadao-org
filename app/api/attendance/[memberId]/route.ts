@@ -6,6 +6,45 @@ const CACHE_HEADERS = {
   "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
 };
 
+/**
+ * Attach `recordingId` to each recent call that has a PUBLISHED recording (the call page exists
+ * only then). Matches CallAttendance rows by date + crew; a lookup failure just leaves the links off.
+ */
+export async function withRecordingLinks<T extends { date: string; crewId: string }>(
+  discordId: string,
+  recent: T[],
+): Promise<Array<T & { recordingId?: string }>> {
+  if (recent.length === 0) return recent;
+  try {
+    const rows = await prisma.callAttendance.findMany({
+      where: {
+        discordId,
+        recordingId: { not: null },
+        callDate: { in: recent.map((c) => new Date(c.date)) },
+      },
+      select: { recordingId: true, callDate: true, crewId: true },
+      orderBy: { createdAt: 'asc' }, // later rows win in the map below: the latest recording
+    });
+    const ids = [...new Set(rows.map((r) => r.recordingId).filter((x): x is string => !!x))];
+    if (ids.length === 0) return recent;
+    const published = await prisma.callRecording.findMany({
+      where: { id: { in: ids }, publishedAt: { not: null } },
+      select: { id: true },
+    });
+    const ok = new Set(published.map((r) => r.id));
+    const byKey = new Map<string, string>();
+    for (const r of rows) {
+      if (r.recordingId && ok.has(r.recordingId)) byKey.set(`${r.callDate.toISOString()}|${r.crewId}`, r.recordingId);
+    }
+    return recent.map((c) => {
+      const recordingId = byKey.get(`${new Date(c.date).toISOString()}|${c.crewId}`);
+      return recordingId ? { ...c, recordingId } : c;
+    });
+  } catch {
+    return recent;
+  }
+}
+
 const EMPTY_RESPONSE = { totalCalls: 0, crewBreakdown: {}, recentCalls: [] };
 
 export async function GET(
@@ -52,10 +91,13 @@ export async function GET(
       return NextResponse.json(EMPTY_RESPONSE, { headers: CACHE_HEADERS });
     }
 
+    const recent = Array.isArray(summary.recentCalls)
+      ? await withRecordingLinks(summary.discordId, summary.recentCalls as Array<{ date: string; crewId: string }>)
+      : summary.recentCalls;
     return NextResponse.json({
       totalCalls: summary.totalCalls,
       crewBreakdown: summary.crewBreakdown,
-      recentCalls: summary.recentCalls,
+      recentCalls: recent,
     }, {
       headers: CACHE_HEADERS,
     });

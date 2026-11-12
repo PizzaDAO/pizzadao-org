@@ -328,17 +328,19 @@ export function buildRecapParts(input: RecapInput, base: string = SITE_URL, filt
   const bullets = recapBullets(rec.summary, rec.chapters, filter, limits).map((b) => mentionInBullet(b, who, found))
   const actions = (Array.isArray(rec.actionItems) ? rec.actionItems : [])
     .map((a) => {
-      const o = a as { text?: unknown; owner?: unknown; suggestedBy?: unknown }
+      const o = a as { text?: unknown; owner?: unknown; suggestedBy?: unknown; done?: unknown }
+      const done = o?.done === true
       const text = typeof o?.text === 'string' ? oneLine(o.text) : ''
       const owner = typeof o?.owner === 'string' ? oneLine(o.owner) : ''
       const by = typeof o?.suggestedBy === 'string' ? oneLine(o.suggestedBy) : ''
-      if (!text || mentionsBlockedTerm(text, filter) || mentionsBlockedTerm(owner, filter) || mentionsBlockedTerm(by, filter)) return ''
+      if (!text || mentionsBlockedTerm(text, filter) || mentionsBlockedTerm(owner, filter) || mentionsBlockedTerm(by, filter)) return null
       // One person who both suggested and owns it: say so once instead of "(Ann) — suggested by Ann".
-      if (owner && by && sameActionPerson(owner, by, who)) return `${clip(text, limits.chars)} — ${mentionNames(clip(owner, 40), who, found)} (suggested, owner)`
-      return `${clip(text, limits.chars)}${owner ? ` (${mentionNames(clip(owner, 40), who, found)})` : ''}${by ? ` — suggested by ${mentionNames(clip(by, 40), who, found)}` : ''}`
+      if (owner && by && sameActionPerson(owner, by, who)) return { done, line: `${clip(text, limits.chars)} — ${mentionNames(clip(owner, 40), who, found)} (suggested, owner)` }
+      return { done, line: `${clip(text, limits.chars)}${owner ? ` (${mentionNames(clip(owner, 40), who, found)})` : ''}${by ? ` — suggested by ${mentionNames(clip(by, 40), who, found)}` : ''}` }
     })
-    .filter(Boolean)
+    .filter((x): x is { done: boolean; line: string } => !!x)
     .slice(0, limits.actions)
+  const actionLine = (a: { done: boolean; line: string }) => `${a.done ? '✅' : '-'} ${a.line}`
   const url = recapUrl(rec.id, base)
   const lines = [`**Call recap: ${title}**`]
   if (bullets.length) lines.push('', ...bullets.map((b) => `- ${b}`))
@@ -350,13 +352,13 @@ export function buildRecapParts(input: RecapInput, base: string = SITE_URL, filt
     const moreLine = (n: number) => `+${n} more on the call page`
     let kept = actions.length
     while (kept > 0) {
-      const shown = actions.slice(0, kept).map((a) => `- ${a}`)
+      const shown = actions.slice(0, kept).map(actionLine)
       const extra = kept < actions.length ? [moreLine(actions.length - kept)] : []
       if (len([...head, ...shown, ...extra, ...tail]) <= DISCORD_MESSAGE_LIMIT) break
       kept--
     }
     if (kept > 0) {
-      lines.push('', '**Action items**', ...actions.slice(0, kept).map((a) => `- ${a}`))
+      lines.push('', '**Action items**', ...actions.slice(0, kept).map(actionLine))
       if (kept < actions.length) lines.push(moreLine(actions.length - kept))
     }
   }
