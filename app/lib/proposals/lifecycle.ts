@@ -5,6 +5,7 @@
 import { prisma } from '@/app/lib/db'
 import { CLOSE_MARGIN_MS, DRAFT_RETRY_MS } from './constants'
 import { alertStuck, announceCancelled, announceOpen, announceResult, type PostDeps, defaultPostDeps } from './discord'
+import { clearProposalReminders } from '@/app/lib/reminders/proposal-store'
 import { KeyConfigError } from './keys'
 import type { PendingStore } from './pending'
 import { cancelProposal, drainPending, openProposal, settleProposal, type CancelActor, type CancelResult } from './store'
@@ -58,6 +59,8 @@ export async function openAndAnnounce(id: string, deps: PostDeps = defaultPostDe
 export async function cancelAndAnnounce(id: string, actor: CancelActor, reason: unknown, deps: PostDeps = defaultPostDeps, opts: { now?: Date; pending?: PendingStore | null } = {}): Promise<CancelResult> {
   const r = await cancelProposal(id, actor, reason, { now: opts.now, pending: opts.pending })
   if (r.ok && r.wasOpen) await announceCancelled(id, deps).catch(() => {})
+  // Per-member reminder rows go when the proposal stops being open (best effort; the reminders cron sweeps leftovers).
+  if (r.ok) await clearProposalReminders(id)
   return r
 }
 
@@ -98,7 +101,10 @@ export async function runProposalsCron(now: Date = new Date(), deps: PostDeps = 
   const due: Array<{ id: string }> = await prisma.proposal.findMany({ where: { source: 'APP', status: 'OPEN', closesAt: { lte: new Date(now.getTime() - CLOSE_MARGIN_MS) } }, select: { id: true } })
   for (const p of due) {
     try {
-      if ((await settleProposal(p.id, now, { pending: opts.pending })).ok) out.settled++
+      if ((await settleProposal(p.id, now, { pending: opts.pending })).ok) {
+        out.settled++
+        await clearProposalReminders(p.id)
+      }
     } catch (e) {
       console.error('[proposals] settle failed:', (e as Error)?.name)
     }

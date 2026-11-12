@@ -12,6 +12,7 @@ import { toggleEnabled } from "@/app/lib/settings/toggles";
 import { listOpenProposals, type ProposalSummary } from "@/app/lib/proposals/store";
 import { loadPilotState, proposalsEnabledFor } from "@/app/lib/proposals/pilot";
 import { listHistory, parseHistoryFilters, type HistoryFilters, type HistoryTotals } from "@/app/lib/proposals/history";
+import { ProposalRemindersOptIn } from "./_components/ProposalRemindersOptIn";
 import { EditorialMasthead, EditorialPage, EmptyState, paperCard, pillOutline, pillTomato } from "@/app/ui/shared/Editorial";
 
 export const runtime = "nodejs";
@@ -192,6 +193,7 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
             />
             {voting && (
                 <>
+                    <ProposalRemindersOptIn />
                     <h2 className="mb-3 font-display text-xl font-black">{t("openHeading")}</h2>
                     {open.length === 0 ? (
                         <EmptyState title={t("noOpen")} />

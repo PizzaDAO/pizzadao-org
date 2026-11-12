@@ -102,4 +102,18 @@ describe('roster editor', () => {
     expect(() => cleanRows(spec, [{ name: 'A', memberId: '7' }, { name: 'B', memberId: '7' }])).toThrow(/duplicate/)
     expect(cleanRows(spec, [{ name: 'A' }, { name: 'A' }])).toHaveLength(2)
   })
+
+  it('save passes loadedAt through: a row created after the page loaded is not archived', async () => {
+    const { prisma } = await import('@/app/lib/db')
+    const loadedAt = new Date('2026-10-01T12:00:00Z')
+    const row = (id: string, createdAt: string) => ({ id, crewId: 'ops', naturalKey: `id:${id}`, memberId: id, name: id, status: '', city: '', org: '', skills: '', turtles: '', telegram: '', attendance: '', notes: '', position: 0, archived: false, createdAt: new Date(createdAt), updatedAt: new Date(createdAt) })
+    const update = vi.fn((a: unknown) => a)
+    const p = prisma as unknown as Record<string, unknown>
+    p.crewRole = { findMany: vi.fn(async () => [row('1', '2026-09-01T00:00:00Z'), row('2', '2026-10-01T13:00:00Z')]), update, create: vi.fn() }
+    p.$transaction = vi.fn(async () => [])
+    const counts = await crewRosterEditor('ops').save([], 'actor', { loadedAt })
+    expect(counts.deactivated).toBe(1)
+    expect(update).toHaveBeenCalledTimes(1)
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: '1' } }))
+  })
 })

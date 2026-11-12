@@ -204,10 +204,11 @@ export function crewRosterEditor(crewId: string): EditorSpec {
         turtles: r.turtles, telegram: r.telegram, attendance: r.attendance, notes: r.notes,
       }))
     },
-    async save(rows, actor) {
+    async save(rows, actor, opts) {
       const existing = (await prisma.crewRole.findMany({ where: { crewId } })) as unknown as Row[]
       return saveCrewRows({
         rows,
+        loadedAt: opts?.loadedAt,
         existing,
         labelOf: (r) => roleKey(text(r.memberId) || null, text(r.name)),
         fields: (r, position) => ({

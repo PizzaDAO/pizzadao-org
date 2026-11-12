@@ -85,6 +85,9 @@ describe('formatConfirmation', () => {
       '📝 Action item recorded: Book the venue — Ann\n-# Added to the call notes for review',
     )
   })
+  it('mentions the single speaker who suggested it', () => {
+    expect(formatConfirmation([{ text: 'Book the venue', owner: null, suggestedById: '111222333444555' }], '')).toBe('📝 Action item recorded: Book the venue (suggested by <@111222333444555>)')
+  })
   it('several items: a short list, at most five; no note when empty', () => {
     const items = Array.from({ length: 7 }, (_, i) => ({ text: `Task ${i}`, owner: null }))
     const m = formatConfirmation(items, '')!
@@ -101,6 +104,9 @@ describe('mergeLiveActionItems suggestedBy', () => {
   const item = (speakerIds: string[]) => ({ text: 'Order stickers', owner: null, source: 'speech', messageId: null, speakerIds, startMs: 11_000, endMs: 14_000 })
   it('uses the first speaker display name', () => {
     expect(mergeLiveActionItems([], [item(['111'])], [seg], [], 30, { '111': 'Ann' })[0]).toEqual({ text: 'Order stickers', owner: null, suggestedBy: 'Ann' })
+  })
+  it('credits nobody when several speakers are possible', () => {
+    expect(mergeLiveActionItems([], [item(['111', '222'])], [seg], [], 30, { '111': 'Ann', '222': 'Bob' })[0]).not.toHaveProperty('suggestedBy')
   })
   it('leaves it out without a name or with a generic fallback name', () => {
     expect(mergeLiveActionItems([], [item(['111'])], [seg], [])[0]).not.toHaveProperty('suggestedBy')

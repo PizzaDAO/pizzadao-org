@@ -300,7 +300,7 @@ export interface GuildMemberRow {
   nick?: string | null
   roles: string[]
   joined_at?: string | null
-  user: { id: string; bot?: boolean; username?: string }
+  user: { id: string; bot?: boolean; username?: string; global_name?: string | null }
 }
 
 const defaultSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))

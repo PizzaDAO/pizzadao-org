@@ -10,6 +10,7 @@ import { prisma } from '@/app/lib/db'
 import { resolvePfpUrlsAsync } from '@/app/lib/pfp'
 import { attendanceCrewId, crewIdsFor, loadCrewAliases } from './crew-alias'
 import { callDay } from './attendance-from-recordings'
+import { loadAttendanceExcludes } from './attendance-exclude'
 import { isImportedSource } from './imported'
 import { displaySpeakerName } from './speaker-labels'
 
@@ -65,9 +66,10 @@ export async function loadCallAttendees(rec: AttendeeRecording, text: AttendeeTe
     }
     if (raw.length === 0) raw = speakers
     // Dedupe, drop redacted people and anything that is not a Discord user id.
+    const exclude = await loadAttendanceExcludes()
     const byId = new Map<string, string | null>()
     for (const r of raw) {
-      if (hidden.has(r.discordId) || !DISCORD_ID.test(r.discordId)) continue
+      if (hidden.has(r.discordId) || exclude.has(r.discordId) || !DISCORD_ID.test(r.discordId)) continue
       if (!byId.get(r.discordId)) byId.set(r.discordId, r.displayName?.trim() || null)
     }
     if (byId.size === 0) return []

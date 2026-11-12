@@ -20,9 +20,10 @@ import { CALL_TIME_SETTINGS } from './call-time-settings'
 import { SHEETS_SETTINGS } from './sheets-settings'
 import { MAP_LEVELS_SETTINGS } from './map-levels-settings'
 import { REMINDERS_SETTINGS } from './reminders-settings'
+import { CREWS_SETTINGS } from './crews-settings'
 import { ADMIN_ROLE_IDS, DREAD_PIZZA_ROBERTS_ROLE_ID, MISSION_REVIEWER_ROLE_IDS } from '@/app/ui/constants'
 
-export type SettingArea = 'missions' | 'calls' | 'disavow' | 'passport' | 'guide' | 'followups' | 'discord' | 'features' | 'payments' | 'proposals' | 'economy' | 'mafia' | 'telegram' | 'sheets' | 'map' | 'reminders'
+export type SettingArea = 'missions' | 'calls' | 'disavow' | 'passport' | 'guide' | 'followups' | 'discord' | 'features' | 'payments' | 'proposals' | 'economy' | 'mafia' | 'telegram' | 'sheets' | 'map' | 'reminders' | 'crews'
 
 /** Admin-only English group names (kept out of messages/*.json: the disavow feature must not leak into them). */
 export const AREA_LABELS: Record<SettingArea, string> = {
@@ -42,6 +43,7 @@ export const AREA_LABELS: Record<SettingArea, string> = {
   sheets: 'Google Sheets cutover',
   map: 'Reach map levels',
   reminders: 'Reminders',
+  crews: 'Crew rosters',
 }
 
 /** What a reader gets when the stored value cannot be used (DB down, row fails its schema). */
@@ -160,6 +162,9 @@ export const CREW_VOICE_CHANNEL_LINE = /^([A-Za-z0-9_-]+)\s*=\s*(\d{15,25})$/
 
 /** One id per line of calls.recordableVoiceChannels. */
 export const VOICE_CHANNEL_ID_LINE = /^\d{15,25}$/
+
+/** One Discord user id per line of calls.attendanceExcludeIds. */
+export const ATTENDANCE_EXCLUDE_LINE = /^\d{15,25}$/
 
 /** Parse calls.crewVoiceChannels into lower-case crew id -> channel id. Bad lines are skipped. */
 export function parseCrewVoiceChannels(raw: string | null | undefined): Map<string, string> {
@@ -1016,6 +1021,19 @@ export const SETTINGS = {
     check: (v) => v.split('\n').every((line) => line.trim() === '' || AGENDA_LINK_LINE.test(line.trim())),
     checkMessage: 'Use one line per crew: crew-id = Label | https link',
   }),
+  'calls.attendanceExcludeIds': textSetting({
+    key: 'calls.attendanceExcludeIds',
+    area: 'calls',
+    label: 'Accounts left out of attendance',
+    help: 'One Discord user id per line (music bots such as the radio or jukebox, other bot accounts). These accounts are not listed or counted in call attendance, the live view, or the minutes. Empty: nobody is left out.',
+    maxLength: 2000,
+    multiline: true,
+    default: '',
+    onReadFailure: 'lastKnownGood',
+    placeholder: '123456789012345678',
+    check: (v) => v.split('\n').every((line) => line.trim() === '' || ATTENDANCE_EXCLUDE_LINE.test(line.trim())),
+    checkMessage: 'Use one Discord user id per line (digits only)',
+  }),
   'calls.attendanceCrewAliases': textSetting({
     key: 'calls.attendanceCrewAliases',
     area: 'calls',
@@ -1147,6 +1165,19 @@ export const SETTINGS = {
     max: 50,
     default: 1,
     unit: 'people',
+  }),
+  'calls.playOutCommandEnabled': boolSetting({
+    key: 'calls.playOutCommandEnabled',
+    area: 'calls',
+    label: 'Spoken "play us out" command',
+    help: 'Lets a crew lead or admin say "That\'s the end of the call, Metalhead, play the song" (also "play us out") and the recorder asks pizza-radio to play the crew song right away, at most once per call. Replaces the automatic end-of-call song for that call. Needs the end-of-call song switch on, the crew in its crew map, and a live recorder. Short speech from allowed speakers is transcribed on the side (about 1 cent per call). The CALL_PLAY_OUT_COMMAND_ENABLED env var set to off always wins; on preview deploys only the env var counts.',
+    confirmOn: 'Metalhead will play the crew song when an allowed member asks for it out loud.',
+  }),
+  'calls.playOutAnyMember': boolSetting({
+    key: 'calls.playOutAnyMember',
+    area: 'calls',
+    label: 'Play-out command: any member may give it',
+    help: 'Off (default): only crew leads of the call\'s crew and guild admins can ask Metalhead to play the song. On: any signed-up member in the call can.',
   }),
   'calls.startBandEnabled': boolSetting({
     key: 'calls.startBandEnabled',
@@ -1293,8 +1324,8 @@ export const SETTINGS = {
     key: 'calls.liveChunkSeconds',
     area: 'calls',
     label: 'Live action items: check every',
-    help: 'How often the recorder sends new speech. Shorter is faster but costs a little more (more model calls).',
-    min: 60,
+    help: 'How often the recorder sends new speech. Shorter is faster but costs a little more (more model calls; speech is transcribed once either way). Items appear about half this long after they are said, plus 10 to 30 seconds. Below 90 seconds, also raise "most checks per call".',
+    min: 30,
     max: 600,
     default: 150,
     unit: 'seconds',
@@ -1679,6 +1710,12 @@ export const SETTINGS = {
     area: 'features',
     label: 'Trainee nickname sync',
     help: 'Apply the trainee nickname and role changes in Discord. Off: dry run. The TRAINEE_NICK_ENABLED env var set to off always wins.',
+  }),
+  'onboarding.traineeNickHealEnabled': boolSetting({
+    key: 'onboarding.traineeNickHealEnabled',
+    area: 'features',
+    label: 'Restore chosen names on Pizza Trainee members',
+    help: 'Restore the name a member chose on signed-up members who are still nicknamed Pizza Trainee (names that just match their Discord name are left alone). Off: they keep Pizza Trainee until they claim a name. Needs the trainee nickname sync on. The TRAINEE_NICK_HEAL_ENABLED env var set to off always wins.',
   }),
   'names.requireThemed': boolSetting({
     key: 'names.requireThemed',
@@ -2175,6 +2212,7 @@ export const SETTINGS = {
   ...SHEETS_SETTINGS,
   ...MAP_LEVELS_SETTINGS,
   ...REMINDERS_SETTINGS,
+  ...CREWS_SETTINGS,
   // The Work Payment responses sheet. Empty = form ingest does nothing. Never committed to the repo, and
   // never sent anywhere except this admin settings page (private: true) and the ingest job.
   'payments.formSheetId': {

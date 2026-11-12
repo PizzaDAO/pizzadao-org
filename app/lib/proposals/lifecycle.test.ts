@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const fake = vi.hoisted(() => ({ current: null as any }))
 vi.mock('@/app/lib/db', () => ({ prisma: new Proxy({}, { get: (_t, k) => fake.current.db[k] }) }))
+const clearReminders = vi.hoisted(() => vi.fn(async (_id: string) => undefined))
+vi.mock('@/app/lib/reminders/proposal-store', () => ({ clearProposalReminders: (id: string) => clearReminders(id) }))
 vi.mock('@/app/lib/discord-channels', () => ({ getGuildRoles: vi.fn() }))
 vi.mock('@/app/lib/discord', () => ({ hasRole: vi.fn() }))
 vi.mock('@/app/lib/settings', () => ({ getSetting: vi.fn(async () => ''), loadSettings: vi.fn() }))
@@ -12,7 +14,7 @@ vi.mock('@/app/lib/settings/channels', () => ({ resolveConfiguredChannel: vi.fn(
 
 import { DiscordPostError } from '@/app/lib/discord-rest'
 import { announceOpen, openMessage, resultMessage, type PostDeps } from './discord'
-import { runProposalsCron } from './lifecycle'
+import { cancelAndAnnounce, runProposalsCron } from './lifecycle'
 import { createProposal } from './store'
 import { makeFakeDb } from './test-utils'
 
@@ -32,6 +34,7 @@ async function seedOpen(over: Record<string, any> = {}) {
 }
 
 beforeEach(() => {
+  clearReminders.mockClear()
   fake.current = makeFakeDb()
 })
 
@@ -95,6 +98,8 @@ describe('daily run', () => {
     const r = await runProposalsCron(t0, d)
     expect(r).toMatchObject({ settled: 1, resultPosts: 1 })
     const byId = (id: string) => fake.current.state.proposal.find((p: any) => p.id === id)
+    // per-member reminder rows are cleared for the settled proposal only
+    expect(clearReminders.mock.calls.map((c) => c[0])).toEqual([due])
     expect(byId(due)).toMatchObject({ status: 'PASSED', ayes: 30 })
     expect(byId(later).status).toBe('OPEN')
     // the still-open one gets its (missed) announcement, without counts; the closed one gets only the result
@@ -107,6 +112,13 @@ describe('daily run', () => {
     post.mockClear()
     expect(await runProposalsCron(t0, d)).toMatchObject({ settled: 0, resultPosts: 0, openPosts: 0 })
     expect(post).not.toHaveBeenCalled()
+  })
+
+  it('cancelling clears the proposal reminder rows', async () => {
+    const id = await seedOpen()
+    const r = await cancelAndAnnounce(id, { discordId: 'admin', admin: true }, 'duplicate proposal', deps().d, { now: t0, pending: null })
+    expect(r.ok).toBe(true)
+    expect(clearReminders).toHaveBeenCalledWith(id)
   })
 
   it('a proposal with too few votes fails at close', async () => {

@@ -8,6 +8,9 @@ import type { PrefLite } from './schedule'
 
 export const MAX_ATTEMPTS = 3
 
+/** The kinds of send row. Calls are the default everywhere; proposals pass their kind explicitly. */
+export type SendKind = 'CALL' | 'PROPOSAL_OPENED' | 'PROPOSAL_CLOSING'
+
 export interface ReminderStore {
   /** Everyone who opted in to call reminders. */
   listCallPrefs(): Promise<PrefLite[]>
@@ -16,12 +19,12 @@ export interface ReminderStore {
   /** One query: the "<discordId>|<eventId>" pairs already sent a call reminder (any start time) since `since`. */
   sentForEventsSince(discordIds: readonly string[], eventIds: readonly string[], since: Date): Promise<Set<string>>
   /** Claim (member, kind, refKey) before sending. False when it already exists (sent, claimed, skipped, failed) and is not due a retry. */
-  claimCall(discordId: string, refKey: string): Promise<{ claimed: boolean; attempts: number }>
-  markSent(discordId: string, refKey: string): Promise<void>
-  markSkipped(discordId: string, refKey: string, code: string): Promise<void>
+  claimCall(discordId: string, refKey: string, kind?: SendKind): Promise<{ claimed: boolean; attempts: number }>
+  markSent(discordId: string, refKey: string, kind?: SendKind): Promise<void>
+  markSkipped(discordId: string, refKey: string, code: string, kind?: SendKind): Promise<void>
   /** Release the claim for the next run. `countAttempt` false keeps the attempt count (a rate limit is not the message's fault). */
-  release(discordId: string, refKey: string, code: string, attempts: number, countAttempt: boolean): Promise<void>
-  markFailed(discordId: string, refKey: string, code: string): Promise<void>
+  release(discordId: string, refKey: string, code: string, attempts: number, countAttempt: boolean, kind?: SendKind): Promise<void>
+  markFailed(discordId: string, refKey: string, code: string, kind?: SendKind): Promise<void>
 }
 
 export const prismaStore: ReminderStore = {
@@ -58,40 +61,40 @@ export const prismaStore: ReminderStore = {
     return out
   },
 
-  async claimCall(discordId, refKey) {
+  async claimCall(discordId, refKey, kind = 'CALL') {
     try {
-      await prisma.reminderSend.create({ data: { discordId, kind: 'CALL', refKey, status: 'CLAIMED', channel: 'discord', attempts: 0 } })
+      await prisma.reminderSend.create({ data: { discordId, kind, refKey, status: 'CLAIMED', channel: 'discord', attempts: 0 } })
       return { claimed: true, attempts: 0 }
     } catch (e) {
       if (!(e instanceof Prisma.PrismaClientKnownRequestError) || e.code !== 'P2002') throw e
     }
     // Already there: only a released (RETRY) row with attempts left can be claimed again, by exactly one run.
     const won = await prisma.reminderSend.updateMany({
-      where: { discordId, kind: 'CALL', refKey, status: 'RETRY', attempts: { lt: MAX_ATTEMPTS } },
+      where: { discordId, kind, refKey, status: 'RETRY', attempts: { lt: MAX_ATTEMPTS } },
       data: { status: 'CLAIMED' },
     })
     if (won.count !== 1) return { claimed: false, attempts: 0 }
-    const row = await prisma.reminderSend.findUnique({ where: { discordId_kind_refKey: { discordId, kind: 'CALL', refKey } }, select: { attempts: true } })
+    const row = await prisma.reminderSend.findUnique({ where: { discordId_kind_refKey: { discordId, kind, refKey } }, select: { attempts: true } })
     return { claimed: true, attempts: row?.attempts ?? 0 }
   },
 
-  async markSent(discordId, refKey) {
-    await prisma.reminderSend.updateMany({ where: { discordId, kind: 'CALL', refKey }, data: { status: 'SENT', code: null } })
+  async markSent(discordId, refKey, kind = 'CALL') {
+    await prisma.reminderSend.updateMany({ where: { discordId, kind, refKey }, data: { status: 'SENT', code: null } })
   },
 
-  async markSkipped(discordId, refKey, code) {
-    await prisma.reminderSend.updateMany({ where: { discordId, kind: 'CALL', refKey }, data: { status: 'SKIPPED', code } })
+  async markSkipped(discordId, refKey, code, kind = 'CALL') {
+    await prisma.reminderSend.updateMany({ where: { discordId, kind, refKey }, data: { status: 'SKIPPED', code } })
   },
 
-  async release(discordId, refKey, code, attempts, countAttempt) {
+  async release(discordId, refKey, code, attempts, countAttempt, kind = 'CALL') {
     await prisma.reminderSend.updateMany({
-      where: { discordId, kind: 'CALL', refKey },
+      where: { discordId, kind, refKey },
       data: { status: 'RETRY', code, attempts: countAttempt ? attempts + 1 : attempts },
     })
   },
 
-  async markFailed(discordId, refKey, code) {
-    await prisma.reminderSend.updateMany({ where: { discordId, kind: 'CALL', refKey }, data: { status: 'FAILED', code } })
+  async markFailed(discordId, refKey, code, kind = 'CALL') {
+    await prisma.reminderSend.updateMany({ where: { discordId, kind, refKey }, data: { status: 'FAILED', code } })
   },
 }
 
