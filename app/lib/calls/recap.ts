@@ -339,12 +339,13 @@ export function buildRecapParts(input: RecapInput, base: string = SITE_URL, filt
       const by = typeof o?.suggestedBy === 'string' ? oneLine(o.suggestedBy) : ''
       if (!text || mentionsBlockedTerm(text, filter) || mentionsBlockedTerm(owner, filter) || mentionsBlockedTerm(by, filter)) return null
       // One person who both suggested and owns it: say so once instead of "(Ann) — suggested by Ann".
-      if (owner && by && sameActionPerson(owner, by, who)) return { done, line: `${clip(text, limits.chars)} — ${mentionNames(clip(owner, 40), who, found)} (suggested, owner)${ev}` }
-      return { done, line: `${clip(text, limits.chars)}${owner ? ` (${mentionNames(clip(owner, 40), who, found)})` : ''}${by ? ` — suggested by ${mentionNames(clip(by, 40), who, found)}` : ''}${ev}` }
+      if (owner && by && sameActionPerson(owner, by, who)) return { done, line: `${clip(text, limits.chars)} — ${mentionNames(clip(owner, 40), who, found)} (suggested, owner)`, ev }
+      return { done, line: `${clip(text, limits.chars)}${owner ? ` (${mentionNames(clip(owner, 40), who, found)})` : ''}${by ? ` — suggested by ${mentionNames(clip(by, 40), who, found)}` : ''}`, ev }
     })
-    .filter((x): x is { done: boolean; line: string } => !!x)
+    .filter((x): x is { done: boolean; line: string; ev: string } => !!x)
     .slice(0, limits.actions)
-  const actionLine = (a: { done: boolean; line: string }) => `${a.done ? '✅' : '-'} ${a.line}`
+  let withEv = true
+  const actionLine = (a: { done: boolean; line: string; ev: string }) => `${a.done ? '✅' : '-'} ${a.line}${withEv ? a.ev : ''}`
   const url = recapUrl(rec.id, base)
   const lines = [`**Call recap: ${title}**`]
   if (bullets.length) lines.push('', ...bullets.map((b) => `- ${b}`))
@@ -355,6 +356,8 @@ export function buildRecapParts(input: RecapInput, base: string = SITE_URL, filt
     const len = (ls: string[]) => ls.join('\n').length
     const moreLine = (n: number) => `+${n} more on the call page`
     let kept = actions.length
+    // Over the limit: drop the evidence links first, then whole items.
+    if (len([...head, ...actions.map(actionLine), ...tail]) > DISCORD_MESSAGE_LIMIT) withEv = false
     while (kept > 0) {
       const shown = actions.slice(0, kept).map(actionLine)
       const extra = kept < actions.length ? [moreLine(actions.length - kept)] : []

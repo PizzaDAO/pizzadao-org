@@ -85,7 +85,11 @@ function splitEvidence(line: string): { rest: string; evidence: Evidence[] } | n
     if (tail && !/^\s/.test(tail)) return null;
     const tokens = tail.split(/\s+/).filter(Boolean);
     if (!tokens.every((t) => safeEvidenceUrl(t))) return null;
-    return { rest: line.slice(0, at).trim(), evidence: parseEvidenceInput(tail) };
+    return { rest: line.slice(0, at).trim(), evidence: parseEvidenceInput(tail, false) };
+}
+/** The line without its evidence tail (unticking an item drops its links). */
+export function stripEvidence(line: string): string {
+    return splitEvidence(line)?.rest ?? line;
 }
 /** "text | owner | by: suggester | ev: url url" per line; owner and suggester are optional. A final " | by: NAME" is the suggester, then whatever follows the last " | " is the owner. */
 export function formatActionItems(items: ActionItem[]): string {
@@ -191,7 +195,7 @@ export function ReviewActions({
     function toggleDone(i: number) {
         const lines = actionItems.split("\n").filter((l) => l.trim());
         const l = lines[i].trim();
-        lines[i] = /^\[x\]\s/i.test(l) ? l.slice(DONE.length).trim() : DONE + l;
+        lines[i] = /^\[x\]\s/i.test(l) ? stripEvidence(l.slice(DONE.length).trim()) : DONE + l;
         setActionItems(lines.join("\n"));
     }
 

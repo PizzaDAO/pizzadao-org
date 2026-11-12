@@ -1387,7 +1387,7 @@
     "redactLines": "Ocultar sus líneas",
     "redactConfirm": "¿Ocultar todas las líneas de este orador en la página pública y en los resúmenes? No se borra nada y puedes restaurarlas. Una llamada publicada vuelve a revisión. El resumen no se reescribe.",
     "processingNote": "Se está generando el resumen. Recarga en un minuto.",
-    "actionItemsHint": "Una por línea. Responsable facultativo tras una barra vertical y, si quieres, \"by: Nombre\" para quien la sugirió: Enviar la presentación | Ann | by: Bob",
+    "actionItemsHint": "Una por línea. Responsable facultativo tras una barra vertical y, si quieres, \"by: Nombre\" para quien la sugirió: Enviar la presentación | Ann | by: Bob. Una tarea hecha (\"[x] \" al inicio) puede terminar con \" | ev: url url\" (enlaces a su PR o prueba; siempre al final)",
     "actionItemDone": "Hecho",
     "actionItemEvidence": "Enlaces de prueba (PR, documento), hasta 3, separados por espacio o coma",
     "suggestedBy": "sugerido por {name}",

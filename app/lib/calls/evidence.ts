@@ -1,10 +1,9 @@
 /**
  * Evidence for a done action item: links (PRs, docs, ...) that show it was completed.
- * Stored as `evidence: [{ url, label? }]` next to `done` on CallRecording.actionItems.
+ * Stored as `evidence: [{ url }]` next to `done` on CallRecording.actionItems.
  */
 export interface Evidence {
   url: string
-  label?: string
 }
 
 export const MAX_EVIDENCE = 3
@@ -46,12 +45,9 @@ export function parseEvidenceStrict(raw: unknown, name: string, fail: (msg: stri
   if (!Array.isArray(raw) || raw.length > MAX_EVIDENCE) return fail(`${name} must be an array of up to ${MAX_EVIDENCE}`)
   const out: Evidence[] = []
   raw.forEach((x, i) => {
-    const o = (x ?? {}) as { url?: unknown; label?: unknown }
-    const url = safeEvidenceUrl(o.url)
+    const url = safeEvidenceUrl(((x ?? {}) as { url?: unknown }).url)
     if (!url) return fail(`${name}[${i}].url must be an http(s) URL up to ${MAX_EVIDENCE_URL} characters`)
-    if (o.label != null && (typeof o.label !== 'string' || o.label.length > MAX_EVIDENCE_LABEL)) return fail(`${name}[${i}].label must be a string up to ${MAX_EVIDENCE_LABEL} characters`)
-    const label = typeof o.label === 'string' ? o.label.replace(/\s+/g, ' ').trim() : ''
-    if (!out.some((e) => e.url === url)) out.push({ url, ...(label ? { label } : {}) })
+    if (!out.some((e) => e.url === url)) out.push({ url })
   })
   return out
 }
@@ -61,20 +57,18 @@ export function readEvidence(raw: unknown): Array<{ url: string; label: string }
   if (!Array.isArray(raw)) return []
   const out: Array<{ url: string; label: string }> = []
   for (const x of raw) {
-    const o = (x ?? {}) as { url?: unknown; label?: unknown }
-    const url = safeEvidenceUrl(o.url)
+    const url = safeEvidenceUrl(((x ?? {}) as { url?: unknown }).url)
     if (!url || out.some((e) => e.url === url)) continue
-    const label = typeof o.label === 'string' ? o.label.replace(/\s+/g, ' ').trim().slice(0, MAX_EVIDENCE_LABEL) : ''
-    out.push({ url, label: label || evidenceLabel(url) })
+    out.push({ url, label: evidenceLabel(url) })
     if (out.length >= MAX_EVIDENCE) break
   }
   return out
 }
 
-/** Space/comma separated URLs (the editor input); invalid tokens are dropped. */
-export function parseEvidenceInput(raw: string): Evidence[] {
+/** Space (and, for the input box, comma) separated URLs; invalid tokens are dropped. URLs may contain commas, so the textarea passes commas = false. */
+export function parseEvidenceInput(raw: string, commas = true): Evidence[] {
   const out: Evidence[] = []
-  for (const tok of raw.split(/[\s,]+/)) {
+  for (const tok of raw.split(commas ? /[\s,]+/ : /\s+/)) {
     const url = safeEvidenceUrl(tok)
     if (url && !out.some((e) => e.url === url) && out.length < MAX_EVIDENCE) out.push({ url })
   }

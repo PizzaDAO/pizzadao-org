@@ -594,15 +594,14 @@ describe('reviewer edits', () => {
   it('validates evidence on action items', async () => {
     asReviewer()
     db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'IN_REVIEW' })
-    const ok = [{ url: 'https://github.com/o/r/pull/5' }, { url: 'http://example.org/x', label: ' Spec ' }]
+    const ok = [{ url: 'https://github.com/o/r/pull/5' }, { url: 'http://example.org/x', label: 'ignored' }]
     expect((await patch({ actionItems: [{ text: 'A', done: true, evidence: ok }, { text: 'B', evidence: [] }] })).status).toBe(200)
-    expect(db.callRecording.update.mock.calls[0][0].data.actionItems).toEqual([{ text: 'A', done: true, evidence: [{ url: 'https://github.com/o/r/pull/5' }, { url: 'http://example.org/x', label: 'Spec' }] }, { text: 'B' }])
+    expect(db.callRecording.update.mock.calls[0][0].data.actionItems).toEqual([{ text: 'A', done: true, evidence: [{ url: 'https://github.com/o/r/pull/5' }, { url: 'http://example.org/x' }] }, { text: 'B' }])
     for (const evidence of [
       [{ url: 'javascript:alert(1)' }],
       [{ url: 'ftp://example.org/x' }],
       [{ url: 'not a url' }],
       [{ url: 'https://example.org/a' }, { url: 'https://example.org/b' }, { url: 'https://example.org/c' }, { url: 'https://example.org/d' }],
-      [{ url: 'https://example.org/a', label: 'x'.repeat(41) }],
       [{ url: `https://example.org/${'a'.repeat(500)}` }],
       'https://example.org',
     ]) {

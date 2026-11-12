@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest'
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }))
 
-import { formatActionItems, formatChapters, invalidChapterLines, parseActionItems, parseChapters } from './ReviewActions'
+import { stripEvidence as unticked, formatActionItems, formatChapters, invalidChapterLines, parseActionItems, parseChapters } from './ReviewActions'
 
 describe('review form text formats', () => {
   it('round-trips action items with optional owners', () => {
@@ -35,6 +35,14 @@ describe('review form text formats', () => {
     expect(parseActionItems(formatActionItems(items))).toEqual(items)
     expect(parseActionItems('A | ev: javascript:alert(1)')[0].evidence).toBeUndefined()
     expect(parseActionItems('A | ev: https://example.org/a x')[0].evidence).toBeUndefined()
+  })
+
+  it('keeps commas inside URLs and drops the evidence when an item is unticked', () => {
+    const maps = 'https://www.google.com/maps/@40.7,-74.0,15z'
+    const items = [{ text: 'Scout', done: true, evidence: [{ url: maps }, { url: 'https://e.org/a' }] }]
+    expect(parseActionItems(formatActionItems(items))).toEqual(items)
+    expect(unticked('Scout | Ann | ev: https://e.org/a')).toBe('Scout | Ann')
+    expect(unticked('Scout')).toBe('Scout')
   })
 
   it('caps evidence at three and drops duplicates', () => {
