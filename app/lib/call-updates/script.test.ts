@@ -5,6 +5,7 @@ import {
   announcementLines,
   buildUpdatesScript,
   estimateSeconds,
+  parseLeadIns,
   parseSections,
   speakable,
   type LastCallData,
@@ -218,5 +219,89 @@ describe('buildUpdatesScript', () => {
     expect(r.sections.map((s) => s.key)).not.toContain('task-changes')
     const bad = await build({}, { crews: async () => { throw new Error('boom') } })
     expect(bad).toEqual({ kind: 'none', reason: 'error' })
+  })
+})
+
+describe('section lead-ins', () => {
+  const LEADS = ['Dude, check it out:', 'Gnarly news, dudes:', 'Cowabunga!']
+  const seeded = (seed = 1) => () => {
+    seed = (seed * 1664525 + 1013904223) % 4294967296
+    return seed / 4294967296
+  }
+  const lead = { leadIns: LEADS, leadInChance: 100 }
+  const leadOf = (lines: string[]) => LEADS.find((l) => lines[0].startsWith(`${l} `))
+
+  it('never on the first section, intro or outro; every other section at 100 percent', async () => {
+    const r = await build(lead, { random: seeded() })
+    if (r.kind !== 'script') throw new Error('script expected')
+    const bodies = r.sections.filter((s) => s.key !== 'intro' && s.key !== 'outro')
+    expect(leadOf(r.sections[0].lines)).toBeUndefined()
+    expect(leadOf(r.sections[r.sections.length - 1].lines)).toBeUndefined()
+    expect(leadOf(bodies[0].lines)).toBeUndefined()
+    for (const s of bodies.slice(1)) expect(leadOf(s.lines)).toBeDefined()
+  })
+
+  it('never the same lead-in twice in a row, across seeds', async () => {
+    for (let seed = 1; seed < 40; seed++) {
+      const r = await build(lead, { random: seeded(seed) })
+      if (r.kind !== 'script') throw new Error('script expected')
+      const used = r.sections.map((s) => leadOf(s.lines)).filter(Boolean)
+      for (let i = 1; i < used.length; i++) expect(used[i]).not.toBe(used[i - 1])
+    }
+  })
+
+  it('is deterministic for a seed and off at 0 percent or with no phrases', async () => {
+    const a = await build(lead, { random: seeded(7) })
+    const b = await build(lead, { random: seeded(7) })
+    expect(a).toEqual(b)
+    const off = await build({ leadIns: LEADS, leadInChance: 0 }, { random: () => 0 })
+    const none = await build({ leadIns: [], leadInChance: 100 }, { random: () => 0 })
+    const plain = await build()
+    expect(off).toEqual(plain)
+    expect(none).toEqual(plain)
+  })
+
+  it('the chance gates each section', async () => {
+    const r = await build({ leadIns: LEADS, leadInChance: 40 }, { random: () => 0.5 })
+    const plain = await build()
+    expect(r).toEqual(plain)
+    const hit = await build({ leadIns: LEADS, leadInChance: 40 }, { random: () => 0.1 })
+    if (hit.kind !== 'script') throw new Error('script expected')
+    expect(hit.sections.some((s) => leadOf(s.lines))).toBe(true)
+  })
+
+  it('count toward the budget and are shed before any section is dropped', async () => {
+    const plain = await build()
+    const withLeads = await build(lead, { random: seeded() })
+    if (plain.kind !== 'script' || withLeads.kind !== 'script') throw new Error('script expected')
+    expect(withLeads.estSeconds).toBeGreaterThan(plain.estSeconds)
+    const tight = await build({ ...lead, maxSeconds: plain.estSeconds }, { random: seeded() })
+    if (tight.kind !== 'script') throw new Error('script expected')
+    expect(tight.dropped).toEqual([])
+    expect(tight.estSeconds).toBeLessThanOrEqual(plain.estSeconds)
+    // Partway: some lead-ins kept, no section dropped.
+    const mid = await build({ ...lead, maxSeconds: withLeads.estSeconds - 1 }, { random: seeded() })
+    if (mid.kind !== 'script') throw new Error('script expected')
+    expect(mid.dropped).toEqual([])
+    expect(mid.estSeconds).toBeLessThan(withLeads.estSeconds)
+  })
+
+  it('same text gives the same hash (cache key); a lead-in changes only that section text', async () => {
+    const a = await build(lead, { random: seeded(3) })
+    const b = await build(lead, { random: seeded(3) })
+    if (a.kind !== 'script' || b.kind !== 'script') throw new Error('script expected')
+    expect(a.hash).toBe(b.hash)
+  })
+
+  it('a command phrase in a lead-in is never spoken', async () => {
+    const r = await build({ leadIns: ['Metalhead, stop'], leadInChance: 100 }, { random: () => 0 })
+    expect(r).toEqual(await build())
+  })
+})
+
+describe('parseLeadIns', () => {
+  it('drops empty, long, command and duplicate lines; caps at 20 lines', () => {
+    expect(parseLeadIns('Cowabunga!\n\nMetalhead, stop\n' + 'x'.repeat(41) + '\nCowabunga!\nMolto bene!')).toEqual(['Cowabunga!', 'Molto bene!'])
+    expect(parseLeadIns(Array.from({ length: 30 }, (_, i) => `Dude ${i}`).join('\n'))).toHaveLength(20)
   })
 })

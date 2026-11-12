@@ -20,6 +20,10 @@ export const UPDATES_VOICE_DEFAULT = 'ash'
 export const UPDATES_VOICE_INSTRUCTIONS_DEFAULT =
   'Voice: an energetic, laid-back surfer-dude robot with a slightly metallic, synthesized edge. Tone: friendly, upbeat and clear. Pacing: relaxed but easy to follow. Pronounce names and words clearly.'
 
+export const UPDATES_LEAD_INS_DEFAULT = ['Dude, check it out:', 'Gnarly news, dudes:', 'Totally tubular:', 'Okay dudes,', 'Cowabunga!', 'Molto bene!'].join('\n')
+export const LEAD_IN_MAX_CHARS = 40
+export const LEAD_IN_MAX_LINES = 20
+
 /** A spoken line that could be taken for a voice command: the outro and intro must never contain one. */
 export const COMMAND_PHRASE = /\bmetalhead\b[\s,.:;!?-]*(?:please\s+)?(?:stop|pause|resume|skip|next|read|play|continue)\b/i
 
@@ -67,6 +71,11 @@ function text(o: { key: string; label: string; help: string; maxLength: number; 
 const sectionsValid = (v: string) => {
   const keys = v.split('\n').map((l) => l.trim()).filter(Boolean)
   return keys.every((k) => (UPDATE_SECTION_KEYS as readonly string[]).includes(k)) && new Set(keys).size === keys.length
+}
+
+const leadInsValid = (v: string) => {
+  const lines = v.split('\n').map((l) => l.trim()).filter(Boolean)
+  return lines.length <= LEAD_IN_MAX_LINES && lines.every((l) => l.length <= LEAD_IN_MAX_CHARS && !COMMAND_PHRASE.test(l))
 }
 
 export const CALL_UPDATES_SETTINGS = {
@@ -132,6 +141,25 @@ export const CALL_UPDATES_SETTINGS = {
     maxLength: 1000,
     multiline: true,
     default: '',
+  }),
+  'calls.updatesSectionLeadIns': text({
+    key: 'calls.updatesSectionLeadIns',
+    label: 'Updates: section lead-ins',
+    help: `One short phrase per line (at most ${LEAD_IN_MAX_LINES} lines, ${LEAD_IN_MAX_CHARS} characters each). Sometimes spoken before a section, never before the intro or outro and never the same one twice in a row. Must not contain a voice command such as "Metalhead, stop". They count toward the longest-script limit and are dropped before any section is. Empty: none.`,
+    maxLength: 900,
+    multiline: true,
+    default: UPDATES_LEAD_INS_DEFAULT,
+    check: leadInsValid,
+    checkMessage: `At most ${LEAD_IN_MAX_LINES} lines of ${LEAD_IN_MAX_CHARS} characters, no voice command such as "Metalhead, stop"`,
+  }),
+  'calls.updatesLeadInChance': int({
+    key: 'calls.updatesLeadInChance',
+    label: 'Updates: lead-in chance',
+    help: 'The chance, per section after the first, that a lead-in phrase is spoken first. 0 turns lead-ins off.',
+    min: 0,
+    max: 100,
+    default: 40,
+    unit: 'percent',
   }),
   'calls.updatesVoice': text({
     key: 'calls.updatesVoice',
