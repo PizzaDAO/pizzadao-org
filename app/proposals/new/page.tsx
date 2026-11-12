@@ -2,7 +2,7 @@
 
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { proposalsEnabledFor } from "@/app/lib/proposals/pilot";
+import { loadPilotState, proposalsEnabledFor } from "@/app/lib/proposals/pilot";
 import { loadProposalRules } from "@/app/lib/proposals/rules";
 import { getTranslations } from "next-intl/server";
 import { getSession } from "@/app/lib/session";
@@ -34,9 +34,12 @@ export default async function NewProposalPage() {
               general: rules.generalAyes,
           }
         : null;
+    // A creator in a running pilot files test proposals (1 aye, short window), so show those rules, not the tiers.
+    const pilotState = await loadPilotState().catch(() => null);
+    const pilot = pilotState?.running && !pilotState.unknown && pilotState.ids.includes(session.discordId) ? { minutes: rules?.pilotWindowMinutes ?? 60 } : null;
     return (
         <EditorialPage width="max-w-[720px]">
-            <NewProposalForm tiers={tiers} />
+            <NewProposalForm tiers={tiers} pilot={pilot} />
         </EditorialPage>
     );
 }

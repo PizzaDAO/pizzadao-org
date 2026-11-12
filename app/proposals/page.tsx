@@ -13,6 +13,7 @@ import { listOpenProposals, type ProposalSummary } from "@/app/lib/proposals/sto
 import { loadPilotState, proposalsEnabledFor } from "@/app/lib/proposals/pilot";
 import { listHistory, parseHistoryFilters, type HistoryFilters, type HistoryTotals } from "@/app/lib/proposals/history";
 import { ProposalRemindersOptIn } from "./_components/ProposalRemindersOptIn";
+import { LocalClose } from "./_components/LocalClose";
 import { EditorialMasthead, EditorialPage, EmptyState, paperCard, pillOutline, pillTomato } from "@/app/ui/shared/Editorial";
 
 export const runtime = "nodejs";
@@ -25,7 +26,7 @@ export async function generateMetadata(): Promise<Metadata> {
     return { title: t("metaTitle"), robots: { index: false, follow: false } };
 }
 
-function Row({ p, t, fmt, money }: { p: ProposalSummary; t: T; fmt: Intl.DateTimeFormat; money: Intl.NumberFormat }) {
+function Row({ p, t, money }: { p: ProposalSummary; t: T; money: Intl.NumberFormat }) {
     return (
         <li className={`${paperCard} p-4`}>
             <Link href={`/proposals/${p.id}`} className="grid gap-1 no-underline text-foreground">
@@ -34,7 +35,7 @@ function Row({ p, t, fmt, money }: { p: ProposalSummary; t: T; fmt: Intl.DateTim
                 </span>
                 <span className="font-display text-lg font-black">{p.title}</span>
                 {p.amountUsd != null && <span className="text-sm text-foreground/70">{t("amount", { amount: money.format(p.amountUsd) })}</span>}
-                {p.status === "OPEN" && p.closesAt && <span className="text-sm text-foreground/70">{t("closes", { date: fmt.format(new Date(p.closesAt)) })}</span>}
+                {p.status === "OPEN" && p.closesAt && <LocalClose iso={p.closesAt} className="text-sm text-foreground/70" />}
                 {p.result && (
                     <span className="text-sm text-foreground/70">
                         {t("resultLine", { ayes: p.result.ayes, nays: p.result.nays, abstains: p.result.abstains, needed: p.result.ayesNeeded ?? 0 })}
@@ -163,7 +164,6 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
     if (!signedIn && !(await historyEnabled())) redirect("/login?returnTo=/proposals");
     const t = await getTranslations("proposals");
     const locale = await getLocale();
-    const fmt = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
     const day = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" });
     const money = new Intl.NumberFormat(locale, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
     const f = parseHistoryFilters(await searchParams);
@@ -200,7 +200,7 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
                     ) : (
                         <ul className="m-0 mb-8 flex list-none flex-col gap-3 p-0">
                             {open.map((p) => (
-                                <Row key={p.id} p={p} t={t} fmt={fmt} money={money} />
+                                <Row key={p.id} p={p} t={t} money={money} />
                             ))}
                         </ul>
                     )}

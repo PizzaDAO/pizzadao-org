@@ -4,6 +4,8 @@ import dynamic from "next/dynamic";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import { paperCard } from "@/app/ui/shared/Editorial";
+import { flushDue, getQueued, queueVote, QUEUE_EVENT, type QueuedVote } from "@/app/lib/proposals/vote-queue";
+import { formatProposalTime } from "@/app/lib/proposals/time";
 import {
     decodeVoteCode,
     encodeVoteCode,
@@ -36,9 +38,12 @@ type Props = {
     tokenIssued: boolean;
     /** The voting-key fingerprint the server rendered on this page; the browser checks the key it fetches against it. */
     fingerprint: string | null;
+    /** Random send delay bounds (seconds), from the proposals.voteDelay* settings. */
+    delayMinSeconds?: number;
+    delayMaxSeconds?: number;
 };
 
-export function VotePanel({ proposalId, title, open, closesAt, eligible, tokenIssued, fingerprint }: Props) {
+export function VotePanel({ proposalId, title, open, closesAt, eligible, tokenIssued, fingerprint, delayMinSeconds = 60, delayMaxSeconds = 600 }: Props) {
     const t = useTranslations("proposals.vote");
     const locale = useLocale();
     const [ballot, setBallot] = useState<Ballot | null>(null);
@@ -49,6 +54,25 @@ export function VotePanel({ proposalId, title, open, closesAt, eligible, tokenIs
     const [needsCode, setNeedsCode] = useState(false);
     const [ready, setReady] = useState(false);
     const [showBackup, setShowBackup] = useState(false);
+    const [queued, setQueued] = useState<QueuedVote | null>(null);
+    const [now, setNow] = useState(() => Date.now());
+
+    // The queue is in localStorage; the global sender (and this page's own tab) changes it, so follow it.
+    useEffect(() => {
+        const sync = () => {
+            setQueued(getQueued(proposalId));
+            const b = loadBallot(proposalId);
+            if (b) setBallot((cur) => (cur && cur.choice === b.choice ? cur : b));
+            setNow(Date.now());
+        };
+        sync();
+        window.addEventListener(QUEUE_EVENT, sync);
+        const iv = window.setInterval(sync, 15000);
+        return () => {
+            window.removeEventListener(QUEUE_EVENT, sync);
+            window.clearInterval(iv);
+        };
+    }, [proposalId]);
 
     const canVote = open && eligible;
 
@@ -83,7 +107,7 @@ export function VotePanel({ proposalId, title, open, closesAt, eligible, tokenIs
         };
     }, [canVote, proposalId, tokenIssued, fingerprint, title, t]);
 
-    const when = closesAt ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(closesAt)) : "";
+    const when = closesAt ? formatProposalTime(closesAt, locale) : "";
 
     async function vote(choice: Choice) {
         setError("");
@@ -99,10 +123,18 @@ export function VotePanel({ proposalId, title, open, closesAt, eligible, tokenIs
                 }
                 setBallot(b);
             }
-            setBusy("sending");
-            const r = await submitVote(proposalId, b, choice);
-            if (r.outcome === "ok") setBallot(r.ballot);
-            else setError(r.outcome === "closed" ? t("closed") : t("error"));
+            // Record the choice locally and send it after a random delay (vote-queue.ts); changing it before then replaces it.
+            if (!queueVote(proposalId, choice, { minSeconds: delayMinSeconds, maxSeconds: delayMaxSeconds, closesAt })) {
+                // No usable storage to hold a queue: send at once rather than lose the vote.
+                setBusy("sending");
+                const r = await submitVote(proposalId, b, choice);
+                if (r.outcome === "ok") setBallot(r.ballot);
+                else setError(r.outcome === "closed" ? t("closed") : t("error"));
+                return;
+            }
+            setQueued(getQueued(proposalId));
+            setNow(Date.now());
+            void flushDue();
         } catch {
             setError(t("tokenError"));
         } finally {
@@ -137,8 +169,10 @@ export function VotePanel({ proposalId, title, open, closesAt, eligible, tokenIs
     if (!open) return <p className="m-0 text-sm text-foreground/70">{t("closed")}</p>;
     if (!eligible) return <p className="m-0 text-sm text-foreground/70">{t("notEligible")}</p>;
 
-    const current = ballot?.choice;
-    const choiceLabel = current ? t(CHOICES.find((c) => c.choice === current)!.key) : "";
+    const current = queued?.choice ?? ballot?.choice;
+    const labelOf = (c: Choice) => t(CHOICES.find((x) => x.choice === c)!.key);
+    const choiceLabel = ballot?.choice ? labelOf(ballot.choice) : "";
+    const minutes = queued ? Math.max(1, Math.ceil((queued.sendAt - now) / 60000)) : 0;
 
     return (
         <section className={`${paperCard} grid gap-4 p-5`} aria-labelledby="vote-heading">
@@ -205,7 +239,12 @@ export function VotePanel({ proposalId, title, open, closesAt, eligible, tokenIs
                             {busy === "sending" ? t("working") : t("preparing")}
                         </p>
                     )}
-                    {ballot?.choice && busy === "" && (
+                    {queued && (
+                        <p role="status" className="m-0 text-sm">
+                            {t("queued", { choice: labelOf(queued.choice), minutes })}
+                        </p>
+                    )}
+                    {ballot?.choice && !queued && busy === "" && (
                         <p role="status" className="m-0 text-sm">
                             {t("recorded", { choice: choiceLabel, date: when })}
                         </p>

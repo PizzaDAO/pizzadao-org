@@ -2178,7 +2178,8 @@
       "beneficiaryClear": "Remove",
       "tierNeeds": "This proposal will need {count} ayes plus abstains, and more ayes than nays.",
       "tierList": "Up to ${cap}: {low} ayes; up to ${midMax}: {mid}; above that: {high}.",
-      "tierNote": "The amounts and numbers can change over time. Each proposal keeps the numbers it opened with."
+      "tierNote": "The amounts and numbers can change over time. Each proposal keeps the numbers it opened with.",
+      "pilotNeeds": "Pilot test proposal: needs 1 aye, closes after {minutes} minutes, never funds anything."
     },
     "detail": {
       "back": "All proposals",
@@ -2203,6 +2204,7 @@
       "preparing": "Getting your ballot ready...",
       "working": "Recording...",
       "recorded": "Recorded: {choice}. You can change it until {date}.",
+      "queued": "Your vote ({choice}) will be sent within about {minutes, plural, one {# minute} other {# minutes}}. You can close this page; it sends next time you open the site, or before voting closes if you keep it open.",
       "notEligible": "Only members with the Box Mafia role when this proposal opened can vote.",
       "closed": "Voting is closed.",
       "login": "Log in to vote.",

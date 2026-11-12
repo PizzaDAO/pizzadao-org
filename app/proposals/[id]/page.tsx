@@ -15,6 +15,7 @@ import { toggleEnabled } from "@/app/lib/settings/toggles";
 import { resolvePeople } from "@/app/lib/people";
 import { resolveDiscordMentions } from "@/app/lib/discord-mention-resolve";
 import { EditorialMasthead, EditorialPage, paperCard } from "@/app/ui/shared/Editorial";
+import { LocalClose } from "../_components/LocalClose";
 import { VotePanel } from "../_components/VotePanel";
 import { WithdrawButton } from "../_components/WithdrawButton";
 
@@ -180,7 +181,6 @@ export default async function ProposalPage({ params, searchParams }: { params: P
     if (!p) notFound();
     const t = await getTranslations("proposals");
     const locale = await getLocale();
-    const fmt = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
     const day = new Intl.DateTimeFormat(locale, { dateStyle: "long", timeZone: "UTC" });
     const money = new Intl.NumberFormat(locale, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
     // Imported history is a record: it never gets the vote panel, the key fingerprint or an eligibility check,
@@ -202,6 +202,16 @@ export default async function ProposalPage({ params, searchParams }: { params: P
     }
     // The proposer can withdraw until voting is over: while it waits to open, or open and before the window ends.
     const canWithdraw = !imported && p.withdrawable;
+    // Public, non-sensitive: how long the browser waits (randomly) before sending a tapped vote.
+    let delay = { min: 60, max: 600 };
+    if (isOpen) {
+        try {
+            const [min, max] = await Promise.all([getSetting("proposals.voteDelayMinSeconds"), getSetting("proposals.voteDelayMaxSeconds")]);
+            delay = { min, max: Math.max(min, max) };
+        } catch {
+            /* the defaults apply */
+        }
+    }
 
     let hist: HistoryDetail | null = null;
     let proposer: string | null = null;
@@ -249,7 +259,7 @@ export default async function ProposalPage({ params, searchParams }: { params: P
                         {p.ayesNeeded != null && <p className="m-0">{t("detail.meta", { needed: p.ayesNeeded })}</p>}
                         {p.keyFingerprint && <p className="m-0 break-words font-mono text-xs">{t("detail.fingerprint", { fp: p.keyFingerprint })}</p>}
                         {p.eligibleCount != null && <p className="m-0">{t("detail.eligible", { count: p.eligibleCount })}</p>}
-                        {isOpen && p.closesAt && <p className="m-0">{t("closes", { date: fmt.format(new Date(p.closesAt)) })}</p>}
+                        {isOpen && p.closesAt && <LocalClose iso={p.closesAt} as="p" className="m-0" />}
                         {p.status === "CANCELLED" && <p className="m-0">{t("detail.cancelled")}</p>}
                     </div>
                 )}
@@ -263,7 +273,7 @@ export default async function ProposalPage({ params, searchParams }: { params: P
                 )}
                 {canWithdraw && <WithdrawButton proposalId={p.id} />}
                 {isOpen && (
-                    <VotePanel proposalId={p.id} title={p.title} fingerprint={p.keyFingerprint} open eligible={!!viewer?.eligible} tokenIssued={!!viewer?.tokenIssued} closesAt={p.closesAt} />
+                    <VotePanel proposalId={p.id} title={p.title} fingerprint={p.keyFingerprint} open eligible={!!viewer?.eligible} tokenIssued={!!viewer?.tokenIssued} closesAt={p.closesAt} delayMinSeconds={delay.min} delayMaxSeconds={delay.max} />
                 )}
                 {isOpen && <p className="m-0 text-sm text-foreground/70">{t("detail.hidden")}</p>}
                 {!imported && p.result && (

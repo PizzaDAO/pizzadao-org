@@ -2178,7 +2178,8 @@
       "beneficiaryClear": "Retirer",
       "tierNeeds": "Cette proposition nécessitera {count} votes pour plus les abstentions, et plus de votes pour que de votes contre.",
       "tierList": "Jusqu'à ${cap} : {low} pour ; jusqu'à ${midMax} : {mid} ; au-delà : {high}.",
-      "tierNote": "Les montants et les nombres peuvent évoluer. Chaque proposition garde les nombres avec lesquels elle s'est ouverte."
+      "tierNote": "Les montants et les nombres peuvent évoluer. Chaque proposition garde les nombres avec lesquels elle s'est ouverte.",
+      "pilotNeeds": "Proposition de test du pilote : nécessite 1 pour, se clôt après {minutes} minutes et ne finance jamais rien."
     },
     "detail": {
       "back": "Toutes les propositions",
@@ -2203,6 +2204,7 @@
       "preparing": "Préparation de votre bulletin...",
       "working": "Enregistrement...",
       "recorded": "Enregistré : {choice}. Vous pouvez le changer jusqu'au {date}.",
+      "queued": "Votre vote ({choice}) sera envoyé dans environ {minutes, plural, one {# minute} other {# minutes}}. Vous pouvez fermer cette page ; il part à votre prochaine visite sur le site, ou avant la clôture du vote si vous la laissez ouverte.",
       "notEligible": "Seuls les membres ayant le rôle Box Mafia à l'ouverture de cette proposition peuvent voter.",
       "closed": "Le vote est clos.",
       "login": "Connectez-vous pour voter.",

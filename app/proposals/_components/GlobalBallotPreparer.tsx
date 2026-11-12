@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { flushDue, flushOnPageHide } from "@/app/lib/proposals/vote-queue";
 import { listUnsaved, loadBallot, markSaved, markUnsaved, parseMine, prepareBallot, shareVoteCode } from "@/app/lib/proposals/client";
 
 type Ready = { id: string; title: string };
@@ -26,6 +27,24 @@ export function GlobalBallotPreparer() {
     // Cards show only for a signed-in member (the answer from /api/proposals/mine).
     const [signedIn, setSignedIn] = useState(false);
     const pathname = usePathname();
+
+    // Sends queued (randomly delayed) votes that are due, on any page; see vote-queue.ts.
+    useEffect(() => {
+        void flushDue();
+        const iv = window.setInterval(() => void flushDue(), 10000);
+        const hide = () => void flushOnPageHide();
+        const onVis = () => {
+            if (document.visibilityState === "hidden") hide();
+            else void flushDue();
+        };
+        window.addEventListener("pagehide", hide);
+        document.addEventListener("visibilitychange", onVis);
+        return () => {
+            window.clearInterval(iv);
+            window.removeEventListener("pagehide", hide);
+            document.removeEventListener("visibilitychange", onVis);
+        };
+    }, []);
 
     useEffect(() => {
         let cancelled = false;

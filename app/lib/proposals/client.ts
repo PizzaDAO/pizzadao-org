@@ -206,11 +206,12 @@ export function prepareBallot(proposalId: string, pageFingerprint?: string | nul
 export type VoteOutcome = 'ok' | 'closed' | 'invalid' | 'error'
 
 /** Sends the vote with no cookies and no referrer: the request carries nothing but the token and the choice. */
-export async function castVote(proposalId: string, ballot: Ballot, choice: Choice): Promise<VoteOutcome> {
+export async function castVote(proposalId: string, ballot: Ballot, choice: Choice, opts: { keepalive?: boolean } = {}): Promise<VoteOutcome> {
   try {
     const res = await fetch(`/api/proposals/${encodeURIComponent(proposalId)}/vote`, {
       method: 'POST',
       credentials: 'omit',
+      ...(opts.keepalive ? { keepalive: true } : {}),
       referrerPolicy: 'no-referrer',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token: ballot.token, preparedMessage: ballot.preparedMessage, signature: ballot.signature, choice }),
@@ -225,8 +226,8 @@ export async function castVote(proposalId: string, ballot: Ballot, choice: Choic
 }
 
 /**
- * Send the vote now. (There is no client-side delay: the server mixes votes before they reach the ballot table, see
- * pending.ts. "ok" means the server durably recorded the vote.)
+ * Send the vote now. (The random send delay lives in vote-queue.ts, which calls castVote when a queued vote is due; the
+ * server also mixes votes before they reach the ballot table, see pending.ts. "ok" means the server durably recorded it.)
  */
 export async function submitVote(proposalId: string, ballot: Ballot, choice: Choice): Promise<{ outcome: VoteOutcome; ballot: Ballot }> {
   const outcome = await castVote(proposalId, ballot, choice)

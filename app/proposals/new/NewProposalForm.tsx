@@ -18,7 +18,7 @@ function ayesFor(kind: "FUNDING" | "GENERAL", amountUsd: number, tiers: Tiers): 
 
 type Found = { name: string; discordId: string };
 
-export function NewProposalForm({ tiers = null }: { tiers?: Tiers | null }) {
+export function NewProposalForm({ tiers = null, pilot = null }: { tiers?: Tiers | null; pilot?: { minutes: number } | null }) {
     const t = useTranslations("proposals.form");
     const tp = useTranslations("proposals");
     const [kind, setKind] = useState<"FUNDING" | "GENERAL">("FUNDING");
@@ -107,7 +107,12 @@ export function NewProposalForm({ tiers = null }: { tiers?: Tiers | null }) {
                             <input className={field} inputMode="decimal" value={v.amount} onChange={set("amount")} required />
                         </label>
                     )}
-                    {tiers && (
+                    {pilot && (
+                        <p className="m-0 rounded border p-3 text-sm" role="note">
+                            {t("pilotNeeds", { minutes: pilot.minutes })}
+                        </p>
+                    )}
+                    {!pilot && tiers && (
                         <p className="m-0 rounded border p-3 text-sm" role="note">
                             {t("tierNeeds", { count: ayesFor(kind, amountUsd, tiers) })}{" "}
                             {kind === "FUNDING" ? t("tierList", { cap: tiers.capUsd, low: tiers.low, mid: tiers.mid, midMax: tiers.midMaxUsd, high: tiers.high }) : ""}{" "}
