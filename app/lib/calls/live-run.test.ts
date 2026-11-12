@@ -58,7 +58,7 @@ beforeEach(() => {
 describe('typed action items (option C)', () => {
   it('confirms a prefixed chat line in one short message and stores it', async () => {
     const out = await handleLiveRequest(chat('action: book the venue'), deps())
-    expect(out.messages).toEqual(['📝 Action item recorded: book the venue\n-# Added to the call notes for review'])
+    expect(out.messages).toEqual(['📝 Action item recorded: book the venue (suggested by <@111111>)\n-# Added to the call notes for review'])
     expect(items.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ sessionId: SID, source: 'chat', text: 'book the venue', owner: null, speakerIds: ['111111'], messageId: '700000000000000001', posted: true }),
     })
@@ -128,7 +128,7 @@ describe('spoken action items (option A)', () => {
     const input = (a.detect.mock.calls[0] as unknown[])[0] as { transcript: string; newFrom: string; already: string[] }
     expect(input.newFrom).toBe('00:01')
     expect(input.transcript).toContain('S1 (Ann): I will send the deck to the team.')
-    expect(out.messages).toEqual(['📝 Action item recorded: Send the deck to the team — Ann\n-# Added to the call notes for review'])
+    expect(out.messages).toEqual(['📝 Action item recorded: Send the deck to the team — Ann (suggested by <@111111>)\n-# Added to the call notes for review'])
     expect(items.create).toHaveBeenCalledWith({ data: expect.objectContaining({ source: 'speech', speakerIds: ['111111'], owner: 'Ann', startMs: 1000, endMs: 3500 }) })
   })
 
