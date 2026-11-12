@@ -64,6 +64,8 @@ export interface LiveContext {
   voiceChannelId: string | null
   sessionId: string | null
   startedAt: Date
+  /** The instant that picks the occurrence's local day: the Discord event's scheduled start when known. */
+  dayAt?: Date
 }
 
 /** A local calendar day (YYYY-MM-DD) in the time zone the calls run in (env ANNOUNCE_TIMEZONE, default US Eastern). */
@@ -89,8 +91,8 @@ function dateText(d: Date, env: Env): string {
  * One key per call occurrence. The Discord event id plus the local day when known (a recurring event
  * keeps its id), so /live and the recorder agree whichever comes first; else the recorder session.
  */
-export function occurrenceKey(ctx: Pick<LiveContext, 'eventId' | 'sessionId' | 'startedAt'>, env: Env = process.env): string | null {
-  if (ctx.eventId) return `${ctx.eventId}:${localDay(ctx.startedAt, env)}`
+export function occurrenceKey(ctx: Pick<LiveContext, 'eventId' | 'sessionId' | 'startedAt' | 'dayAt'>, env: Env = process.env): string | null {
+  if (ctx.eventId) return `${ctx.eventId}:${localDay(ctx.dayAt ?? ctx.startedAt, env)}`
   return ctx.sessionId ? `session:${ctx.sessionId}` : null
 }
 
@@ -196,7 +198,17 @@ export interface LiveDeps {
   postDiscord?: typeof postDiscordMessage
   editDiscord?: typeof editDiscordMessage
   enqueue?: (input: EnqueueInput, env?: Env) => Promise<EnqueueResult>
+  /** Send what was just queued right away (the route passes processOutbox). */
+  kick?: () => Promise<void>
+  /** How long to wait (ms) for a concurrent winner to record its Discord message id. */
+  sleep?: (ms: number) => Promise<void>
+  /** The Discord event of the call channel, for a session whose recorder did not report an event id. */
+  resolveEvent?: (channelId: string) => Promise<{ id: string; startsAt: Date } | null>
 }
+
+/** A live post stays queued this long after the call started (then it is dropped, not sent late). */
+export const LIVE_POST_TTL_MS = 2 * 3_600_000
+const WAIT_FOR_WINNER_MS = 5_000
 
 // ---------------------------------------------------------------------------------------------
 // Announce
@@ -212,6 +224,8 @@ export interface LiveResult {
   telegramQueued?: number
   streamLink?: string | null
   error?: string
+  /** An honest caveat for the reply. */
+  note?: string
 }
 
 const discordTarget = (channelId: string, env: Env) => {
@@ -246,15 +260,16 @@ export async function runLiveAnnounce(
     renderTemplate(settings.get('calls.liveAnnounceXTemplate'), buildVars(r, 'plain', env))
   const may = liveAnnounceMayPost(env)
 
-  const existing = await store.get(key)
-  if (existing) {
+  const withExisting = async (existing: AnnounceRow): Promise<LiveResult> => {
     // The automatic path only fills a missing link; a host's /live link is never overwritten by it.
-    if (!stream || stream === existing.streamLink || (input.mode === 'auto' && existing.streamLink)) return { status: 'already', xText: xFor(existing), streamLink: existing.streamLink, discord: 'skipped', telegram: 'skipped' }
+    if (!stream || stream === existing.streamLink || (input.mode === 'auto' && existing.streamLink)) {
+      return { status: 'already', xText: xFor(existing), streamLink: existing.streamLink, discord: 'skipped', telegram: 'skipped' }
+    }
     const updated = { ...existing, streamLink: stream }
     let discord: LiveResult['discord'] = 'skipped'
     if (may) {
       await store.update(key, { streamLink: stream })
-      if (input.ctx.sessionId) await store.setSessionStream(input.ctx.sessionId, stream).catch(() => undefined)
+      if (input.mode === 'command' && input.ctx.sessionId) await store.setSessionStream(input.ctx.sessionId, stream).catch(() => undefined)
       const t = existing.postedChannelId && existing.discordMessageId ? discordTarget(existing.postedChannelId, env) : null
       if (t && existing.discordMessageId) {
         try {
@@ -271,6 +286,9 @@ export async function runLiveAnnounce(
     }
     return { status: may ? 'edited' : 'preview', xText: xFor(updated), streamLink: stream, discord, telegram: 'skipped' }
   }
+
+  const existing = await store.get(key)
+  if (existing) return withExisting(existing)
 
   const row: AnnounceRow = {
     occurrenceKey: key,
@@ -289,10 +307,17 @@ export async function runLiveAnnounce(
   if (!may) return { status: 'preview', xText: xFor(row), streamLink: stream, discord: 'skipped', telegram: 'skipped' }
 
   if (!(await store.claim(row))) {
-    const again = await store.get(key)
-    return { status: 'already', xText: xFor(again ?? row), streamLink: again?.streamLink ?? null, discord: 'skipped', telegram: 'skipped' }
+    // Lost the race: the winner is posting. Wait briefly for its message id, then treat it as the existing row
+    // (so a stream link given here is still added by editing its message).
+    const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)))
+    let again = await store.get(key)
+    for (let waited = 0; again && !again.discordMessageId && waited < WAIT_FOR_WINNER_MS; waited += 500) {
+      await sleep(500)
+      again = await store.get(key)
+    }
+    return withExisting(again ?? row)
   }
-  if (stream && input.ctx.sessionId) await store.setSessionStream(input.ctx.sessionId, stream).catch(() => undefined)
+  if (stream && input.mode === 'command' && input.ctx.sessionId) await store.setSessionStream(input.ctx.sessionId, stream).catch(() => undefined)
 
   const result: LiveResult = { status: 'posted', xText: xFor(row), streamLink: stream }
   const channelId = (settings.get('calls.liveAnnounceChannelId') as string).trim()
@@ -303,29 +328,40 @@ export async function runLiveAnnounce(
     if (!t) {
       result.discord = 'no-token'
     } else {
+      let sent: { id: string | null }
       try {
-        const sent = await (deps.postDiscord ?? postDiscordMessage)(
+        sent = await (deps.postDiscord ?? postDiscordMessage)(
           { kind: 'bot', channelId: t.channelId, botToken: t.botToken },
           {
             content: discordContent(settings, row, env),
             allowed_mentions: settings.get('calls.liveAnnounceEveryone') ? { parse: ['everyone'] } : { parse: [] },
           },
         )
-        result.discord = 'posted'
-        await store.update(key, { postedChannelId: channelId, discordMessageId: sent.id })
       } catch (err) {
         // Nothing was posted: free the claim so a retry can post (the Telegram queue is idempotent anyway).
         await store.release(key).catch(() => undefined)
         return { status: 'error', discord: 'error', error: err instanceof Error ? err.message : String(err), xText: result.xText }
+      }
+      result.discord = 'posted'
+      // The message is out: whatever happens to the bookkeeping, the claim stays so it is never posted twice.
+      try {
+        await store.update(key, { postedChannelId: channelId, discordMessageId: sent.id })
+      } catch (err) {
+        console.error('[live-announce] posted but could not record the message id:', err instanceof Error ? err.message : err)
+        result.note = 'Posted, but the message could not be recorded, so a later stream link cannot be added by editing it.'
       }
     }
   }
 
   const tgText = renderTemplate(settings.get('calls.liveAnnounceTelegramTemplate'), buildVars(row, 'plain', env))
   if (tgText) {
-    const q = await (deps.enqueue ?? enqueueMirror)({ kind: 'live', sourceId: key, text: tgText }, env)
+    const q = await (deps.enqueue ?? enqueueMirror)(
+      { kind: 'live', sourceId: key, text: tgText, expiresAt: new Date(input.ctx.startedAt.getTime() + LIVE_POST_TTL_MS) },
+      env,
+    )
     result.telegramQueued = q.queued
     result.telegram = q.queued > 0 ? 'queued' : q.reason === 'no-cities' ? 'none' : 'off'
+    if (q.queued > 0) await deps.kick?.().catch(() => undefined)
   } else {
     result.telegram = 'none'
   }
@@ -349,7 +385,13 @@ export async function runLiveReminders(deps: LiveDeps = {}, onlyKey?: string): P
     if (!(await store.claimReminder(row.occurrenceKey, now))) continue
     handled += 1
     const text = renderTemplate(settings.get('calls.liveReminderTemplate'), buildVars(row, 'plain', env))
-    if (text) await (deps.enqueue ?? enqueueMirror)({ kind: 'liverem', sourceId: row.occurrenceKey, text }, env)
+    if (text) {
+      const q = await (deps.enqueue ?? enqueueMirror)(
+        { kind: 'liverem', sourceId: row.occurrenceKey, text, sendAfter: row.reminderDueAt, expiresAt: new Date(row.startedAt.getTime() + LIVE_POST_TTL_MS) },
+        env,
+      )
+      if (q.queued > 0) await deps.kick?.().catch(() => undefined)
+    }
   }
   return handled
 }
@@ -381,16 +423,23 @@ export async function liveAnnounceTick(s: TickSession | null, deps: LiveDeps = {
     const settings = deps.settings ?? (await loadSettings())
     const now = (deps.now ?? (() => new Date()))()
     const isCommunity = (s.crewId ?? '').toLowerCase() === LIVE_ANNOUNCE_CREW_ID
-    if (isCommunity && resolveToggle('calls.liveAnnounceAutoEnabled', settings, env) && now.getTime() - s.startedAt.getTime() <= AUTO_MAX_SESSION_AGE_MS) {
-      await runLiveAnnounce(
-        { mode: 'auto', ctx: { eventId: s.eventId, voiceChannelId: s.channelId, sessionId: s.sessionId, startedAt: s.startedAt }, streamLink: s.streamLinkOverride ?? s.streamLink },
-        { ...deps, settings, env },
-      )
+    if (!isCommunity) return
+    // A session without an event id shares the occurrence with /live through the call channel's Discord event.
+    let eventId = s.eventId
+    let dayAt: Date | undefined
+    if (!eventId && s.channelId && deps.resolveEvent) {
+      const ev = await deps.resolveEvent(s.channelId).catch(() => null)
+      if (ev) {
+        eventId = ev.id
+        dayAt = ev.startsAt
+      }
     }
-    if (isCommunity) {
-      const key = occurrenceKey({ eventId: s.eventId, sessionId: s.sessionId, startedAt: s.startedAt }, env)
-      if (key) await runLiveReminders({ ...deps, settings, env }, key)
+    const ctx: LiveContext = { eventId, voiceChannelId: s.channelId, sessionId: s.sessionId, startedAt: s.startedAt, ...(dayAt ? { dayAt } : {}) }
+    if (resolveToggle('calls.liveAnnounceAutoEnabled', settings, env) && now.getTime() - s.startedAt.getTime() <= AUTO_MAX_SESSION_AGE_MS) {
+      await runLiveAnnounce({ mode: 'auto', ctx, streamLink: s.streamLinkOverride ?? s.streamLink }, { ...deps, settings, env })
     }
+    const key = occurrenceKey(ctx, env)
+    if (key) await runLiveReminders({ ...deps, settings, env }, key)
   } catch (err) {
     console.error('[live-announce] tick failed:', err instanceof Error ? err.message : err)
   }

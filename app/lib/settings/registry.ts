@@ -1281,7 +1281,7 @@ export const SETTINGS = {
     key: 'calls.liveAnnounceAutoEnabled',
     area: 'calls',
     label: 'Announce automatically when the Community Call starts recording',
-    help: 'When the recorder starts on the Community Call, post the "we\'re live" Discord message and queue the Telegram posts by itself (once per call, no stream link unless one was set; /live can add it later). The CALL_LIVE_ANNOUNCE_AUTO_ENABLED env var set to off always wins; on preview deploys only the env var counts.',
+    help: 'When the recorder starts on the Community Call, post the "we\'re live" Discord message and queue the Telegram posts by itself (once per call, no stream link unless one was set; /live can add it later). Needs the live call view (calls.liveViewEnabled) on, because it rides on the live heartbeat of the recorder. The CALL_LIVE_ANNOUNCE_AUTO_ENABLED env var set to off always wins; on preview deploys only the env var counts.',
     confirmOn: 'The Community Call will announce itself in Discord and Telegram as soon as recording starts.',
   }),
   'calls.liveReminderEnabled': boolSetting({

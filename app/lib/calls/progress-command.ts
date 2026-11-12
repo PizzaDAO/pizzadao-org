@@ -39,7 +39,7 @@ export async function loadProgressSettings(): Promise<ProgressSettings> {
 }
 
 /** The event in progress in the call voice channel: ACTIVE, else one scheduled around now. */
-export async function currentCallEvent(o: { now?: Date; fetchImpl?: typeof fetch; env?: NodeJS.ProcessEnv } = {}): Promise<{ id: string; name: string } | null> {
+export async function currentCallEvent(o: { now?: Date; fetchImpl?: typeof fetch; env?: NodeJS.ProcessEnv } = {}): Promise<{ id: string; name: string; startsAt: Date | null } | null> {
   const env = o.env ?? process.env
   const token = env.DISCORD_BOT_TOKEN?.trim()
   const guild = env.DISCORD_GUILD_ID?.trim()
@@ -54,14 +54,14 @@ export async function currentCallEvent(o: { now?: Date; fetchImpl?: typeof fetch
   const now = (o.now ?? new Date()).getTime()
   const inChannel = raw.filter((e) => e.channel_id === channel)
   const active = inChannel.find((e) => e.status === 2)
-  if (active) return { id: String(active.id), name: active.name ?? '' }
+  if (active) return { id: String(active.id), name: active.name ?? '', startsAt: active.scheduled_start_time ? new Date(active.scheduled_start_time) : null }
   const near = inChannel
     .filter((e) => {
       const start = e.scheduled_start_time ? Date.parse(e.scheduled_start_time) : NaN
       return e.status === 1 && Number.isFinite(start) && start - now <= BEFORE_MS && now - start <= AFTER_MS
     })
     .sort((a, b) => Date.parse(a.scheduled_start_time!) - Date.parse(b.scheduled_start_time!))[0]
-  return near ? { id: String(near.id), name: near.name ?? '' } : null
+  return near ? { id: String(near.id), name: near.name ?? '', startsAt: new Date(near.scheduled_start_time!) } : null
 }
 
 export function defaultProgressDeps(fetchImpl?: typeof fetch): ProgressDeps {

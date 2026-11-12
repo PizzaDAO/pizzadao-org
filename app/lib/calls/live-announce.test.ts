@@ -3,7 +3,12 @@ import { describe, it, expect, vi } from 'vitest'
 import type { Settings } from '@/app/lib/settings'
 
 vi.mock('@/app/lib/db', () => ({ prisma: {} }))
-vi.mock('@/app/lib/telegram/city-posts', () => ({ enqueueMirror: vi.fn() }))
+vi.mock('@/app/lib/telegram/city-posts', () => ({ enqueueMirror: vi.fn(), processOutbox: vi.fn() }))
+const crewsMock = vi.fn()
+vi.mock('@/app/lib/crew-mappings', () => ({ getCrewMappings: () => crewsMock() }))
+const sessionsMock = vi.fn(async () => [] as unknown[])
+vi.mock('./live-state', async (orig) => ({ ...(await orig<typeof import('./live-state')>()), findLiveSessions: () => sessionsMock() }))
+vi.mock('@/app/lib/settings', async (orig) => ({ ...(await orig<typeof import('@/app/lib/settings')>()), loadSettings: vi.fn(async () => ({})) }))
 
 import {
   buildVars,
@@ -16,7 +21,8 @@ import {
   type AnnounceRow,
   type LiveStore,
 } from './live-announce'
-import { liveReplyText } from './live-announce-command'
+import { liveReplyText, resolveLiveContext, resolveSessionEvent } from './live-announce-command'
+import { currentCallEvent } from './progress-command'
 
 vi.mock('@/app/lib/mission-review-access', () => ({ isDreadPizzaRoberts: vi.fn(async () => false) }))
 vi.mock('@/app/lib/settings/channels', () => ({ savedChannelId: vi.fn(async () => '') }))
@@ -268,5 +274,122 @@ describe('liveReplyText', () => {
     expect(r.body).toContain('Discord: posted')
     expect(r.body).toContain('queued for 2 groups')
     expect(r.body).toContain('```\nhello\n```')
+  })
+})
+
+
+describe('review fixes', () => {
+  const KEY = '777:2026-11-15'
+
+  it('a failed bookkeeping write after a successful post keeps the claim and says so', async () => {
+    const h = harness()
+    const update = vi.spyOn(h.store, 'update').mockRejectedValueOnce(new Error('db down'))
+    const release = vi.spyOn(h.store, 'release')
+    const r = await runLiveAnnounce({ mode: 'command', ctx: CTX }, h.deps)
+    expect(update).toHaveBeenCalled()
+    expect(release).not.toHaveBeenCalled()
+    expect(r.status).toBe('posted')
+    expect(r.note).toMatch(/could not be recorded/)
+    expect(liveReplyText(r).body).toMatch(/could not be recorded/)
+    expect((await runLiveAnnounce({ mode: 'command', ctx: CTX }, h.deps)).status).toBe('already')
+    expect(h.postDiscord).toHaveBeenCalledTimes(1)
+  })
+
+  it('kicks the outbox after queueing, gives live and reminder rows an expiry, and holds the reminder until it is due', async () => {
+    const h = harness()
+    const kick = vi.fn(async () => undefined)
+    await runLiveAnnounce({ mode: 'command', ctx: CTX }, { ...h.deps, kick })
+    expect(kick).toHaveBeenCalledTimes(1)
+    const live = (h.enqueue.mock.calls[0] as unknown as [{ expiresAt: Date }])[0]
+    expect(live.expiresAt).toEqual(new Date(START.getTime() + 2 * 3_600_000))
+    h.enqueue.mockClear()
+    await runLiveReminders({ ...h.deps, kick, now: () => new Date(NOW.getTime() + 4 * 60_000) })
+    const rem = (h.enqueue.mock.calls[0] as unknown as [{ kind: string; sendAfter: Date; expiresAt: Date }])[0]
+    expect(rem.kind).toBe('liverem')
+    expect(rem.sendAfter).toEqual(new Date(NOW.getTime() + 180_000))
+    expect(rem.expiresAt).toEqual(new Date(START.getTime() + 2 * 3_600_000))
+    expect(kick).toHaveBeenCalledTimes(2)
+  })
+
+  it('a lost claim race waits for the winner message id, then adds the stream link by editing', async () => {
+    const h = harness()
+    const winner: AnnounceRow = {
+      occurrenceKey: KEY, eventId: '777', sessionId: 's1', voiceChannelId: '888', postedChannelId: '999', discordMessageId: null,
+      streamLink: null, source: 'auto', startedAt: START, reminderDueAt: NOW, reminderQueuedAt: null,
+    }
+    let gets = 0
+    h.store.get = async () => {
+      gets += 1
+      if (gets === 1) return null
+      if (gets <= 3) return { ...winner }
+      return { ...winner, discordMessageId: '4242' }
+    }
+    h.store.claim = async () => false
+    h.store.update = async () => undefined
+    const sleep = vi.fn(async () => undefined)
+    const r = await runLiveAnnounce({ mode: 'command', ctx: CTX, streamLink: 'https://x.com/i/broadcasts/abc' }, { ...h.deps, sleep })
+    expect(sleep).toHaveBeenCalledTimes(2)
+    expect(r.status).toBe('edited')
+    expect(h.postDiscord).not.toHaveBeenCalled()
+    expect((h.editDiscord.mock.calls[0] as unknown as [{ messageId: string }])[0].messageId).toBe('4242')
+  })
+
+  it('a lost race without a stream link replies "already", and the wait is bounded', async () => {
+    const h = harness()
+    const winner = { occurrenceKey: KEY, eventId: '777', sessionId: 's1', voiceChannelId: '888', postedChannelId: null, discordMessageId: null, streamLink: null, source: 'auto', startedAt: START, reminderDueAt: NOW, reminderQueuedAt: null }
+    let first = true
+    h.store.get = async () => (first ? ((first = false), null) : { ...winner })
+    h.store.claim = async () => false
+    const sleep = vi.fn(async () => undefined)
+    const r = await runLiveAnnounce({ mode: 'command', ctx: CTX }, { ...h.deps, sleep })
+    expect(r.status).toBe('already')
+    expect(sleep.mock.calls.length).toBeLessThanOrEqual(10)
+  })
+
+  it('only /live writes the session stream override, never the automatic path', async () => {
+    const auto = harness()
+    await runLiveAnnounce({ mode: 'auto', ctx: CTX, streamLink: 'https://x.com/i/broadcasts/abc' }, auto.deps)
+    expect(auto.sessionStream.s1).toBeUndefined()
+    const cmd = harness()
+    await runLiveAnnounce({ mode: 'command', ctx: CTX, streamLink: 'https://x.com/i/broadcasts/abc' }, cmd.deps)
+    expect(cmd.sessionStream.s1).toBe('https://x.com/i/broadcasts/abc')
+    // And a later auto fill of a missing link on an existing row does not write it either.
+    const later = harness()
+    await runLiveAnnounce({ mode: 'command', ctx: CTX }, later.deps)
+    await runLiveAnnounce({ mode: 'auto', ctx: CTX, streamLink: 'https://x.com/i/broadcasts/abc' }, later.deps)
+    expect(later.sessionStream.s1).toBeUndefined()
+  })
+
+  it('the occurrence day comes from the event scheduled start, not from now', () => {
+    const late = new Date('2026-11-16T00:30:00Z') // already the next UTC day
+    expect(occurrenceKey({ eventId: '777', sessionId: null, startedAt: late, dayAt: START }, PROD)).toBe(KEY)
+  })
+
+  it('a session without an event id shares the key with an earlier /live through the call-channel event', async () => {
+    const h = harness()
+    const ev = { id: '777', startsAt: START }
+    const resolveEvent = vi.fn(async () => ev)
+    // /live before the recorder: event + scheduled start, started "now" a day boundary later is irrelevant.
+    await runLiveAnnounce({ mode: 'command', ctx: { eventId: '777', voiceChannelId: '888', sessionId: null, startedAt: NOW, dayAt: START } }, h.deps)
+    const session = { sessionId: 's1', eventId: null, channelId: '888', crewId: 'community_call', hidden: false, endedAt: null, startedAt: NOW, streamLink: null }
+    await liveAnnounceTick(session, { ...h.deps, resolveEvent })
+    expect(resolveEvent).toHaveBeenCalledWith('888')
+    expect(h.postDiscord).toHaveBeenCalledTimes(1) // auto found the /live row
+    expect(h.rows.size).toBe(1)
+  })
+
+  it('/live outside a live session only announces the Community Call event', async () => {
+    crewsMock.mockResolvedValue({ crews: [{ id: 'community_call', label: 'Community Call' }, { id: 'ops', label: 'Ops' }] })
+    ;(currentCallEvent as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ id: '777', name: 'Ops weekly', startsAt: START })
+    expect(await resolveLiveContext(NOW)).toBeNull()
+    ;(currentCallEvent as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ id: '777', name: 'Community Call', startsAt: START })
+    expect(await resolveLiveContext(NOW)).toMatchObject({ eventId: '777', dayAt: START, sessionId: null })
+  })
+
+  it('a session event is resolved only for the call channel and the Community Call event', async () => {
+    crewsMock.mockResolvedValue({ crews: [{ id: 'community_call', label: 'Community Call' }] })
+    ;(currentCallEvent as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ id: '777', name: 'Community Call', startsAt: START })
+    expect(await resolveSessionEvent('1')).toEqual({ id: '777', startsAt: START }) // default call channel is mocked as '1'
+    expect(await resolveSessionEvent('other')).toBeNull()
   })
 })

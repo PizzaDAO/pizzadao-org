@@ -13,6 +13,9 @@ import { prisma } from '@/app/lib/db'
 import { canRunLive, LIVE_ANNOUNCE_CREW_ID, runLiveAnnounce, type LiveContext, type LiveDeps, type LiveResult } from './live-announce'
 import { currentCallEvent, editOriginalUrl } from './progress-command'
 import { findLiveSessions } from './live-state'
+import { getCrewMappings } from '@/app/lib/crew-mappings'
+import { resolveCrewForEvent } from './crew-map'
+import { processOutbox } from '@/app/lib/telegram/city-posts'
 
 export interface LiveJob {
   applicationId: string
@@ -47,9 +50,33 @@ export async function resolveLiveContext(now: Date = new Date()): Promise<LiveCo
   const s = sessions.find((x) => (x.crewId ?? '').toLowerCase() === LIVE_ANNOUNCE_CREW_ID)
   if (s) return { eventId: s.eventId, voiceChannelId: s.channelId, sessionId: s.sessionId, startedAt: s.startedAt }
   const ev = await currentCallEvent({ now }).catch(() => null)
-  if (!ev) return null
-  const channel = (await savedChannelId('discord.callVoiceChannelId')) || process.env.CALL_VOICE_CHANNEL_ID?.trim() || DEFAULT_CALL_VOICE_CHANNEL_ID
-  return { eventId: ev.id, voiceChannelId: channel, sessionId: null, startedAt: now }
+  if (!ev || !(await isCommunityCallEvent(ev))) return null
+  const channel = await callVoiceChannel()
+  return { eventId: ev.id, voiceChannelId: channel, sessionId: null, startedAt: now, dayAt: ev.startsAt ?? now }
+}
+
+async function callVoiceChannel(): Promise<string> {
+  return (await savedChannelId('discord.callVoiceChannelId')) || process.env.CALL_VOICE_CHANNEL_ID?.trim() || DEFAULT_CALL_VOICE_CHANNEL_ID
+}
+
+/** Only the Community Call's event may be announced by /live (the call channel hosts other crews' events too). */
+async function isCommunityCallEvent(ev: { id: string; name: string }): Promise<boolean> {
+  const { crews } = await getCrewMappings()
+  const crew = resolveCrewForEvent(crews.map((c) => ({ id: c.id, label: c.label, event: c.event })), { eventId: ev.id, eventName: ev.name })
+  return (crew?.crewId ?? '').toLowerCase() === LIVE_ANNOUNCE_CREW_ID
+}
+
+/** The community call's event in the call voice channel, when `channelId` is that channel (for a session with no event id). */
+export async function resolveSessionEvent(channelId: string): Promise<{ id: string; startsAt: Date } | null> {
+  if (channelId !== (await callVoiceChannel())) return null
+  const ev = await currentCallEvent().catch(() => null)
+  if (!ev || !ev.startsAt || !(await isCommunityCallEvent(ev))) return null
+  return { id: ev.id, startsAt: ev.startsAt }
+}
+
+/** Send what was just queued now instead of waiting for the 5-minute cron. */
+const kickOutbox = async () => {
+  await processOutbox()
 }
 
 const mark = (done: boolean) => (done ? 'Done' : 'Skipped')
@@ -67,6 +94,7 @@ export function liveReplyText(r: LiveResult): { tone: 'success' | 'error'; title
     lines.push(`Discord: ${r.discord === 'posted' ? 'posted' : r.discord === 'no-channel' ? 'not posted (no announcement channel set)' : r.discord === 'no-token' ? 'not posted (bot not configured)' : mark(false)}`)
     lines.push(`Telegram: ${r.telegram === 'queued' ? `queued for ${r.telegramQueued} group${r.telegramQueued === 1 ? '' : 's'}` : r.telegram === 'none' ? 'no groups set' : 'not queued (Telegram posting is off)'}`)
   }
+  if (r.note) lines.push(r.note)
   if (r.streamLink) lines.push(`Stream link: ${r.streamLink}`)
   if (r.xText) lines.push('', 'X post text (copy):', '```', r.xText.replace(/```/g, "'''"), '```')
   return { tone: 'success', title: r.status === 'posted' ? "You're live" : 'Live announcement', body: lines.join('\n') }
@@ -90,7 +118,7 @@ export async function runLiveCommand(
   try {
     const ctx = await (o.resolve ?? (() => resolveLiveContext()))()
     const result: LiveResult = ctx
-      ? await runLiveAnnounce({ mode: 'command', ctx, streamLink: job.stream }, o.deps)
+      ? await runLiveAnnounce({ mode: 'command', ctx, streamLink: job.stream }, { kick: kickOutbox, ...o.deps })
       : { status: 'no-occurrence' }
     const r = liveReplyText(result)
     await edit(r.tone, r.title, r.body)
@@ -108,5 +136,5 @@ export async function runLiveCommand(
 export async function liveTickForSession(sessionId: string, deps: LiveDeps = {}): Promise<void> {
   const { liveAnnounceTick } = await import('./live-announce')
   const s = await prisma.callLiveSession.findUnique({ where: { sessionId } }).catch(() => null)
-  await liveAnnounceTick(s, deps)
+  await liveAnnounceTick(s, { kick: kickOutbox, resolveEvent: resolveSessionEvent, ...deps })
 }

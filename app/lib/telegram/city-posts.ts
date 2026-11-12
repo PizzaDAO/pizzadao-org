@@ -85,6 +85,8 @@ export interface EnqueueInput {
   text: string
   /** Agendas: the event start. Others: now + telegram.postMaxAgeHours. */
   expiresAt?: Date
+  /** Hold the row until then (the live reminder). */
+  sendAfter?: Date
 }
 
 export interface EnqueueResult {
@@ -114,6 +116,7 @@ export async function enqueueMirror(input: EnqueueInput, env: Record<string, str
         cityKey,
         text,
         expiresAt,
+        ...(input.sendAfter ? { sendAfter: input.sendAfter } : {}),
       })),
       skipDuplicates: true,
     })
