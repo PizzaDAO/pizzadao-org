@@ -103,6 +103,8 @@ export const TOGGLES = {
   'map.levelsEnabled': { env: 'MAP_LEVELS_ENABLED', legacy: ON_WORDS },
   // Off unless turned on: opt-in call reminders by Discord DM (plans/voting-golive-and-reminders.md, B1).
   'reminders.callsEnabled': { env: 'REMINDERS_CALLS_ENABLED', legacy: ON_WORDS },
+  // Off unless turned on: opt-in proposal reminders by Discord DM (B2). Also needs proposals.enabled.
+  'reminders.proposalsEnabled': { env: 'REMINDERS_PROPOSALS_ENABLED', legacy: ON_WORDS },
   // Off unless turned on: the nightly crew roster auto-add from call attendance (counts only while off).
   'crews.rosterAutoAddEnabled': { env: 'CREWS_ROSTER_AUTOADD_ENABLED', legacy: ON_WORDS },
 } as const satisfies Partial<Record<SettingKey, ToggleDef>>

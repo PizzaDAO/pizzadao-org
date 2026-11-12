@@ -1653,7 +1653,9 @@
       "saveError": "Couldn't save your reminder settings. Try again?",
       "loadError": "Couldn't load your reminder settings.",
       "dmClosed": "We couldn't DM you on Discord. Allow direct messages from server members, then try again.",
-      "tryAgain": "Try again"
+      "tryAgain": "Try again",
+      "proposals": "DM me when a proposal opens or is about to close",
+      "proposalsHint": "If you already picked up your ballot, you won't get the closing reminder. Every DM has a Stop button."
     }
   },
   "reengage": {
