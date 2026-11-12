@@ -119,6 +119,7 @@ describe('settings registry', () => {
       ['calls.recapMentionPing', true],
       ['calls.agendaPostEnabled', false],
       ['calls.agendaLinks', ''],
+      ['calls.attendanceExcludeIds', ''],
       ['calls.attendanceCrewAliases', 'community = community_call'],
       ['calls.recordableVoiceChannels', ''],
       ['calls.crewVoiceChannels', ''],
