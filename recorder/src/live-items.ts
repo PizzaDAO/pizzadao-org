@@ -43,6 +43,10 @@ export interface LiveRequest {
   startedAt: string
   /** Speech chunk number (idempotency on the app side); absent for chat-only requests. */
   seq?: number
+  /** Play-out command fast path (play-out.ts): 'play-out' checks bursts, 'play-out-allowed' asks who may give the command. */
+  command?: 'play-out' | 'play-out-allowed'
+  /** play-out-allowed: Discord ids to look up. */
+  speakers?: string[]
   segments?: LiveSegment[]
   chat?: LiveChat[]
 }

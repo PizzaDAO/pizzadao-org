@@ -8,6 +8,7 @@ import { fetchFilteredPOAPs } from "@/app/lib/poap";
 import { fetchMemberById } from "@/app/lib/sheets/member-repository";
 import { cacheGetOrSet } from "@/app/api/lib/cache";
 import { loadSettings } from "@/app/lib/settings";
+import { loadAttendanceExcludes } from "@/app/lib/calls/attendance-exclude";
 import { effectiveInt } from "@/app/lib/settings/numbers";
 import { mafiaRanks, mafiaSources } from "@/app/lib/settings/mafia";
 import {
@@ -78,7 +79,7 @@ export async function calculateMafiaPoints(
   // Run all data fetches in parallel
   const [guildMember, allAttendance, nftData, poapData] = await Promise.all([
     discordId ? fetchGuildMember(discordId) : Promise.resolve(null),
-    discordId
+    discordId && !(await loadAttendanceExcludes()).has(discordId)
       ? prisma.callAttendance.findMany({ where: { discordId }, select: { crewId: true } })
       : Promise.resolve([]),
     wallet ? fetchPizzaDAONFTs(wallet) : Promise.resolve({ nfts: [] as Array<{ contractName: string }> }),

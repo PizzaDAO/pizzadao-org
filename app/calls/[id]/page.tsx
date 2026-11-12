@@ -72,6 +72,12 @@ export default async function PublishedCallPage({ params }: Params) {
                 dek={`${when} · ${t("minutes", { count: Math.max(1, Math.round(rec.durationSec / 60)) })}`}
             />
 
+            {rec.crewId && (
+                <Link href={`/crew/${encodeURIComponent(rec.crewId)}`} className="mb-6 inline-flex min-h-11 items-center text-sm font-semibold text-tomato-readable underline underline-offset-4">
+                    {t("crewPage", { crew: rec.crewLabel ?? rec.crewId })}
+                </Link>
+            )}
+
             <AttendeeChips attendees={attendees} label={t("attended", { count: attendees.length })} showMore={(n) => t("attendedShowMore", { count: n })} />
 
             <article className="grid gap-8">

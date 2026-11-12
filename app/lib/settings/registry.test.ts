@@ -85,7 +85,7 @@ describe('settings registry', () => {
       ['telegram.hostMatchDailyHashes', 1000],
     ])
     // And the literal values today (a change here is a deliberate, reviewed change).
-    expect(SETTING_KEYS.filter((k) => !k.startsWith('guide.') && !k.startsWith('followups.') && !k.startsWith('payments.') && !k.startsWith('proposals.') && !k.startsWith('telegram.') && !k.startsWith('sheets.') && !k.startsWith('map.') && !k.startsWith('reminders.') && !ECONOMY_KEYS.has(k)).map((k) => [k, SETTINGS[k].default])).toEqual([
+    expect(SETTING_KEYS.filter((k) => !k.startsWith('guide.') && !k.startsWith('followups.') && !k.startsWith('payments.') && !k.startsWith('proposals.') && !k.startsWith('telegram.') && !k.startsWith('sheets.') && !k.startsWith('map.') && !k.startsWith('reminders.') && !k.startsWith('crews.') && !ECONOMY_KEYS.has(k)).map((k) => [k, SETTINGS[k].default])).toEqual([
       ['calls.transcriptMinLevel', 6],
       ['calls.summaryMinLevel', 5],
       ['calls.actionItemsMinLevel', 4],
@@ -119,6 +119,7 @@ describe('settings registry', () => {
       ['calls.recapMentionPing', true],
       ['calls.agendaPostEnabled', false],
       ['calls.agendaLinks', ''],
+      ['calls.attendanceExcludeIds', ''],
       ['calls.attendanceCrewAliases', 'community = community_call'],
       ['calls.recordableVoiceChannels', ''],
       ['calls.crewVoiceChannels', ''],
@@ -132,6 +133,8 @@ describe('settings registry', () => {
       ['calls.startNotice', ''],
       ['calls.endSongTriggerEnabled', false],
       ['calls.endSongMinHumans', 1],
+      ['calls.playOutCommandEnabled', false],
+      ['calls.playOutAnyMember', false],
       ['calls.startBandEnabled', false],
       ['calls.startBandCalls', 'Community Call'],
       ['calls.transcriptionTerms', TRANSCRIPTION_KEYTERMS_DEFAULT],
@@ -190,6 +193,7 @@ describe('settings registry', () => {
       ['disavow.enabled', false],
       ['reengage.enabled', false],
       ['onboarding.traineeNickEnabled', false],
+      ['onboarding.traineeNickHealEnabled', false],
       ['names.requireThemed', false],
       ['mafia.rankFreshHours', 26],
       ['profile.collectionStatsFreshHours', 26],

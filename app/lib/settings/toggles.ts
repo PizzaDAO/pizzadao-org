@@ -41,6 +41,8 @@ export const TOGGLES = {
   },
   'calls.dstFixEnabled': { env: 'CALL_DST_FIX_ENABLED', legacy: ON_WORDS },
   'calls.endSongTriggerEnabled': { env: 'CALL_END_SONG_ENABLED', legacy: ON_WORDS },
+  'calls.playOutCommandEnabled': { env: 'CALL_PLAY_OUT_COMMAND_ENABLED', legacy: ON_WORDS },
+  'calls.playOutAnyMember': { env: 'CALL_PLAY_OUT_ANY_MEMBER', legacy: ON_WORDS },
   'calls.startBandEnabled': { env: 'CALL_START_BAND_ENABLED', legacy: ON_WORDS },
   'calls.progressReportEnabled': { env: 'CALL_PROGRESS_ENABLED', legacy: ON_WORDS },
   'calls.progressShowFollowups': { env: 'CALL_PROGRESS_FOLLOWUPS_ENABLED', legacy: ON_WORDS },
@@ -77,6 +79,7 @@ export const TOGGLES = {
     legacy: (raw) => ['true', '1'].includes((raw ?? '').trim().toLowerCase()),
   },
   'reengage.enabled': { env: 'REENGAGE_EMAIL_ENABLED', legacy: (raw) => (raw ?? '').trim().toLowerCase() === 'true' },
+  'onboarding.traineeNickHealEnabled': { env: 'TRAINEE_NICK_HEAL_ENABLED', legacy: ON_WORDS },
   'onboarding.traineeNickEnabled': { env: 'TRAINEE_NICK_ENABLED', legacy: (raw) => raw === 'true' },
   'games.enabled': { env: 'PEP_GAMES_ENABLED', legacy: (raw) => raw === '1' },
   'crime.enabled': { env: 'PEP_CRIME_ENABLED', legacy: (raw) => raw === '1' },
@@ -102,6 +105,8 @@ export const TOGGLES = {
   'reminders.callsEnabled': { env: 'REMINDERS_CALLS_ENABLED', legacy: ON_WORDS },
   // Off unless turned on: opt-in proposal reminders by Discord DM (B2). Also needs proposals.enabled.
   'reminders.proposalsEnabled': { env: 'REMINDERS_PROPOSALS_ENABLED', legacy: ON_WORDS },
+  // Off unless turned on: the nightly crew roster auto-add from call attendance (counts only while off).
+  'crews.rosterAutoAddEnabled': { env: 'CREWS_ROSTER_AUTOADD_ENABLED', legacy: ON_WORDS },
 } as const satisfies Partial<Record<SettingKey, ToggleDef>>
 
 export type ToggleKey = keyof typeof TOGGLES

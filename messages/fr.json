@@ -1050,7 +1050,8 @@
       "qaVotes": "{count, plural, one {# vote} other {# votes}}",
       "qaBy": "Posée par {name}",
       "pollsTitle": "Résultats des sondages",
-      "pollTotal": "{count, plural, one {# vote} other {# votes}}"
+      "pollTotal": "{count, plural, one {# vote} other {# votes}}",
+      "crewPage": "Ouvrir la page de la crew {crew}"
     },
     "readRecordings": "Lisez les résumés et transcriptions des appels passés.",
     "live": {
@@ -1145,7 +1146,19 @@
       "streamLabel": "Lien du stream (x.com)",
       "streamSave": "Enregistrer",
       "streamCancel": "Annuler",
-      "bannerMore": "En direct : {title} et {count, plural, one {# autre appel} other {# autres appels}}"
+      "bannerMore": "En direct : {title} et {count, plural, one {# autre appel} other {# autres appels}}",
+      "crewPage": "Ouvrir la page de la crew {crew}",
+      "crewTitle": "À propos de cette crew",
+      "crewGoals": "Objectifs",
+      "crewTasks": "Tâches ouvertes ({count})",
+      "crewMoreTasks": "et {count} de plus sur la page de la crew",
+      "crewLeads": "Responsables",
+      "crewNone": "Rien n'est encore listé pour cette crew.",
+      "inviteTitle": "Amenez quelqu'un",
+      "inviteBody": "Vous connaissez quelqu'un que ça intéresserait ? Envoyez-lui le lien du direct.",
+      "inviteCopy": "Copier le lien",
+      "inviteCopied": "Lien copié",
+      "inviteShare": "Partager"
     }
   },
   "communityTerms": {
