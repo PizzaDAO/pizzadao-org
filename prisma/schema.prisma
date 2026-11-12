@@ -2944,3 +2944,30 @@ model CrewSession {
   @@unique([crewId, dedupeKey])
   @@index([crewId, startsAt])
 }
+
+// One spoken call-updates run (plans/metalhead-reads-updates.md): the claim, what was said (hash and
+// counts only, never the text) and how it ended. At most 3 non-skipped runs per call session.
+// trigger: command | auto | voice. status: queued | playing | paused | stopped | done | skipped.
+model CallUpdatesRun {
+  id           String   @id @default(cuid())
+  sessionId    String
+  seq          Int
+  eventId      String?
+  startsAt     DateTime // the call session's start
+  crewId       String
+  channelId    String
+  trigger      String
+  status       String   @default("queued")
+  reason       String?
+  scriptHash   String?
+  sectionCount Int?
+  estSeconds   Int?
+  startedBy    String? // Discord id of whoever ran the command
+  controlledBy String? // Discord id of whoever last paused, resumed, skipped or stopped it
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([sessionId, seq])
+  @@index([eventId, startsAt])
+  @@index([crewId, createdAt])
+}

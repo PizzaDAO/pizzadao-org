@@ -47,6 +47,10 @@ export const TOGGLES = {
   'calls.startBandEnabled': { env: 'CALL_START_BAND_ENABLED', legacy: ON_WORDS },
   'calls.progressReportEnabled': { env: 'CALL_PROGRESS_ENABLED', legacy: ON_WORDS },
   'calls.progressShowFollowups': { env: 'CALL_PROGRESS_FOLLOWUPS_ENABLED', legacy: ON_WORDS },
+  // Off unless turned on: spoken call updates and their /metalhead command (plans/metalhead-reads-updates.md).
+  'calls.updatesEnabled': { env: 'CALL_UPDATES_ENABLED', legacy: ON_WORDS },
+  'calls.updatesControlAnyMember': { env: 'CALL_UPDATES_CONTROL_ANY_MEMBER', legacy: ON_WORDS },
+  'discord.metalheadCommandEnabled': { env: 'METALHEAD_COMMAND_ENABLED', legacy: ON_WORDS },
   'vouches.requestsEnabled': { env: 'VOUCH_REQUESTS_ENABLED', legacy: ON_WORDS },
   'vouches.quickVouchEnabled': { env: 'VOUCH_QUICK_ENABLED', legacy: ON_WORDS },
   'vouches.showVouchersEnabled': { env: 'VOUCH_SHOW_VOUCHERS_ENABLED', legacy: ON_WORDS },

@@ -16,6 +16,8 @@
 //      deferred ephemeral replies (app/lib/discord-interactions/member-commands.ts), 10 per member per minute.
 // /progress (calls.progressReportEnabled on): deferred public reply, then the crew's last call
 //      action items and open tasks (app/lib/calls/progress-report.ts), 1 per channel per 2 min.
+// /metalhead (discord.metalheadCommandEnabled on): spoken call updates and their stop / pause / resume / skip
+//      controls, deferred ephemeral replies (app/lib/call-updates/command.ts), 10 per member per minute.
 // Mission review cards (missions.reviewCardsEnabled on): Approve / Release /
 //      Reject buttons on the #work cards and the Reject modal. Checked with
 //      canReviewMission(member.roles, level), never your own; deferred update,
@@ -27,7 +29,8 @@
 //      and PEP_ADMIN_LOG_CHANNEL_ID (audit post via the bot token).
 import { after, NextResponse } from "next/server";
 import { verifyDiscordRequest } from "@/app/lib/discord-interactions/verify";
-import { handleInteraction, type HandlerDeps, type Interaction, type ProgressJob } from "@/app/lib/discord-interactions/handle";
+import { handleInteraction, type HandlerDeps, type Interaction, type MetalheadJob, type ProgressJob } from "@/app/lib/discord-interactions/handle";
+import { liveCallChoices, metalheadEnabled, runMetalheadCommand } from "@/app/lib/call-updates/command";
 import { progressEnabled, runProgressCommand } from "@/app/lib/calls/progress-command";
 import { getCrewMappings } from "@/app/lib/crew-mappings";
 import { runMemberCommand, type MemberCommandJob } from "@/app/lib/discord-interactions/member-commands";
@@ -130,6 +133,19 @@ async function progressRateLimit(channelId: string): Promise<Date | null> {
 function deferProgress(job: ProgressJob) {
   after(async () => {
     await runProgressCommand(job);
+  });
+}
+
+/** /metalhead: 10 per member per minute (private replies; the heavy work is capped per call). */
+async function metalheadRateLimit(discordId: string): Promise<Date | null> {
+  const r = await checkKeyedRateLimit("metalhead-command", discordId);
+  return r.success ? null : new Date(r.reset);
+}
+
+/** The deferred /metalhead work (build, speak or control), after the type-5 reply has gone out. */
+function deferMetalhead(job: MetalheadJob) {
+  after(async () => {
+    await runMetalheadCommand(job);
   });
 }
 
@@ -247,6 +263,7 @@ function deps(guildId: string | undefined, settings: Settings): HandlerDeps {
     missions: { rateLimit: missionsRateLimit, defer: deferMissions },
     memberCommands: { enabled: (name) => toggleEnabled(MEMBER_COMMAND_TOGGLES[name]), rateLimit: memberCommandRateLimit, defer: deferMemberCommand },
     progress: { enabled: progressEnabled, rateLimit: progressRateLimit, defer: deferProgress, crewChoices: progressCrewChoices },
+    metalhead: { enabled: () => metalheadEnabled(), rateLimit: metalheadRateLimit, defer: deferMetalhead, callChoices: liveCallChoices },
     missionReview,
     followups,
     reminders,

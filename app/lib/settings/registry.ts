@@ -21,6 +21,7 @@ import { SHEETS_SETTINGS } from './sheets-settings'
 import { MAP_LEVELS_SETTINGS } from './map-levels-settings'
 import { REMINDERS_SETTINGS } from './reminders-settings'
 import { CREWS_SETTINGS } from './crews-settings'
+import { CALL_UPDATES_SETTINGS } from './call-updates-settings'
 import { ADMIN_ROLE_IDS, DREAD_PIZZA_ROBERTS_ROLE_ID, MISSION_REVIEWER_ROLE_IDS } from '@/app/ui/constants'
 
 export type SettingArea = 'missions' | 'calls' | 'disavow' | 'passport' | 'guide' | 'followups' | 'discord' | 'features' | 'payments' | 'proposals' | 'economy' | 'mafia' | 'telegram' | 'sheets' | 'map' | 'reminders' | 'crews'
@@ -2233,6 +2234,7 @@ export const SETTINGS = {
   ...MAP_LEVELS_SETTINGS,
   ...REMINDERS_SETTINGS,
   ...CREWS_SETTINGS,
+  ...CALL_UPDATES_SETTINGS,
   // The Work Payment responses sheet. Empty = form ingest does nothing. Never committed to the repo, and
   // never sent anywhere except this admin settings page (private: true) and the ingest job.
   'payments.formSheetId': {
