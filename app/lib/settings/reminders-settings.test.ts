@@ -10,6 +10,8 @@ describe('reminders settings', () => {
     expect(AREA_LABELS.reminders).toBe('Reminders')
     expect(SETTING_KEYS.filter((k) => k.startsWith('reminders.')).map((k) => [k, SETTINGS[k].default])).toEqual([
       ['reminders.callsEnabled', false],
+      ['reminders.proposalsEnabled', false],
+      ['reminders.proposalClosingHours', 24],
       ['reminders.callLeadMinutes', 60],
       ['reminders.maxSendsPerRun', 40],
       ['reminders.maxPerMemberPerDay', 6],
@@ -20,6 +22,10 @@ describe('reminders settings', () => {
     expect(SETTINGS['reminders.callLeadMinutes'].schema.safeParse(9).success).toBe(false)
     expect(SETTINGS['reminders.callLeadMinutes'].schema.safeParse(1440).success).toBe(true)
     expect(SETTINGS['reminders.callLeadMinutes'].schema.safeParse(1441).success).toBe(false)
+    expect(SETTINGS['reminders.proposalClosingHours'].schema.safeParse(1).success).toBe(false)
+    expect(SETTINGS['reminders.proposalClosingHours'].schema.safeParse(2).success).toBe(true)
+    expect(SETTINGS['reminders.proposalClosingHours'].schema.safeParse(72).success).toBe(true)
+    expect(SETTINGS['reminders.proposalClosingHours'].schema.safeParse(73).success).toBe(false)
     expect(SETTINGS['reminders.maxSendsPerRun'].schema.safeParse(0).success).toBe(false)
     expect(SETTINGS['reminders.maxSendsPerRun'].schema.safeParse(200).success).toBe(true)
     expect(SETTINGS['reminders.maxPerMemberPerDay'].schema.safeParse(21).success).toBe(false)
@@ -34,5 +40,15 @@ describe('reminders settings', () => {
     expect(resolveToggle('reminders.callsEnabled', on, { VERCEL_ENV: 'production', REMINDERS_CALLS_ENABLED: '0' })).toBe(false)
     // A saved ON never reaches a preview.
     expect(resolveToggle('reminders.callsEnabled', on, { VERCEL_ENV: 'preview' })).toBe(false)
+  })
+
+  it('proposal reminders: off by default, REMINDERS_PROPOSALS_ENABLED, env off wins, previews never', () => {
+    expect(TOGGLES['reminders.proposalsEnabled'].env).toBe('REMINDERS_PROPOSALS_ENABLED')
+    expect(TOGGLES['reminders.proposalsEnabled'].legacy(undefined)).toBe(false)
+    expect(resolveToggle('reminders.proposalsEnabled', none, { VERCEL_ENV: 'production' })).toBe(false)
+    const on = { get: () => true, isSet: () => true, readFailed: false, invalidKeys: [] } as unknown as Settings
+    expect(resolveToggle('reminders.proposalsEnabled', on, { VERCEL_ENV: 'production' })).toBe(true)
+    expect(resolveToggle('reminders.proposalsEnabled', on, { VERCEL_ENV: 'production', REMINDERS_PROPOSALS_ENABLED: 'off' })).toBe(false)
+    expect(resolveToggle('reminders.proposalsEnabled', on, { VERCEL_ENV: 'preview' })).toBe(false)
   })
 })

@@ -64,7 +64,7 @@ export type LiveOutcome = { messages: string[]; reason?: string }
 const none = (reason: string): LiveOutcome => ({ messages: [], reason })
 
 /** Largest live segment file downloaded (a burst of speech is far smaller). */
-const MAX_SEGMENT_BYTES = 8 * 1024 * 1024
+export const MAX_SEGMENT_BYTES = 8 * 1024 * 1024
 /** Transcription must be over by this long into the request (the route allows 120 s). */
 const TRANSCRIBE_BUDGET_MS = 60_000
 const DETECT_BUDGET_MS = 35_000
@@ -128,7 +128,7 @@ export async function recordAndConfirm(sessionId: string, candidates: LiveCandid
   const existing = await prisma.callLiveItem.findMany({ where: { sessionId }, select: { text: true, posted: true } })
   let posted = existing.filter((e) => e.posted).length
   const known = existing.map((e) => e.text)
-  const toPost: Array<{ text: string; owner: string | null }> = []
+  const toPost: Array<{ text: string; owner: string | null; suggestedById: string | null }> = []
   for (const c of candidates) {
     const text = cleanItemText(c.text)
     const owner = cleanOwner(c.owner)
@@ -148,7 +148,7 @@ export async function recordAndConfirm(sessionId: string, candidates: LiveCandid
     known.push(text)
     if (post) {
       posted++
-      toPost.push({ text, owner })
+      toPost.push({ text, owner, suggestedById: c.speakerIds.length === 1 ? c.speakerIds[0] : null })
     }
   }
   const msg = formatConfirmation(toPost, cfg.note)
@@ -165,7 +165,7 @@ interface StoredLine {
   text: string
 }
 
-async function defaultDecode(bytes: Uint8Array, durMs: number): Promise<Int16Array | undefined> {
+export async function defaultDecode(bytes: Uint8Array, durMs: number): Promise<Int16Array | undefined> {
   const [pcm] = await extractSpeech(bytes, [{ startMs: 0, endMs: Math.max(1, durMs) }])
   return pcm
 }
@@ -177,7 +177,7 @@ async function pool<T>(items: T[], limit: number, fn: (item: T) => Promise<void>
 }
 
 /** One speaker's bursts as Whisper chunks (back to back, CHUNK_GAP_MS apart), transcribed and mapped to call time. */
-async function transcribeSpeaker(
+export async function transcribeSpeaker(
   segs: NonNullable<LiveRequest['segments']>,
   deps: Required<Pick<LiveDeps, 'download' | 'decode' | 'transcribe'>>,
   deadline: number,
@@ -229,7 +229,7 @@ async function detectFromSpeech(req: LiveRequest, cfg: LiveConfig, settings: Set
   // The key must be exactly this session's live key for that speaker and start.
   const wanted = (req.segments ?? []).filter((s) => s.key === `calls/${req.sessionId}/live/${s.discordId}/${s.startMs}.ogg` && s.endMs > s.startMs)
   if (wanted.length === 0) return []
-  const done = await prisma.callLiveChunk.findMany({ where: { sessionId: req.sessionId }, select: { seq: true, audioMs: true, segmentKeys: true } })
+  const done = await prisma.callLiveChunk.findMany({ where: { sessionId: req.sessionId, seq: { gt: 0 } }, select: { seq: true, audioMs: true, segmentKeys: true } })
   if (done.length >= cfg.maxChunks) return capped(log, 'chunk cap reached')
   const seen = new Set(done.flatMap((c) => c.segmentKeys ?? []))
   let budgetMs = cfg.maxAudioMs - done.reduce((n, c) => n + (c.audioMs ?? 0), 0)

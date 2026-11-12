@@ -1050,7 +1050,8 @@
       "qaVotes": "{count, plural, one {# vote} other {# votes}}",
       "qaBy": "Posée par {name}",
       "pollsTitle": "Résultats des sondages",
-      "pollTotal": "{count, plural, one {# vote} other {# votes}}"
+      "pollTotal": "{count, plural, one {# vote} other {# votes}}",
+      "crewPage": "Ouvrir la page de la crew {crew}"
     },
     "readRecordings": "Lisez les résumés et transcriptions des appels passés.",
     "live": {
@@ -1145,7 +1146,19 @@
       "streamLabel": "Lien du stream (x.com)",
       "streamSave": "Enregistrer",
       "streamCancel": "Annuler",
-      "bannerMore": "En direct : {title} et {count, plural, one {# autre appel} other {# autres appels}}"
+      "bannerMore": "En direct : {title} et {count, plural, one {# autre appel} other {# autres appels}}",
+      "crewPage": "Ouvrir la page de la crew {crew}",
+      "crewTitle": "À propos de cette crew",
+      "crewGoals": "Objectifs",
+      "crewTasks": "Tâches ouvertes ({count})",
+      "crewMoreTasks": "et {count} de plus sur la page de la crew",
+      "crewLeads": "Responsables",
+      "crewNone": "Rien n'est encore listé pour cette crew.",
+      "inviteTitle": "Amenez quelqu'un",
+      "inviteBody": "Vous connaissez quelqu'un que ça intéresserait ? Envoyez-lui le lien du direct.",
+      "inviteCopy": "Copier le lien",
+      "inviteCopied": "Lien copié",
+      "inviteShare": "Partager"
     }
   },
   "communityTerms": {
@@ -1641,7 +1654,9 @@
       "saveError": "Impossible d'enregistrer vos rappels. Réessayer ?",
       "loadError": "Impossible de charger vos rappels.",
       "dmClosed": "Nous n'avons pas pu vous envoyer de MP sur Discord. Autorisez les messages privés des membres du serveur, puis réessayez.",
-      "tryAgain": "Réessayer"
+      "tryAgain": "Réessayer",
+      "proposals": "M'envoyer un MP quand une proposition s'ouvre ou va bientôt se clôturer",
+      "proposalsHint": "Si vous avez déjà retiré votre bulletin, vous ne recevrez pas le rappel de clôture. Chaque MP a un bouton pour arrêter."
     }
   },
   "reengage": {

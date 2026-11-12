@@ -234,7 +234,7 @@ export interface DiscordScheduledEventRaw {
  * `reason` as X-Audit-Log-Reason so Discord's audit log shows why.
  */
 export async function discordScheduledEventRequest(
-  req: { method: "GET" | "PATCH"; guildId: string; eventId?: string; botToken: string; body?: Record<string, unknown>; reason?: string },
+  req: { method: "GET" | "PATCH" | "POST"; guildId: string; eventId?: string; botToken: string; body?: Record<string, unknown>; reason?: string },
   opts: DiscordPostOptions = {},
 ): Promise<DiscordScheduledEventRaw | DiscordScheduledEventRaw[]> {
   const maxAttempts = opts.maxAttempts ?? 3;
@@ -247,7 +247,7 @@ export async function discordScheduledEventRequest(
   }
   const url = `https://discord.com/api/v10/guilds/${req.guildId}/scheduled-events${req.eventId ? `/${req.eventId}` : ""}`;
   const headers: Record<string, string> = { Authorization: `Bot ${req.botToken}` };
-  if (req.method === "PATCH") headers["Content-Type"] = "application/json";
+  if (req.method === "PATCH" || req.method === "POST") headers["Content-Type"] = "application/json";
   // Header values must be ASCII; Discord limits the reason to 512 characters.
   if (req.reason) headers["X-Audit-Log-Reason"] = encodeURIComponent(req.reason).slice(0, 512);
   const init: RequestInit = {

@@ -1050,7 +1050,8 @@
       "qaVotes": "{count, plural, one {# voto} other {# votos}}",
       "qaBy": "Pregunta de {name}",
       "pollsTitle": "Resultados de encuestas",
-      "pollTotal": "{count, plural, one {# voto} other {# votos}}"
+      "pollTotal": "{count, plural, one {# voto} other {# votos}}",
+      "crewPage": "Abrir la página de la crew {crew}"
     },
     "readRecordings": "Lee resúmenes y transcripciones de llamadas anteriores.",
     "live": {
@@ -1145,7 +1146,19 @@
       "streamLabel": "Enlace de transmisión (x.com)",
       "streamSave": "Guardar",
       "streamCancel": "Cancelar",
-      "bannerMore": "En vivo ahora: {title} y {count, plural, one {# llamada más} other {# llamadas más}}"
+      "bannerMore": "En vivo ahora: {title} y {count, plural, one {# llamada más} other {# llamadas más}}",
+      "crewPage": "Abrir la página de la crew {crew}",
+      "crewTitle": "Sobre esta crew",
+      "crewGoals": "Objetivos",
+      "crewTasks": "Tareas abiertas ({count})",
+      "crewMoreTasks": "y {count} más en la página de la crew",
+      "crewLeads": "Líderes",
+      "crewNone": "Todavía no hay nada listado para esta crew.",
+      "inviteTitle": "Trae a alguien",
+      "inviteBody": "¿Conoces a alguien a quien le interese esto? Envíale el enlace en vivo.",
+      "inviteCopy": "Copiar enlace",
+      "inviteCopied": "Enlace copiado",
+      "inviteShare": "Compartir"
     }
   },
   "communityTerms": {
@@ -1641,7 +1654,9 @@
       "saveError": "No se pudieron guardar tus recordatorios. ¿Intentar de nuevo?",
       "loadError": "No se pudieron cargar tus recordatorios.",
       "dmClosed": "No pudimos enviarte un MD en Discord. Permite mensajes directos de miembros del servidor y vuelve a intentarlo.",
-      "tryAgain": "Intentar de nuevo"
+      "tryAgain": "Intentar de nuevo",
+      "proposals": "Envíame un MD cuando se abra una propuesta o esté por cerrar",
+      "proposalsHint": "Si ya recogiste tu boleta, no recibirás el recordatorio de cierre. Cada MD tiene un botón para parar."
     }
   },
   "reengage": {

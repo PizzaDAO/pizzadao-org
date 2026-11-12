@@ -1,8 +1,8 @@
 // app/api/reminder-prefs/route.ts
 //
 // The signed-in member's reminder settings (profile edit page).
-//   GET  -> { calls: "NONE" | "COMMUNITY" | "MY_CREWS", dmClosed }
-//   POST (application/json, same origin) { calls?, retryDm? } -> same
+//   GET  -> { calls: "NONE" | "COMMUNITY" | "MY_CREWS", proposals: boolean, dmClosed }
+//   POST (application/json, same origin) { calls?, proposals?, retryDm? } -> same
 // Opt-in only: no row means no reminders. The member is the session's Discord id; nothing else is read.
 import { NextRequest, NextResponse } from 'next/server'
 import { requireSession } from '@/app/lib/auth-guards'

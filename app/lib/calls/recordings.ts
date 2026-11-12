@@ -10,6 +10,7 @@ import type { IngestPayload, TranscriptSegment } from './ingest-schema'
 import { chatOnlyAuthors, mergeChat, publicChatText, segmentKey } from './chat'
 import { buildSpeakerNames, DEFAULT_SUMMARY_BUDGET_MS, generateCallSummary } from './summarize'
 import { mergeLiveActionItems } from './live-items'
+import { resolveMemberNames } from './live-members'
 
 /**
  * Crew list for event -> crew mapping. A sheet outage must not lose a
@@ -400,7 +401,7 @@ export function carryDone<T extends { text: string }>(prev: unknown, next: T[]):
  * The summary's action items plus those confirmed during the call (live-items.ts), without duplicates
  * and respecting redactions. Any failure keeps the summary's own list.
  */
-async function withLiveItems(
+export async function withLiveItems(
   base: Array<{ text: string; owner: string | null; suggestedBy?: string | null }>,
   sessionId: string | null | undefined,
   segments: TranscriptSegment[],
@@ -414,7 +415,12 @@ async function withLiveItems(
       orderBy: { createdAt: 'asc' },
       select: { text: true, owner: true, source: true, speakerIds: true, messageId: true, startMs: true, endMs: true },
     })
-    return live.length ? mergeLiveActionItems(base, live, segments, redactedSpeakerIds, undefined, names) : base
+    if (!live.length) return base
+    // Speakers the transcript has no name for: use the member's name.
+    const lacking = live.map((l) => l.speakerIds[0]).filter((id): id is string => !!id && (!names[id] || /^Speaker \d+$/.test(names[id])))
+    const filled = { ...names }
+    if (lacking.length) for (const [id, n] of await resolveMemberNames(lacking)) filled[id] = n
+    return mergeLiveActionItems(base, live, segments, redactedSpeakerIds, undefined, filled)
   } catch (err) {
     console.warn('[calls/summary] live action items not merged:', err instanceof Error ? err.message : err)
     return base

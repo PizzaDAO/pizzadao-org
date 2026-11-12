@@ -41,6 +41,12 @@ describe('/api/reminder-prefs', () => {
     expect(res.status).toBe(200)
     expect(savePrefs).toHaveBeenCalledWith('u1', { calls: 'MY_CREWS' })
   })
+  it('POST accepts the proposals opt-in (boolean only) for the session member', async () => {
+    expect((await POST(post({ proposals: true }))).status).toBe(200)
+    expect(savePrefs).toHaveBeenCalledWith('u1', { proposals: true })
+    expect((await POST(post({ proposals: 'yes' }))).status).toBe(400)
+    expect(savePrefs).toHaveBeenCalledTimes(1)
+  })
   it('rejects values B1 does not offer, unknown fields and empty bodies', async () => {
     for (const body of [{ calls: 'SELECTED' }, { calls: 'COMMUNITY', discordId: 'u2' }, {}, { channel: 'TELEGRAM' }, 'not json']) {
       expect((await POST(post(body))).status).toBe(400)

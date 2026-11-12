@@ -14,6 +14,14 @@ describe('rm: Stop button on reminder DMs', () => {
     expect(res.data?.content).toMatch(/not get call reminders/i)
     expect(res.data?.flags).toBe(64)
   })
+  it('rm:stop:proposals turns proposal reminders off for the invoking user only', async () => {
+    const r = rm()
+    const res = await handleInteraction(dm('rm:stop:proposals'), deps(r))
+    expect(r.stop).toHaveBeenCalledWith('u1', 'proposals')
+    expect(res.data?.content).toMatch(/not get proposal reminders/i)
+    expect(res.data?.flags).toBe(64)
+    expect((await handleInteraction(dm('rm:stop:proposals:u9'), deps(r))).data?.content).toMatch(/unknown/i)
+  })
   it('the actor is member.user.id when present, never anything from the custom id', async () => {
     const r = rm()
     await handleInteraction(dm('rm:stop:calls', { user: undefined, member: { user: { id: 'u2' } } } as Partial<Interaction>), deps(r))

@@ -2919,3 +2919,28 @@ model DiscordDmReach {
   recheckAt   DateTime?
   checkedAt   DateTime?
 }
+
+// One scheduled crew session (education talks first). The (crewId, dedupeKey) unique row is claimed BEFORE
+// anything is created, and each step records its Discord id, so a re-submit only does the steps still missing.
+model CrewSession {
+  id                String   @id @default(cuid())
+  crewId            String
+  dedupeKey         String // sha256 of crew + title + start
+  title             String
+  presenter         String?
+  description       String
+  startsAt          DateTime
+  endsAt            DateTime
+  timeZone          String
+  createdBy         String // discordId of the lead who scheduled it
+  eventId           String? // Discord scheduled event
+  announceMessageId String? // post in the crew channel
+  generalMessageId  String? // post in the general announcements channel
+  telegramQueued    Boolean  @default(false)
+  lastError         String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([crewId, dedupeKey])
+  @@index([crewId, startsAt])
+}
