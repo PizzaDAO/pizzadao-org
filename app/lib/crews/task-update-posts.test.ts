@@ -10,11 +10,13 @@ const m = vi.hoisted(() => ({
   toggle: vi.fn(),
   filter: vi.fn(),
   crews: vi.fn(),
+  exec: vi.fn(),
   minutes: { value: 60 },
 }))
 
 vi.mock('@/app/lib/db', () => ({
   prisma: {
+    $executeRaw: m.exec,
     crewTaskEvent: { findMany: m.events },
     crewTask: { findMany: m.tasks },
     crewTaskUpdatePost: { findMany: m.marks, create: m.markCreate, updateMany: m.markUpdateMany, deleteMany: m.markDeleteMany },
@@ -46,6 +48,7 @@ const run = (env: Record<string, string | undefined> = prod) => runCrewTaskUpdat
 beforeEach(() => {
   vi.clearAllMocks()
   m.minutes.value = 60
+  m.exec.mockResolvedValue(1)
   m.toggle.mockResolvedValue(true)
   m.filter.mockResolvedValue({ excludedCrewIds: [], excludedCrewLabelTerms: [], blockedTerms: [] })
   m.crews.mockResolvedValue({ crews: [{ id: 'ops', label: 'Ops' }, { id: 'comms', label: 'Comms' }] })
@@ -107,6 +110,27 @@ describe('runCrewTaskUpdatePosts', () => {
     expect((await run()).status).toBe('disabled')
     expect(m.events).not.toHaveBeenCalled()
     expect(post).not.toHaveBeenCalled()
+  })
+
+  it('while off in production it moves the watermarks to the latest event, so turning it on never dumps history', async () => {
+    m.toggle.mockResolvedValue(false)
+    await run()
+    expect(m.exec).toHaveBeenCalledTimes(1)
+    expect((m.exec.mock.calls[0][0] as string[]).join('')).toContain('MAX("id")')
+  })
+
+  it('a preview never writes the watermarks', async () => {
+    m.toggle.mockResolvedValue(false)
+    await run({ ...prod, VERCEL_ENV: 'preview' })
+    expect(m.exec).not.toHaveBeenCalled()
+  })
+
+  it('filters events in SQL per crew watermark', async () => {
+    m.marks.mockResolvedValue([{ crewId: 'ops', lastEventId: 7, postedAt: NOW }])
+    await run()
+    const where = m.events.mock.calls[0][0].where
+    expect(where.OR).toContainEqual({ crewId: 'ops', id: { gt: 7 } })
+    expect(where.OR).toContainEqual(expect.objectContaining({ crewId: { notIn: ['ops'] } }))
   })
 
   it('never posts on a preview, even with the switch on', async () => {
@@ -187,7 +211,7 @@ describe('runCrewTaskUpdatePosts', () => {
   it('releases the claim when Discord refuses, keeps it when the outcome is unknown', async () => {
     post.mockRejectedValue(new DiscordPostError('nope', 403))
     expect((await run()).outcomes[0].status).toBe('failed')
-    expect(m.markDeleteMany).toHaveBeenCalledWith({ where: { crewId: 'ops' } })
+    expect(m.markDeleteMany).toHaveBeenCalledWith({ where: { crewId: 'ops', lastEventId: 1 } })
     m.markDeleteMany.mockClear()
     post.mockRejectedValue(new Error('timeout'))
     expect((await run()).outcomes[0].status).toBe('post-uncertain')

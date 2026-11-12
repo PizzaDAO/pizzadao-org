@@ -8,8 +8,9 @@
  *  - Batching: per crew, at most one post per `crews.taskUpdateDigestMinutes`. The digest lists
  *    everything since the crew's last one (CrewTaskUpdatePost keeps the last event id covered).
  *  - Off by default (crews.taskUpdatePostsEnabled, env kill switch CREWS_TASK_UPDATE_POSTS_ENABLED).
- *    Production only: a preview never posts. While off nothing is claimed, so turning it on starts
- *    with the last digest window, not the whole history.
+ *    Production only: a preview never posts. While it is off, production runs move every crew's
+ *    watermark to the latest event (one UPDATE), so turning it on never dumps what happened in the
+ *    meantime; a crew with no watermark yet starts at the last digest window.
  *  - No pings (allowed_mentions parse []), embeds suppressed, crews excluded by calls.postFilter
  *    get nothing. The watermark is claimed BEFORE posting; it is released only when Discord
  *    definitely refused, so an unknown outcome never reposts.
@@ -127,7 +128,13 @@ export async function taskUpdatePostsEnabled(env: Env = process.env): Promise<bo
 export async function runCrewTaskUpdatePosts(deps: DigestDeps = {}): Promise<DigestRunResult> {
   const env = deps.env ?? process.env
   const now = deps.now ?? new Date()
-  if (!(await taskUpdatePostsEnabled(env))) return { status: 'disabled', outcomes: [] }
+  if (!(await taskUpdatePostsEnabled(env))) {
+    // Off in production: keep the watermarks at the latest event (previews share the database and never write).
+    if (env.VERCEL_ENV === 'production') {
+      await prisma.$executeRaw`UPDATE "CrewTaskUpdatePost" SET "lastEventId" = COALESCE((SELECT MAX("id") FROM "CrewTaskEvent"), "lastEventId"), "updatedAt" = NOW()`.catch((e: unknown) => console.warn('[crew-task-updates] watermark advance failed:', e instanceof Error ? e.message : e))
+    }
+    return { status: 'disabled', outcomes: [] }
+  }
   const botToken = env.DISCORD_BOT_TOKEN?.trim()
   if (!botToken) return { status: 'no-token', outcomes: [] }
 
@@ -138,8 +145,18 @@ export async function runCrewTaskUpdatePosts(deps: DigestDeps = {}): Promise<Dig
   const filter = await loadPostFilter()
 
   const marks = new Map((await prisma.crewTaskUpdatePost.findMany()).map((m) => [m.crewId, m]))
+  // Filter in SQL so the cap can never hide newer events behind old, already covered ones: per crew
+  // with a watermark, everything after it; for the rest, the last digest window.
+  const marked = [...marks.values()]
   const events = (await prisma.crewTaskEvent.findMany({
-    where: { action: { in: ACTIONS }, createdAt: { gte: new Date(now.getTime() - MAX_AGE_MS) } },
+    where: {
+      action: { in: ACTIONS },
+      createdAt: { gte: new Date(now.getTime() - MAX_AGE_MS) },
+      OR: [
+        ...marked.map((m) => ({ crewId: m.crewId, id: { gt: m.lastEventId } })),
+        { crewId: { notIn: marked.map((m) => m.crewId) }, createdAt: { gte: new Date(now.getTime() - intervalMs) } },
+      ],
+    },
     orderBy: { id: 'asc' },
     take: MAX_EVENTS,
   })) as TaskEventRow[]
@@ -215,8 +232,9 @@ async function postCrewDigest(o: {
     console.error('[crew-task-updates] post failed', crewId, err instanceof Error ? err.message : err)
     if (err instanceof DiscordPostError && err.status >= 400 && err.status < 500) {
       // Discord refused: put the previous watermark back so the next run retries.
-      if (mark) await prisma.crewTaskUpdatePost.updateMany({ where: { crewId }, data: { lastEventId: mark.lastEventId, postedAt: mark.postedAt } })
-      else await prisma.crewTaskUpdatePost.deleteMany({ where: { crewId } })
+      // Compare-and-set on the id we claimed, so a later run's newer claim is never undone.
+      if (mark) await prisma.crewTaskUpdatePost.updateMany({ where: { crewId, lastEventId }, data: { lastEventId: mark.lastEventId, postedAt: mark.postedAt } })
+      else await prisma.crewTaskUpdatePost.deleteMany({ where: { crewId, lastEventId } })
       return { crewId, status: 'failed' }
     }
     // The message may have been delivered: keep the claim rather than risk a double post.
