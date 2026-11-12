@@ -22,6 +22,7 @@ import { toggleEnabled } from '@/app/lib/settings/toggles'
 import { loadSettings, type Settings } from '@/app/lib/settings'
 import { settingInt } from '@/app/lib/settings/numbers'
 import { importedAllowed, isImportedSource } from '@/app/lib/calls/imported'
+import { readEvidence } from '@/app/lib/calls/evidence'
 import { enqueueMirror } from '@/app/lib/telegram/city-posts'
 
 export const COMMUNITY_CALL_CREW_ID = 'community_call'
@@ -328,15 +329,18 @@ export function buildRecapParts(input: RecapInput, base: string = SITE_URL, filt
   const bullets = recapBullets(rec.summary, rec.chapters, filter, limits).map((b) => mentionInBullet(b, who, found))
   const actions = (Array.isArray(rec.actionItems) ? rec.actionItems : [])
     .map((a) => {
-      const o = a as { text?: unknown; owner?: unknown; suggestedBy?: unknown; done?: unknown }
+      const o = a as { text?: unknown; owner?: unknown; suggestedBy?: unknown; done?: unknown; evidence?: unknown }
       const done = o?.done === true
+      // Masked links with <> around the URL (no embeds); only on done items. Long URLs are left out to keep the line short.
+      const proof = done ? readEvidence(o.evidence).filter((e) => e.url.length <= 200).map((e) => `[${e.label.replace(/[\[\]()<>*_`~|\\]/g, '') || 'link'}](<${e.url}>)`) : []
+      const ev = proof.length ? ` — ${proof.join(', ')}` : ''
       const text = typeof o?.text === 'string' ? oneLine(o.text) : ''
       const owner = typeof o?.owner === 'string' ? oneLine(o.owner) : ''
       const by = typeof o?.suggestedBy === 'string' ? oneLine(o.suggestedBy) : ''
       if (!text || mentionsBlockedTerm(text, filter) || mentionsBlockedTerm(owner, filter) || mentionsBlockedTerm(by, filter)) return null
       // One person who both suggested and owns it: say so once instead of "(Ann) — suggested by Ann".
-      if (owner && by && sameActionPerson(owner, by, who)) return { done, line: `${clip(text, limits.chars)} — ${mentionNames(clip(owner, 40), who, found)} (suggested, owner)` }
-      return { done, line: `${clip(text, limits.chars)}${owner ? ` (${mentionNames(clip(owner, 40), who, found)})` : ''}${by ? ` — suggested by ${mentionNames(clip(by, 40), who, found)}` : ''}` }
+      if (owner && by && sameActionPerson(owner, by, who)) return { done, line: `${clip(text, limits.chars)} — ${mentionNames(clip(owner, 40), who, found)} (suggested, owner)${ev}` }
+      return { done, line: `${clip(text, limits.chars)}${owner ? ` (${mentionNames(clip(owner, 40), who, found)})` : ''}${by ? ` — suggested by ${mentionNames(clip(by, 40), who, found)}` : ''}${ev}` }
     })
     .filter((x): x is { done: boolean; line: string } => !!x)
     .slice(0, limits.actions)

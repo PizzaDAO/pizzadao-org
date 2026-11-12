@@ -1389,6 +1389,7 @@
     "processingNote": "Se está generando el resumen. Recarga en un minuto.",
     "actionItemsHint": "Una por línea. Responsable facultativo tras una barra vertical y, si quieres, \"by: Nombre\" para quien la sugirió: Enviar la presentación | Ann | by: Bob",
     "actionItemDone": "Hecho",
+    "actionItemEvidence": "Enlaces de prueba (PR, documento), hasta 3, separados por espacio o coma",
     "suggestedBy": "sugerido por {name}",
     "chaptersHint": "Una por línea: hora de inicio y título, como 12:30 Actualización del presupuesto",
     "restoreLines": "Restaurar sus líneas",

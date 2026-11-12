@@ -1389,6 +1389,7 @@
     "processingNote": "The summary is being generated. Reload in a minute.",
     "actionItemsHint": "One per line. Optional owner after a vertical bar, then optional \"by: Name\" for who suggested it: Send the deck | Ann | by: Bob",
     "actionItemDone": "Done",
+    "actionItemEvidence": "Evidence links (PR, doc), up to 3, space or comma separated",
     "suggestedBy": "suggested by {name}",
     "chaptersHint": "One per line: start time then title, like 12:30 Budget update",
     "restoreLines": "Restore their lines",

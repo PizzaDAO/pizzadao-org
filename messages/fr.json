@@ -1389,6 +1389,7 @@
     "processingNote": "Le résumé est en cours de génération. Rechargez dans une minute.",
     "actionItemsHint": "Une par ligne. Responsable facultatif après une barre verticale, puis \"by: Nom\" pour qui l'a suggéré : Envoyer la présentation | Ann | by: Bob",
     "actionItemDone": "Fait",
+    "actionItemEvidence": "Liens de preuve (PR, doc), 3 maximum, séparés par un espace ou une virgule",
     "suggestedBy": "suggéré par {name}",
     "chaptersHint": "Une par ligne : heure de début puis titre, par exemple 12:30 Point budget",
     "restoreLines": "Rétablir ses lignes",

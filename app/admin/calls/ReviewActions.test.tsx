@@ -23,6 +23,25 @@ describe('review form text formats', () => {
     expect(parseActionItems(formatActionItems(items))).toEqual(items)
   })
 
+  it('round-trips evidence links, with and without the other fields', () => {
+    const e = [{ url: 'https://github.com/o/r/pull/5' }, { url: 'https://example.org/doc?a=1&b=2' }]
+    const items = [{ text: 'A', owner: 'Ann', suggestedBy: 'Bob', done: true, evidence: e }, { text: 'B', done: true, evidence: [e[0]] }, { text: 'C', evidence: e }, { text: 'D', owner: 'Dee', done: true }]
+    expect(formatActionItems(items)).toBe('[x] A | Ann | by: Bob | ev: https://github.com/o/r/pull/5 https://example.org/doc?a=1&b=2\n[x] B | ev: https://github.com/o/r/pull/5\nC | ev: https://github.com/o/r/pull/5 https://example.org/doc?a=1&b=2\n[x] D | Dee')
+    expect(parseActionItems(formatActionItems(items))).toEqual(items)
+  })
+
+  it('does not read look-alike text as evidence, and escapes text that ends like it', () => {
+    const items = [{ text: 'Check | ev: soon', owner: 'Ann' }, { text: 'Look', owner: 'ev: https://example.org/x' }, { text: 'Fix', done: true, owner: 'ev: https://example.org/x' }]
+    expect(parseActionItems(formatActionItems(items))).toEqual(items)
+    expect(parseActionItems('A | ev: javascript:alert(1)')[0].evidence).toBeUndefined()
+    expect(parseActionItems('A | ev: https://example.org/a x')[0].evidence).toBeUndefined()
+  })
+
+  it('caps evidence at three and drops duplicates', () => {
+    const line = '[x] A | ev: https://e.org/1 https://e.org/1 https://e.org/2 https://e.org/3 https://e.org/4'
+    expect(parseActionItems(line)[0].evidence).toEqual([{ url: 'https://e.org/1' }, { url: 'https://e.org/2' }, { url: 'https://e.org/3' }])
+  })
+
   it('does not turn an open item whose text starts like a marker into a done one', () => {
     const items = [{ text: '[x] literal' }, { text: '[ ] box' }, { text: '\\[x] already', owner: 'Ann' }, { text: '[x] real', done: true }, { text: '[x] odd', done: true, suggestedBy: 'Bob' }]
     expect(parseActionItems(formatActionItems(items))).toEqual(items)

@@ -8,6 +8,7 @@
 // row is updated, so the form always shows what is stored after a refresh.
 // Publish saves the current fields first.
 
+import { parseEvidenceInput, safeEvidenceUrl, MAX_EVIDENCE, type Evidence } from "@/app/lib/calls/evidence";
 import { useEffect, useState } from "react";
 import { setReviewDirty } from "./reviewDirty";
 import { useRouter } from "next/navigation";
@@ -18,6 +19,7 @@ export interface ReviewLabels {
     actionItems: string;
     actionItemsHint: string;
     actionItemDone: string;
+    actionItemEvidence: string;
     chapters: string;
     chaptersHint: string;
     tooManyItems: string;
@@ -44,6 +46,8 @@ export interface ActionItem {
     owner?: string;
     suggestedBy?: string;
     done?: boolean;
+    /** Links showing a done item was completed (up to 3). The editor shows them as a trailing " | ev: url url" segment. */
+    evidence?: Evidence[];
 }
 export interface Chapter {
     startMs: number;
@@ -72,10 +76,27 @@ function escapeMarker(text: string): string {
 function unescapeMarker(text: string): string {
     return /^\\+\[[xX ]\]\s/.test(text) ? text.slice(1) : text;
 }
-/** "text | owner | by: suggester" per line; owner and suggester are optional. A final " | by: NAME" is the suggester, then whatever follows the last " | " is the owner. */
+const EV = " | ev:";
+/** The evidence tail of a line ("... | ev: url url", the final segment, every token a valid URL) split off, or null when the line has none. */
+function splitEvidence(line: string): { rest: string; evidence: Evidence[] } | null {
+    const at = line.lastIndexOf(EV);
+    if (at === -1 || line.indexOf(" | ", at + 3) !== -1) return null;
+    const tail = line.slice(at + EV.length);
+    if (tail && !/^\s/.test(tail)) return null;
+    const tokens = tail.split(/\s+/).filter(Boolean);
+    if (!tokens.every((t) => safeEvidenceUrl(t))) return null;
+    return { rest: line.slice(0, at).trim(), evidence: parseEvidenceInput(tail) };
+}
+/** "text | owner | by: suggester | ev: url url" per line; owner and suggester are optional. A final " | by: NAME" is the suggester, then whatever follows the last " | " is the owner. */
 export function formatActionItems(items: ActionItem[]): string {
     return items
-        .map((i) => (i.done ? DONE : "") + [escapeMarker(i.text), i.owner, i.suggestedBy ? `${BY}${i.suggestedBy}` : ""].filter(Boolean).join(" | "))
+        .map((i) => {
+            const ev = (i.evidence ?? []).slice(0, MAX_EVIDENCE).map((e) => e.url);
+            const body = [escapeMarker(i.text), i.owner, i.suggestedBy ? `${BY}${i.suggestedBy}` : ""].filter(Boolean).join(" | ");
+            // Text that already ends like an evidence segment gets an empty "| ev:" so it is not read back as evidence.
+            const tail = ev.length ? `${EV} ${ev.join(" ")}` : splitEvidence(body) ? EV : "";
+            return (i.done ? DONE : "") + body + tail;
+        })
         .join("\n");
 }
 export function parseActionItems(raw: string): ActionItem[] {
@@ -87,6 +108,8 @@ export function parseActionItems(raw: string): ActionItem[] {
             let rest = l;
             const done = /^\[x\]\s/i.test(rest);
             if (done) rest = rest.slice(DONE.length).trim();
+            const ev = splitEvidence(rest);
+            if (ev) rest = ev.rest;
             let suggestedBy = "";
             const byAt = rest.lastIndexOf(` | ${BY}`);
             // Only the FINAL segment counts as the suggester; a " | by: " followed by more segments is part of the text.
@@ -97,7 +120,7 @@ export function parseActionItems(raw: string): ActionItem[] {
             const at = rest.lastIndexOf(" | ");
             const owner = at === -1 ? "" : rest.slice(at + 3).trim();
             const text = unescapeMarker((at === -1 ? rest : rest.slice(0, at)).trim());
-            return { text, ...(owner ? { owner } : {}), ...(suggestedBy ? { suggestedBy } : {}), ...(done ? { done: true } : {}) };
+            return { text, ...(owner ? { owner } : {}), ...(suggestedBy ? { suggestedBy } : {}), ...(done ? { done: true } : {}), ...(ev?.evidence.length ? { evidence: ev.evidence } : {}) };
         })
         .filter((i) => i.text);
 }
@@ -172,6 +195,15 @@ export function ReviewActions({
         setActionItems(lines.join("\n"));
     }
 
+    /** Replace the evidence links on line i (the input under its checkbox). */
+    function setEvidence(i: number, raw: string) {
+        const lines = actionItems.split("\n").filter((l) => l.trim());
+        const items = parseActionItems(actionItems);
+        lines[i] = formatActionItems([{ ...items[i], evidence: parseEvidenceInput(raw), done: false }]).split("\n")[0];
+        if (items[i].done) lines[i] = DONE + lines[i];
+        setActionItems(lines.join("\n"));
+    }
+
     /** A clear message for input we can see is invalid, instead of a generic failure. */
     function validate(): string | null {
         if (parseActionItems(actionItems).length > MAX_LIST) return labels.tooManyItems;
@@ -242,10 +274,24 @@ export function ReviewActions({
             {parseActionItems(actionItems).length > 0 && (
                 <div className="grid gap-1">
                     {parseActionItems(actionItems).map((it, i) => (
-                        <label key={i} className="flex items-center gap-2 text-sm">
-                            <input type="checkbox" checked={!!it.done} onChange={() => toggleDone(i)} aria-label={`${labels.actionItemDone}: ${it.text}`} />
-                            <span className={it.done ? "text-foreground/60" : undefined}>{it.text}</span>
-                        </label>
+                        <div key={i} className="grid gap-1">
+                            <label className="flex items-center gap-2 text-sm">
+                                <input type="checkbox" checked={!!it.done} onChange={() => toggleDone(i)} aria-label={`${labels.actionItemDone}: ${it.text}`} />
+                                <span className={it.done ? "text-foreground/60" : undefined}>{it.text}</span>
+                            </label>
+                            {it.done && (
+                                <input
+                                    key={(it.evidence ?? []).map((e) => e.url).join(" ")}
+                                    type="text"
+                                    defaultValue={(it.evidence ?? []).map((e) => e.url).join(" ")}
+                                    onBlur={(e) => setEvidence(i, e.target.value)}
+                                    placeholder={labels.actionItemEvidence}
+                                    aria-label={`${labels.actionItemEvidence}: ${it.text}`}
+                                    className={`${field} ml-6 text-xs`}
+                                    style={fieldStyle}
+                                />
+                            )}
+                        </div>
                     ))}
                 </div>
             )}
