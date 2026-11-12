@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 
 type Choice = "NONE" | "COMMUNITY" | "MY_CREWS";
-type Prefs = { calls: Choice; dmClosed: boolean };
+type Prefs = { calls: Choice; proposals?: boolean; dmClosed: boolean };
 
 const CHOICES: Array<{ value: Choice; key: "none" | "community" | "myCrews" }> = [
     { value: "NONE", key: "none" },
@@ -78,7 +78,19 @@ export function ReminderPrefsEditor() {
                     {t(c.key)}
                 </label>
             ))}
-            {prefs?.dmClosed && prefs.calls !== "NONE" ? (
+            <label style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 15, marginTop: 6 }}>
+                <input
+                    type="checkbox"
+                    checked={!!prefs?.proposals}
+                    disabled={busy || !loaded}
+                    onChange={(e) => void submit({ proposals: e.target.checked })}
+                />
+                <span>
+                    {t("proposals")}
+                    <span style={{ display: "block", fontSize: 13, opacity: 0.7 }}>{t("proposalsHint")}</span>
+                </span>
+            </label>
+            {prefs?.dmClosed && (prefs.calls !== "NONE" || prefs.proposals) ? (
                 <div role="status" style={{ fontSize: 13, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
                     <span>{t("dmClosed")}</span>
                     <button

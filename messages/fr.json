@@ -1400,8 +1400,9 @@
     "redactLines": "Masquer ses lignes",
     "redactConfirm": "Masquer toutes les lignes de cet intervenant sur la page publique et dans les résumés ? Rien n’est supprimé et vous pouvez les rétablir. Un appel publié repasse en relecture. Le résumé n’est pas réécrit.",
     "processingNote": "Le résumé est en cours de génération. Rechargez dans une minute.",
-    "actionItemsHint": "Une par ligne. Responsable facultatif après une barre verticale, puis \"by: Nom\" pour qui l'a suggéré : Envoyer la présentation | Ann | by: Bob",
+    "actionItemsHint": "Une par ligne. Responsable facultatif après une barre verticale, puis \"by: Nom\" pour qui l'a suggéré : Envoyer la présentation | Ann | by: Bob. Un élément terminé (\"[x] \" au début) peut finir par \" | ev: url url\" (liens vers sa PR ou preuve ; toujours en dernier)",
     "actionItemDone": "Fait",
+    "actionItemEvidence": "Liens de preuve (PR, doc), 3 maximum, séparés par un espace ou une virgule",
     "suggestedBy": "suggéré par {name}",
     "chaptersHint": "Une par ligne : heure de début puis titre, par exemple 12:30 Point budget",
     "restoreLines": "Rétablir ses lignes",
@@ -1653,7 +1654,9 @@
       "saveError": "Impossible d'enregistrer vos rappels. Réessayer ?",
       "loadError": "Impossible de charger vos rappels.",
       "dmClosed": "Nous n'avons pas pu vous envoyer de MP sur Discord. Autorisez les messages privés des membres du serveur, puis réessayez.",
-      "tryAgain": "Réessayer"
+      "tryAgain": "Réessayer",
+      "proposals": "M'envoyer un MP quand une proposition s'ouvre ou va bientôt se clôturer",
+      "proposalsHint": "Si vous avez déjà retiré votre bulletin, vous ne recevrez pas le rappel de clôture. Chaque MP a un bouton pour arrêter."
     }
   },
   "reengage": {

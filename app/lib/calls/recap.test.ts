@@ -43,6 +43,25 @@ describe('recap text', () => {
     expect(t).not.toContain('- Finished')
   })
 
+  it('appends masked evidence links (no embeds) after done items only', () => {
+    const ev = [{ url: 'https://github.com/org/repo/pull/308' }, { url: 'https://docs.example.org/plan' }]
+    const t = buildRecapText({ ...rec, actionItems: [{ text: 'Shipped', owner: 'Ann', done: true, evidence: ev }, { text: 'Open', evidence: ev }, { text: 'Bad', done: true, evidence: [{ url: 'javascript:alert(1)' }] }] }, base)
+    expect(t).toContain('\u2705 Shipped (Ann) \u2014 [PR #308](<https://github.com/org/repo/pull/308>), [docs.example.org](<https://docs.example.org/plan>)')
+    expect(t).toContain('- Open\n')
+    expect(t).toContain('\u2705 Bad\n')
+    expect(t).not.toContain('javascript:')
+  })
+
+  it('fit logic drops evidence links before items', () => {
+    const ev = [{ url: `https://example.org/${'a'.repeat(150)}` }, { url: `https://example.org/${'b'.repeat(150)}` }, { url: `https://example.org/${'c'.repeat(150)}` }]
+    const items = Array.from({ length: 12 }, (_, i) => ({ text: `Item ${i} ${'x'.repeat(100)}`, done: true, evidence: ev }))
+    const t = buildRecapText({ ...rec, actionItems: items }, base, undefined, { bullets: 5, actions: 12, chars: 120 })
+    expect(t.length).toBeLessThanOrEqual(2000)
+    expect(t).not.toContain('example.org/aaaa')
+    expect(t).toContain('Item 11 ')
+    expect(t).toContain('Full summary and transcript')
+  })
+
   it('fit logic counts the check prefix when trimming', () => {
     const items = Array.from({ length: 10 }, (_, i) => ({ text: `Item ${i} ${'x'.repeat(190)}`, owner: 'Ann', done: i % 2 === 0 }))
     const t = buildRecapText({ ...rec, actionItems: items }, base, undefined, { bullets: 5, actions: 10, chars: 220 })

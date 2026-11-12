@@ -1400,8 +1400,9 @@
     "redactLines": "Hide their lines",
     "redactConfirm": "Hide all of this speaker's lines from the public page and from summaries? Nothing is deleted and you can restore them. A published call goes back to review. The summary is not rewritten.",
     "processingNote": "The summary is being generated. Reload in a minute.",
-    "actionItemsHint": "One per line. Optional owner after a vertical bar, then optional \"by: Name\" for who suggested it: Send the deck | Ann | by: Bob",
+    "actionItemsHint": "One per line. Optional owner after a vertical bar, then optional \"by: Name\" for who suggested it: Send the deck | Ann | by: Bob. A done item (\"[x] \" first) can end with \" | ev: url url\" (links to its PR or proof; this goes last)",
     "actionItemDone": "Done",
+    "actionItemEvidence": "Evidence links (PR, doc), up to 3, space or comma separated",
     "suggestedBy": "suggested by {name}",
     "chaptersHint": "One per line: start time then title, like 12:30 Budget update",
     "restoreLines": "Restore their lines",
@@ -1653,7 +1654,9 @@
       "saveError": "Couldn't save your reminder settings. Try again?",
       "loadError": "Couldn't load your reminder settings.",
       "dmClosed": "We couldn't DM you on Discord. Allow direct messages from server members, then try again.",
-      "tryAgain": "Try again"
+      "tryAgain": "Try again",
+      "proposals": "DM me when a proposal opens or is about to close",
+      "proposalsHint": "If you already picked up your ballot, you won't get the closing reminder. Every DM has a Stop button."
     }
   },
   "reengage": {

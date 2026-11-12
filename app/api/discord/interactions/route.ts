@@ -68,7 +68,7 @@ import type { FollowUpInteractionDeps } from "@/app/lib/discord-interactions/fol
 import { applyMemberAction } from "@/app/lib/followups/actions";
 import { notifyApprovers } from "@/app/lib/followups/notify";
 import type { ReminderInteractionDeps } from "@/app/lib/discord-interactions/reminders";
-import { stopCallReminders } from "@/app/lib/reminders/prefs";
+import { stopCallReminders, stopProposalReminders } from "@/app/lib/reminders/prefs";
 import { SITE_URL } from "@/app/lib/site-url";
 
 export const runtime = "nodejs";
@@ -211,7 +211,7 @@ const followups: FollowUpInteractionDeps = {
 };
 
 const reminders: ReminderInteractionDeps = {
-  stop: (discordId) => stopCallReminders(discordId),
+  stop: (discordId, kind) => (kind === 'proposals' ? stopProposalReminders(discordId) : stopCallReminders(discordId)),
   settingsUrl: async (discordId) => {
     const memberId = await fetchMemberIdByDiscordId(discordId);
     return memberId ? `${SITE_URL}/profile/${encodeURIComponent(memberId)}/edit` : null;

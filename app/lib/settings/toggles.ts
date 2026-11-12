@@ -39,6 +39,7 @@ export const TOGGLES = {
     env: 'CALL_AGENDA_POST_ENABLED',
     legacy: (raw) => ['true', '1'].includes((raw ?? '').trim().toLowerCase()),
   },
+  'education.sessionAnnounceEnabled': { env: 'EDUCATION_SESSION_ANNOUNCE_ENABLED', legacy: ON_WORDS },
   'calls.dstFixEnabled': { env: 'CALL_DST_FIX_ENABLED', legacy: ON_WORDS },
   'calls.endSongTriggerEnabled': { env: 'CALL_END_SONG_ENABLED', legacy: ON_WORDS },
   'calls.playOutCommandEnabled': { env: 'CALL_PLAY_OUT_COMMAND_ENABLED', legacy: ON_WORDS },
@@ -96,6 +97,7 @@ export const TOGGLES = {
   'telegram.recapMirrorEnabled': { env: 'TELEGRAM_RECAP_MIRROR_ENABLED', legacy: ON_WORDS },
   'telegram.agendaMirrorEnabled': { env: 'TELEGRAM_AGENDA_MIRROR_ENABLED', legacy: ON_WORDS },
   'telegram.announceMirrorEnabled': { env: 'TELEGRAM_ANNOUNCE_MIRROR_ENABLED', legacy: ON_WORDS },
+  'telegram.sessionMirrorEnabled': { env: 'TELEGRAM_SESSION_MIRROR_ENABLED', legacy: ON_WORDS },
   'telegram.hostMatchEnabled': { env: 'TELEGRAM_HOST_MATCH_ENABLED', legacy: ON_WORDS },
   // On unless the env var is an explicit off (plans/sheets-cutover.md: keep the archive current until the freeze).
   'sheets.mirror.members': { env: 'SHEETS_MIRROR_MEMBERS', legacy: (raw) => !envKillsToggle(raw) },
@@ -103,6 +105,8 @@ export const TOGGLES = {
   'map.levelsEnabled': { env: 'MAP_LEVELS_ENABLED', legacy: ON_WORDS },
   // Off unless turned on: opt-in call reminders by Discord DM (plans/voting-golive-and-reminders.md, B1).
   'reminders.callsEnabled': { env: 'REMINDERS_CALLS_ENABLED', legacy: ON_WORDS },
+  // Off unless turned on: opt-in proposal reminders by Discord DM (B2). Also needs proposals.enabled.
+  'reminders.proposalsEnabled': { env: 'REMINDERS_PROPOSALS_ENABLED', legacy: ON_WORDS },
   // Off unless turned on: the nightly crew roster auto-add from call attendance (counts only while off).
   'crews.rosterAutoAddEnabled': { env: 'CREWS_ROSTER_AUTOADD_ENABLED', legacy: ON_WORDS },
   // Off unless turned on: past attendees as Cold bench rows on the crew page.

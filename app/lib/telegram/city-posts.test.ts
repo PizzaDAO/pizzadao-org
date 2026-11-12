@@ -50,6 +50,10 @@ describe('toPlainPost', () => {
     expect(out).not.toMatch(/\*\*|@everyone|<@/)
   })
 
+  it('turns masked evidence links into a plain (label)', () => {
+    expect(toPlainPost('\u2705 Shipped (Ann) \u2014 [PR #308](<https://github.com/a/b/pull/308>), [docs.x.org](<https://docs.x.org/p>)\n\nFull: https://example.org/calls/1')).toBe('\u2705 Shipped (Ann) \u2014 (PR #308), (docs.x.org)\n\nFull: https://example.org/calls/1')
+  })
+
   it('adds the app link when the text has none, and caps the length', () => {
     expect(toPlainPost('hello', 'https://app.example')).toBe('hello\n\nhttps://app.example')
     expect(toPlainPost('x'.repeat(5000)).length).toBeLessThanOrEqual(3500)

@@ -994,6 +994,13 @@ export const SETTINGS = {
     help: 'On: members named in a call recap (speakers, action-item owners) are @mentioned and notified. Off: they show as clickable names without a notification. The CALL_RECAP_MENTION_PING_ENABLED env var set to off always wins.',
     default: true,
   }),
+  'education.sessionAnnounceEnabled': boolSetting({
+    key: 'education.sessionAnnounceEnabled',
+    area: 'discord',
+    label: 'Schedule education sessions from the website',
+    help: 'Lets crew leads create the Discord event and post the announcement for an education session. Off: the form only previews the flyer. The EDUCATION_SESSION_ANNOUNCE_ENABLED env var set to off always wins.',
+    confirmOn: 'Crew leads can now create Discord events and announcements for education sessions.',
+  }),
   'calls.agendaPostEnabled': boolSetting({
     key: 'calls.agendaPostEnabled',
     area: 'calls',
@@ -1905,6 +1912,22 @@ export const SETTINGS = {
     help: 'Scheduled events in this voice channel get an agenda post.',
     kind: 'voice',
   }),
+  'discord.educationChannelId': channelSetting({
+    key: 'discord.educationChannelId',
+    label: 'Education sessions: announcement channel',
+    help: 'Where a scheduled education session is announced, with its flyer. Empty: the session is not announced.',
+  }),
+  'discord.educationEventChannelId': channelSetting({
+    key: 'discord.educationEventChannelId',
+    label: 'Education sessions: event voice or stage channel',
+    help: 'The voice or stage channel the Discord event for a session is created in. Empty: no event is created.',
+    kind: 'voice',
+  }),
+  'discord.educationGeneralChannelId': channelSetting({
+    key: 'discord.educationGeneralChannelId',
+    label: 'Education sessions: general announcements channel (optional)',
+    help: 'Also post the announcement here. Empty: only the education channel.',
+  }),
   'discord.dstFixChannelId': channelSetting({
     key: 'discord.dstFixChannelId',
     label: 'Crew call time fix: report channel',
@@ -2117,6 +2140,13 @@ export const SETTINGS = {
     label: 'Mirror the Community Call announcement to city groups',
     help: 'When the announcement goes out on Discord, also queue it for the announcement city groups below. Needs the master switch.',
     confirmOn: 'The Community Call announcement will also post to the chosen city Telegram groups.',
+  }),
+  'telegram.sessionMirrorEnabled': boolSetting({
+    key: 'telegram.sessionMirrorEnabled',
+    area: 'telegram',
+    label: 'Mirror crew session announcements to city groups',
+    help: 'When a crew session (education talks) is announced on Discord, also queue it for the city groups mapped to that crew in "Crew to city groups" below (the same mapping crew recaps use; no mapping, no post). Needs the master switch.',
+    confirmOn: 'Crew session announcements will also post to the city Telegram groups mapped to that crew.',
   }),
   // Optional host matching (PR P4): the switch here, the mode and pacing in ./telegram-settings.
   'telegram.hostMatchEnabled': boolSetting({
