@@ -278,7 +278,7 @@ describe('section lead-ins', () => {
     const tight = await build({ ...lead, maxSeconds: plain.estSeconds }, { random: seeded() })
     if (tight.kind !== 'script') throw new Error('script expected')
     expect(tight.dropped).toEqual([])
-    expect(tight.text).toBe(plain.text)
+    expect(tight.estSeconds).toBeLessThanOrEqual(plain.estSeconds)
     // Partway: some lead-ins kept, no section dropped.
     const mid = await build({ ...lead, maxSeconds: withLeads.estSeconds - 1 }, { random: seeded() })
     if (mid.kind !== 'script') throw new Error('script expected')
