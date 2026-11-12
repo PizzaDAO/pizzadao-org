@@ -33,7 +33,7 @@ describe('nothing is dropped silently', () => {
     seed(NOW - 1, NOW + 86_400_000)
     await flushDue(NOW)
     expect(getQueued(ID)).toBeNull()
-    expect(getFailed(ID)).toEqual({ choice: 'AYE', reason: 'closed' })
+    expect(getFailed(ID)).toMatchObject({ choice: 'AYE', reason: 'closed' })
   })
   it('records a failure when the server refuses the ballot (401/400)', async () => {
     castVote.mockResolvedValue('invalid')
@@ -42,7 +42,7 @@ describe('nothing is dropped silently', () => {
     expect(getFailed(ID)?.reason).toBe('invalid')
   })
   it('records "closed" for a vote still queued when the close passes', async () => {
-    seed(NOW - 1, NOW - 1)
+    seed(NOW - 1, NOW - 2 * MIN)
     await flushDue(NOW)
     expect(castVote).not.toHaveBeenCalled()
     expect(getFailed(ID)?.reason).toBe('closed')
@@ -128,20 +128,59 @@ describe('one flusher at a time', () => {
     expect(castVote).toHaveBeenCalledTimes(1)
     expect(localStorage.getItem(LEASE_KEY)).toBeNull()
   })
-  it('a pagehide flush during a running flush is skipped and does not release its guard', async () => {
+  it('a pagehide flush during a running flush still sends, and does not release the other flush\'s guard', async () => {
     let release!: () => void
     castVote.mockImplementationOnce(() => new Promise((r) => (release = () => r('ok'))))
     vi.stubGlobal('navigator', {})
     seed(NOW - 1, NOW + 10 * MIN)
     const running = flushDue(NOW)
     await Promise.resolve()
-    await flushOnPageHide(NOW) // skipped
-    expect(castVote).toHaveBeenCalledTimes(1)
-    // the first flush still holds the guard: a third call is also skipped
+    castVote.mockResolvedValueOnce('ok')
+    await flushOnPageHide(NOW) // keepalive path ignores the guard
+    expect(castVote).toHaveBeenCalledTimes(2)
+    expect(castVote.mock.calls[1][3]).toEqual({ keepalive: true })
+    // the first flush still holds the guard: a plain call is skipped
+    seed(NOW - 1, NOW + 10 * MIN)
     await flushDue(NOW)
-    expect(castVote).toHaveBeenCalledTimes(1)
+    expect(castVote).toHaveBeenCalledTimes(2)
     release()
     await running
     expect(getQueued(ID)).toBeNull()
+  })
+})
+
+describe('pagehide starts the request synchronously', () => {
+  it('calls castVote with keepalive inside the handler even when the Web Lock would grant later', () => {
+    vi.stubGlobal('navigator', { locks: { request: () => new Promise(() => {}) } })
+    seed(NOW + 10 * MIN, NOW + 10 * MIN)
+    void flushOnPageHide(NOW)
+    expect(castVote).toHaveBeenCalledTimes(1) // no await happened yet
+    expect(castVote.mock.calls[0][3]).toEqual({ keepalive: true })
+  })
+})
+
+describe('clock persistence and the close grace', () => {
+  it('a due vote just past the close is still sent (the server decides)', async () => {
+    seed(NOW - 1, NOW - 10_000)
+    await flushDue(NOW)
+    expect(castVote).toHaveBeenCalledTimes(1)
+  })
+  it('a 409 from the server then records the failure', async () => {
+    castVote.mockResolvedValue('closed')
+    seed(NOW - 1, NOW - 10_000)
+    await flushDue(NOW)
+    expect(getFailed(ID)?.reason).toBe('closed')
+  })
+})
+
+describe('failed records', () => {
+  it('prunes records older than 14 days', async () => {
+    const { listFailed, FAILED_KEY } = await import('./vote-queue')
+    localStorage.setItem(
+      FAILED_KEY,
+      JSON.stringify({ old: { choice: 'AYE', reason: 'closed', at: Date.now() - 15 * 86_400_000 }, fresh: { choice: 'NAY', reason: 'invalid', at: Date.now() } }),
+    )
+    expect(listFailed().map((f) => f.id)).toEqual(['fresh'])
+    expect(Object.keys(JSON.parse(localStorage.getItem(FAILED_KEY)!))).toEqual(['fresh'])
   })
 })

@@ -2,7 +2,7 @@
 // The vote sender mounted in the root layout: sends due queued votes on any page; pagehide only near the close.
 import React from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, waitFor } from '@testing-library/react'
 import { renderWithIntl } from '@/app/lib/i18n/test-utils'
 import { GlobalBallotPreparer } from './GlobalBallotPreparer'
 
@@ -50,5 +50,25 @@ describe('the vote sender (random delay)', () => {
     window.dispatchEvent(new Event('pagehide'))
     await waitFor(() => expect(voteCalls(f)).toHaveLength(1))
     expect((voteCalls(f)[0][1] as RequestInit).keepalive).toBe(true)
+  })
+})
+
+describe('failed-vote banner and send timeout', () => {
+  it('shows a dismissible banner linking to the proposal', async () => {
+    localStorage.clear()
+    sessionStorage.clear()
+    localStorage.setItem('pizzadao:proposal-vote-failed', JSON.stringify({ [id]: { choice: 'AYE', reason: 'closed', at: Date.now() } }))
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 401 })))
+    const { findByText, container } = renderWithIntl(<GlobalBallotPreparer />)
+    expect(await findByText('A vote could not be sent. Open the proposal.')).toBeTruthy()
+    expect(container.querySelector(`a[href="/proposals/${id}"]`)).toBeTruthy()
+    fireEvent.click(await findByText('Dismiss'))
+    await waitFor(() => expect(localStorage.getItem('pizzadao:proposal-vote-failed')).toBe('{}'))
+  })
+
+  it('a vote request that times out counts as unavailable (retry)', async () => {
+    const { castVote } = await import('@/app/lib/proposals/client')
+    vi.stubGlobal('fetch', vi.fn(async () => { throw Object.assign(new Error('t'), { name: 'TimeoutError' }) }))
+    expect(await castVote(id, { token: 't', preparedMessage: 'p', signature: 's' }, 'AYE')).toBe('unavailable')
   })
 })

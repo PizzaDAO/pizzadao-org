@@ -48,13 +48,13 @@ describe('VotePanel with the send delay', () => {
     expect(await screen.findByText(/Recorded: Nay/)).toBeTruthy()
   })
 
-  it('shows the closed message for a vote that failed, and not the old Recorded choice', async () => {
+  it('shows the closed message for a failed change and keeps the recorded choice as current', async () => {
     saveBallot(ID, { token: `proposal-${ID}-x`, preparedMessage: 'p', signature: 's', choice: 'AYE' })
     localStorage.setItem(FAILED_KEY, JSON.stringify({ [ID]: { choice: 'NAY', reason: 'closed' } }))
     panel()
-    expect(await screen.findByText('Voting is closed.')).toBeTruthy()
-    expect(screen.queryByText(/Recorded: Aye/)).toBeNull()
-    expect(screen.getByRole('button', { name: 'Aye' }).getAttribute('aria-pressed')).toBe('false')
+    expect(await screen.findByText(/Voting is closed\. Your change to Nay did not go through; Aye is what counts\./)).toBeTruthy()
+    expect(screen.getByText(/Recorded: Aye/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Aye' }).getAttribute('aria-pressed')).toBe('true')
   })
 
   it('shows the generic error for a refused vote', async () => {

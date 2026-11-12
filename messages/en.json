@@ -2207,6 +2207,7 @@
       "queued": "Not sent yet ({choice}). It goes in about {minutes, plural, one {# minute} other {# minutes}} while this site is open in this browser. If you close it, it goes next time you open the site here; if you don't come back before voting closes, it won't count.",
       "sendNow": "Send now",
       "sendNowHelp": "Sending now is certain but a little less private: the wait exists so the site's logs cannot link your vote to your ballot request.",
+      "failedChange": "Your change to {failed} did not go through; {recorded} is what counts.",
       "notEligible": "Only members with the Box Mafia role when this proposal opened can vote.",
       "closed": "Voting is closed.",
       "login": "Log in to vote.",
@@ -2248,6 +2249,7 @@
       "saveCode": "Save code",
       "open": "Open proposal",
       "dismiss": "Dismiss",
+      "voteFailed": "A vote could not be sent. Open the proposal.",
       "shared": "Code shared.",
       "copied": "Code copied.",
       "failed": "Could not copy. Open the proposal and copy the code from there."

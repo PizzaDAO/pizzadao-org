@@ -23,6 +23,9 @@ export const CLOSE_MARGIN_MS = 5 * 60 * 1000
 export const PAGEHIDE_SEND_WITHIN_MS = 30 * 60 * 1000
 export const RETRY_MS = 60 * 1000
 const LEASE_MS = 30 * 1000
+/** The device clock may be off and unsynced: only fail locally as closed this long after closesAt; before that the server's 409 decides. */
+export const LOCAL_CLOSE_GRACE_MS = 60 * 1000
+export const FAILED_MAX_AGE_MS = 14 * 24 * 3600 * 1000
 
 export interface QueuedVote {
   id: string
@@ -37,6 +40,8 @@ export interface QueuedVote {
 export interface FailedVote {
   choice: Choice
   reason: 'closed' | 'invalid'
+  /** ms epoch the failure was recorded */
+  at?: number
 }
 
 const CHOICES = ['AYE', 'NAY', 'ABSTAIN']
@@ -89,6 +94,21 @@ function writeFailed(m: Record<string, FailedVote>): void {
   notify()
 }
 
+/** Failed records (id -> record), without the ones older than 14 days (those are removed). */
+export function listFailed(): Array<{ id: string } & FailedVote> {
+  const m = readFailed()
+  const keep: Record<string, FailedVote> = {}
+  let pruned = false
+  for (const [id, f] of Object.entries(m)) {
+    if (typeof f?.at === 'number' && Date.now() - f.at > FAILED_MAX_AGE_MS) pruned = true
+    else keep[id] = f
+  }
+  if (pruned) writeFailed(keep)
+  return Object.entries(keep)
+    .filter(([, f]) => f && CHOICES.includes(f.choice) && (f.reason === 'closed' || f.reason === 'invalid'))
+    .map(([id, f]) => ({ id, ...f }))
+}
+
 export function getFailed(id: string): FailedVote | null {
   const f = readFailed()[id]
   return f && CHOICES.includes(f.choice) && (f.reason === 'closed' || f.reason === 'invalid') ? f : null
@@ -102,7 +122,7 @@ export function clearFailed(id: string): void {
 }
 
 function fail(q: QueuedVote, reason: FailedVote['reason']): void {
-  writeFailed({ ...readFailed(), [q.id]: { choice: q.choice, reason } })
+  writeFailed({ ...readFailed(), [q.id]: { choice: q.choice, reason, at: Date.now() } })
   dropQueued(q.id)
 }
 
@@ -224,17 +244,33 @@ export async function withFlushLock(fn: () => Promise<void>): Promise<void> {
   }
 }
 
-/** Send every queued vote that is due (or, for page hide, every one whose proposal closes soon). Never throws. */
-export async function flushDue(now: number = serverNow(), opts: { keepalive?: boolean; closingWithinMs?: number } = {}): Promise<void> {
-  const isDue = (q: QueuedVote) => (opts.closingWithinMs !== undefined ? q.closesAt !== null && q.closesAt - now <= opts.closingWithinMs : q.sendAt <= now)
+/** Settle one queued vote after its send attempt. */
+function settle(q: QueuedVote, outcome: Awaited<ReturnType<typeof castVote>>, now: number): void {
+  const latest = getQueued(q.id)
+  if (outcome === 'ok') {
+    const b = loadBallot(q.id)
+    if (b) saveBallot(q.id, { ...b, choice: q.choice })
+    if (!latest || latest.choice === q.choice) dropQueued(q.id)
+    else writeAll(readAll().map((x) => (x.id === q.id ? { ...x, sendAt: Math.max(x.sendAt, now) } : x)))
+  } else if (outcome === 'closed' || outcome === 'invalid') {
+    fail(q, outcome)
+  } else {
+    // Network error, timeout, rate limit, server error or a 404 (feature off for now): keep it and try again shortly.
+    writeAll(readAll().map((x) => (x.id === q.id ? { ...x, sendAt: retryAt(now, x.closesAt) } : x)))
+  }
+}
+
+/** Send every queued vote that is due. Never throws. */
+export async function flushDue(now: number = serverNow()): Promise<void> {
   try {
-    // Nothing due: do not take the lock at all (a no-op flush must never make a real pagehide flush skip).
-    if (!readAll().some(isDue)) return
+    // Nothing due: do not take the lock at all.
+    if (!readAll().some((q) => q.sendAt <= now)) return
     await withFlushLock(async () => {
       for (const q of readAll()) {
-        if (!isDue(q)) continue
-        if (q.closesAt !== null && q.closesAt <= now) {
-          fail(q, 'closed') // voting is over: never send after the close, and tell the member
+        if (q.sendAt > now) continue
+        // Fail locally only well after the close (the device clock may be off); otherwise the server's 409 decides.
+        if (q.closesAt !== null && now > q.closesAt + LOCAL_CLOSE_GRACE_MS) {
+          fail(q, 'closed')
           continue
         }
         const ballot = loadBallot(q.id)
@@ -242,19 +278,7 @@ export async function flushDue(now: number = serverNow(), opts: { keepalive?: bo
           fail(q, 'invalid')
           continue
         }
-        const outcome = await castVote(q.id, ballot, q.choice, { keepalive: opts.keepalive })
-        // Re-read: the member may have changed the choice while this request was in flight.
-        const latest = getQueued(q.id)
-        if (outcome === 'ok') {
-          saveBallot(q.id, { ...(loadBallot(q.id) ?? ballot), choice: q.choice })
-          if (!latest || latest.choice === q.choice) dropQueued(q.id)
-          else writeAll(readAll().map((x) => (x.id === q.id ? { ...x, sendAt: Math.max(x.sendAt, now) } : x)))
-        } else if (outcome === 'closed' || outcome === 'invalid') {
-          fail(q, outcome)
-        } else {
-          // Network error, rate limit, server error or a 404 (feature off for now): keep it and try again shortly.
-          writeAll(readAll().map((x) => (x.id === q.id ? { ...x, sendAt: retryAt(now, x.closesAt) } : x)))
-        }
+        settle(q, await castVote(q.id, ballot, q.choice), now)
       }
     })
   } catch {
@@ -262,7 +286,22 @@ export async function flushDue(now: number = serverNow(), opts: { keepalive?: bo
   }
 }
 
-/** Real pagehide only (not a tab switch): send at once what closes within 30 minutes; the rest stays queued for the next visit. */
+/**
+ * Real pagehide only (not a tab switch): send at once what closes within 30 minutes; the rest stays queued for the next
+ * visit. The fetch (keepalive) must start synchronously inside the event handler, so this takes no lock and ignores
+ * `held`: a duplicate send of the same choice is harmless (the server replaces the choice for the same token).
+ */
 export function flushOnPageHide(now: number = serverNow()): Promise<void> {
-  return flushDue(now, { keepalive: true, closingWithinMs: PAGEHIDE_SEND_WITHIN_MS })
+  const sends: Promise<void>[] = []
+  try {
+    for (const q of readAll()) {
+      if (q.closesAt === null || q.closesAt - now > PAGEHIDE_SEND_WITHIN_MS || now > q.closesAt + LOCAL_CLOSE_GRACE_MS) continue
+      const ballot = loadBallot(q.id)
+      if (!ballot) continue
+      sends.push(castVote(q.id, ballot, q.choice, { keepalive: true }).then((o) => settle(q, o, now)))
+    }
+  } catch {
+    /* silent */
+  }
+  return Promise.all(sends).then(() => {})
 }

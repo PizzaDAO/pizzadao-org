@@ -2207,6 +2207,7 @@
       "queued": "Aún no enviado ({choice}). Se envía en unos {minutes, plural, one {# minuto} other {# minutos}} mientras este sitio esté abierto en este navegador. Si lo cierras, se envía la próxima vez que abras el sitio aquí; si no vuelves antes de que cierre la votación, no contará.",
       "sendNow": "Enviar ahora",
       "sendNowHelp": "Enviar ahora es seguro pero un poco menos privado: la espera existe para que los registros del sitio no puedan vincular tu voto con tu solicitud de papeleta.",
+      "failedChange": "Tu cambio a {failed} no se registró; lo que cuenta es {recorded}.",
       "notEligible": "Solo pueden votar los miembros con el rol Box Mafia cuando se abrió esta propuesta.",
       "closed": "La votación está cerrada.",
       "login": "Inicia sesión para votar.",
@@ -2248,6 +2249,7 @@
       "saveCode": "Guardar código",
       "open": "Abrir propuesta",
       "dismiss": "Cerrar",
+      "voteFailed": "No se pudo enviar un voto. Abre la propuesta.",
       "shared": "Código compartido.",
       "copied": "Código copiado.",
       "failed": "No se pudo copiar. Abre la propuesta y copia el código desde allí."

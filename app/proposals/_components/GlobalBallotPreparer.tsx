@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { flushDue, flushOnPageHide } from "@/app/lib/proposals/vote-queue";
+import { clearFailed, flushDue, flushOnPageHide, listFailed, QUEUE_EVENT } from "@/app/lib/proposals/vote-queue";
 import { noteServerDate, listUnsaved, loadBallot, markSaved, markUnsaved, parseMine, prepareBallot, shareVoteCode } from "@/app/lib/proposals/client";
 
 type Ready = { id: string; title: string };
@@ -27,6 +27,14 @@ export function GlobalBallotPreparer() {
     // Cards show only for a signed-in member (the answer from /api/proposals/mine).
     const [signedIn, setSignedIn] = useState(false);
     const pathname = usePathname();
+    const [failedIds, setFailedIds] = useState<string[]>([]);
+    // Votes that could not be sent (voting closed, refused): a small banner linking to the proposal, until dismissed.
+    useEffect(() => {
+        const sync = () => setFailedIds(listFailed().map((f) => f.id));
+        sync();
+        window.addEventListener(QUEUE_EVENT, sync);
+        return () => window.removeEventListener(QUEUE_EVENT, sync);
+    }, []);
 
     // Sends queued (randomly delayed) votes that are due, on any page; see vote-queue.ts.
     useEffect(() => {
@@ -95,9 +103,22 @@ export function GlobalBallotPreparer() {
 
     // On the proposal's own page the vote panel has the same prompt.
     const shown = ready.filter((r) => pathname !== `/proposals/${r.id}`);
-    if (!signedIn || shown.length === 0) return null;
+    const failedShown = failedIds.filter((id) => pathname !== `/proposals/${id}`);
+    if (!signedIn && failedShown.length === 0) return null;
+    if (shown.length === 0 && failedShown.length === 0) return null;
     return (
         <div className="fixed bottom-4 left-4 right-4 z-50 grid gap-2 sm:right-auto sm:max-w-sm" role="region" aria-label={t("region")}>
+            {failedShown.map((id) => (
+                <div key={`failed-${id}`} className="flex flex-wrap items-center gap-2 rounded border border-[hsl(var(--tomato)/0.5)] bg-card p-3 text-sm shadow" role="alert">
+                    <p className="m-0">{t("voteFailed")}</p>
+                    <Link href={`/proposals/${id}`} className="inline-flex min-h-11 items-center rounded border px-4 no-underline text-foreground">
+                        {t("open")}
+                    </Link>
+                    <button type="button" className="min-h-11 rounded px-3 underline" onClick={() => clearFailed(id)}>
+                        {t("dismiss")}
+                    </button>
+                </div>
+            ))}
             {shown.map((r) => (
                 <div key={r.id} className="grid gap-2 rounded border border-[hsl(var(--tomato)/0.5)] bg-card p-3 text-sm shadow">
                     <p className="m-0 font-semibold">{t("ready", { title: r.title })}</p>

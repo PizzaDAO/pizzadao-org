@@ -109,13 +109,42 @@ export function decodeVoteCode(code: string, proposalId: string): Ballot | null 
   }
 }
 
+const CLOCK_KEY = 'pizzadao:proposals-clock'
 let clockOffsetMs = 0
+let clockLoaded = false
+
+function loadClock(): void {
+  if (clockLoaded) return
+  clockLoaded = true
+  for (const store of ['sessionStorage', 'localStorage'] as const) {
+    try {
+      const o = JSON.parse(window[store].getItem(CLOCK_KEY) || 'null') as { offset?: number; at?: number } | null
+      if (o && Number.isFinite(o.offset) && Number.isFinite(o.at) && Date.now() - (o.at as number) < 30 * 24 * 3600 * 1000) {
+        clockOffsetMs = o.offset as number
+        return
+      }
+    } catch {
+      /* try the next store */
+    }
+  }
+}
 
 /** Learn how far this device's clock is from the server's, from a response's Date header (1 s resolution). */
 export function noteServerDate(res: { headers?: { get(name: string): string | null } } | null | undefined): void {
   try {
     const d = Date.parse(res?.headers?.get('date') ?? '')
-    if (Number.isFinite(d)) clockOffsetMs = d - Date.now()
+    if (Number.isFinite(d)) {
+      clockLoaded = true
+      clockOffsetMs = d - Date.now()
+      const v = JSON.stringify({ offset: clockOffsetMs, at: Date.now() })
+      for (const store of ['sessionStorage', 'localStorage'] as const) {
+        try {
+          window[store].setItem(CLOCK_KEY, v)
+        } catch {
+          /* blocked */
+        }
+      }
+    }
   } catch {
     /* no header: keep the last offset */
   }
@@ -123,6 +152,7 @@ export function noteServerDate(res: { headers?: { get(name: string): string | nu
 
 /** The server's idea of "now" (ms). Close times are the server's, so the close clamp and checks use this, not the device clock. */
 export function serverNow(): number {
+  loadClock()
   return Date.now() + clockOffsetMs
 }
 
@@ -230,7 +260,7 @@ export async function castVote(proposalId: string, ballot: Ballot, choice: Choic
     const res = await fetch(`/api/proposals/${encodeURIComponent(proposalId)}/vote`, {
       method: 'POST',
       credentials: 'omit',
-      ...(opts.keepalive ? { keepalive: true } : {}),
+      ...(opts.keepalive ? { keepalive: true } : typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? { signal: AbortSignal.timeout(20_000) } : {}),
       referrerPolicy: 'no-referrer',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token: ballot.token, preparedMessage: ballot.preparedMessage, signature: ballot.signature, choice }),
@@ -242,8 +272,8 @@ export async function castVote(proposalId: string, ballot: Ballot, choice: Choic
     if (res.status === 404) return 'unavailable'
     if (res.status === 401 || res.status === 400) return 'invalid'
     return 'error'
-  } catch {
-    return 'error'
+  } catch (e) {
+    return e instanceof Error && (e.name === 'TimeoutError' || e.name === 'AbortError') ? 'unavailable' : 'error'
   }
 }
 

@@ -2207,6 +2207,7 @@
       "queued": "Pas encore envoyé ({choice}). Il part dans environ {minutes, plural, one {# minute} other {# minutes}} tant que ce site reste ouvert dans ce navigateur. Si vous le fermez, il part à votre prochaine visite ici ; si vous ne revenez pas avant la clôture du vote, il ne comptera pas.",
       "sendNow": "Envoyer maintenant",
       "sendNowHelp": "Envoyer maintenant est plus sûr mais un peu moins privé : l'attente empêche les journaux du site de relier votre vote à votre demande de bulletin.",
+      "failedChange": "Votre changement vers {failed} n'a pas abouti ; {recorded} est ce qui compte.",
       "notEligible": "Seuls les membres ayant le rôle Box Mafia à l'ouverture de cette proposition peuvent voter.",
       "closed": "Le vote est clos.",
       "login": "Connectez-vous pour voter.",
@@ -2248,6 +2249,7 @@
       "saveCode": "Enregistrer le code",
       "open": "Ouvrir la proposition",
       "dismiss": "Fermer",
+      "voteFailed": "Un vote n'a pas pu être envoyé. Ouvrez la proposition.",
       "shared": "Code partagé.",
       "copied": "Code copié.",
       "failed": "Copie impossible. Ouvrez la proposition et copiez le code de là."

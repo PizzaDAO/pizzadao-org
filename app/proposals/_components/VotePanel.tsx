@@ -179,7 +179,7 @@ export function VotePanel({ proposalId, title, open, closesAt, eligible, tokenIs
     if (!open) return <p className="m-0 text-sm text-foreground/70">{t("closed")}</p>;
     if (!eligible) return <p className="m-0 text-sm text-foreground/70">{t("notEligible")}</p>;
 
-    const current = queued?.choice ?? (failed ? undefined : ballot?.choice);
+    const current = queued?.choice ?? ballot?.choice;
     const labelOf = (c: Choice) => t(CHOICES.find((x) => x.choice === c)!.key);
     const choiceLabel = ballot?.choice ? labelOf(ballot.choice) : "";
     const minutes = queued ? Math.max(1, Math.ceil((queued.sendAt - now) / 60000)) : 0;
@@ -263,9 +263,10 @@ export function VotePanel({ proposalId, title, open, closesAt, eligible, tokenIs
                     {failed && !queued && (
                         <p role="alert" className="m-0 text-tomato">
                             {failed.reason === "closed" ? t("closed") : t("error")}
+                            {ballot?.choice && ballot.choice !== failed.choice ? " " + t("failedChange", { failed: labelOf(failed.choice), recorded: labelOf(ballot.choice) }) : ""}
                         </p>
                     )}
-                    {ballot?.choice && !queued && !failed && busy === "" && (
+                    {ballot?.choice && !queued && busy === "" && (
                         <p role="status" className="m-0 text-sm">
                             {t("recorded", { choice: choiceLabel, date: when })}
                         </p>

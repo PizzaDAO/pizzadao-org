@@ -80,7 +80,7 @@ describe('sending', () => {
     expect(getQueued(ID)?.sendAt).toBeGreaterThan(NOW + 60_000)
   })
   it('never sends after the close', async () => {
-    localStorage.setItem(QUEUE_KEY, JSON.stringify([{ id: ID, choice: 'AYE', sendAt: NOW - 1000, closesAt: NOW - 1 }]))
+    localStorage.setItem(QUEUE_KEY, JSON.stringify([{ id: ID, choice: 'AYE', sendAt: NOW - 1000, closesAt: NOW - 2 * MIN }]))
     await flushDue(NOW)
     expect(castVote).not.toHaveBeenCalled()
     expect(getQueued(ID)).toBeNull()
