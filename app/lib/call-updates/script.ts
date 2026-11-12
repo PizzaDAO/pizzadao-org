@@ -19,6 +19,8 @@ import { buildAgendaBullets, type ActionItem } from '@/app/lib/call-agenda/rank'
 import type { Settings } from '@/app/lib/settings'
 import {
   COMMAND_PHRASE,
+  LEAD_IN_MAX_CHARS,
+  LEAD_IN_MAX_LINES,
   UPDATES_INTRO_DEFAULT,
   UPDATES_OUTRO_DEFAULT,
   UPDATE_SECTION_KEYS,
@@ -43,6 +45,10 @@ export interface UpdatesSettings {
   announcements: string
   /** Characters per spoken item (the agenda's item length). */
   itemChars: number
+  /** Surfer-style phrases sometimes spoken before a section (not the first). Empty or absent: none. */
+  leadIns?: string[]
+  /** Percent chance (0-100) per section after the first. */
+  leadInChance?: number
 }
 
 export interface LastCallData {
@@ -64,6 +70,8 @@ export interface UpdatesDeps {
   /** Upcoming scheduled events in the next days, soonest first (the current call is excluded by the caller). */
   upcomingEvents: (now: Date) => Promise<Array<{ name: string; startsAt: Date }>>
   now: () => Date
+  /** Uniform [0, 1) randomness for lead-ins; injectable (seeded) for tests. Defaults to Math.random. */
+  random?: () => number
   /** The weekday label for an event ("Thursday", "today"); injectable for tests. */
   dayLabel?: (startsAt: Date, now: Date) => string
 }
@@ -112,6 +120,18 @@ export function speakable(input: string | null | undefined, max = 160): string {
   s = s.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim()
   if (s.length > max) s = `${s.slice(0, max - 1).trimEnd()}…`
   return s
+}
+
+/** One phrase per line; over-long, command-like or empty lines are dropped; capped at the line limit. */
+export function parseLeadIns(raw: string): string[] {
+  const out: string[] = []
+  for (const l of raw.split('\n').slice(0, LEAD_IN_MAX_LINES)) {
+    const t = l.trim()
+    if (!t || t.length > LEAD_IN_MAX_CHARS || COMMAND_PHRASE.test(t)) continue
+    const s = speakable(t, LEAD_IN_MAX_CHARS)
+    if (s && !out.includes(s)) out.push(s)
+  }
+  return out
 }
 
 const wordCount = (s: string) => s.split(/\s+/).filter(Boolean).length
@@ -256,24 +276,54 @@ export async function buildUpdatesScript(crewId: string, settings: UpdatesSettin
     const order = settings.sections.filter((k) => sections.has(k))
     if (order.length === 0) return { kind: 'none', reason: 'empty' }
 
-    const compose = (keys: UpdateSectionKey[]): ScriptSection[] => [
-      { key: 'intro', lines: [intro] },
-      ...keys.map((k) => ({ key: k, lines: sections.get(k)! })),
-      { key: 'outro', lines: [outro] },
-    ]
+    // Lead-ins: rolled once per section (by position in the full order) so the result is stable while
+    // the budget loop trims. A section after the first gets one with the configured chance, never the same
+    // phrase as the previous lead-in. Never on the intro or outro.
+    const pool = (settings.leadIns ?? []).filter((l) => l && !COMMAND_PHRASE.test(l))
+    const chance = Math.max(0, Math.min(100, settings.leadInChance ?? 0)) / 100
+    const random = deps.random ?? Math.random
+    const rolls = order.map(() => ({ hit: random() < chance, pick: random() }))
+    /** `limit` caps how many lead-ins are kept (the earliest ones), so they can be shed before sections. */
+    let usedLeadIns = 0
+    const compose = (keys: UpdateSectionKey[], limit = Infinity): ScriptSection[] => {
+      let used = 0
+      usedLeadIns = 0
+      let prev = ''
+      return [
+        { key: 'intro', lines: [intro] },
+        ...keys.map((k, i) => {
+          const lines = sections.get(k)!
+          const r = rolls[order.indexOf(k)]
+          if (i === 0 || !pool.length || !r.hit || used >= limit) return { key: k, lines }
+          const choices = pool.filter((l) => l !== prev)
+          if (!choices.length) return { key: k, lines }
+          const lead = choices[Math.min(choices.length - 1, Math.floor(r.pick * choices.length))]
+          used++
+          usedLeadIns = used
+          prev = lead
+          return { key: k, lines: [`${lead} ${lines[0]}`, ...lines.slice(1)] }
+        }),
+        { key: 'outro', lines: [outro] },
+      ]
+    }
     const textOf = (s: ScriptSection[]) => s.map((x) => x.lines.join(' ')).join('\n\n')
 
-    // Fit the time budget by dropping whole sections, lowest ranked first.
+    // Fit the time budget: shed lead-ins first (last one first), then drop whole sections, lowest ranked first.
     let keys = [...order]
     const dropped: UpdateSectionKey[] = []
-    while (keys.length && estimateSeconds(textOf(compose(keys))) > settings.maxSeconds) {
+    const leadCount = (ks: UpdateSectionKey[]) => (compose(ks), usedLeadIns)
+    let limit = leadCount(keys)
+    const fits = () => estimateSeconds(textOf(compose(keys, limit))) <= settings.maxSeconds
+    while (limit > 0 && !fits()) limit--
+    while (keys.length && !fits()) {
       const victim = DROP_ORDER.find((k) => keys.includes(k))!
       keys = keys.filter((k) => k !== victim)
       dropped.push(victim)
+      limit = Math.min(limit, leadCount(keys))
     }
     if (keys.length === 0) return { kind: 'none', reason: 'empty' }
 
-    const out = compose(keys)
+    const out = compose(keys, limit)
     const text = textOf(out)
     return {
       kind: 'script',
@@ -300,5 +350,7 @@ export function updatesSettings(settings: Settings, itemChars: number): UpdatesS
     outro: settings.get('calls.updatesOutro') || UPDATES_OUTRO_DEFAULT,
     announcements: settings.get('calls.updatesAnnouncements'),
     itemChars,
+    leadIns: parseLeadIns(settings.get('calls.updatesSectionLeadIns')),
+    leadInChance: settings.get('calls.updatesLeadInChance'),
   }
 }

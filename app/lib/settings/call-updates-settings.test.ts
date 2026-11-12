@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { SETTINGS, SETTING_KEYS } from './registry'
 import { TOGGLES, resolveToggle } from './toggles'
-import { COMMAND_PHRASE, UPDATES_VOICES, UPDATES_VOICE_INSTRUCTIONS_DEFAULT } from './call-updates-settings'
+import { COMMAND_PHRASE, UPDATES_LEAD_INS_DEFAULT, UPDATES_VOICES, UPDATES_VOICE_INSTRUCTIONS_DEFAULT } from './call-updates-settings'
 import type { Settings } from './index'
 
 const none = { get: () => undefined, isSet: () => false, readFailed: false, invalidKeys: [] } as unknown as Settings
@@ -18,6 +18,8 @@ describe('call updates settings', () => {
       ['calls.updatesIntro', 'Automated call updates for the {crew} call.'],
       ['calls.updatesOutro', "That's the update."],
       ['calls.updatesAnnouncements', ''],
+      ['calls.updatesSectionLeadIns', UPDATES_LEAD_INS_DEFAULT],
+      ['calls.updatesLeadInChance', 40],
       ['calls.updatesVoice', 'ash'],
       ['calls.updatesVoiceInstructions', UPDATES_VOICE_INSTRUCTIONS_DEFAULT],
       ['calls.updatesPauseMaxMinutes', 5],
@@ -55,6 +57,18 @@ describe('call updates settings', () => {
     expect(s('calls.updatesPauseMaxMinutes', 0)).toBe(false)
     expect(s('calls.updatesPauseMaxMinutes', 15)).toBe(true)
     expect(s('calls.updatesPauseMaxMinutes', 16)).toBe(false)
+  })
+
+  it('lead-ins: capped, no command phrases, chance 0-100', () => {
+    const ok = (v: string) => SETTINGS['calls.updatesSectionLeadIns'].schema.safeParse(v).success
+    expect(ok(UPDATES_LEAD_INS_DEFAULT)).toBe(true)
+    expect(ok('')).toBe(true)
+    expect(ok('x'.repeat(41))).toBe(false)
+    expect(ok('Metalhead, stop!')).toBe(false)
+    expect(ok(Array.from({ length: 20 }, () => 'Dude').join('\n'))).toBe(true)
+    expect(ok(Array.from({ length: 21 }, () => 'Dude').join('\n'))).toBe(false)
+    const c = (v: number) => SETTINGS['calls.updatesLeadInChance'].schema.safeParse(v).success
+    expect([c(-1), c(0), c(100), c(101)]).toEqual([false, true, true, false])
   })
 
   it('the voice must be a known base voice', () => {
