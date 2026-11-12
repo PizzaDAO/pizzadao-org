@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { flushDue, flushOnPageHide } from "@/app/lib/proposals/vote-queue";
-import { listUnsaved, loadBallot, markSaved, markUnsaved, parseMine, prepareBallot, shareVoteCode } from "@/app/lib/proposals/client";
+import { noteServerDate, listUnsaved, loadBallot, markSaved, markUnsaved, parseMine, prepareBallot, shareVoteCode } from "@/app/lib/proposals/client";
 
 type Ready = { id: string; title: string };
 
@@ -33,9 +33,9 @@ export function GlobalBallotPreparer() {
         void flushDue();
         const iv = window.setInterval(() => void flushDue(), 10000);
         const hide = () => void flushOnPageHide();
+        // Only a real pagehide sends early; switching tabs keeps the delay.
         const onVis = () => {
-            if (document.visibilityState === "hidden") hide();
-            else void flushDue();
+            if (document.visibilityState === "visible") void flushDue();
         };
         window.addEventListener("pagehide", hide);
         document.addEventListener("visibilitychange", onVis);
@@ -61,6 +61,7 @@ export function GlobalBallotPreparer() {
             }
             if (throttled && earlier.length === 0) return;
             const r = await fetch("/api/proposals/mine", { cache: "no-store" }).catch(() => null);
+            noteServerDate(r);
             if (!r?.ok || cancelled) return; // logged out, feature off or any error: do nothing (and show no card)
             setSignedIn(true);
             // Ballots made earlier whose code was never saved: the card comes back until saved or dismissed.

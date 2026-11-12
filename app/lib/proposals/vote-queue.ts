@@ -6,28 +6,48 @@
  * choice, the send time and the close time; the token itself stays in its own ballot key (client.ts).
  *
  *  - one entry per proposal: tapping again before it is sent replaces the choice (no extra request, same send time);
+ *  - all times are in the SERVER's clock (serverNow()), so a wrong device clock cannot push a send past the close;
  *  - never later than CLOSE_MARGIN_MS before voting closes (inside the margin: send at once);
- *  - flushDue() sends what is due and runs from the global ballot preparer on every page;
- *  - on pagehide, only votes whose proposal closes within PAGEHIDE_SEND_WITHIN_MS are sent (keepalive); others stay queued.
+ *  - flushDue() sends what is due and runs from the global ballot preparer on every page, under a cross-tab lock;
+ *  - on pagehide (not a tab switch), only votes whose proposal closes within PAGEHIDE_SEND_WITHIN_MS are sent (keepalive);
+ *  - nothing is dropped silently: a vote that cannot be sent leaves a "failed" record the vote panel shows.
  */
-import { castVote, loadBallot, saveBallot, type Choice } from './client'
+import { castVote, loadBallot, saveBallot, serverNow, type Choice } from './client'
 
 export const QUEUE_KEY = 'pizzadao:proposal-vote-queue'
+export const FAILED_KEY = 'pizzadao:proposal-vote-failed'
+export const LEASE_KEY = 'pizzadao:proposal-vote-lease'
+export const LOCK_NAME = 'pizzadao-proposal-vote-flush'
 export const QUEUE_EVENT = 'pizzadao:vote-queue-changed'
-export const CLOSE_MARGIN_MS = 2 * 60 * 1000
+export const CLOSE_MARGIN_MS = 5 * 60 * 1000
 export const PAGEHIDE_SEND_WITHIN_MS = 30 * 60 * 1000
-const RETRY_MS = 60 * 1000
+export const RETRY_MS = 60 * 1000
+const LEASE_MS = 30 * 1000
 
 export interface QueuedVote {
   id: string
   choice: Choice
-  /** ms epoch */
+  /** ms epoch, server clock */
   sendAt: number
   /** ms epoch, or null when unknown */
   closesAt: number | null
 }
 
+/** Why a vote did not go: voting is over ('closed', also when the close passed before it could be sent) or the server refused it ('invalid'). */
+export interface FailedVote {
+  choice: Choice
+  reason: 'closed' | 'invalid'
+}
+
 const CHOICES = ['AYE', 'NAY', 'ABSTAIN']
+
+function notify(): void {
+  try {
+    window.dispatchEvent(new Event(QUEUE_EVENT))
+  } catch {
+    /* no window */
+  }
+}
 
 function readAll(): QueuedVote[] {
   try {
@@ -48,11 +68,42 @@ function writeAll(list: QueuedVote[]): void {
   } catch {
     /* blocked storage: the vote cannot be queued; callers fall back to sending at once */
   }
+  notify()
+}
+
+function readFailed(): Record<string, FailedVote> {
   try {
-    window.dispatchEvent(new Event(QUEUE_EVENT))
+    const o = JSON.parse(localStorage.getItem(FAILED_KEY) || '{}') as unknown
+    return o && typeof o === 'object' && !Array.isArray(o) ? (o as Record<string, FailedVote>) : {}
   } catch {
-    /* no window */
+    return {}
   }
+}
+
+function writeFailed(m: Record<string, FailedVote>): void {
+  try {
+    localStorage.setItem(FAILED_KEY, JSON.stringify(m))
+  } catch {
+    /* blocked storage */
+  }
+  notify()
+}
+
+export function getFailed(id: string): FailedVote | null {
+  const f = readFailed()[id]
+  return f && CHOICES.includes(f.choice) && (f.reason === 'closed' || f.reason === 'invalid') ? f : null
+}
+
+export function clearFailed(id: string): void {
+  const m = readFailed()
+  if (!(id in m)) return
+  delete m[id]
+  writeFailed(m)
+}
+
+function fail(q: QueuedVote, reason: FailedVote['reason']): void {
+  writeFailed({ ...readFailed(), [q.id]: { choice: q.choice, reason } })
+  dropQueued(q.id)
 }
 
 export function getQueued(id: string): QueuedVote | null {
@@ -77,6 +128,14 @@ export function computeSendAt(now: number, minS: number, maxS: number, closesAt:
   return Math.round(sendAt)
 }
 
+/** The retry time after a failed attempt: a minute on, but still before the close margin; already inside it: now. */
+export function retryAt(now: number, closesAt: number | null): number {
+  const at = now + RETRY_MS
+  if (closesAt === null) return at
+  const latest = closesAt - CLOSE_MARGIN_MS
+  return latest <= now ? now : Math.min(at, latest)
+}
+
 /**
  * Queue (or replace) the member's vote. Returns the entry, or null when storage is unavailable (the caller then sends at once).
  * A replacement keeps the send time already drawn, so re-tapping never reveals anything or adds a request.
@@ -85,7 +144,7 @@ export function queueVote(
   id: string,
   choice: Choice,
   opts: { minSeconds: number; maxSeconds: number; closesAt: string | null },
-  now: number = Date.now(),
+  now: number = serverNow(),
   rand: () => number = Math.random,
 ): QueuedVote | null {
   const closesAt = opts.closesAt ? Date.parse(opts.closesAt) : NaN
@@ -98,6 +157,7 @@ export function queueVote(
     sendAt: existing ? Math.min(existing.sendAt, closes !== null ? Math.max(now, closes - CLOSE_MARGIN_MS) : Infinity) : computeSendAt(now, opts.minSeconds, opts.maxSeconds, closes, rand),
     closesAt: closes,
   }
+  clearFailed(id)
   writeAll([...list.filter((q) => q.id !== id), entry])
   return getQueued(id)
 }
@@ -106,47 +166,103 @@ export function dropQueued(id: string): void {
   writeAll(readAll().filter((q) => q.id !== id))
 }
 
-let flushing = false
+/** "Send now": the member trades the privacy of the delay for certainty. Sends at once. */
+export async function sendNow(id: string, now: number = serverNow()): Promise<void> {
+  writeAll(readAll().map((q) => (q.id === id ? { ...q, sendAt: now } : q)))
+  await flushDue(now)
+}
 
-/** Send every queued vote that is due (or all whose proposal closes within `withinMs`, for page hide). Never throws. */
-export async function flushDue(now: number = Date.now(), opts: { keepalive?: boolean; closingWithinMs?: number } = {}): Promise<void> {
-  if (flushing && !opts.keepalive) return
-  flushing = true
-  try {
-    for (const q of readAll()) {
-      const due = opts.closingWithinMs !== undefined ? q.closesAt !== null && q.closesAt - now <= opts.closingWithinMs : q.sendAt <= now
-      if (!due) continue
-      if (q.closesAt !== null && q.closesAt <= now) {
-        dropQueued(q.id) // voting is over: never send after the close
-        continue
-      }
-      const ballot = loadBallot(q.id)
-      if (!ballot) {
-        dropQueued(q.id)
-        continue
-      }
-      const outcome = await castVote(q.id, ballot, q.choice, { keepalive: opts.keepalive })
-      // Re-read: the member may have changed the choice while this request was in flight.
-      const now2 = getQueued(q.id)
-      if (outcome === 'ok') {
-        saveBallot(q.id, { ...(loadBallot(q.id) ?? ballot), choice: q.choice })
-        if (!now2 || now2.choice === q.choice) dropQueued(q.id)
-        else writeAll(readAll().map((x) => (x.id === q.id ? { ...x, sendAt: Math.max(x.sendAt, now) } : x)))
-      } else if (outcome === 'closed' || outcome === 'invalid') {
-        dropQueued(q.id)
-      } else {
-        // Network or server error: try again shortly (still before the close margin where possible).
-        writeAll(readAll().map((x) => (x.id === q.id ? { ...x, sendAt: now + RETRY_MS } : x)))
-      }
+// ---- one flusher at a time, across tabs ----
+
+let held = false // this tab is flushing
+
+/**
+ * Runs fn when no other flush (this tab or another) is running; otherwise skips it. Uses the Web Locks API where there
+ * is one, else a localStorage lease. A skipped caller never touches the holder's state.
+ */
+export async function withFlushLock(fn: () => Promise<void>): Promise<void> {
+  if (held) return
+  const locks = typeof navigator !== 'undefined' ? (navigator as Navigator & { locks?: LockManager }).locks : undefined
+  if (locks && typeof locks.request === 'function') {
+    try {
+      await locks.request(LOCK_NAME, { ifAvailable: true }, async (lock) => {
+        if (!lock || held) return
+        held = true
+        try {
+          await fn()
+        } finally {
+          held = false
+        }
+      })
+      return
+    } catch {
+      /* fall back to the lease below */
     }
+  }
+  const me = `${Date.now()}-${Math.random()}`
+  try {
+    const cur = JSON.parse(localStorage.getItem(LEASE_KEY) || 'null') as { owner?: string; until?: number } | null
+    if (cur && typeof cur.until === 'number' && cur.until > Date.now()) return
+    localStorage.setItem(LEASE_KEY, JSON.stringify({ owner: me, until: Date.now() + LEASE_MS }))
+    // Re-read: if another tab wrote at the same moment, only the last writer proceeds.
+    const check = JSON.parse(localStorage.getItem(LEASE_KEY) || 'null') as { owner?: string } | null
+    if (check?.owner !== me) return
   } catch {
-    /* silent: this runs on every page */
+    /* storage blocked: nothing is queued either, so there is nothing to protect */
+  }
+  held = true
+  try {
+    await fn()
   } finally {
-    flushing = false
+    held = false
+    try {
+      const cur = JSON.parse(localStorage.getItem(LEASE_KEY) || 'null') as { owner?: string } | null
+      if (cur?.owner === me) localStorage.removeItem(LEASE_KEY)
+    } catch {
+      /* ignore */
+    }
   }
 }
 
-/** pagehide: send at once only what closes within 30 minutes; the rest stays queued for the next visit. */
-export function flushOnPageHide(now: number = Date.now()): Promise<void> {
+/** Send every queued vote that is due (or, for page hide, every one whose proposal closes soon). Never throws. */
+export async function flushDue(now: number = serverNow(), opts: { keepalive?: boolean; closingWithinMs?: number } = {}): Promise<void> {
+  const isDue = (q: QueuedVote) => (opts.closingWithinMs !== undefined ? q.closesAt !== null && q.closesAt - now <= opts.closingWithinMs : q.sendAt <= now)
+  try {
+    // Nothing due: do not take the lock at all (a no-op flush must never make a real pagehide flush skip).
+    if (!readAll().some(isDue)) return
+    await withFlushLock(async () => {
+      for (const q of readAll()) {
+        if (!isDue(q)) continue
+        if (q.closesAt !== null && q.closesAt <= now) {
+          fail(q, 'closed') // voting is over: never send after the close, and tell the member
+          continue
+        }
+        const ballot = loadBallot(q.id)
+        if (!ballot) {
+          fail(q, 'invalid')
+          continue
+        }
+        const outcome = await castVote(q.id, ballot, q.choice, { keepalive: opts.keepalive })
+        // Re-read: the member may have changed the choice while this request was in flight.
+        const latest = getQueued(q.id)
+        if (outcome === 'ok') {
+          saveBallot(q.id, { ...(loadBallot(q.id) ?? ballot), choice: q.choice })
+          if (!latest || latest.choice === q.choice) dropQueued(q.id)
+          else writeAll(readAll().map((x) => (x.id === q.id ? { ...x, sendAt: Math.max(x.sendAt, now) } : x)))
+        } else if (outcome === 'closed' || outcome === 'invalid') {
+          fail(q, outcome)
+        } else {
+          // Network error, rate limit, server error or a 404 (feature off for now): keep it and try again shortly.
+          writeAll(readAll().map((x) => (x.id === q.id ? { ...x, sendAt: retryAt(now, x.closesAt) } : x)))
+        }
+      }
+    })
+  } catch {
+    /* silent: this runs on every page */
+  }
+}
+
+/** Real pagehide only (not a tab switch): send at once what closes within 30 minutes; the rest stays queued for the next visit. */
+export function flushOnPageHide(now: number = serverNow()): Promise<void> {
   return flushDue(now, { keepalive: true, closingWithinMs: PAGEHIDE_SEND_WITHIN_MS })
 }

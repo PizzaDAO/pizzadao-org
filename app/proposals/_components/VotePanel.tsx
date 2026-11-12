@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import { paperCard } from "@/app/ui/shared/Editorial";
-import { flushDue, getQueued, queueVote, QUEUE_EVENT, type QueuedVote } from "@/app/lib/proposals/vote-queue";
+import { flushDue, getFailed, getQueued, queueVote, sendNow, QUEUE_EVENT, type FailedVote, type QueuedVote } from "@/app/lib/proposals/vote-queue";
 import { formatProposalTime } from "@/app/lib/proposals/time";
 import {
     decodeVoteCode,
@@ -12,7 +12,9 @@ import {
     loadBallot,
     markSaved,
     markUnsaved,
+    noteServerDate,
     prepareBallot,
+    serverNow,
     saveBallot,
     shareVoteCode,
     submitVote,
@@ -55,15 +57,17 @@ export function VotePanel({ proposalId, title, open, closesAt, eligible, tokenIs
     const [ready, setReady] = useState(false);
     const [showBackup, setShowBackup] = useState(false);
     const [queued, setQueued] = useState<QueuedVote | null>(null);
-    const [now, setNow] = useState(() => Date.now());
+    const [failed, setFailed] = useState<FailedVote | null>(null);
+    const [now, setNow] = useState(() => serverNow());
 
     // The queue is in localStorage; the global sender (and this page's own tab) changes it, so follow it.
     useEffect(() => {
         const sync = () => {
             setQueued(getQueued(proposalId));
+            setFailed(getFailed(proposalId));
             const b = loadBallot(proposalId);
             if (b) setBallot((cur) => (cur && cur.choice === b.choice ? cur : b));
-            setNow(Date.now());
+            setNow(serverNow());
         };
         sync();
         window.addEventListener(QUEUE_EVENT, sync);
@@ -75,6 +79,11 @@ export function VotePanel({ proposalId, title, open, closesAt, eligible, tokenIs
     }, [proposalId]);
 
     const canVote = open && eligible;
+
+    // Learn the server's clock (from the response's Date header) so the close-time clamp does not trust this device's clock.
+    useEffect(() => {
+        if (canVote) fetch("/api/proposals/mine", { cache: "no-store" }).then(noteServerDate).catch(() => {});
+    }, [canVote]);
 
     useEffect(() => {
         if (!canVote) return;
@@ -133,7 +142,8 @@ export function VotePanel({ proposalId, title, open, closesAt, eligible, tokenIs
                 return;
             }
             setQueued(getQueued(proposalId));
-            setNow(Date.now());
+            setFailed(null);
+            setNow(serverNow());
             void flushDue();
         } catch {
             setError(t("tokenError"));
@@ -169,7 +179,7 @@ export function VotePanel({ proposalId, title, open, closesAt, eligible, tokenIs
     if (!open) return <p className="m-0 text-sm text-foreground/70">{t("closed")}</p>;
     if (!eligible) return <p className="m-0 text-sm text-foreground/70">{t("notEligible")}</p>;
 
-    const current = queued?.choice ?? ballot?.choice;
+    const current = queued?.choice ?? (failed ? undefined : ballot?.choice);
     const labelOf = (c: Choice) => t(CHOICES.find((x) => x.choice === c)!.key);
     const choiceLabel = ballot?.choice ? labelOf(ballot.choice) : "";
     const minutes = queued ? Math.max(1, Math.ceil((queued.sendAt - now) / 60000)) : 0;
@@ -240,11 +250,22 @@ export function VotePanel({ proposalId, title, open, closesAt, eligible, tokenIs
                         </p>
                     )}
                     {queued && (
-                        <p role="status" className="m-0 text-sm">
-                            {t("queued", { choice: labelOf(queued.choice), minutes })}
+                        <div role="status" className="grid gap-2 text-sm">
+                            <p className="m-0">{t("queued", { choice: labelOf(queued.choice), minutes })}</p>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <button type="button" className="min-h-11 rounded border px-4" onClick={() => void sendNow(proposalId)}>
+                                    {t("sendNow")}
+                                </button>
+                                <span className="text-foreground/70">{t("sendNowHelp")}</span>
+                            </div>
+                        </div>
+                    )}
+                    {failed && !queued && (
+                        <p role="alert" className="m-0 text-tomato">
+                            {failed.reason === "closed" ? t("closed") : t("error")}
                         </p>
                     )}
-                    {ballot?.choice && !queued && busy === "" && (
+                    {ballot?.choice && !queued && !failed && busy === "" && (
                         <p role="status" className="m-0 text-sm">
                             {t("recorded", { choice: choiceLabel, date: when })}
                         </p>
