@@ -2944,3 +2944,15 @@ model CrewSession {
   @@unique([crewId, dedupeKey])
   @@index([crewId, startsAt])
 }
+
+// One row per name-reminder DM an admin sent from /admin/members/names (cooldown + audit).
+model MemberNameReminder {
+  id        String   @id @default(cuid())
+  discordId String
+  memberId  String
+  sentBy    String
+  status    String // SENT | FAILED
+  createdAt DateTime @default(now())
+
+  @@index([discordId, createdAt])
+}
