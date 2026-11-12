@@ -10,7 +10,7 @@ import { prisma } from '@/app/lib/db'
 import { enqueueMirror } from '@/app/lib/telegram/city-posts'
 import { DiscordPostError } from '@/app/lib/discord-rest'
 import { clearPostFilterCache, type PostFilter } from './post-filters'
-import { buildRecapText, channelIdFromCell, parseChannelCell, postCallRecap, recapBullets, recapFilteredCount, recapPostingEnabled, redactionsNewerThanSummary, resolveRecapChannel } from './recap'
+import { buildRecapText, recapHeading, channelIdFromCell, parseChannelCell, postCallRecap, recapBullets, recapFilteredCount, recapPostingEnabled, redactionsNewerThanSummary, resolveRecapChannel } from './recap'
 
 const db = prisma as unknown as Record<string, Record<string, ReturnType<typeof vi.fn>>>
 const base = 'https://example.org'
@@ -93,7 +93,7 @@ describe('recap text', () => {
 
   it('has title, bullets, action items with owners and the link', () => {
     const t = buildRecapText(rec, base)
-    expect(t).toContain('**Call recap: Ops sync**')
+    expect(t).toContain('**Ops Crew Recap: Ops sync**')
     expect(t).toContain('- We reviewed the launch plan.')
     expect(t).toContain('- Send the deck (Ann)')
     expect(t).toContain('- Book the venue')
@@ -110,7 +110,7 @@ describe('recap text', () => {
     expect(b).toEqual(['Budget', 'Launch', 'Venue'])
   })
   it('flattens newlines so a title cannot inject lines', () => {
-    expect(buildRecapText({ ...rec, title: 'A\n@everyone' }, base)).toContain('**Call recap: A @everyone**')
+    expect(buildRecapText({ ...rec, title: 'A\n@everyone' }, base)).toContain('**Ops Crew Recap: A @everyone**')
   })
 })
 
@@ -310,5 +310,15 @@ describe('post filters', () => {
     expect(await postCallRecap('abc123', { env, post })).toBe('failed')
     expect(post).not.toHaveBeenCalled()
     expect(db.callRecording.updateMany).not.toHaveBeenCalled()
+  })
+})
+
+describe('recapHeading', () => {
+  it('names the crew, the Community Call, or falls back to Call Recap', () => {
+    expect(recapHeading({ crewId: 'education', crewLabel: 'Education' })).toBe('Education Crew Recap')
+    expect(recapHeading({ crewId: 'ops', crewLabel: 'Ops Crew' })).toBe('Ops Crew Recap')
+    expect(recapHeading({ crewId: 'community_call', crewLabel: null })).toBe('Community Call Recap')
+    expect(recapHeading({ crewId: 'community', crewLabel: 'Community' })).toBe('Community Call Recap')
+    expect(recapHeading({ crewId: null, crewLabel: null })).toBe('Call Recap')
   })
 })

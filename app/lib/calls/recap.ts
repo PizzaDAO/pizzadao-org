@@ -320,6 +320,13 @@ function cleanRecapInput(rec: RecapInput, people?: RecapPeople): RecapInput {
   }
 }
 
+/** The recap heading: "Education Crew Recap", "Community Call Recap", or "Call Recap" when the crew is unknown. */
+export function recapHeading(rec: { crewId?: string | null; crewLabel?: string | null }): string {
+  if (rec.crewId === COMMUNITY_CALL_CREW_ID || rec.crewId === 'community') return 'Community Call Recap'
+  const label = oneLine(rec.crewLabel ?? '').replace(/\s+crew$/i, '')
+  return label ? `${label} Crew Recap` : 'Call Recap'
+}
+
 /** The recap text plus which mentions it contains. `mention: false` gives plain names (Telegram). Always within Discord's 2000-character limit. */
 export function buildRecapParts(input: RecapInput, base: string = SITE_URL, filter: PostFilter = EMPTY_POST_FILTER, limits: RecapLimits = DEFAULT_RECAP_LIMITS, people?: RecapPeople, mention = true): RecapParts {
   const rec = cleanRecapInput(input, people)
@@ -347,7 +354,8 @@ export function buildRecapParts(input: RecapInput, base: string = SITE_URL, filt
   let withEv = true
   const actionLine = (a: { done: boolean; line: string; ev: string }) => `${a.done ? '✅' : '-'} ${a.line}${withEv ? a.ev : ''}`
   const url = recapUrl(rec.id, base)
-  const lines = [`**Call recap: ${title}**`]
+  const heading = recapHeading(rec)
+  const lines = [`**${heading}: ${title}**`]
   if (bullets.length) lines.push('', ...bullets.map((b) => `- ${b}`))
   const tail = ['', `Full summary and transcript: ${url}`]
   if (actions.length) {
@@ -377,7 +385,7 @@ export function buildRecapParts(input: RecapInput, base: string = SITE_URL, filt
     lines.splice(at, 1)
     text = lines.join('\n')
   }
-  if (text.length > DISCORD_MESSAGE_LIMIT) text = `**Call recap: ${clip(title, 80)}**\n\nFull summary and transcript: ${url}`
+  if (text.length > DISCORD_MESSAGE_LIMIT) text = `**${recapHeading(rec)}: ${clip(title, 80)}**\n\nFull summary and transcript: ${url}`
   // Only ids we inserted and that survived the trimming.
   const mentions: RecapMentions = new Map([...found].filter(([id]) => text.includes(`<@${id}>`)))
   return { text, mentions }
