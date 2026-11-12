@@ -46,6 +46,10 @@ export const RATE_LIMITS = {
   "missions-command": { limit: 1, windowSec: 60 },
   // /vouch, /level, /profile: per member.
   "member-command": { limit: 10, windowSec: 60 },
+  // /metalhead (spoken call updates and their controls): per member.
+  "metalhead-command": { limit: 10, windowSec: 60 },
+  // Admin voice samples for the spoken call updates (each one is a paid text-to-speech call).
+  "updates-sample": { limit: 12, windowSec: 10 * 60 },
   // /progress posts publicly: one per channel per 2 minutes.
   "progress-command": { limit: 1, windowSec: 120 },
   "missions-submit": { limit: 10, windowSec: 60 * 60 },

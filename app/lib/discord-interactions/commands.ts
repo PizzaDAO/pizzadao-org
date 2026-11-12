@@ -30,6 +30,9 @@ const adminMoneyOptions = (verb: string) =>
     { type: STRING, name: 'reason', description: 'Why (shown publicly and logged)', required: true, min_length: 3, max_length: 200 },
   ] as const
 
+// Which live call a /metalhead subcommand means (default: the call whose voice channel chat it is typed in).
+const callOption = { type: STRING, name: 'call', description: "Which live call (default: this channel's call)", required: false, autocomplete: true, max_length: 100 } as const
+
 export const PEP_COMMANDS = [
   {
     name: 'balance',
@@ -149,6 +152,22 @@ export const PEP_COMMANDS = [
     name: 'live',
     description: 'Announce that the community call is live (Discord, Telegram) and get the X post text',
     options: [{ type: STRING, name: 'stream', description: 'X (Twitter) stream link to include', required: false, max_length: 300 }],
+    dm_permission: false,
+  },
+  {
+    // Deferred and ephemeral (type 5, flags 64): spoken call updates and their controls. Leads of the
+    // call's crew, admins and live hosts only (checked in the handler); answers "not enabled" until
+    // discord.metalheadCommandEnabled (and calls.updatesEnabled for the rest).
+    name: 'metalhead',
+    description: 'Spoken call updates: read them, or stop / pause / skip them',
+    options: [
+      { type: SUB_COMMAND, name: 'updates', description: 'Read the call updates now', options: [callOption] },
+      { type: SUB_COMMAND, name: 'stop', description: 'Stop speaking and leave the call channel (the recording is not affected)', options: [callOption] },
+      { type: SUB_COMMAND, name: 'pause', description: 'Pause the updates', options: [callOption] },
+      { type: SUB_COMMAND, name: 'resume', description: 'Resume the updates', options: [callOption] },
+      { type: SUB_COMMAND, name: 'skip', description: 'Skip to the next part of the updates', options: [callOption] },
+      { type: SUB_COMMAND, name: 'script', description: 'Show what would be read (nothing is played)', options: [callOption] },
+    ],
     dm_permission: false,
   },
 ] as const

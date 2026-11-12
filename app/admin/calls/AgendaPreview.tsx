@@ -1,6 +1,10 @@
 // Server component: the next crew-call agendas Metalhead would post (read-only preview).
 import { getLocale, getTranslations } from "next-intl/server";
 import { callAgendaEnabled, planAgendas } from "@/app/lib/call-agenda/run";
+import { loadSettings } from "@/app/lib/settings";
+import { UPDATES_VOICES } from "@/app/lib/settings/call-updates-settings";
+import UpdatesScriptPanel from "./UpdatesScriptPanel";
+import VoiceSamples from "./VoiceSamples";
 
 const HORIZON_MS = 48 * 60 * 60 * 1000;
 
@@ -15,11 +19,14 @@ export default async function AgendaPreview() {
         console.error("[admin/calls] agenda preview failed:", err instanceof Error ? err.message : err);
     }
 
+    const voice = (await loadSettings()).get("calls.updatesVoice");
+
     return (
         <section className="grid gap-3">
             <h2 className="font-[family-name:var(--font-display)] font-black text-xl m-0">{t("agendaTitle")}</h2>
             <p className="m-0 text-foreground/70">{t("agendaDescription")}</p>
             <p className="m-0 text-sm">{(await callAgendaEnabled()) ? t("agendaOn") : t("agendaOff")}</p>
+            <VoiceSamples voices={UPDATES_VOICES} current={voice} enabled={process.env.VERCEL_ENV === "production"} />
             {plans === null ? (
                 <p className="text-foreground/60">{t("agendaError")}</p>
             ) : plans.length === 0 ? (
@@ -42,6 +49,7 @@ export default async function AgendaPreview() {
                             ) : (
                                 <pre className="m-0 whitespace-pre-wrap text-sm font-sans">{p.message}</pre>
                             )}
+                            {!p.excluded && <UpdatesScriptPanel crewId={p.crewId} />}
                         </article>
                     ))}
                 </div>

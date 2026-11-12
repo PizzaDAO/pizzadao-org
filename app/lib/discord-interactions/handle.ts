@@ -18,13 +18,13 @@ import type { IncomeResult } from '../pep-earn/income'
 import type { BlackjackMove, BlackjackStart, BlackjackView } from '../pep-games/blackjack'
 import { SLOT_EMOJI, type SlotSymbol } from '../pep-games/slots'
 import { EPHEMERAL, InteractionType, ResponseType } from './commands'
-import { authorFor, makeEmbed, numbered, roleLabel, type Embed, type EmbedAuthor, type EmbedField, type Tone } from './embeds'
+import { authorFor, displayName, makeEmbed, numbered, roleLabel, type Embed, type EmbedAuthor, type EmbedField, type Tone } from './embeds'
 import { handleReviewButton, handleReviewModal, type MissionReviewDeps } from './mission-review'
 import type { MemberCommandJob, MemberCommandName } from './member-commands'
 import { handleFollowUpInteraction, isFollowUpInteraction, type FollowUpInteractionDeps } from './followups'
 import { handleReminderInteraction, isReminderInteraction, type ReminderInteractionDeps } from './reminders'
 
-type Option = { name: string; type: number; value: unknown; focused?: boolean }
+type Option = { name: string; type: number; value?: unknown; focused?: boolean; options?: Option[] }
 type DiscordUser = { id: string; username?: string; global_name?: string | null; avatar?: string | null; bot?: boolean }
 
 export interface Interaction {
@@ -130,6 +130,17 @@ export interface HandlerDeps {
     defer: (job: LiveJob) => void
   }
   /**
+   * /metalhead updates | stop | pause | resume | skip | script (discord.metalheadCommandEnabled).
+   * `enabled` is checked first so a disabled command uses no rate limit. `defer` does the work and
+   * edits the deferred ephemeral reply; it must not block (route: after()).
+   */
+  metalhead?: {
+    enabled: () => Promise<boolean>
+    rateLimit: (discordId: string) => Promise<Date | null>
+    defer: (job: MetalheadJob) => void
+    callChoices: () => Promise<Array<{ name: string; value: string }>>
+  }
+  /**
    * /vouch, /level and /profile (./member-commands.ts), each behind its own setting. `enabled` is
    * checked first so a disabled command uses no rate limit. `defer` builds the reply and edits the
    * deferred ephemeral message; it must not block (route: after()).
@@ -171,6 +182,24 @@ export interface ProgressJob {
   token: string
   /** The crew option, if the member typed one. */
   crew?: string
+  author?: EmbedAuthor
+}
+
+export const METALHEAD_SUBCOMMANDS = ['updates', 'stop', 'pause', 'resume', 'skip', 'script'] as const
+
+/** What the deferred /metalhead follow-up needs. */
+export interface MetalheadJob {
+  sub: (typeof METALHEAD_SUBCOMMANDS)[number]
+  discordId: string
+  displayName: string
+  /** Guild admin (isAdmin on the member's roles). */
+  admin: boolean
+  /** The channel the command was typed in. */
+  channelId?: string
+  /** The call choice (a live session id), if the member picked one. */
+  call?: string
+  applicationId: string
+  token: string
   author?: EmbedAuthor
 }
 
@@ -474,6 +503,31 @@ async function command(i: Interaction, userId: string, deps: HandlerDeps, cur: s
       return { type: ResponseType.DEFERRED_CHANNEL_MESSAGE, data: { flags: EPHEMERAL, allowed_mentions: NO_PINGS } }
     }
 
+    case 'metalhead': {
+      if (!deps.metalhead || !(await deps.metalhead.enabled())) return out.error("/metalhead isn't enabled yet.")
+      if (!i.application_id || !i.token) return out.error('Could not start the command. Please try again.')
+      const subOpt = i.data?.options?.[0] as { name?: string; options?: Option[] } | undefined
+      const sub = METALHEAD_SUBCOMMANDS.find((s) => s === subOpt?.name)
+      if (!sub) return out.error('Pick one of: updates, stop, pause, resume, skip, script.')
+      const readyAt = await deps.metalhead.rateLimit(userId)
+      if (readyAt) return out.wait('Slow down.', `You can use /metalhead again ${rel(readyAt)}.`)
+      const callOpt = subOpt?.options?.find((o) => o.name === 'call')?.value
+      const member = i.member ? { ...i.member, guildId: i.guild_id } : undefined
+      deps.metalhead.defer({
+        sub,
+        discordId: userId,
+        displayName: displayName(member ?? {}),
+        admin: await deps.isAdmin(i.member?.roles ?? []).catch(() => false),
+        ...(i.channel_id ? { channelId: i.channel_id } : {}),
+        ...(typeof callOpt === 'string' && callOpt.trim() ? { call: callOpt.trim().slice(0, 100) } : {}),
+        applicationId: i.application_id,
+        token: i.token,
+        author: authorFor(member),
+      })
+      // "Metalhead is thinking..." (only you see it); the reply is edited in.
+      return { type: ResponseType.DEFERRED_CHANNEL_MESSAGE, data: { flags: EPHEMERAL } }
+    }
+
     default:
       return out.error('Unknown command.')
   }
@@ -528,6 +582,10 @@ async function autocomplete(i: Interaction, deps: HandlerDeps): Promise<Interact
       .filter((it) => it.name.toLowerCase().includes(q))
       .slice(0, 25)
       .map((it) => ({ name: `${it.name} (${n(it.price)})`.slice(0, 100), value: String(it.id) }))
+  } else if (i.data?.name === 'metalhead' && deps.metalhead && (await deps.metalhead.enabled())) {
+    // The focused option sits inside the subcommand; only the `call` option has choices.
+    const sub = i.data.options?.[0] as { options?: Option[] } | undefined
+    if (sub?.options?.some((o) => o.focused && o.name === 'call')) choices = (await deps.metalhead.callChoices()).slice(0, 25)
   } else if (i.data?.name === 'progress' && focused?.name === 'crew' && deps.progress && (await deps.progress.enabled())) {
     choices = (await deps.progress.crewChoices(String(focused.value ?? ''))).slice(0, 25)
   }

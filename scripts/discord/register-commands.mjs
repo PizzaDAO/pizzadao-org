@@ -5,7 +5,8 @@
  *
  * Commands: /balance /work /collect-income /pay /leaderboard /blackjack
  * /roulette /slots /shop /buy /add-money /remove-money /missions /vouch /level
- * /profile /progress /live. /live answers "not enabled" until calls.liveAnnounceCommandEnabled. /vouch, /level, /profile and /progress answer "not enabled"
+ * /profile /progress /live /metalhead. /live answers "not enabled" until calls.liveAnnounceCommandEnabled; /metalhead
+ * until discord.metalheadCommandEnabled (and calls.updatesEnabled). /vouch, /level, /profile and /progress answer "not enabled"
  * until discord.vouchCommandEnabled / levelCommandEnabled / profileCommandEnabled /
  * calls.progressReportEnabled. The games
  * answer "not enabled yet" until games.enabled (Vercel env), so
