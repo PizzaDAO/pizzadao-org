@@ -350,7 +350,7 @@ describe('coverage of the schema', () => {
     for (const mdl of models) expect(PK_OVERRIDES[mdl] ?? 'id').toBe(pks[mdl])
   })
 
-  // Member-id columns that are deliberately not merged: they hold a Discord id or a display name.
+  // Member-id columns that are deliberately not merged: they hold a Discord id or a display name, or are audit-only (MemberNameReminder.memberId; its cooldown is keyed by Discord id).
   const IGNORED = new Set(['ArticleReaction.memberId', 'MafiaRankCache.memberName', 'Proposal.proposerDiscordId', 'Proposal.proposerLabel', 'Vouch.followerId', 'Vouch.followeeId', 'MemberNameReminder.memberId'])
   it('every member-id column in prisma/schema.prisma is handled or explicitly ignored', () => {
     const schema = readFileSync(join(__dirname, '../../../prisma/schema.prisma'), 'utf8')

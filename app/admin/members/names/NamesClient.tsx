@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import type { NameReport } from "@/app/lib/members/name-reminders";
 
+const CAP = 20; // keep in step with MAX_PER_REQUEST (server file is not importable here)
+
 export function NamesClient() {
     const [report, setReport] = useState<NameReport | null>(null);
     const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -26,13 +28,13 @@ export function NamesClient() {
         void load();
     }, [load]);
 
-    const eligible = (report?.rows ?? []).filter((r) => r.discordId && !r.coolingDown);
+    const eligible = (report?.rows ?? []).filter((r) => r.discordId && !r.coolingDown && r.lastStatus !== "CLOSED");
 
     function toggle(id: string) {
         setPicked((p) => {
             const n = new Set(p);
             if (n.has(id)) n.delete(id);
-            else n.add(id);
+            else if (n.size < CAP) n.add(id);
             return n;
         });
     }
@@ -70,8 +72,8 @@ export function NamesClient() {
                 Cooldown: {report.cooldownDays} days.
             </p>
             <div className="flex gap-3 items-center flex-wrap">
-                <button className="rounded border border-foreground/20 px-3 py-1" onClick={() => setPicked(new Set(eligible.map((r) => r.id)))} disabled={busy}>
-                    Select all eligible ({eligible.length})
+                <button className="rounded border border-foreground/20 px-3 py-1" onClick={() => setPicked(new Set(eligible.slice(0, CAP).map((r) => r.id)))} disabled={busy}>
+                    Select next {Math.min(CAP, eligible.length)} (of {eligible.length} eligible)
                 </button>
                 <button className="rounded border border-foreground/20 px-3 py-1" onClick={() => setPicked(new Set())} disabled={busy}>Clear</button>
                 <button className="rounded bg-foreground text-background px-3 py-1 disabled:opacity-50" onClick={send} disabled={busy || !picked.size}>
@@ -88,7 +90,7 @@ export function NamesClient() {
                             <input type="checkbox" checked={picked.has(r.id)} disabled={!can || busy} onChange={() => toggle(r.id)} aria-label={`Select ${r.name}`} />
                             <span className="grow">{r.name}</span>
                             <span className="text-foreground/50 text-sm">
-                                {!r.discordId ? "no Discord id" : r.coolingDown ? `reminded ${r.lastReminderAt?.slice(0, 10)}` : r.lastReminderAt ? `last ${r.lastReminderAt.slice(0, 10)}` : ""}
+                                {!r.discordId ? "no Discord id" : r.coolingDown ? `${r.lastStatus === "CLOSED" ? "DMs closed" : "reminded"} ${r.lastReminderAt?.slice(0, 10)}` : r.lastStatus ? `last: ${r.lastStatus.toLowerCase()} ${r.lastReminderAt?.slice(0, 10)}` : ""}
                             </span>
                         </li>
                     );

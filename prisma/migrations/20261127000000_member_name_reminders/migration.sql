@@ -5,9 +5,12 @@ CREATE TABLE "MemberNameReminder" (
     "memberId" TEXT NOT NULL,
     "sentBy" TEXT NOT NULL,
     "status" TEXT NOT NULL,
+    "claimKey" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "MemberNameReminder_pkey" PRIMARY KEY ("id")
 );
 
 CREATE INDEX "MemberNameReminder_discordId_createdAt_idx" ON "MemberNameReminder"("discordId", "createdAt");
+
+CREATE UNIQUE INDEX "MemberNameReminder_claimKey_key" ON "MemberNameReminder"("claimKey");

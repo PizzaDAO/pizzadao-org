@@ -1,5 +1,5 @@
 import { requireDpr, rejectUnsafeWrite, json } from '@/app/lib/admin-guard'
-import { buildNameReport, sendNameReminders } from '@/app/lib/members/name-reminders'
+import { buildNameReport, sendNameReminders, MAX_PER_REQUEST } from '@/app/lib/members/name-reminders'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -25,6 +25,6 @@ export async function POST(request: Request) {
     return json({ error: 'Invalid JSON' }, 400)
   }
   const ids = Array.isArray(body.memberIds) ? body.memberIds.filter((x): x is string => typeof x === 'string') : []
-  if (!ids.length || ids.length > 100) return json({ error: 'Select between 1 and 100 members' }, 400)
+  if (!ids.length || ids.length > MAX_PER_REQUEST) return json({ error: `Select between 1 and ${MAX_PER_REQUEST} members` }, 400)
   return json(await sendNameReminders([...new Set(ids)], auth.session.discordId))
 }

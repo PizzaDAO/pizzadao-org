@@ -2951,7 +2951,9 @@ model MemberNameReminder {
   discordId String
   memberId  String
   sentBy    String
-  status    String // SENT | FAILED
+  status    String // SENDING | SENT | CLOSED | FAILED
+  // discordId + cooldown window; unique so concurrent sends cannot double-DM. Null once released (FAILED).
+  claimKey  String?  @unique
   createdAt DateTime @default(now())
 
   @@index([discordId, createdAt])
