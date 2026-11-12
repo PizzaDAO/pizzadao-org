@@ -115,5 +115,20 @@ export function buildAnnouncement(s: SessionTimes, eventUrl: string | null): str
     .slice(0, 2000)
 }
 
+/** Telegram text: plain, with the date written out in the session's zone (Telegram has no <t:> tags). */
+export function buildTelegramText(s: SessionTimes, eventUrl: string | null): string {
+  return [
+    `🎓 ${s.title}`,
+    s.presenter ? `Presented by ${s.presenter}` : null,
+    '',
+    s.description,
+    '',
+    `🕒 ${formatWhen(s)}`,
+    eventUrl ? `📅 ${eventUrl}` : null,
+  ]
+    .filter((l): l is string => l !== null)
+    .join('\n')
+}
+
 /** Message body setting: never pings anyone. */
 export const NO_MENTIONS = { parse: [] as Array<'everyone' | 'roles' | 'users'> }

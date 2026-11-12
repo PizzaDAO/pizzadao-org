@@ -2104,6 +2104,13 @@ export const SETTINGS = {
     help: 'When the announcement goes out on Discord, also queue it for the announcement city groups below. Needs the master switch.',
     confirmOn: 'The Community Call announcement will also post to the chosen city Telegram groups.',
   }),
+  'telegram.sessionMirrorEnabled': boolSetting({
+    key: 'telegram.sessionMirrorEnabled',
+    area: 'telegram',
+    label: 'Mirror crew session announcements to city groups',
+    help: 'When a crew session (education talks) is announced on Discord, also queue it for the city groups mapped to that crew in "Crew to city groups" below (the same mapping crew recaps use; no mapping, no post). Needs the master switch.',
+    confirmOn: 'Crew session announcements will also post to the city Telegram groups mapped to that crew.',
+  }),
   // Optional host matching (PR P4): the switch here, the mode and pacing in ./telegram-settings.
   'telegram.hostMatchEnabled': boolSetting({
     key: 'telegram.hostMatchEnabled',

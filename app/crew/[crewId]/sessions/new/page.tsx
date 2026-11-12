@@ -9,6 +9,7 @@ import { getSession } from "@/app/lib/session";
 import { canManageCrew } from "@/app/lib/crew-leads";
 import { normalizeCrewId } from "@/app/lib/crew-id";
 import { EDUCATION_CREW_ID } from "@/app/lib/education-sessions/build";
+import { isAdminDiscordId } from "@/app/lib/auth-guards";
 import { toggleEnabled } from "@/app/lib/settings/toggles";
 import SessionForm from "./SessionForm";
 
@@ -41,6 +42,7 @@ export default async function NewSessionPage({ params }: { params: Promise<{ cre
     }
 
     const enabled = await toggleEnabled("education.sessionAnnounceEnabled");
+    const isAdmin = await isAdminDiscordId(session!.discordId);
     return (
         <main className="min-h-screen bg-background text-foreground p-5">
             <div className="max-w-2xl mx-auto">
@@ -51,7 +53,7 @@ export default async function NewSessionPage({ params }: { params: Promise<{ cre
                 <p className="text-foreground/60 mb-5">
                     Schedule creates the Discord event (with the flyer as its cover) and posts the announcement with the flyer. Pressing it twice is safe.
                 </p>
-                <SessionForm enabled={enabled} crewId={crewId} />
+                <SessionForm enabled={enabled} crewId={crewId} isAdmin={isAdmin} />
             </div>
         </main>
     );

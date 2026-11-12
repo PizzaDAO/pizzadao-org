@@ -16,6 +16,16 @@ export const maxDuration = 60
 
 type Ctx = { params: Promise<{ crewId: string }> }
 
+// GET: whether the signed-in user may schedule sessions (drives the crew page link). Never throws on auth.
+const GET_HANDLER = async (_request: NextRequest, { params }: Ctx) => {
+  const { crewId } = await params
+  const canManage = await requireEducationManager(crewId).then(
+    () => true,
+    () => false,
+  )
+  return NextResponse.json({ canManage }, { headers: NO_STORE_HEADERS })
+}
+
 const POST_HANDLER = async (request: NextRequest, { params }: Ctx) => {
   const { crewId } = await params
   const discordId = await requireEducationManager(crewId)
@@ -32,4 +42,5 @@ const POST_HANDLER = async (request: NextRequest, { params }: Ctx) => {
   return NextResponse.json(result, { status, headers: NO_STORE_HEADERS })
 }
 
+export const GET = withErrorHandling(GET_HANDLER)
 export const POST = withErrorHandling(POST_HANDLER)

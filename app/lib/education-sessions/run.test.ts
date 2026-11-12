@@ -37,7 +37,7 @@ vi.mock('@/app/lib/telegram/city-posts', () => ({ enqueueMirror: enqueue }))
 
 import { DiscordPostError } from '@/app/lib/discord-rest'
 import { parseSessionInput } from './build'
-import { scheduleEducationSession } from './run'
+import { resetPendingSteps, scheduleEducationSession } from './run'
 
 const session = parseSessionInput(
   { title: 'Intro', presenter: 'P', description: 'D', date: '2026-11-20', time: '18:30', timeZone: 'UTC', lengthMinutes: 60 },
@@ -45,7 +45,7 @@ const session = parseSessionInput(
 )
 const env = { DISCORD_BOT_TOKEN: 't', DISCORD_GUILD_ID: '555555' } as unknown as NodeJS.ProcessEnv
 const channels: Record<string, string> = { 'discord.educationEventChannelId': '111111', 'discord.educationChannelId': '222222', 'discord.educationGeneralChannelId': '' }
-const deps = (over = {}) => ({ enabled: async () => true, channelId: async (k: string) => channels[k] ?? '', flyer: async () => Buffer.from('png'), env, ...over }) as never
+const deps = (over = {}) => ({ enabled: async () => true, channelId: async (k: string) => channels[k] ?? '', flyer: vi.fn(async () => Buffer.from('png')), env, ...over }) as never
 
 beforeEach(() => {
   rows.length = 0
@@ -69,6 +69,11 @@ describe('scheduleEducationSession', () => {
     expect(body.method).toBe('POST')
     expect(body.body.image).toMatch(/^data:image\/png;base64,/)
     expect(postFile).toHaveBeenCalledTimes(1)
+    const tg = (enqueue.mock.calls[0] as unknown as [{ kind: string; text: string }])[0]
+    expect(tg.kind).toBe('session')
+    expect(tg.text).toContain('Friday, November 20')
+    expect(tg.text).toContain('UTC')
+    expect(tg.text).not.toMatch(/<t:/)
     const msg = (postFile.mock.calls[0] as unknown as [unknown, { allowed_mentions: unknown; content: string }])[1]
     expect(msg.allowed_mentions).toEqual({ parse: [] })
     expect(msg.content).toContain('discord.com/events/555555/999001')
@@ -116,5 +121,17 @@ describe('scheduleEducationSession', () => {
     const r = await scheduleEducationSession(session, 'u1', deps({ channelId: async () => '' }))
     expect(r.status).toBe('not-configured')
     expect(rows).toHaveLength(0)
+  })
+})
+
+describe('resetPendingSteps', () => {
+  it('clears only PENDING markers', async () => {
+    postFile.mockRejectedValueOnce(new DiscordPostError('boom', 502))
+    await scheduleEducationSession(session, 'u1', deps())
+    expect(rows[0].announceMessageId).toBe('PENDING')
+    expect(await resetPendingSteps(rows[0].id as string)).toEqual({ cleared: 1 })
+    expect(rows[0]).toMatchObject({ announceMessageId: null, eventId: '999001' })
+    const r = await scheduleEducationSession(session, 'u1', deps())
+    expect(r.announcement).toBe('done')
   })
 })

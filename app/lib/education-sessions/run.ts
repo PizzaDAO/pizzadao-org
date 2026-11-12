@@ -20,8 +20,8 @@ import { DiscordPostError, discordScheduledEventRequest } from '@/app/lib/discor
 import { savedChannelId } from '@/app/lib/settings/channels'
 import { toggleEnabled } from '@/app/lib/settings/toggles'
 import { enqueueMirror } from '@/app/lib/telegram/city-posts'
-import { buildAnnouncement, buildEventPayload, dedupeKey, EDUCATION_CREW_ID, NO_MENTIONS, type SessionTimes } from './build'
-import { renderFlyerPng } from './flyer'
+import { buildAnnouncement, buildEventPayload, buildTelegramText, dedupeKey, EDUCATION_CREW_ID, NO_MENTIONS, type SessionTimes } from './build'
+import { renderFlyerPng, type FlyerVariant } from './flyer'
 import { postMessageWithFile } from './discord-file'
 
 const PENDING = 'PENDING'
@@ -43,7 +43,7 @@ export interface ScheduleResult {
 export interface ScheduleDeps {
   enabled?: () => Promise<boolean>
   channelId?: (key: 'discord.educationChannelId' | 'discord.educationEventChannelId' | 'discord.educationGeneralChannelId') => Promise<string>
-  flyer?: typeof renderFlyerPng
+  flyer?: (s: SessionTimes, variant: FlyerVariant) => Promise<Buffer>
   fetchImpl?: typeof fetch
   env?: NodeJS.ProcessEnv
 }
@@ -100,10 +100,10 @@ export async function scheduleEducationSession(s: SessionTimes, actorDiscordId: 
     prisma.crewSession.updateMany({ where: { id, [field]: PENDING }, data: { [field]: v ?? PENDING } })
   const definitive = (err: unknown) => err instanceof DiscordPostError && err.status >= 400 && err.status < 500
 
-  let flyer: Buffer | null = null
-  const getFlyer = async () => {
+  const flyers: Partial<Record<FlyerVariant, Buffer>> = {}
+  const getFlyer = async (variant: FlyerVariant) => {
     try {
-      return (flyer ??= await (deps.flyer ?? renderFlyerPng)(s))
+      return (flyers[variant] ??= await (deps.flyer ?? renderFlyerPng)(s, variant))
     } catch (e) {
       throw new DiscordPostError(`Could not render the flyer: ${e instanceof Error ? e.message : e}`, 400)
     }
@@ -119,7 +119,7 @@ export async function scheduleEducationSession(s: SessionTimes, actorDiscordId: 
       const channels = await getGuildChannels({ botToken: token, guildId, fetchImpl: deps.fetchImpl })
       const ch = channels?.find((c) => c.id === eventChannelId)
       if (!ch) throw new DiscordPostError('The event channel was not found in the server.', 404)
-      const png = await getFlyer()
+      const png = await getFlyer('cover')
       const created = (await discordScheduledEventRequest(
         { method: 'POST', guildId, botToken: token, body: buildEventPayload(s, ch, `data:image/png;base64,${png.toString('base64')}`), reason: 'Education session scheduled from the website' },
         { fetchImpl: deps.fetchImpl },
@@ -144,7 +144,7 @@ export async function scheduleEducationSession(s: SessionTimes, actorDiscordId: 
     if (current) return current === PENDING ? 'uncertain' : 'already'
     if (!(await claim(field))) return 'uncertain'
     try {
-      const png = await getFlyer()
+      const png = await getFlyer('post')
       const { id: messageId } = await postMessageWithFile(
         { channelId, botToken: token },
         { content: buildAnnouncement(s, out.eventUrl ?? null), allowed_mentions: NO_MENTIONS, flags: SUPPRESS_EMBEDS },
@@ -165,11 +165,12 @@ export async function scheduleEducationSession(s: SessionTimes, actorDiscordId: 
   out.announcement = await post('announceMessageId', announceChannelId)
   out.general = generalChannelId && generalChannelId !== announceChannelId ? await post('generalMessageId', generalChannelId) : 'skipped'
 
-  // 4. Telegram, through the existing mirror (its own switches and city mapping decide; never throws).
+  // 4. Telegram, through the existing mirror as kind 'session' (telegram.sessionMirrorEnabled + the crew's
+  // city mapping decide; never throws).
   if (row.telegramQueued) out.telegram = 'already'
   else if (out.announcement === 'done' || out.announcement === 'already') {
     const r = await enqueueMirror(
-      { kind: 'announce', sourceId: `edu-session:${id}`, crewId: EDUCATION_CREW_ID, crewLabel: 'Education', text: buildAnnouncement(s, out.eventUrl ?? null), expiresAt: s.startsAt },
+      { kind: 'session', sourceId: `edu-session:${id}`, crewId: EDUCATION_CREW_ID, crewLabel: 'Education', text: buildTelegramText(s, out.eventUrl ?? null), expiresAt: s.startsAt },
       env,
     )
     if (r.queued > 0) await prisma.crewSession.update({ where: { id }, data: { telegramQueued: true } })
@@ -181,4 +182,16 @@ export async function scheduleEducationSession(s: SessionTimes, actorDiscordId: 
   if (bad) out.status = 'partial'
   else if (existed && ![out.event, out.announcement, out.general].includes('done')) out.status = 'already'
   return out
+}
+
+/**
+ * Admin recovery: clear the PENDING markers of a session (steps left "unclear" by a crash or a 5xx), so
+ * the next Schedule retries them. The admin must first check Discord for a half-made event or post.
+ */
+export async function resetPendingSteps(sessionId: string): Promise<{ cleared: number }> {
+  let cleared = 0
+  for (const field of ['eventId', 'announceMessageId', 'generalMessageId'] as const) {
+    cleared += (await prisma.crewSession.updateMany({ where: { id: sessionId, [field]: PENDING }, data: { [field]: null } })).count
+  }
+  return { cleared }
 }

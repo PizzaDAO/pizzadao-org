@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 const DEFAULT_ZONES = ["America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles", "Europe/London", "Europe/Berlin", "Asia/Tokyo", "Australia/Sydney", "UTC"];
 
 type Result = {
+    sessionId?: string;
     status: string;
     event?: string;
     announcement?: string;
@@ -20,10 +21,10 @@ const STEP_LABEL: Record<string, string> = {
     already: "already done earlier",
     skipped: "not configured / off",
     failed: "failed (press Schedule again to retry)",
-    uncertain: "unclear; check Discord before retrying",
+    uncertain: "not retried automatically; ask an admin",
 };
 
-export default function SessionForm({ enabled, crewId }: { enabled: boolean; crewId: string }) {
+export default function SessionForm({ enabled, crewId, isAdmin }: { enabled: boolean; crewId: string; isAdmin: boolean }) {
     const localZone = useMemo(() => {
         try {
             return Intl.DateTimeFormat().resolvedOptions().timeZone || "America/New_York";
@@ -38,6 +39,14 @@ export default function SessionForm({ enabled, crewId }: { enabled: boolean; cre
     const [busy, setBusy] = useState(false);
     const [result, setResult] = useState<Result | null>(null);
     const set = (k: keyof typeof f, v: string | number) => setF((p) => ({ ...p, [k]: v }));
+
+    const [resetMsg, setResetMsg] = useState<string | null>(null);
+    async function resetStuck(id: string) {
+        if (!window.confirm("Check Discord first: if the event or post for this session already exists, delete it or leave it and do not retry. Clear the stuck steps so Schedule retries them?")) return;
+        const res = await fetch(`/api/crew/${crewId}/sessions/${id}/reset`, { method: "POST" });
+        const j = (await res.json().catch(() => ({}))) as { cleared?: number; error?: string };
+        setResetMsg(res.ok ? `Cleared ${j.cleared ?? 0} step(s). Press Schedule again to retry.` : (j.error ?? "Could not clear."));
+    }
 
     const ready = !!(f.title && f.date && f.time);
     function preview() {
@@ -153,6 +162,14 @@ export default function SessionForm({ enabled, crewId }: { enabled: boolean; cre
                                     <a className="underline" href={result.eventUrl} target="_blank" rel="noreferrer">
                                         Open the Discord event
                                     </a>
+                                </p>
+                            )}
+                            {isAdmin && result.sessionId && [result.event, result.announcement, result.general].includes("uncertain") && (
+                                <p>
+                                    <button type="button" className="underline" onClick={() => resetStuck(result.sessionId!)}>
+                                        Clear stuck steps (admin)
+                                    </button>
+                                    {resetMsg && <span className="ml-2">{resetMsg}</span>}
                                 </p>
                             )}
                             {result.errors?.map((e) => (

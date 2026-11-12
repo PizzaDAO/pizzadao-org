@@ -22,12 +22,13 @@ import { resolveToggle, toggleEnabled, type ToggleKey } from '@/app/lib/settings
 import { parseCityKeys } from '@/app/lib/settings/telegram-settings'
 import { cityPost, telegramSendAllowed, type CityPostResult } from './rsv-client'
 
-export type MirrorKind = 'recap' | 'agenda' | 'announce'
+export type MirrorKind = 'recap' | 'agenda' | 'announce' | 'session'
 
 const KIND_TOGGLE: Record<MirrorKind, ToggleKey> = {
   recap: 'telegram.recapMirrorEnabled',
   agenda: 'telegram.agendaMirrorEnabled',
   announce: 'telegram.announceMirrorEnabled',
+  session: 'telegram.sessionMirrorEnabled',
 }
 
 /** The proxy rejects text over 3500 characters. */

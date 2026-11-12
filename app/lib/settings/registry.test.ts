@@ -69,6 +69,7 @@ describe('settings registry', () => {
       ['telegram.recapMirrorEnabled', false],
       ['telegram.agendaMirrorEnabled', false],
       ['telegram.announceMirrorEnabled', false],
+      ['telegram.sessionMirrorEnabled', false],
       ['telegram.hostMatchEnabled', false],
       ['telegram.hostMatchDiscordLine', 'Prefer Telegram? Confirm here: {link}'],
       ['telegram.hostMatchConfirmText', 'Confirm this Telegram for your PizzaDAO account. Only tap the button if you just asked for this in the PizzaDAO app.'],

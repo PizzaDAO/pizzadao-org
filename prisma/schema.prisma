@@ -1559,20 +1559,20 @@ model CallLiveItem {
 // (POST /api/calls/recorder/live-state), read by /calls/live. No audio or transcript. Stale (no
 // heartbeat for calls.liveStaleSeconds) counts as ended. Swept with the other live data.
 model CallLiveSession {
-  sessionId          String    @id
-  eventId            String?
-  eventName          String?
-  crewId             String?
-  crewLabel          String?
-  channelId          String?
-  startedAt          DateTime
-  lastSeenAt         DateTime
-  endedAt            DateTime?
-  hidden             Boolean   @default(false) // excluded crew (private post filter), or the filter could not be read: never shown
-  streamLink         String? // first x.com broadcast or status link posted in the call chat
+  sessionId  String    @id
+  eventId    String?
+  eventName  String?
+  crewId     String?
+  crewLabel  String?
+  channelId  String?
+  startedAt  DateTime
+  lastSeenAt DateTime
+  endedAt    DateTime?
+  hidden     Boolean   @default(false) // excluded crew (private post filter), or the filter could not be read: never shown
+  streamLink String? // first x.com broadcast or status link posted in the call chat
   streamLinkOverride String? // set by a host on the live page; wins over the chat link and the crew setting
-  presence           Json      @default("[]") // [{discordId, displayName, presentSec, inChannel}] humans only, max 300
-  updatedAt          DateTime  @updatedAt
+  presence   Json      @default("[]") // [{discordId, displayName, presentSec, inChannel}] humans only, max 300
+  updatedAt  DateTime  @updatedAt
 
   @@index([endedAt, lastSeenAt])
 }
@@ -2223,48 +2223,48 @@ enum ProposalChoice {
 }
 
 model Proposal {
-  id                   String         @id @default(cuid())
-  kind                 ProposalKind
-  status               ProposalStatus @default(DRAFT)
-  title                String
-  body                 String
-  amountUsdCents       Int? // FUNDING only; fixed once the proposal exists
-  eventDate            DateTime?
-  city                 String?
-  proposerDiscordId    String? // null only for imported history rows
-  sponsorLabel         String? // free text: a holder who sponsors a proposer without a box
+  id                  String         @id @default(cuid())
+  kind                ProposalKind
+  status              ProposalStatus @default(DRAFT)
+  title               String
+  body                String
+  amountUsdCents      Int? // FUNDING only; fixed once the proposal exists
+  eventDate           DateTime?
+  city                String?
+  proposerDiscordId   String? // null only for imported history rows
+  sponsorLabel        String? // free text: a holder who sponsors a proposer without a box
   beneficiaryDiscordId String? // optional member who may file the payment requests (set at creation, never changed)
-  isTest               Boolean        @default(false) // created during the pilot: short window, threshold 1, never in lists, totals or funding
-  opensAt              DateTime?
-  closesAt             DateTime?
-  closedAt             DateTime?
+  isTest              Boolean        @default(false) // created during the pilot: short window, threshold 1, never in lists, totals or funding
+  opensAt             DateTime?
+  closesAt            DateTime?
+  closedAt            DateTime?
   // Rules snapshotted when the proposal opens, so later setting changes never move a running vote.
-  ayesNeeded           Int?
-  countAbstains        Boolean        @default(true)
-  requireAyesOverNays  Boolean        @default(true)
-  eligibleCount        Int?
-  voterRoleId          String? // the Discord role whose holders were the eligible set at open
+  ayesNeeded          Int?
+  countAbstains       Boolean        @default(true)
+  requireAyesOverNays Boolean        @default(true)
+  eligibleCount       Int?
+  voterRoleId         String? // the Discord role whose holders were the eligible set at open
   // Per-proposal blind-signature key pair, generated at open. The private key is stored AES-GCM wrapped.
-  keyPublicPem         String?
-  keyFingerprint       String?
-  keyPrivateEnc        String?
+  keyPublicPem        String?
+  keyFingerprint      String?
+  keyPrivateEnc       String?
   // Settled counts (written once, at close).
-  ayes                 Int            @default(0)
-  nays                 Int            @default(0)
-  abstains             Int            @default(0)
-  discordChannelId     String?
-  discordMessageId     String?
-  resultPostedAt       DateTime?
+  ayes                Int            @default(0)
+  nays                Int            @default(0)
+  abstains            Int            @default(0)
+  discordChannelId    String?
+  discordMessageId    String?
+  resultPostedAt      DateTime?
   // Imported history (plans/proposals-history-import.md). Imported rows are closed, read-only records.
-  source               ProposalSource @default(APP)
-  importKey            String?        @unique // "discord:<messageId>" | "sheet:<row>" | "early:<messageId>"
-  proposerLabel        String? // the proposer's name as written, when no Discord id matched
-  votesRecorded        Boolean        @default(true)
-  outcomeSource        String? // override | votes | votes_era_quorum | sheet
-  paidOverride         Boolean? // null = derive from the payments
-  historical           Json? // amountRaw, quorumStated, sheetStatus, eventDateRaw, reactions, resubmissionOf, notes
-  createdAt            DateTime       @default(now())
-  updatedAt            DateTime       @updatedAt
+  source              ProposalSource @default(APP)
+  importKey           String?        @unique // "discord:<messageId>" | "sheet:<row>" | "early:<messageId>"
+  proposerLabel       String? // the proposer's name as written, when no Discord id matched
+  votesRecorded       Boolean        @default(true)
+  outcomeSource       String? // override | votes | votes_era_quorum | sheet
+  paidOverride        Boolean? // null = derive from the payments
+  historical          Json? // amountRaw, quorumStated, sheetStatus, eventDateRaw, reactions, resubmissionOf, notes
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
 
   voters          ProposalVoter[]
   ballots         ProposalBallot[]
@@ -2648,14 +2648,14 @@ model CrewRole {
 // DB-backed getMembersTable returns the same table and every reader keeps working unchanged.
 // Private columns (notes, telegram, wallet...) live in `cells`: never expose this table directly.
 model Member {
-  id         String    @id // the ID cell text
-  discordId  String?
-  name       String    @default("")
-  cells      Json
-  position   Int // sheet order at import (ties after sorting by id)
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  updatedBy  String?
+  id        String   @id // the ID cell text
+  discordId String?
+  name      String   @default("")
+  cells     Json
+  position  Int // sheet order at import (ties after sorting by id)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  updatedBy String?
   // Set when this member was merged into another (app/lib/members/merge.ts). The row is a tombstone:
   // every reader skips rows where mergedInto is set.
   mergedInto String?
@@ -2668,7 +2668,7 @@ model Member {
 
 // Audit row for one member merge: who ran it, which ids, and the full per-table report.
 model MemberMerge {
-  id        Int       @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
   keepId    String
   removeId  String
   actor     String
@@ -2676,7 +2676,7 @@ model MemberMerge {
   // Set by unmergeMembers() when the merge was reversed.
   undoneAt  DateTime?
   undoneBy  String?
-  createdAt DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([keepId])
   @@index([removeId])
@@ -2784,29 +2784,29 @@ model PfpAssetGrant {
 
 /// A member's composed PFP. composedUrl is content-hashed so CDN caches never go stale.
 model MemberPfp {
-  memberId         String   @id
-  baseKind         String   @db.VarChar(16) // static | discord | upload | mafia | restyle
-  baseUrl          String
-  layers           Json // [{assetId, x, y, scale, rotation}] in z-order
-  composedUrl      String
+  memberId    String   @id
+  baseKind    String   @db.VarChar(16) // static | discord | upload | mafia | restyle
+  baseUrl     String
+  layers      Json // [{assetId, x, y, scale, rotation}] in z-order
+  composedUrl String
   // Set only while baseKind is "restyle" (an AI dress-up): the base it was made from, for "Undo dress-up".
-  originalBaseKind String?  @db.VarChar(16)
+  originalBaseKind String? @db.VarChar(16)
   originalBaseUrl  String?
-  updatedAt        DateTime @updatedAt
+  updatedAt   DateTime @updatedAt
 }
 
 /// One AI dress-up generation (cost control and audit). costCents is an estimate; refused and
 /// failed calls cost 0. No FK on purpose: rows survive an asset delete.
 model PfpRestyle {
-  id         Int      @id @default(autoincrement())
-  memberId   String
-  discordId  String
-  outfitId   Int
-  outfitName String   @db.VarChar(60)
-  costCents  Int
-  status     String   @db.VarChar(12) // pending | ok | refused | error
-  resultUrl  String?
-  createdAt  DateTime @default(now())
+  id           Int      @id @default(autoincrement())
+  memberId     String
+  discordId    String
+  outfitId     Int
+  outfitName   String   @db.VarChar(60)
+  costCents    Int
+  status       String   @db.VarChar(12) // pending | ok | refused | error
+  resultUrl    String?
+  createdAt    DateTime @default(now())
 
   @@index([memberId, createdAt])
   @@index([memberId, outfitId])
