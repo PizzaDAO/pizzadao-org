@@ -1,4 +1,4 @@
-import { sanitizeDisplayName } from "../display-name";
+import { sanitizeDisplayName, sliceUnits } from "../display-name";
 
 export { sanitizeDisplayName, validateDisplayName } from "../display-name";
 
@@ -21,7 +21,7 @@ export interface ProfilePayload {
 
 function clampStr(s: unknown, max: number): string {
   const t = String(s ?? "").trim().replace(/\s+/g, " ");
-  return t.length > max ? t.slice(0, max) : t;
+  return sliceUnits(t, max);
 }
 
 function clampBool(v: unknown): boolean {
