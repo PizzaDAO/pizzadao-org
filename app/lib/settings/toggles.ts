@@ -105,6 +105,8 @@ export const TOGGLES = {
   'reminders.callsEnabled': { env: 'REMINDERS_CALLS_ENABLED', legacy: ON_WORDS },
   // Off unless turned on: the nightly crew roster auto-add from call attendance (counts only while off).
   'crews.rosterAutoAddEnabled': { env: 'CREWS_ROSTER_AUTOADD_ENABLED', legacy: ON_WORDS },
+  // Off unless turned on: past attendees as Cold bench rows on the crew page.
+  'crews.rosterBenchEnabled': { env: 'CREWS_ROSTER_BENCH_ENABLED', legacy: ON_WORDS },
 } as const satisfies Partial<Record<SettingKey, ToggleDef>>
 
 export type ToggleKey = keyof typeof TOGGLES

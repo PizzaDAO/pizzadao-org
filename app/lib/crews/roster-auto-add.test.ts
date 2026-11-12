@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 
 const settingValues = new Map<string, unknown>()
 const toggle = vi.fn(async () => true)
+let benchOn = false
 vi.mock('@/app/lib/db', () => ({ prisma: {} }))
 vi.mock('@/app/lib/crew-mappings', () => ({ getCrewMappings: vi.fn() }))
 vi.mock('@/app/lib/sheets/members-list', () => ({ fetchAllMembers: vi.fn() }))
@@ -15,15 +16,15 @@ vi.mock('@/app/lib/roster-writeback', () => ({
   },
 }))
 vi.mock('@/app/lib/settings', () => ({ loadSettings: async () => ({ get: (k: string) => settingValues.get(k) }) }))
-vi.mock('@/app/lib/settings/toggles', () => ({ toggleEnabled: () => toggle() }))
+vi.mock('@/app/lib/settings/toggles', () => ({ toggleEnabled: (k: string) => (k === 'crews.rosterBenchEnabled' ? Promise.resolve(benchOn) : toggle()) }))
 
-import { parseExcludeIds, planRosterAdds, roundRobinByCrew, runRosterAutoAdd, type AttendanceRow, type PageRoster, type RosterAutoAddDeps, type RosterMember } from './roster-auto-add'
+import { parseExcludeIds, planRosterAdds, roundRobinByCrew, STATUS_COLD, STATUS_WARM, runRosterAutoAdd, type AttendanceRow, type PageRoster, type RosterAutoAddDeps, type RosterMember } from './roster-auto-add'
 
 const id = (n: number) => `1000000000000000${String(n).padStart(3, '0')}`
 const day = (n: number) => new Date(Date.UTC(2026, 9, n))
 const row = (n: number, crewId: string, d: number): AttendanceRow => ({ discordId: id(n), crewId, callDate: day(d) })
 const member = (n: number, crews: string[] = []): RosterMember => ({ id: `m${n}`, discordId: id(n), crews: new Set(crews) })
-const rule = { minCalls: 2, windowCalls: 4 }
+const rule = { minCalls: 2, lookbackDays: 365, benchMinCalls: 3, now: day(30) }
 const known = new Set(['ops', 'comms'])
 const pageOf = (ids: string[] = [], o: Partial<Record<'names' | 'removedMemberIds' | 'removedNames', string[]>> = {}): PageRoster => ({
   memberIds: new Set(ids),
@@ -33,10 +34,12 @@ const pageOf = (ids: string[] = [], o: Partial<Record<'names' | 'removedMemberId
 })
 
 const plan = (rows: AttendanceRow[], members: RosterMember[], extra: Partial<Parameters<typeof planRosterAdds>[0]> = {}) =>
+  planRosterAdds({ rows, members, knownCrews: known, excluded: new Set(), rule, ...extra }).active
+const planBoth = (rows: AttendanceRow[], members: RosterMember[], extra: Partial<Parameters<typeof planRosterAdds>[0]> = {}) =>
   planRosterAdds({ rows, members, knownCrews: known, excluded: new Set(), rule, ...extra })
 
 describe('planRosterAdds', () => {
-  it('adds a member who attended 2 of the last 4 calls', () => {
+  it('adds a member who attended 2 distinct calls within the look-back', () => {
     const rows = [row(1, 'ops', 1), row(1, 'ops', 8), row(2, 'ops', 15), row(2, 'ops', 22)]
     expect(plan(rows, [member(1), member(2)])).toEqual([
       { crewId: 'ops', memberId: 'm1', discordId: id(1), cell: true, page: false, role: false },
@@ -44,10 +47,18 @@ describe('planRosterAdds', () => {
     ])
   })
 
-  it('does not add one attendance, or attendance outside the last 4 calls', () => {
-    const rows = [row(1, 'ops', 1), row(1, 'ops', 8), row(9, 'ops', 15), row(9, 'ops', 22), row(9, 'ops', 23), row(9, 'ops', 24), row(3, 'ops', 24)]
-    // Calls: days 1, 8, 15, 22, 23, 24 -> the last 4 are 15, 22, 23, 24. Member 1 only attended outside; member 3 once.
-    expect(plan(rows, [member(1), member(3), member(9)]).map((p) => p.memberId)).toEqual(['m9'])
+  it('does not add one attendance, or attendance outside the look-back', () => {
+    const rows = [row(1, 'ops', 1), row(1, 'ops', 8), row(9, 'ops', 22), row(9, 'ops', 23), row(9, 'ops', 24), row(3, 'ops', 24)]
+    // Look-back of 10 days from day 30: only days 20+ count. Member 1 attended long before; member 3 once.
+    expect(plan(rows, [member(1), member(3), member(9)], { rule: { ...rule, lookbackDays: 10 } }).map((p) => p.memberId)).toEqual(['m9'])
+  })
+
+  it('a call long ago does not count towards the active rule but the history still counts for the bench', () => {
+    const rows = [1, 2, 3].map((d) => row(1, 'ops', d))
+    const old = { ...rule, lookbackDays: 10 }
+    const r = planBoth(rows, [member(1)], { rule: old, pageRosters: new Map([['ops', pageOf()]]) })
+    expect(r.active).toEqual([])
+    expect(r.bench).toEqual([{ crewId: 'ops', memberId: 'm1' }])
   })
 
   it('counts a call once however many rows it has', () => {
@@ -73,8 +84,37 @@ describe('planRosterAdds', () => {
 
   it('applies the configured rule', () => {
     const rows = [row(1, 'ops', 1), row(1, 'ops', 8), row(1, 'ops', 15)]
-    expect(plan(rows, [member(1)], { rule: { minCalls: 3, windowCalls: 4 } })).toHaveLength(1)
-    expect(plan(rows, [member(1)], { rule: { minCalls: 4, windowCalls: 4 } })).toHaveLength(0)
+    expect(plan(rows, [member(1)], { rule: { ...rule, minCalls: 3 } })).toHaveLength(1)
+    expect(plan(rows, [member(1)], { rule: { ...rule, minCalls: 4 } })).toHaveLength(0)
+  })
+})
+
+describe('planRosterAdds: bench', () => {
+  const pages = new Map([['ops', pageOf()]])
+  const hist = (n: number, k: number, from = 1) => Array.from({ length: k }, (_, i) => row(n, 'ops', from + i))
+  const old = { ...rule, lookbackDays: 5 }
+  it('plans only a page row for a past attendee with enough history who is not active', () => {
+    const r = planBoth(hist(1, 3), [member(1)], { rule: old, pageRosters: pages, roleIds: new Map([['ops', '555']]), heldRoles: new Map([[id(1), new Set<string>()]]) })
+    expect(r.active).toEqual([])
+    expect(r.bench).toEqual([{ crewId: 'ops', memberId: 'm1' }])
+  })
+  it('needs benchMinCalls distinct calls ever', () => {
+    expect(planBoth(hist(1, 2), [member(1)], { rule: old, pageRosters: pages }).bench).toEqual([])
+    expect(planBoth([...hist(1, 2), row(1, 'ops', 2)], [member(1)], { rule: old, pageRosters: pages }).bench).toEqual([])
+  })
+  it('an active regular is never on the bench', () => {
+    const r = planBoth(hist(1, 3, 25), [member(1)], { pageRosters: pages })
+    expect(r.bench).toEqual([])
+    expect(r.active).toHaveLength(1)
+  })
+  it('no bench row when already on the page, archived (removed), or the crew page is sheet-sourced', () => {
+    expect(planBoth(hist(1, 3), [member(1)], { rule: old, pageRosters: new Map([['ops', pageOf(['m1'])]]) }).bench).toEqual([])
+    expect(planBoth(hist(1, 3), [member(1)], { rule: old, pageRosters: new Map([['ops', pageOf([], { removedMemberIds: ['m1'] })]]) }).bench).toEqual([])
+    expect(planBoth(hist(1, 3), [member(1)], { rule: old }).bench).toEqual([])
+  })
+  it('skips excluded ids and people without a member record', () => {
+    expect(planBoth(hist(1, 3), [member(1)], { rule: old, pageRosters: pages, excluded: new Set([id(1)]) }).bench).toEqual([])
+    expect(planBoth(hist(5, 3), [member(1)], { rule: old, pageRosters: pages }).bench).toEqual([])
   })
 })
 
@@ -159,7 +199,10 @@ function makeDeps(over: Partial<RosterAutoAddDeps> = {}) {
 beforeEach(() => {
   settingValues.clear()
   settingValues.set('crews.rosterAutoAddMinCalls', 2)
-  settingValues.set('crews.rosterAutoAddWindowCalls', 4)
+  settingValues.set('crews.rosterAutoAddLookbackDays', 365)
+  settingValues.set('crews.rosterBenchMinCalls', 3)
+  settingValues.set('crews.rosterBenchMaxPerRun', 100)
+  benchOn = false
   settingValues.set('crews.rosterAutoAddMaxPerRun', 25)
   settingValues.set('crews.rosterAutoAddExcludeIds', '')
   toggle.mockResolvedValue(true)
@@ -170,7 +213,7 @@ describe('runRosterAutoAdd', () => {
     toggle.mockResolvedValue(false)
     const { deps } = makeDeps()
     const r = await runRosterAutoAdd({}, deps)
-    expect(r).toMatchObject({ dryRun: true, switchOff: true, planned: 1, perCrew: { crewsCell: { ops: 1 }, crewPage: { ops: 1 }, role: { ops: 1 } } })
+    expect(r).toMatchObject({ dryRun: true, switchOff: true, planned: 1, perCrew: { active: { crewsCell: { ops: 1 }, crewPage: { ops: 1 }, role: { ops: 1 } }, bench: { crewPage: {} } } })
     expect(r.adds).toBeUndefined()
     expect(deps.updateCrews).not.toHaveBeenCalled()
     expect(deps.addToCrewPage).not.toHaveBeenCalled()
@@ -181,7 +224,7 @@ describe('runRosterAutoAdd', () => {
     const { deps } = makeDeps()
     const r = await runRosterAutoAdd({ dryRun: true }, deps)
     expect(r.adds).toEqual([{ crewId: 'ops', memberId: 'm1', crewsCell: true, crewPage: true, role: true }])
-    expect(r.perCrew).toEqual({ crewsCell: { ops: 1 }, crewPage: { ops: 1 }, role: { ops: 1 } })
+    expect(r.perCrew).toEqual({ active: { crewsCell: { ops: 1 }, crewPage: { ops: 1 }, role: { ops: 1 } }, bench: { crewPage: {} } })
     expect(deps.updateCrews).not.toHaveBeenCalled()
     expect(deps.addToCrewPage).not.toHaveBeenCalled()
     expect(deps.writeRole).not.toHaveBeenCalled()
@@ -256,7 +299,7 @@ describe('runRosterAutoAdd', () => {
     expect(r).toMatchObject({ added: 1, pageAdded: 1, roleFailed: 1, stoppedReason: 'discord rate limited' })
     expect(cells.get('m1')).toEqual(['ops'])
     // Tomorrow: cell and page are there, only the role is still planned.
-    expect(await runRosterAutoAdd({ dryRun: true }, deps)).toMatchObject({ perCrew: { crewsCell: {}, crewPage: {}, role: { ops: 1 } } })
+    expect(await runRosterAutoAdd({ dryRun: true }, deps)).toMatchObject({ perCrew: { active: { crewsCell: {}, crewPage: {}, role: { ops: 1 } } } })
   })
 
   const crewFixture = (crewIds: string[], perCrew: number) => {
@@ -333,5 +376,84 @@ describe('runRosterAutoAdd', () => {
     expect(calls.filter((c) => c === '111')).toHaveLength(1)
     expect(calls.filter((c) => c === '222')).toHaveLength(2)
     expect(r).toMatchObject({ crewsRoleBlocked: 1, roleFailed: 1, roleGranted: 2, added: 4 })
+  })
+
+  it('new page rows for active regulars are 3. Warm', async () => {
+    const { deps } = makeDeps()
+    await runRosterAutoAdd({}, deps)
+    expect(deps.addToCrewPage).toHaveBeenCalledWith(expect.objectContaining({ memberId: 'm1', status: STATUS_WARM }))
+  })
+
+  describe('bench', () => {
+    const benchFixture = (n: number, crews = ['ops']) => {
+      const ms: RosterMember[] = []
+      const rows: AttendanceRow[] = []
+      let k = 20
+      for (const c of crews)
+        for (let i = 0; i < n; i++) {
+          k++
+          ms.push(member(k))
+          rows.push(row(k, c, 1), row(k, c, 2), row(k, c, 3))
+        }
+      return { ms, rows }
+    }
+    // Calls in Oct 2026, so a 30 day look-back from the fake 2026-10-30 clock is Oct 1: set days old via lookback.
+    const mk = (n: number, over: Partial<RosterAutoAddDeps> = {}, crews = ['ops']) => {
+      const { ms, rows } = benchFixture(n, crews)
+      return makeDeps({
+        now: () => new Date('2027-10-30T00:00:00Z'),
+        loadRows: async () => rows,
+        loadMembers: async () => ms,
+        loadCrews: async () => crews.map((id) => ({ id })),
+        loadPageRosters: async () => ({ rosters: new Map(crews.map((c) => [c, pageOf()])), sheetSourced: [] }),
+        loadHeldRoles: async () => new Map(),
+        ...over,
+      })
+    }
+
+    it('off by default: counts only, writes nothing; the active switch is separate', async () => {
+      const { deps } = mk(3)
+      const r = await runRosterAutoAdd({}, deps)
+      expect(r).toMatchObject({ benchSwitchOff: true, benchPlanned: 3, benchAdded: 0, planned: 0 })
+      expect(deps.addToCrewPage).not.toHaveBeenCalled()
+    })
+
+    it('on: only 5. Cold page rows, no cell change and no role; idempotent', async () => {
+      benchOn = true
+      toggle.mockResolvedValue(false) // the active switch stays off
+      const { deps, page } = mk(3)
+      const r = await runRosterAutoAdd({}, deps)
+      expect(r).toMatchObject({ benchAdded: 3, planned: 0 })
+      expect(deps.addToCrewPage).toHaveBeenCalledTimes(3)
+      for (const [i] of (deps.addToCrewPage as ReturnType<typeof vi.fn>).mock.calls) expect(i.status).toBe(STATUS_COLD)
+      expect(deps.updateCrews).not.toHaveBeenCalled()
+      expect(deps.writeRole).not.toHaveBeenCalled()
+      expect(page.size).toBe(4)
+    })
+
+    it('has its own cap, round-robin across crews, and catches up over nights', async () => {
+      benchOn = true
+      settingValues.set('crews.rosterBenchMaxPerRun', 2)
+      const { deps } = mk(2, {}, ['comms', 'ops'])
+      const r = await runRosterAutoAdd({}, deps)
+      expect(r).toMatchObject({ benchAdded: 2, benchDeferred: 2 })
+      const crews = (deps.addToCrewPage as ReturnType<typeof vi.fn>).mock.calls.map(([i]) => i.crewId)
+      expect(new Set(crews)).toEqual(new Set(['comms', 'ops']))
+    })
+
+    it('dry run lists bench ids per crew and writes nothing', async () => {
+      benchOn = true
+      const { deps } = mk(2)
+      const r = await runRosterAutoAdd({ dryRun: true }, deps)
+      expect(r.perCrew.bench.crewPage).toEqual({ ops: 2 })
+      expect(r.benchAdds).toHaveLength(2)
+      expect(deps.addToCrewPage).not.toHaveBeenCalled()
+    })
+
+    it('never changes an existing row: a member already on the page is not re-added', async () => {
+      benchOn = true
+      const { deps } = mk(1, { loadPageRosters: async () => ({ rosters: new Map([['ops', pageOf(['m21'])]]), sheetSourced: [] }) })
+      expect(await runRosterAutoAdd({}, deps)).toMatchObject({ benchPlanned: 0, benchAdded: 0 })
+    })
   })
 })
