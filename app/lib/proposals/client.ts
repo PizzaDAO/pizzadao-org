@@ -109,6 +109,53 @@ export function decodeVoteCode(code: string, proposalId: string): Ballot | null 
   }
 }
 
+const CLOCK_KEY = 'pizzadao:proposals-clock'
+let clockOffsetMs = 0
+let clockLoaded = false
+
+function loadClock(): void {
+  if (clockLoaded) return
+  clockLoaded = true
+  for (const store of ['sessionStorage', 'localStorage'] as const) {
+    try {
+      const o = JSON.parse(window[store].getItem(CLOCK_KEY) || 'null') as { offset?: number; at?: number } | null
+      if (o && Number.isFinite(o.offset) && Number.isFinite(o.at) && Date.now() - (o.at as number) < 30 * 24 * 3600 * 1000) {
+        clockOffsetMs = o.offset as number
+        return
+      }
+    } catch {
+      /* try the next store */
+    }
+  }
+}
+
+/** Learn how far this device's clock is from the server's, from a response's Date header (1 s resolution). */
+export function noteServerDate(res: { headers?: { get(name: string): string | null } } | null | undefined): void {
+  try {
+    const d = Date.parse(res?.headers?.get('date') ?? '')
+    if (Number.isFinite(d)) {
+      clockLoaded = true
+      clockOffsetMs = d - Date.now()
+      const v = JSON.stringify({ offset: clockOffsetMs, at: Date.now() })
+      for (const store of ['sessionStorage', 'localStorage'] as const) {
+        try {
+          window[store].setItem(CLOCK_KEY, v)
+        } catch {
+          /* blocked */
+        }
+      }
+    }
+  } catch {
+    /* no header: keep the last offset */
+  }
+}
+
+/** The server's idea of "now" (ms). Close times are the server's, so the close clamp and checks use this, not the device clock. */
+export function serverNow(): number {
+  loadClock()
+  return Date.now() + clockOffsetMs
+}
+
 const squash = (fp: string) => fp.replace(/\s+/g, '').toLowerCase()
 
 /**
@@ -124,6 +171,7 @@ export function discordFingerprintFromUrl(search: string): string | null {
 /** Fetch the proposal's key and check it: same fingerprint as the page and the Discord link showed, never changed since first seen, RSA >= 2048. */
 async function trustedPublicKey(proposalId: string, pageFingerprint?: string | null): Promise<string> {
   const res = await fetch(`/api/proposals/${encodeURIComponent(proposalId)}/pubkey`, { cache: 'no-store' })
+  noteServerDate(res)
   if (!res.ok) throw new Error('key')
   const { publicKey, fingerprint } = (await res.json()) as { publicKey: string; fingerprint: string }
   const computed = await fingerprintOfPem(publicKey)
@@ -190,6 +238,7 @@ export function prepareBallot(proposalId: string, pageFingerprint?: string | nul
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ blindedMessage: toBase64(blindedMessage) }),
       })
+      noteServerDate(res)
       if (res.status === 409 || res.status === 403 || res.status === 404) return loadBallot(proposalId) // issued elsewhere / not eligible / closed
       if (!res.ok) throw new Error('sign')
       const { blindSignature } = (await res.json()) as { blindSignature: string }
@@ -203,30 +252,34 @@ export function prepareBallot(proposalId: string, pageFingerprint?: string | nul
   return p
 }
 
-export type VoteOutcome = 'ok' | 'closed' | 'invalid' | 'error'
+export type VoteOutcome = 'ok' | 'closed' | 'invalid' | 'unavailable' | 'error'
 
 /** Sends the vote with no cookies and no referrer: the request carries nothing but the token and the choice. */
-export async function castVote(proposalId: string, ballot: Ballot, choice: Choice): Promise<VoteOutcome> {
+export async function castVote(proposalId: string, ballot: Ballot, choice: Choice, opts: { keepalive?: boolean } = {}): Promise<VoteOutcome> {
   try {
     const res = await fetch(`/api/proposals/${encodeURIComponent(proposalId)}/vote`, {
       method: 'POST',
       credentials: 'omit',
+      ...(opts.keepalive ? { keepalive: true } : typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? { signal: AbortSignal.timeout(20_000) } : {}),
       referrerPolicy: 'no-referrer',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token: ballot.token, preparedMessage: ballot.preparedMessage, signature: ballot.signature, choice }),
     })
+    noteServerDate(res)
     if (res.ok) return 'ok'
-    if (res.status === 409 || res.status === 404) return 'closed'
+    // 409 is the server saying voting is over. 404 can also mean the feature was switched off for a while: not final.
+    if (res.status === 409) return 'closed'
+    if (res.status === 404) return 'unavailable'
     if (res.status === 401 || res.status === 400) return 'invalid'
     return 'error'
-  } catch {
-    return 'error'
+  } catch (e) {
+    return e instanceof Error && (e.name === 'TimeoutError' || e.name === 'AbortError') ? 'unavailable' : 'error'
   }
 }
 
 /**
- * Send the vote now. (There is no client-side delay: the server mixes votes before they reach the ballot table, see
- * pending.ts. "ok" means the server durably recorded the vote.)
+ * Send the vote now. (The random send delay lives in vote-queue.ts, which calls castVote when a queued vote is due; the
+ * server also mixes votes before they reach the ballot table, see pending.ts. "ok" means the server durably recorded it.)
  */
 export async function submitVote(proposalId: string, ballot: Ballot, choice: Choice): Promise<{ outcome: VoteOutcome; ballot: Ballot }> {
   const outcome = await castVote(proposalId, ballot, choice)

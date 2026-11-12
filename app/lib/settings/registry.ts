@@ -2046,6 +2046,26 @@ export const SETTINGS = {
     unit: 'minutes',
     onReadFailure: { value: 60 },
   }),
+  'proposals.voteDelayMinSeconds': intSetting({
+    key: 'proposals.voteDelayMinSeconds',
+    area: 'proposals',
+    label: 'Vote send delay, minimum',
+    help: 'When a member taps Aye, Nay or Abstain the browser waits a random time between this minimum and the maximum below before sending the vote, so the vote cannot be matched to the ballot-token request by server logs. Never past the close of voting. Keep this at or below the maximum (if not, the maximum is used for both).',
+    min: 0,
+    max: 3600,
+    default: 60,
+    unit: 'seconds',
+  }),
+  'proposals.voteDelayMaxSeconds': intSetting({
+    key: 'proposals.voteDelayMaxSeconds',
+    area: 'proposals',
+    label: 'Vote send delay, maximum',
+    help: 'The longest random wait before a vote is sent (see the minimum above). At most 3600 seconds.',
+    min: 0,
+    max: 3600,
+    default: 600,
+    unit: 'seconds',
+  }),
   'proposals.liveSince': {
     ...textSetting({
     key: 'proposals.liveSince',

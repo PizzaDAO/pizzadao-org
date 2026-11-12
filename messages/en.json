@@ -2178,7 +2178,8 @@
       "beneficiaryClear": "Remove",
       "tierNeeds": "This proposal will need {count} ayes plus abstains, and more ayes than nays.",
       "tierList": "Up to ${cap}: {low} ayes; up to ${midMax}: {mid}; above that: {high}.",
-      "tierNote": "The amounts and numbers can change over time. Each proposal keeps the numbers it opened with."
+      "tierNote": "The amounts and numbers can change over time. Each proposal keeps the numbers it opened with.",
+      "pilotNeeds": "Pilot test proposal: needs 1 aye, closes after {minutes} minutes, never funds anything."
     },
     "detail": {
       "back": "All proposals",
@@ -2203,6 +2204,10 @@
       "preparing": "Getting your ballot ready...",
       "working": "Recording...",
       "recorded": "Recorded: {choice}. You can change it until {date}.",
+      "queued": "Not sent yet ({choice}). It goes in about {minutes, plural, one {# minute} other {# minutes}} while this site is open in this browser. If you close it, it goes next time you open the site here; if you don't come back before voting closes, it won't count.",
+      "sendNow": "Send now",
+      "sendNowHelp": "Sending now is certain but a little less private: the wait exists so the site's logs cannot link your vote to your ballot request.",
+      "failedChange": "Your change to {failed} did not go through; {recorded} is what counts.",
       "notEligible": "Only members with the Box Mafia role when this proposal opened can vote.",
       "closed": "Voting is closed.",
       "login": "Log in to vote.",
@@ -2244,6 +2249,7 @@
       "saveCode": "Save code",
       "open": "Open proposal",
       "dismiss": "Dismiss",
+      "voteFailed": "A vote could not be sent. Open the proposal.",
       "shared": "Code shared.",
       "copied": "Code copied.",
       "failed": "Could not copy. Open the proposal and copy the code from there."
