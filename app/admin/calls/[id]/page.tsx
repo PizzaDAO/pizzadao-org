@@ -25,6 +25,7 @@ import { CrewCallUpdates } from "@/app/crew/[crewId]/CrewCallUpdates";
 import { crewInAllowlist, loadTaskProposalConfig } from "@/app/lib/call-tasks/config";
 import { prisma } from "@/app/lib/db";
 import { PERMANENT_TRANSCRIBE_ERRORS, PROGRESS } from "@/app/lib/calls/transcribe";
+import { readEvidence } from "@/app/lib/calls/evidence";
 import { HideLine } from "../HideLine";
 import { segmentKey } from "@/app/lib/calls/chat";
 import { displaySpeakerName, importedSpeakerNumber } from "@/app/lib/calls/speaker-labels";
@@ -71,7 +72,7 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
     const labelsNewerThanSummary =
         imported && !!rec.speakerLabelsUpdatedAt && !!rec.summary && rec.speakerLabelsUpdatedAt.getTime() > Math.max(rec.summaryGeneratedAt?.getTime() ?? 0, rec.summaryEditedAt?.getTime() ?? 0);
     const canLabel = imported && rec.status !== "REJECTED" && rec.status !== "PROCESSING";
-    const actionItems = (Array.isArray(rec.actionItems) ? rec.actionItems : []) as Array<{ text?: string; owner?: string; suggestedBy?: string; done?: boolean }>;
+    const actionItems = (Array.isArray(rec.actionItems) ? rec.actionItems : []) as Array<{ text?: string; owner?: string; suggestedBy?: string; done?: boolean; evidence?: Array<{ url: string; label?: string }> }>;
     const chapters = (Array.isArray(rec.chapters) ? rec.chapters : []) as Array<{ startMs?: number; title?: string }>;
     // Preview of the Discord recap that publishing triggers (text from the saved title/summary/action items).
     const postFilter = await loadPostFilter().catch(() => null);
@@ -280,13 +281,14 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                                 status={rec.status}
                                 initialTitle={rec.title ?? ""}
                                 initialSummary={rec.summary ?? ""}
-                                initialActionItems={actionItems.filter((i): i is { text: string; owner?: string; suggestedBy?: string; done?: boolean } => !!i.text)}
+                                initialActionItems={actionItems.filter((i): i is { text: string; owner?: string; suggestedBy?: string; done?: boolean; evidence?: Array<{ url: string; label?: string }> } => !!i.text)}
                                 initialChapters={chapters.filter((c): c is { startMs: number; title: string } => !!c.title && typeof c.startMs === "number")}
                                 labels={{
                                     title: t("fieldTitle"),
                                     actionItems: t("actionItemsHeading"),
                                     actionItemsHint: t("actionItemsHint"),
                                     actionItemDone: t("actionItemDone"),
+                                    actionItemEvidence: t("actionItemEvidence"),
                                     tooManyItems: t("tooManyItems"),
                                     tooManyChapters: t("tooManyChapters"),
                                     badChapter: t("badChapter"),
@@ -353,6 +355,9 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                                 <li key={i}>
                                     {item.done ? <span role="img" aria-label={t("actionItemDone")}>{"\u2705"} </span> : null}
                                     {item.text}
+                                    {item.done ? readEvidence(item.evidence).map((e) => (
+                                        <a key={e.url} href={e.url} target="_blank" rel="noopener noreferrer" className="ml-2 text-xs underline">{e.label}</a>
+                                    )) : null}
                                     {item.owner ? <span className="text-foreground/60"> ({item.owner})</span> : null}
                                     {item.suggestedBy ? <span className="text-foreground/60"> {"\u2014"} {t("suggestedBy", { name: item.suggestedBy })}</span> : null}
                                 </li>

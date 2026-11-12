@@ -42,7 +42,8 @@ const MAX_WAIT_MS = 15_000
 
 /** Discord markup to the plain text the proxy sends: no mentions, no bold/italic markers, capped length. */
 export function toPlainPost(text: string, link: string = SITE_URL): string {
-  let t = discordTextToPlainText(text)
+  // Masked evidence links on done action items ([PR #308](<url>)) become just "(PR #308)".
+  let t = discordTextToPlainText(text.replace(/\[([^\]\n]{1,60})\]\(<https?:\/\/[^>\s]+>\)/g, '($1)'))
     .replace(/@(everyone|here)\b/gi, '')
     .replace(/\*\*|__|~~|`{1,3}/g, '')
     .replace(/(^|[\s(])\*(?=\S)([^*\n]+)\*(?=$|[\s).,!?])/g, '$1$2')

@@ -3,6 +3,7 @@ import { requireCallReviewer } from '@/app/lib/calls/access'
 import { updateRecordingText, type RecordingTextEdit } from '@/app/lib/calls/recordings'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { NotFoundError, ValidationError } from '@/app/lib/errors/api-errors'
+import { parseEvidenceStrict, type Evidence } from '@/app/lib/calls/evidence'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -24,13 +25,14 @@ function parseTextEdit(body: Record<string, unknown>): RecordingTextEdit {
     if (!Array.isArray(body.actionItems) || body.actionItems.length > MAX_LIST) throw new ValidationError(`actionItems must be an array of up to ${MAX_LIST}`)
     edit.actionItems = body.actionItems
       .map((raw, i) => {
-        const r = (raw ?? {}) as { text?: unknown; owner?: unknown; suggestedBy?: unknown; done?: unknown }
+        const r = (raw ?? {}) as { text?: unknown; owner?: unknown; suggestedBy?: unknown; done?: unknown; evidence?: unknown }
         const t = text(r.text ?? null, `actionItems[${i}].text`, 500)
         const owner = r.owner == null ? null : text(r.owner, `actionItems[${i}].owner`, 100)
         const suggestedBy = r.suggestedBy == null ? null : text(r.suggestedBy, `actionItems[${i}].suggestedBy`, 100)
-        return t ? { text: t, ...(owner ? { owner } : {}), ...(suggestedBy ? { suggestedBy } : {}), ...(r.done === true ? { done: true } : {}) } : null
+        const evidence = parseEvidenceStrict(r.evidence, `actionItems[${i}].evidence`, (m) => { throw new ValidationError(m) })
+        return t ? { text: t, ...(owner ? { owner } : {}), ...(suggestedBy ? { suggestedBy } : {}), ...(r.done === true ? { done: true } : {}), ...(evidence.length ? { evidence } : {}) } : null
       })
-      .filter((x): x is { text: string; owner?: string; suggestedBy?: string; done?: boolean } => !!x)
+      .filter((x): x is { text: string; owner?: string; suggestedBy?: string; done?: boolean; evidence?: Evidence[] } => !!x)
   }
   if (body.chapters !== undefined) {
     if (!Array.isArray(body.chapters) || body.chapters.length > MAX_LIST) throw new ValidationError(`chapters must be an array of up to ${MAX_LIST}`)

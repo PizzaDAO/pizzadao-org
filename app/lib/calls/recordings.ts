@@ -384,14 +384,17 @@ export async function generateAndStoreSummaryResult(id: string, opts: SummaryOpt
 }
 
 /** Keeps `done` on regenerated action items whose text is unchanged (case/whitespace-insensitive); everything else stays open. */
-export function carryDone<T extends { text: string }>(prev: unknown, next: T[]): Array<T & { done?: boolean }> {
+export function carryDone<T extends { text: string }>(prev: unknown, next: T[]): Array<T & { done?: boolean; evidence?: Array<{ url: string; label?: string }> }> {
   const norm = (s: string) => s.replace(/\s+/g, ' ').trim().toLowerCase()
-  const done = new Set<string>()
+  const done = new Map<string, Array<{ url: string; label?: string }>>()
   for (const a of Array.isArray(prev) ? prev : []) {
-    const o = a as { text?: unknown; done?: unknown }
-    if (o?.done === true && typeof o.text === 'string') done.add(norm(o.text))
+    const o = a as { text?: unknown; done?: unknown; evidence?: unknown }
+    if (o?.done === true && typeof o.text === 'string') done.set(norm(o.text), Array.isArray(o.evidence) ? (o.evidence as Array<{ url: string; label?: string }>) : [])
   }
-  return next.map((a) => (done.has(norm(a.text)) ? { ...a, done: true } : a))
+  return next.map((a) => {
+    const ev = done.get(norm(a.text))
+    return ev ? { ...a, done: true, ...(ev.length ? { evidence: ev } : {}) } : a
+  })
 }
 
 /**
@@ -466,7 +469,7 @@ export async function unpublishRecording(id: string, reviewerDiscordId: string, 
 export interface RecordingTextEdit {
   title?: string | null
   summary?: string | null
-  actionItems?: Array<{ text: string; owner?: string; suggestedBy?: string; done?: boolean }>
+  actionItems?: Array<{ text: string; owner?: string; suggestedBy?: string; done?: boolean; evidence?: Array<{ url: string; label?: string }> }>
   chapters?: Array<{ startMs: number; title: string }>
 }
 
@@ -484,8 +487,8 @@ export async function updateRecordingText(id: string, edit: RecordingTextEdit): 
   const data: Prisma.CallRecordingUpdateInput = {}
   // A reviewer's words: automatic transcription/summary runs must never overwrite them.
   // Only a real change of the summary / action items / chapters text counts (a title-only or no-op save does not).
-  // `done` is a status flag, not reviewer text: toggling it alone does not freeze the summary against automatic reruns.
-  const stripDone = (v: unknown) => (Array.isArray(v) ? v.map((x) => { if (!x || typeof x !== 'object') return x; const { done: _d, ...rest } = x as Record<string, unknown>; return rest }) : v)
+  // `done` and its evidence links are status, not reviewer text: toggling it alone does not freeze the summary against automatic reruns.
+  const stripDone = (v: unknown) => (Array.isArray(v) ? v.map((x) => { if (!x || typeof x !== 'object') return x; const { done: _d, evidence: _e, ...rest } = x as Record<string, unknown>; return rest }) : v)
   const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
   const textChanged =
     (edit.summary !== undefined && !same(rec.summary, edit.summary)) ||
