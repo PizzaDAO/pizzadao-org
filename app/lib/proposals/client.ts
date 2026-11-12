@@ -9,7 +9,7 @@
  *    unblinds, keeps it in localStorage;
  *  - submitVote(): sends the vote at once; the server mixes votes before they reach the ballot table (pending.ts);
  *  - castVote(): sends token + choice with no cookies and no referrer to the unauthenticated vote endpoint;
- *  - the "vote code" is the ballot encoded as text, to change a vote from another browser.
+ *  - the "vote code" is the ballot encoded as text, to vote or change a vote from another browser.
  */
 import { blind, finalize, fromBase64, importPublicKey, prepareMessage, toBase64 } from '@/utils/blindRsa.client'
 import { fingerprintOfPem, modulusOk } from './fingerprint'
@@ -49,45 +49,39 @@ export function saveBallot(proposalId: string, ballot: Ballot): void {
   }
 }
 
-const UNSAVED_KEY = 'pizzadao:proposals-unsaved'
-export interface Unsaved {
-  id: string
-  title: string
+const LEGACY_UNSAVED_KEY = 'pizzadao:proposals-unsaved'
+
+/** Proposal ids that have a ballot stored in this browser. */
+export function listBallotIds(): string[] {
+  const ids: string[] = []
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (k && k.startsWith(PREFIX)) ids.push(k.slice(PREFIX.length))
+    }
+  } catch {
+    /* no storage */
+  }
+  return ids
 }
 
-/**
- * Ballots this browser made whose vote code the member has not saved or dismissed yet. The "save your code" card
- * (GlobalBallotPreparer) shows them on every page until saved or dismissed, also after a reload. Only ids and titles
- * (public) are kept here; the ballot itself is in its own key.
- */
-export function listUnsaved(): Unsaved[] {
+/** Forget this browser's ballot and pinned key for a proposal (used once the proposal is no longer open). */
+export function removeBallot(proposalId: string): void {
   try {
-    const raw = JSON.parse(localStorage.getItem(UNSAVED_KEY) || '[]') as unknown
-    if (!Array.isArray(raw)) return []
-    return raw
-      .filter((x): x is Unsaved => !!x && typeof (x as Unsaved).id === 'string' && /^[A-Za-z0-9_-]{8,60}$/.test((x as Unsaved).id) && typeof (x as Unsaved).title === 'string')
-      .filter((x) => loadBallot(x.id) !== null)
-      .slice(0, 20)
+    localStorage.removeItem(storageKey(proposalId))
+    localStorage.removeItem(pinKey(proposalId))
   } catch {
-    return []
+    /* no storage */
   }
 }
 
-function writeUnsaved(list: Unsaved[]): void {
+/** Drops the old "save your code" reminder list that earlier versions kept. */
+export function clearLegacyUnsaved(): void {
   try {
-    localStorage.setItem(UNSAVED_KEY, JSON.stringify(list.slice(0, 20)))
+    localStorage.removeItem(LEGACY_UNSAVED_KEY)
   } catch {
-    /* blocked storage: the card only lasts for this page then */
+    /* no storage */
   }
-}
-
-export function markUnsaved(id: string, title: string): void {
-  const rest = listUnsaved().filter((x) => x.id !== id)
-  writeUnsaved([...rest, { id, title: title.slice(0, 200) }])
-}
-
-export function markSaved(id: string): void {
-  writeUnsaved(listUnsaved().filter((x) => x.id !== id))
 }
 
 /** The ballot as a copyable string. base64url of {t, p, s}. */
@@ -289,21 +283,12 @@ export async function submitVote(proposalId: string, ballot: Ballot, choice: Cho
   return { outcome, ballot: next }
 }
 
-/** Share (where the browser supports it) or copy the vote code. Returns how it was handled. */
-export async function shareVoteCode(ballot: Ballot, title: string): Promise<'shared' | 'copied' | 'failed'> {
-  const code = encodeVoteCode(ballot)
+/** Copy the vote code to the clipboard. */
+export async function copyVoteCode(ballot: Ballot): Promise<boolean> {
   try {
-    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
-      await navigator.share({ title, text: code })
-      return 'shared'
-    }
+    await navigator.clipboard.writeText(encodeVoteCode(ballot))
+    return true
   } catch {
-    /* cancelled: fall through to copy */
-  }
-  try {
-    await navigator.clipboard.writeText(code)
-    return 'copied'
-  } catch {
-    return 'failed'
+    return false
   }
 }

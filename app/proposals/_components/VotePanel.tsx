@@ -7,16 +7,14 @@ import { paperCard } from "@/app/ui/shared/Editorial";
 import { flushDue, getFailed, getQueued, queueVote, sendNow, QUEUE_EVENT, type FailedVote, type QueuedVote } from "@/app/lib/proposals/vote-queue";
 import { formatProposalTime } from "@/app/lib/proposals/time";
 import {
+    copyVoteCode,
     decodeVoteCode,
     encodeVoteCode,
     loadBallot,
-    markSaved,
-    markUnsaved,
     noteServerDate,
     prepareBallot,
     serverNow,
     saveBallot,
-    shareVoteCode,
     submitVote,
     type Ballot,
     type Choice,
@@ -33,7 +31,6 @@ const CHOICES: Array<{ choice: Choice; key: "aye" | "nay" | "abstain" }> = [
 
 type Props = {
     proposalId: string;
-    title: string;
     open: boolean;
     closesAt: string | null;
     eligible: boolean;
@@ -45,17 +42,18 @@ type Props = {
     delayMaxSeconds?: number;
 };
 
-export function VotePanel({ proposalId, title, open, closesAt, eligible, tokenIssued, fingerprint, delayMinSeconds = 60, delayMaxSeconds = 600 }: Props) {
+export function VotePanel({ proposalId, open, closesAt, eligible, tokenIssued, fingerprint, delayMinSeconds = 60, delayMaxSeconds = 600 }: Props) {
     const t = useTranslations("proposals.vote");
     const locale = useLocale();
     const [ballot, setBallot] = useState<Ballot | null>(null);
     const [busy, setBusy] = useState<"" | "preparing" | "sending">("");
     const [error, setError] = useState("");
     const [code, setCode] = useState("");
-    const [saved, setSaved] = useState<"" | "shared" | "copied" | "failed">("");
+    const [saved, setSaved] = useState<"" | "copied" | "failed">("");
     const [needsCode, setNeedsCode] = useState(false);
     const [ready, setReady] = useState(false);
     const [showBackup, setShowBackup] = useState(false);
+    const [showWhy, setShowWhy] = useState(false);
     const [queued, setQueued] = useState<QueuedVote | null>(null);
     const [failed, setFailed] = useState<FailedVote | null>(null);
     const [now, setNow] = useState(() => serverNow());
@@ -103,18 +101,15 @@ export function VotePanel({ proposalId, title, open, closesAt, eligible, tokenIs
         prepareBallot(proposalId, fingerprint)
             .then((b) => {
                 if (cancelled) return;
-                if (b) {
-                    setBallot(b);
-                    // A fresh ballot: the save card follows the member to other pages until the code is saved.
-                    markUnsaved(proposalId, title);
-                } else setNeedsCode(true);
+                if (b) setBallot(b);
+                else setNeedsCode(true);
             })
             .catch(() => !cancelled && setError(t("tokenError")))
             .finally(() => !cancelled && setReady(true));
         return () => {
             cancelled = true;
         };
-    }, [canVote, proposalId, tokenIssued, fingerprint, title, t]);
+    }, [canVote, proposalId, tokenIssued, fingerprint, t]);
 
     const when = closesAt ? formatProposalTime(closesAt, locale) : "";
 
@@ -171,9 +166,7 @@ export function VotePanel({ proposalId, title, open, closesAt, eligible, tokenIs
 
     async function saveCode() {
         if (!ballot) return;
-        const how = await shareVoteCode(ballot, title);
-        setSaved(how);
-        if (how !== "failed") markSaved(proposalId);
+        setSaved((await copyVoteCode(ballot)) ? "copied" : "failed");
     }
 
     if (!open) return <p className="m-0 text-sm text-foreground/70">{t("closed")}</p>;
@@ -190,25 +183,33 @@ export function VotePanel({ proposalId, title, open, closesAt, eligible, tokenIs
                 {t("heading")}
             </h2>
             {ballot && (
-                <div className="grid gap-2 rounded border border-[hsl(var(--tomato)/0.5)] p-3" role="note">
-                    <p className="m-0 font-semibold">{t("saveTitle")}</p>
-                    <p className="m-0 text-sm">{t("saveHelp")}</p>
-                    <div className="flex flex-wrap gap-2">
-                        <button type="button" onClick={saveCode} className="min-h-11 rounded bg-foreground px-4 text-background">
-                            {t("saveCode")}
+                <div className="grid gap-1 text-sm">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-foreground/80">
+                        <span>{t("otherDevice")}</span>
+                        <button type="button" onClick={saveCode} className="min-h-11 rounded border px-3">
+                            {saved === "copied" ? t("copied") : t("copyCode")}
                         </button>
-                        <button type="button" onClick={() => setShowBackup((v) => !v)} className="min-h-11 rounded border px-4" aria-expanded={showBackup}>
-                            {t("backupWallet")}
+                        <button type="button" onClick={() => setShowWhy((v) => !v)} className="min-h-11 rounded px-2 underline" aria-expanded={showWhy}>
+                            {t("why")}
                         </button>
                     </div>
-                    {saved && (
-                        <p role="status" className="m-0 text-sm">
-                            {saved === "failed" ? t("saveFailed") : saved === "shared" ? t("saveShared") : t("copied")}
-                        </p>
+                    {showWhy && (
+                        <div className="grid gap-2 text-foreground/70">
+                            <p className="m-0">{t("codeWhy")}</p>
+                            <button type="button" onClick={() => setShowBackup((v) => !v)} className="min-h-11 w-fit rounded border px-3" aria-expanded={showBackup}>
+                                {t("backupWallet")}
+                            </button>
+                        </div>
+                    )}
+                    {saved === "failed" && (
+                        <div className="grid gap-1" role="status">
+                            <p className="m-0">{t("copyFailed")}</p>
+                            <textarea readOnly className="min-h-20 w-full rounded border bg-card p-2 font-mono text-xs" value={encodeVoteCode(ballot)} onFocus={(e) => e.currentTarget.select()} />
+                        </div>
                     )}
                 </div>
             )}
-            {(showBackup || (needsCode && !ballot)) && <WalletBackup proposalId={proposalId} ballot={ballot} onRestored={adopt} />}
+            {((showBackup && showWhy) || (needsCode && !ballot)) && <WalletBackup proposalId={proposalId} ballot={ballot} onRestored={adopt} />}
             {needsCode && !ballot ? (
                 <div className="grid gap-2">
                     <p className="m-0 text-sm">{t("needsCode")}</p>
@@ -280,13 +281,6 @@ export function VotePanel({ proposalId, title, open, closesAt, eligible, tokenIs
             )}
             <p className="m-0 text-sm text-foreground/70">{t("secret")}</p>
             {fingerprint && <p className="m-0 break-words font-mono text-xs text-foreground/70">{t("fingerprint", { fp: fingerprint })}</p>}
-            {ballot && (
-                <details className="text-sm">
-                    <summary className="cursor-pointer">{t("yourCode")}</summary>
-                    <p className="mt-2 text-foreground/70">{t("codeHelp")}</p>
-                    <textarea readOnly className="min-h-20 w-full rounded border bg-card p-2 font-mono text-xs" value={encodeVoteCode(ballot)} onFocus={(e) => e.currentTarget.select()} />
-                </details>
-            )}
         </section>
     );
 }

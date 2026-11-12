@@ -76,16 +76,18 @@ describe('GlobalBallotPreparer', () => {
   it('is silent when the answer is null', () => run(() => res(null)))
 })
 
-describe('the save card is sticky (H4)', () => {
+describe('no save-code card; closed proposals are pruned', () => {
   const id = 'abcdefgh12345678'
+  const other = 'zyxwvuts87654321'
+  const ballot = JSON.stringify({ token: 'proposal-x', preparedMessage: 'AA==', signature: 'AA==' })
   beforeEach(() => {
     sessionStorage.clear()
     localStorage.clear()
-    // the ballot is in this browser, but its code was never saved
-    localStorage.setItem(`pizzadao:proposal-ballot:${id}`, JSON.stringify({ token: `proposal-${id}-x`, preparedMessage: 'AA==', signature: 'AA==' }))
+    localStorage.setItem(`pizzadao:proposal-ballot:${id}`, ballot)
+    localStorage.setItem(`pizzadao:proposal-ballot:${other}`, ballot)
     localStorage.setItem('pizzadao:proposals-unsaved', JSON.stringify([{ id, title: 'Party' }]))
-    // nothing new to prepare: the feature answers "off"
-    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ enabled: false, proposals: [] }) })))
+    // only `id` is still open
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ enabled: true, proposals: [{ id, title: 'Party', tokenIssued: true }] }) })))
   })
   afterEach(() => {
     cleanup()
@@ -93,29 +95,28 @@ describe('the save card is sticky (H4)', () => {
     localStorage.clear()
   })
 
-  it('shows the card again after a reload until the member dismisses it', async () => {
+  it('shows no card, and forgets ballots of proposals that are no longer open', async () => {
+    const { container } = renderWithIntl(<GlobalBallotPreparer />)
+    await waitFor(() => expect(localStorage.getItem(`pizzadao:proposal-ballot:${other}`)).toBeNull())
+    expect(localStorage.getItem(`pizzadao:proposal-ballot:${id}`)).toBe(ballot)
+    expect(localStorage.getItem('pizzadao:proposals-unsaved')).toBeNull()
+    expect(container.innerHTML).toBe('')
+  })
+
+  it('turns a queued vote of a closed proposal into a failure and shows the compact banner', async () => {
+    localStorage.setItem('pizzadao:proposal-vote-queue', JSON.stringify([{ id: other, choice: 'AYE', sendAt: Date.now() + 600000, closesAt: null }]))
     const { container, getByText } = renderWithIntl(<GlobalBallotPreparer />)
-    await waitFor(() => expect(container.textContent).toContain('Party'))
-    fireEvent.click(getByText('Dismiss'))
-    await waitFor(() => expect(container.innerHTML).toBe(''))
-    expect(localStorage.getItem('pizzadao:proposals-unsaved')).toBe('[]')
-    cleanup()
-    const again = renderWithIntl(<GlobalBallotPreparer />)
-    await new Promise((r) => setTimeout(r, 20))
-    expect(again.container.innerHTML).toBe('')
+    await waitFor(() => expect(container.textContent).toContain('A vote could not be sent.'))
+    expect(JSON.parse(localStorage.getItem('pizzadao:proposal-vote-queue')!)).toEqual([])
+    expect(container.textContent).not.toContain('vote code')
+    fireEvent.click(getByText('Open proposal'))
+    expect(localStorage.getItem('pizzadao:proposal-vote-failed')).toContain(other)
   })
 
-  it('forgets a card whose ballot is no longer in this browser', async () => {
-    localStorage.removeItem(`pizzadao:proposal-ballot:${id}`)
-    const { container } = renderWithIntl(<GlobalBallotPreparer />)
+  it('prunes nothing when the feature answers "off"', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ enabled: false, proposals: [] }) })))
+    renderWithIntl(<GlobalBallotPreparer />)
     await new Promise((r) => setTimeout(r, 20))
-    expect(container.innerHTML).toBe('')
-  })
-
-  it('shows no card for a signed-out visitor (the saved ballot belongs to the browser, not to a login)', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 401, json: async () => ({}) })))
-    const { container } = renderWithIntl(<GlobalBallotPreparer />)
-    await new Promise((r) => setTimeout(r, 20))
-    expect(container.innerHTML).toBe('')
+    expect(localStorage.getItem(`pizzadao:proposal-ballot:${other}`)).toBe(ballot)
   })
 })
