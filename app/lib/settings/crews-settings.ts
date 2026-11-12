@@ -54,7 +54,29 @@ const benchEnabled: SettingDef<boolean> = {
   confirm: (from, to) => (to && !from ? 'Past attendees will be added to crew pages as Cold bench members.' : null),
 }
 
+const taskUpdatePostsEnabled: SettingDef<boolean> = {
+  key: 'crews.taskUpdatePostsEnabled',
+  area: 'crews',
+  label: 'Post crew task updates to the crew channel',
+  help: "When a crew task is created, moved to Doing or Done, or given a lead on the website, Metalhead posts one digest in that crew's Discord channel with a link to the crew page (at most one per crew per the interval below; no pings). Uses the private post filter: excluded crews get no post. Off: nothing is posted and nothing is queued. The CREWS_TASK_UPDATE_POSTS_ENABLED env var set to off always wins; preview deploys never post.",
+  schema: z.boolean(),
+  default: false,
+  onReadFailure: { value: false },
+  input: { type: 'bool' },
+  confirm: (from, to) => (to && !from ? "Crew channels will get a digest of task changes made on the website." : null),
+}
+
 export const CREWS_SETTINGS = {
+  'crews.taskUpdatePostsEnabled': taskUpdatePostsEnabled,
+  'crews.taskUpdateDigestMinutes': int({
+    key: 'crews.taskUpdateDigestMinutes',
+    label: 'Task update digest: minutes between posts',
+    help: 'A crew gets at most one task-update digest per this many minutes; changes in between are listed together in the next one. The job runs every 15 minutes, so the effective minimum is 15.',
+    min: 15,
+    max: 1440,
+    default: 60,
+    unit: 'minutes',
+  }),
   'crews.rosterAutoAddEnabled': enabled,
   'crews.rosterAutoAddMinCalls': int({
     key: 'crews.rosterAutoAddMinCalls',

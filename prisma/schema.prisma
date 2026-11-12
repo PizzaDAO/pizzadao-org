@@ -2944,3 +2944,12 @@ model CrewSession {
   @@unique([crewId, dedupeKey])
   @@index([crewId, startsAt])
 }
+
+// Where the crew task update digest (crews.taskUpdatePostsEnabled) stopped for each crew: the last
+// CrewTaskEvent id it covered and when it last posted. Additive; written only by that job.
+model CrewTaskUpdatePost {
+  crewId      String   @id
+  lastEventId Int
+  postedAt    DateTime
+  updatedAt   DateTime @updatedAt
+}
