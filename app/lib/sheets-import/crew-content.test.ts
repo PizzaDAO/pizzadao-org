@@ -131,6 +131,49 @@ describe('blank stage', () => {
   })
 })
 
+describe('task editor history events', () => {
+  const prev = (id: string, position: number, over: Record<string, unknown> = {}) => ({
+    id, crewId: 'ops', naturalKey: id, label: `Task ${id}`, url: null, stage: 'todo', priority: null, due: null, dueRaw: null,
+    leadName: null, leadMemberId: null, goal: null, notes: null, position, doneAt: null, archived: false, updatedAt: new Date(0), createdAt: new Date(0), ...over,
+  })
+  const setup = (existing: unknown[]) => {
+    const eventCreate = vi.fn((a: unknown) => a)
+    const db = prisma as unknown as Record<string, unknown>
+    db.$transaction = vi.fn(async () => [])
+    db.crewTask = { findMany: vi.fn(async () => existing), create: vi.fn((a: unknown) => a), update: vi.fn((a: unknown) => a) }
+    db.crewTaskEvent = { create: eventCreate }
+    return { eventCreate, db }
+  }
+  const row = (id: string, over: Record<string, string> = {}) => ({ id, rev: new Date(0).toISOString(), task: `Task ${id}`, stage: 'todo', ...over })
+  const events = (f: ReturnType<typeof vi.fn>) => f.mock.calls.map((c) => (c[0] as { data: { action: string; taskId: string; data: unknown } }).data)
+
+  it('logs only the fields that differ, as { changes }', async () => {
+    const { eventCreate } = setup([prev('a', 0)])
+    const spec = crewTasksEditor('ops')
+    await spec.save(cleanRows(spec, [row('a', { stage: 'Doing', lead: 'Sal', leadId: '5' })]), 'tester')
+    const ev = events(eventCreate)
+    expect(ev).toHaveLength(1)
+    expect(ev[0]).toMatchObject({ action: 'update', taskId: 'a', data: { changes: { stage: 'Doing', leadName: 'Sal', leadMemberId: '5' } } })
+  })
+
+  it('a pure position shift updates the row but logs no event', async () => {
+    const { eventCreate, db } = setup([prev('a', 0), prev('b', 1)])
+    const spec = crewTasksEditor('ops')
+    await spec.save(cleanRows(spec, [row('b'), row('a')]), 'tester')
+    expect((db.crewTask as { update: ReturnType<typeof vi.fn> }).update).toHaveBeenCalledTimes(2)
+    expect(eventCreate).not.toHaveBeenCalled()
+  })
+
+  it('logs a create event naming the new row', async () => {
+    const { eventCreate, db } = setup([])
+    const spec = crewTasksEditor('ops')
+    await spec.save(cleanRows(spec, [{ task: 'Brand new', stage: 'todo' }]), 'tester')
+    const created = ((db.crewTask as { create: ReturnType<typeof vi.fn> }).create.mock.calls[0][0] as { data: { id: string } }).data.id
+    expect(created).toBeTruthy()
+    expect(events(eventCreate)).toEqual([expect.objectContaining({ action: 'create', taskId: created, data: { label: 'Brand new' } })])
+  })
+})
+
 describe('parity: sheet ranking rows outside the task section', () => {
   it('drops ranked rows that are not tasks of the task section, keeping the rest in order', () => {
     const ranked = [{ label: 'A  task' }, { label: 'Goal' }, { label: 'B' }, { label: 'Issue' }, { label: 'B' }]

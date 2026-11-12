@@ -2945,6 +2945,15 @@ model CrewSession {
   @@index([crewId, startsAt])
 }
 
+// Where the crew task update digest (crews.taskUpdatePostsEnabled) stopped for each crew: the last
+// CrewTaskEvent id it covered and when it last posted. Additive; written only by that job.
+model CrewTaskUpdatePost {
+  crewId      String   @id
+  lastEventId Int
+  postedAt    DateTime
+  updatedAt   DateTime @updatedAt
+}
+
 // One row per name-reminder DM an admin sent from /admin/members/names (cooldown + audit).
 model MemberNameReminder {
   id        String   @id @default(cuid())

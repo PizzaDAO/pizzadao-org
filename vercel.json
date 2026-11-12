@@ -23,6 +23,7 @@
     { "path": "/api/cron/unlock-tickets", "schedule": "10 4 * * *" },
     { "path": "/api/cron/collection-stats", "schedule": "40 4 * * *" },
     { "path": "/api/cron/reminders", "schedule": "*/5 * * * *" },
-    { "path": "/api/cron/crew-roster", "schedule": "50 5 * * *" }
+    { "path": "/api/cron/crew-roster", "schedule": "50 5 * * *" },
+    { "path": "/api/cron/crew-task-updates", "schedule": "*/15 * * * *" }
   ]
 }

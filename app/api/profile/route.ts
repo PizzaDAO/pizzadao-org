@@ -1,4 +1,5 @@
 import { prisma } from "@/app/lib/db";
+import { sliceUnits } from "@/app/lib/display-name";
 import { recordActivationLater as recordActivation } from "@/app/lib/activation";
 import { SIGNUP_DRAFT_COOKIE } from "@/app/lib/signup-draft";
 import { Prisma } from "@prisma/client";
@@ -31,7 +32,7 @@ export const runtime = "nodejs";
 
 function clampStr(s: unknown, max: number) {
   const t = String(s ?? "").trim().replace(/\s+/g, " ");
-  return t.length > max ? t.slice(0, max) : t;
+  return sliceUnits(t, max);
 }
 function clampBool(v: unknown) {
   return v === true || v === "true" || v === 1 || v === "1";
