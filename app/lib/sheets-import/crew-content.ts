@@ -3,6 +3,7 @@
  * sheet, parity check of the open-task ranking (what the crew list and the call agenda use), and
  * the crew-lead editors for the crew page.
  */
+import { randomUUID } from 'node:crypto'
 import { prisma } from '@/app/lib/db'
 import { getAgendaStepLinks, getTaskLinks } from '@/app/api/lib/google-sheets'
 import { fetchCrewTasksFromDb, fetchOpenCrewTasksResult, getCrewMappings, invalidateCrewMappingsCache, isClosedStage, parseSheetDue } from '@/app/lib/crew-mappings'
@@ -292,6 +293,9 @@ export type Row = { id: string; naturalKey: string; archived: boolean } & Record
  * Shared save for the crew editors: rows are matched by id; new rows are created; rows that
  * disappeared are archived (never deleted). `fields` builds the stored fields from an edited row.
  */
+/** Columns that change as a side effect of an edit and are not worth a history event on their own. */
+const UNLOGGED_FIELDS = new Set(['position', 'dueRaw', 'doneAt', 'archived'])
+
 export async function saveCrewRows(o: {
   rows: EditorRow[]
   existing: Row[]
@@ -330,11 +334,21 @@ export async function saveCrewRows(o: {
       }
       counts.updated++
       ops.push(o.update(prev.id, { ...data, archived: false }))
-      ops.push(...(o.onChange?.('update', prev.id, data) ?? []))
+      // The history records only what actually differs, as { changes } (the shape crew-tasks-write.ts
+      // and the crew task update digest read). A pure position shift or derived column is not an event.
+      const changes: Record<string, unknown> = {}
+      for (const [k, v] of Object.entries(data)) {
+        if (UNLOGGED_FIELDS.has(k)) continue
+        if (JSON.stringify(prev[k] ?? null) !== JSON.stringify(v ?? null)) changes[k] = v ?? null
+      }
+      if (Object.keys(changes).length) ops.push(...(o.onChange?.('update', prev.id, { changes }) ?? []))
     } else {
       counts.created++
-      const createData = { ...data, naturalKey: freshKey(o.labelOf(row), taken) }
+      // With a history hook the id is chosen here so the `create` event can name the new row.
+      const id = o.onChange ? randomUUID() : null
+      const createData = { ...(id ? { id } : {}), ...data, naturalKey: freshKey(o.labelOf(row), taken) }
       ops.push(o.create(createData))
+      if (id) ops.push(...(o.onChange?.('create', id, { label: o.labelOf(row) }) ?? []))
     }
   })
   for (const r of o.existing) {

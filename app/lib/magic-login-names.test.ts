@@ -97,6 +97,23 @@ describe('login name matching', () => {
     mocks.search.mockResolvedValue([mem('1', 'x1', { nick: '\u{1F36B} Enzo' })]);
     expect((await requestMagicLogin('\u{1F36B} Enzo', 'https://app.example')).status).toBe('sent');
   });
+  it('searches without the emoji the user typed, and with it', async () => {
+    mocks.search.mockResolvedValue([mem('1', 'x1', { nick: 'Enzo' })]);
+    expect((await requestMagicLogin('Enzo \u{1F468}\u200D\u{1F469}\u200D\u{1F467}', 'https://app.example')).status).toBe('sent');
+    expect(mocks.search).toHaveBeenCalledWith('Enzo', 100);
+    expect(dmTo()).toEqual(['1']);
+  });
+  it('matches flags and skin tones in the stored name', async () => {
+    mocks.search.mockResolvedValue([mem('1', 'x1', { nick: '\u{1F1FA}\u{1F1F8} Enzo \u{1F44D}\u{1F3FD}' })]);
+    expect((await requestMagicLogin('Enzo', 'https://app.example')).status).toBe('sent');
+  });
+  it('matches a decomposed accent against a composed nick', async () => {
+    mocks.search.mockResolvedValue([mem('1', 'x1', { nick: 'Jos\u00e9' })]);
+    expect((await requestMagicLogin('Jose\u0301', 'https://app.example')).status).toBe('sent');
+  });
+  it('does not call Discord for a single emoji', async () => {
+    expect((await requestMagicLogin('\u{1F355}', 'https://app.example')).status).toBe('not_found');
+  });
   it('never matches emoji-only names', async () => {
     mocks.search.mockResolvedValue([mem('1', 'a1', { nick: '\u{1F36B}\u{1F355}' }), mem('2', 'a2', { user: { global_name: '\u{1F355}' } })]);
     expect((await requestMagicLogin('\u{1F36B}\u{1F355}', 'https://app.example')).status).toBe('not_found');

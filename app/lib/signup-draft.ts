@@ -1,4 +1,4 @@
-import { sanitizeDisplayName } from "./display-name";
+import { sanitizeDisplayName, sliceUnits } from "./display-name";
 
 export const SIGNUP_DRAFT_COOKIE = "pd_signup_draft";
 export const SIGNUP_DRAFT_TTL_SECONDS = 30 * 60;
@@ -8,7 +8,7 @@ export type SignupDraft = { mafiaName: string; city: string; sessionId: string; 
 export function sanitizeSignupDraft(value: unknown): SignupDraft | null {
   if (!value || typeof value !== "object") return null;
   const v = value as Record<string, unknown>;
-  const str = (key: string, max: number) => typeof v[key] === "string" ? (v[key] as string).trim().slice(0, max) : "";
+  const str = (key: string, max: number) => typeof v[key] === "string" ? sliceUnits((v[key] as string).trim(), max) : "";
   const mafiaName = sanitizeDisplayName(str("mafiaName", 256));
   const city = str("city", 120);
   if (!mafiaName || !city) return null;
@@ -26,7 +26,7 @@ export function sanitizeSignupDraft(value: unknown): SignupDraft | null {
   if (v.invitedBy === null) draft.invitedBy = null;
   const inviter = v.invitedBy as Record<string, unknown> | undefined;
   if (inviter && typeof inviter.memberId === "string" && /^\d{1,10}$/.test(inviter.memberId)) {
-    draft.invitedBy = { memberId: inviter.memberId, name: String(inviter.name || "").slice(0, 80), viaLink: inviter.viaLink === true };
+    draft.invitedBy = { memberId: inviter.memberId, name: sliceUnits(String(inviter.name || ""), 80), viaLink: inviter.viaLink === true };
   }
   return draft;
 }

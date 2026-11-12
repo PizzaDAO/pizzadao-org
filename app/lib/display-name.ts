@@ -113,3 +113,17 @@ export function truncateForDiscordNick(
   }
   return cut.join("").trim();
 }
+
+/**
+ * Cut to at most `max` UTF-16 units without ever leaving half of a surrogate
+ * pair (a lone surrogate is rejected by Postgres text/JSON and renders as
+ * "?"). Unlike `String#slice` this keeps emoji whole; it does not try to keep
+ * a ZWJ/flag/skin-tone sequence whole (use truncateForDiscordNick for that).
+ */
+export function sliceUnits(s: string, max: number): string {
+  if (s.length <= max) return s;
+  let end = max;
+  const last = s.charCodeAt(end - 1);
+  if (end > 0 && last >= 0xd800 && last <= 0xdbff) end -= 1;
+  return s.slice(0, end);
+}

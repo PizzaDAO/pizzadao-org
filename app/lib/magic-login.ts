@@ -30,6 +30,27 @@ export function normalizeLoginName(input: string): string {
   return input.trim().replace(/^@+/, "").replace(/\s+/g, " ").trim();
 }
 
+// Keycap emoji ("1\uFE0F\u20E3"): the digit is part of the emoji, not of the name.
+const KEYCAP = /[0-9#*]\uFE0F?\u20E3/gu;
+
+/**
+ * What to send to Discord's member search: the typed name with emoji, symbols,
+ * ZWJ/variation selectors and invisible characters removed. Search is a prefix
+ * match, so "Enzo <emoji>" must be searched as "Enzo" to find a member whose
+ * nick is just "Enzo". Falls back to the typed text when nothing but symbols
+ * was typed (a global name can be emoji-only).
+ */
+export function searchQueryFor(input: string): string {
+  const typed = normalizeLoginName(input).normalize("NFC");
+  const stripped = typed
+    .replace(KEYCAP, " ")
+    .replace(/[\p{Cc}\p{Cf}\uFE0F\u20E3\u{1F3FB}-\u{1F3FF}]/gu, "")
+    .replace(/[\p{Extended_Pictographic}\p{S}]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return Array.from(stripped).length >= 2 ? stripped : typed.replace(/[\p{Cc}\p{Cf}]/gu, "").trim();
+}
+
 const SYMBOL_RUN = /[\p{Extended_Pictographic}\p{S}]/gu;
 // ZWJ, variation selectors, combining enclosing keycap, skin-tone modifiers.
 const EMOJI_GLUE = /[\u200D\uFE0F\u20E3\u{1F3FB}-\u{1F3FF}]/gu;
@@ -67,7 +88,8 @@ export type LoginMatch =
  * when exactly one distinct member matches. Bots never match.
  */
 export function pickLoginMember(members: SearchMember[], input: string, truncated = false): LoginMatch {
-  const q = normalizeLoginName(input).toLowerCase();
+  // NFC so a decomposed "e\u0301" typed on one keyboard equals a composed nick.
+  const q = normalizeLoginName(input).normalize("NFC").toLowerCase();
   if (!q) return { kind: "none" };
   const humans = members.filter((m) => !m.user.bot);
   const distinct = (list: SearchMember[]) => [...new Map(list.map((m) => [m.user.id, m])).values()];
@@ -88,7 +110,7 @@ export function pickLoginMember(members: SearchMember[], input: string, truncate
   if (!lq) return { kind: "none" };
 
   // Pass 1: exact (normalized) nick / global name. Beats emoji twins ("Sam" vs "Sam 🍕").
-  const norm = (v?: string | null) => (v ? v.trim().replace(/\s+/g, " ").toLowerCase() : "");
+  const norm = (v?: string | null) => (v ? v.trim().replace(/\s+/g, " ").normalize("NFC").toLowerCase() : "");
   const exact = resolve(
     distinct(humans.filter((m) => norm(realNick(m.nick)) === q || norm(m.user.global_name) === q)),
   );
@@ -114,17 +136,24 @@ export async function requestMagicLogin(
   const draft = options.onboarding ? sanitizeSignupDraft(options.signupDraft) : null;
   // Discord's member search matches username/nickname prefixes. Members often
   // type their server nickname or display name, so fall back to those.
-  const query = normalizeLoginName(username);
-  if (query.length < 2) return { status: "not_found" };
+  const query = searchQueryFor(username);
+  if (Array.from(query).length < 2) return { status: "not_found" };
   const limit = 100;
   let members: SearchMember[];
+  let truncated = false;
   try {
-    members = await searchGuildMembers(query, limit);
+    // Search the typed text as well as the symbol-free form: a nick that starts with an emoji is
+    // only found by the former, one without the emoji the user typed only by the latter.
+    const typed = normalizeLoginName(username).normalize("NFC");
+    const queries = [...new Set([query, typed])].filter((q) => Array.from(q).length >= 2);
+    const lists = await Promise.all(queries.map((q) => searchGuildMembers(q, limit)));
+    truncated = lists.some((l) => l.length >= limit);
+    members = [...new Map(lists.flat().map((m) => [m.user.id, m])).values()];
   } catch (e) {
     console.error("Magic login member search failed:", e);
     return { status: "lookup_failed" };
   }
-  const found = pickLoginMember(members, username, members.length >= limit);
+  const found = pickLoginMember(members, username, truncated);
 
   if (found.kind === "none") return { status: "not_found" };
   if (found.kind === "ambiguous") return { status: "ambiguous" };

@@ -21,7 +21,7 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/app/lib/db";
 import { getSession } from "@/app/lib/session";
-import { sanitizeDisplayName } from "@/app/lib/display-name";
+import { sanitizeDisplayName, sliceUnits } from "@/app/lib/display-name";
 import { activationActor, recordActivationLater } from "@/app/lib/activation";
 import { enforceRateLimit } from "@/app/lib/rate-limit";
 import { verifyNameOrigin } from "@/app/lib/name-origin-sig";
@@ -142,7 +142,7 @@ export async function POST(req: Request) {
     }
     try {
       existing = await prisma.mafiaNameClaim.create({
-        data: { id: newClaimId(), ...owner, name: name.slice(0, 80), ...fields },
+        data: { id: newClaimId(), ...owner, name: sliceUnits(name, 80), ...fields },
         select: { id: true },
       });
     } catch (e) {

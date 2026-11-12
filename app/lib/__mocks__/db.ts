@@ -57,6 +57,7 @@ export const prisma = {
   crewDraft: createModelMock(),
   crewTask: createModelMock(),
   crewTaskEvent: createModelMock(),
+  crewTaskUpdatePost: createModelMock(),
   crewTaskProposal: createModelMock(),
   appSetting: createModelMock(),
   sheetImportRun: createModelMock(),
