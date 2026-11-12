@@ -37,6 +37,7 @@ const plan = (members: PlanMember[], over: Partial<PlanInput> = {}) =>
     pizzaNoobRoleId: NOOB,
     roleAssignable: true,
     completedL2: new Set(),
+    healEnabled: true,
     ...over,
   })
 
@@ -121,6 +122,13 @@ describe('planTraineeNicks: nicknames', () => {
     expect(p.heal).toEqual([])
     expect(p.healSkippedUnchosen).toBe(3)
     expect(p.enforce).toEqual([])
+  })
+
+  it('plans no heals when healing is off, counting them in healWouldHeal', () => {
+    const p = plan([m('a', { nick: TRAINEE_NICK })], { signedUp: new Map([['a', 'Tony Pepperoni']]), healEnabled: false })
+    expect(p.heal).toEqual([])
+    expect(p.healWouldHeal).toBe(1)
+    expect(p.healSkippedUnchosen).toBe(0)
   })
 
   it('skips placeholder and empty Names without clearing the nick', () => {

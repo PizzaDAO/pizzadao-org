@@ -48,6 +48,7 @@ function setup(over: Partial<TraineeNickDeps> = {}, env: Record<string, string> 
       return signed
     }),
     completedL2: vi.fn(async () => new Set<string>()),
+    healEnabled: vi.fn(async () => true),
     write: vi.fn(async (op: MemberWrite, reason: string) => {
       writes.push({ op, reason })
       return ok
@@ -179,6 +180,19 @@ describe('runTraineeNicks: writes', () => {
       { op: { kind: 'removeRole', userId: 'g1', roleId: NOOB }, reason: 'anchovy-52918 completed missions Level 2' },
     ])
     expect(r).toMatchObject({ healed: 1, roleRemoved: 1, healSkippedUnchosen: 0 })
+  })
+
+  it('heal toggle off: no heal writes, healWouldHeal reported', async () => {
+    const { deps, writes } = setup({
+      healEnabled: vi.fn(async () => false),
+      listMembers: vi.fn(async () => [
+        member(BOT, { roles: ['100003'], joined_at: '2020-01-01T00:00:00Z' }),
+        member('s1', { nick: 'Pizza Trainee' }),
+      ]),
+    })
+    const r = await runTraineeNicks({ dryRun: false, deps })
+    expect(writes).toEqual([])
+    expect(r).toMatchObject({ healed: 0, healWouldHeal: 1 })
   })
 
   it('fails closed when the L2 lookup throws: no role adds or removals, nicks still enforced', async () => {

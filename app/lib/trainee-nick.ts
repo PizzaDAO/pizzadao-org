@@ -82,6 +82,8 @@ export interface PlanInput {
   roleAssignable: boolean
   /** Ids (among the candidates) that completed missions L2; null when the lookup failed. */
   completedL2: ReadonlySet<string> | null
+  /** onboarding.traineeNickHealEnabled. Off: no heals are planned (they are counted in healWouldHeal). */
+  healEnabled: boolean
 }
 
 export interface EnforceItem { id: string; setNick: boolean; addRole: boolean }
@@ -92,6 +94,8 @@ export interface TraineePlan {
   heal: HealItem[]
   /** Signed-up members with the placeholder whose stored Name was not chosen (left as is). */
   healSkippedUnchosen: number
+  /** Chosen-name heals not planned because healing is off. */
+  healWouldHeal: number
   sweep: SweepItem[]
   enforce: EnforceItem[]
   skipped: { bot: number; owner: number; outranked: number; signedUp: number }
@@ -130,7 +134,7 @@ const roleOk = (input: Pick<PlanInput, 'pizzaNoobRoleId' | 'roleAssignable'>) =>
  * renameable, who either hold Pizza Noob (sweep) or lack it while not signed up
  * (add). Everyone else can't get the role added or removed.
  */
-export function pizzaNoobCandidates(input: Omit<PlanInput, 'completedL2' | 'max'>): string[] {
+export function pizzaNoobCandidates(input: Omit<PlanInput, 'completedL2' | 'max' | 'healEnabled'>): string[] {
   if (!roleOk(input)) return []
   const ids: string[] = []
   for (const m of input.members) {
@@ -151,6 +155,7 @@ export function planTraineeNicks(input: PlanInput): TraineePlan {
   const heal: HealItem[] = []
   const sweep: SweepItem[] = []
   let healSkippedUnchosen = 0
+  let healWouldHeal = 0
   const enforce: EnforceItem[] = []
   const candidates: Array<{ id: string; setNick: boolean }> = []
   let inScope = 0
@@ -174,7 +179,8 @@ export function planTraineeNicks(input: PlanInput): TraineePlan {
       if (inWindow) skipped.signedUp++
       if (isTraineeNick(m.nick)) {
         const chosen = chosenName(signedName, m)
-        if (chosen) heal.push({ id: m.id, nick: chosen })
+        if (chosen && !input.healEnabled) healWouldHeal++
+        else if (chosen) heal.push({ id: m.id, nick: chosen })
         else healSkippedUnchosen++
       }
     }
@@ -203,5 +209,5 @@ export function planTraineeNicks(input: PlanInput): TraineePlan {
   const total = heal.length + sweep.length + enforce.length
   const out = { heal: take(heal), sweep: take(sweep), enforce: take(enforce) }
   const kept = out.heal.length + out.sweep.length + out.enforce.length
-  return { ...out, healSkippedUnchosen, skipped, overflow: total - kept, alreadyTrainee, inScope, candidates }
+  return { ...out, healSkippedUnchosen, healWouldHeal, skipped, overflow: total - kept, alreadyTrainee, inScope, candidates }
 }

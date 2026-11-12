@@ -65,6 +65,7 @@ export interface TraineeNickResult {
   pizzaNoobRoleId?: string | null
   healed?: number
   healSkippedUnchosen?: number
+  healWouldHeal?: number
   skipped?: { bot: number; owner: number; outranked: number; signedUp: number }
   signedUpCount?: number
   forbidden?: number
@@ -86,6 +87,8 @@ export interface TraineeNickDeps {
   readSignedUp: () => Promise<Map<string, string>>
   completedL2: (ids: string[]) => Promise<Set<string>>
   write: (op: MemberWrite, reason: string) => Promise<MemberWriteResult>
+  /** onboarding.traineeNickHealEnabled (fail closed). */
+  healEnabled: () => Promise<boolean>
   welcome: (userId: string, text: string, channelId: string | null) => Promise<WelcomeResult>
   /** Which of these ids already have a TraineeWelcome row. */
   welcomedIds: (ids: string[]) => Promise<Set<string>>
@@ -123,6 +126,7 @@ const defaultDeps = (): TraineeNickDeps => ({
   readSignedUp: () => readSignedUpMembers(),
   completedL2: (ids) => completedLevelBy(ids, PIZZA_NOOB_GRADUATE_LEVEL),
   write: (op, reason) => writeGuildMember(op, reason),
+  healEnabled: () => toggleEnabled('onboarding.traineeNickHealEnabled'),
   welcome: (userId, text, channelId) => sendWelcome(userId, text, channelId),
   welcomedIds: async (ids) => {
     if (ids.length === 0) return new Set()
@@ -246,7 +250,13 @@ export async function runTraineeNicks(opts: {
     } catch (e) {
       console.error('[trainee-nicks] L2 lookup failed', (e as Error)?.message)
     }
-    const plan = planTraineeNicks({ ...base, max, completedL2 })
+    let healEnabled = false
+    try {
+      healEnabled = await deps.healEnabled()
+    } catch (e) {
+      console.error('[trainee-nicks] heal toggle read failed', (e as Error)?.message)
+    }
+    const plan = planTraineeNicks({ ...base, max, completedL2, healEnabled })
 
     const result: TraineeNickResult = {
       status: 'finished',
@@ -267,6 +277,7 @@ export async function runTraineeNicks(opts: {
       pizzaNoobRoleId,
       healed: 0,
       healSkippedUnchosen: plan.healSkippedUnchosen,
+      healWouldHeal: plan.healWouldHeal,
       skipped: plan.skipped,
       signedUpCount: signedUp.size,
       forbidden: 0,
