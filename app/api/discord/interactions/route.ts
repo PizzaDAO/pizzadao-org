@@ -69,6 +69,7 @@ import { applyMemberAction } from "@/app/lib/followups/actions";
 import { notifyApprovers } from "@/app/lib/followups/notify";
 import type { ReminderInteractionDeps } from "@/app/lib/discord-interactions/reminders";
 import { stopCallReminders, stopProposalReminders } from "@/app/lib/reminders/prefs";
+import { liveCommandEnabled, mayRunLive, runLiveCommand, type LiveJob } from "@/app/lib/calls/live-announce-command";
 import { SITE_URL } from "@/app/lib/site-url";
 
 export const runtime = "nodejs";
@@ -130,6 +131,13 @@ async function progressRateLimit(channelId: string): Promise<Date | null> {
 function deferProgress(job: ProgressJob) {
   after(async () => {
     await runProgressCommand(job);
+  });
+}
+
+/** The deferred /live work, after the type-5 (ephemeral) reply has gone out. */
+function deferLive(job: LiveJob) {
+  after(async () => {
+    await runLiveCommand(job);
   });
 }
 
@@ -247,6 +255,12 @@ function deps(guildId: string | undefined, settings: Settings): HandlerDeps {
     missions: { rateLimit: missionsRateLimit, defer: deferMissions },
     memberCommands: { enabled: (name) => toggleEnabled(MEMBER_COMMAND_TOGGLES[name]), rateLimit: memberCommandRateLimit, defer: deferMemberCommand },
     progress: { enabled: progressEnabled, rateLimit: progressRateLimit, defer: deferProgress, crewChoices: progressCrewChoices },
+    live: {
+      enabled: () => liveCommandEnabled(),
+      canRun: (roles) =>
+        mayRunLive(roles, (r) => isPepAdmin(r, { baseRoleIds: ADMIN_ROLE_IDS, getGuildRoles: async () => (guildId ? getGuildRoles(guildId) : null) })),
+      defer: deferLive,
+    },
     missionReview,
     followups,
     reminders,

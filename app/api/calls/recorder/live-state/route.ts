@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server'
+import { after, NextResponse } from 'next/server'
+import { liveTickForSession } from '@/app/lib/calls/live-announce-command'
 import { isRecorderAuthorized } from '@/app/lib/calls/recorder-auth'
 import { handleLiveState, liveStateSchema } from '@/app/lib/calls/live-state'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
@@ -26,5 +27,7 @@ export const POST = withErrorHandling(async (request: Request) => {
   if (!parsed.success) throw new ValidationError('Invalid live state')
   const out = await handleLiveState(parsed.data)
   if (out === 'off') return new NextResponse(null, { status: 204, headers: { 'Cache-Control': 'no-store' } })
+  // The "we're live" announcement and its reminder ride on the heartbeat (each is off unless switched on).
+  if (out === 'ok') after(() => liveTickForSession(parsed.data.sessionId))
   return NextResponse.json({}, { headers: { 'Cache-Control': 'no-store' } })
 })

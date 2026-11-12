@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isCronAuthorized } from '@/app/lib/cron-auth'
 import { internalError } from '@/app/lib/errors/error-response'
+import { runLiveReminders } from '@/app/lib/calls/live-announce'
 import { processOutbox } from '@/app/lib/telegram/city-posts'
 
 export const runtime = 'nodejs'
@@ -18,6 +19,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   try {
+    // Fallback for the live reminder if no heartbeat fired it (queued rows go out in the run below).
+    await runLiveReminders().catch((err) => console.error('[cron/telegram-posts] live reminders failed:', err instanceof Error ? err.message : err))
     const result = await processOutbox({ budgetMs: 200_000 })
     console.log('[cron/telegram-posts]', JSON.stringify(result))
     return NextResponse.json(result)

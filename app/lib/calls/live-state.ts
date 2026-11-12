@@ -16,6 +16,7 @@ import { loadSettings, type Settings } from '@/app/lib/settings'
 import { resolveToggle } from '@/app/lib/settings/toggles'
 import { normalizeCrewId } from '@/app/lib/crew-id'
 import { resolveCrewForEvent } from './crew-map'
+import { normalizeStreamLink } from './stream-link'
 import { isCrewExcluded, loadPostFilter, type PostFilter } from './post-filters'
 
 const snowflake = z.string().regex(/^\d{15,25}$/)
@@ -42,25 +43,7 @@ export const liveStateSchema = z.object({
 })
 export type LiveStateBody = z.infer<typeof liveStateSchema>
 
-/**
- * An X / Twitter broadcast or status link, normalized to https (x.com / twitter.com and their www and
- * mobile hosts), or null. Anything else (other hosts, http, other paths, credentials, a port) is rejected.
- */
-export function normalizeStreamLink(raw: string | null | undefined): string | null {
-  if (!raw) return null
-  let u: URL
-  try {
-    u = new URL(raw.trim())
-  } catch {
-    return null
-  }
-  if (u.protocol !== 'https:' || u.username || u.password || u.port) return null
-  if (!/^(www\.|mobile\.)?(x|twitter)\.com$/i.test(u.hostname)) return null
-  const broadcast = /^\/i\/broadcasts\/[A-Za-z0-9]+\/?$/.test(u.pathname)
-  const status = /^\/[A-Za-z0-9_]{1,15}\/status\/\d+\/?$/.test(u.pathname)
-  if (!broadcast && !status) return null
-  return `https://${u.hostname.toLowerCase()}${u.pathname}`
-}
+export { normalizeStreamLink }
 
 /** A broadcast link (/i/broadcasts/...) beats a status link: the host's stream is the broadcast. */
 export const isBroadcastLink = (link: string | null | undefined): boolean => !!link && link.includes('/i/broadcasts/')

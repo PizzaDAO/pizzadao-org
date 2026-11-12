@@ -22,13 +22,16 @@ import { resolveToggle, toggleEnabled, type ToggleKey } from '@/app/lib/settings
 import { parseCityKeys } from '@/app/lib/settings/telegram-settings'
 import { cityPost, telegramSendAllowed, type CityPostResult } from './rsv-client'
 
-export type MirrorKind = 'recap' | 'agenda' | 'announce' | 'session'
+export type MirrorKind = 'recap' | 'agenda' | 'announce' | 'session' | 'live' | 'liverem'
 
 const KIND_TOGGLE: Record<MirrorKind, ToggleKey> = {
   recap: 'telegram.recapMirrorEnabled',
   agenda: 'telegram.agendaMirrorEnabled',
   announce: 'telegram.announceMirrorEnabled',
   session: 'telegram.sessionMirrorEnabled',
+  // "We're live" posts and their reminder have their own calls.* switches (live-announce.ts); only the master switch applies here.
+  live: 'telegram.cityPostsEnabled',
+  liverem: 'telegram.cityPostsEnabled',
 }
 
 /** The proxy rejects text over 3500 characters. */
@@ -58,6 +61,12 @@ export function toPlainPost(text: string, link: string = SITE_URL): string {
 
 /** The city keys a post of this kind goes to (empty = none). */
 export function targetCityKeys(kind: MirrorKind, crewId: string | null | undefined, settings: Settings): string[] {
+  if (kind === 'live' || kind === 'liverem') {
+    const own = (settings.get(kind === 'live' ? 'calls.liveTelegramCityKeys' : 'calls.liveReminderCityKeys') as string[]).map((k) => k.trim().toLowerCase()).filter(Boolean)
+    const live = (settings.get('calls.liveTelegramCityKeys') as string[]).map((k) => k.trim().toLowerCase()).filter(Boolean)
+    const announce = (settings.get('telegram.announceCityKeys') as string[]).map((k) => k.trim().toLowerCase()).filter(Boolean)
+    return [...new Set(own.length ? own : live.length ? live : announce)]
+  }
   if (kind === 'announce') return [...new Set((settings.get('telegram.announceCityKeys') as string[]).map((k) => k.trim().toLowerCase()).filter(Boolean))]
   const want = normalizeCrewId(crewId)
   if (!want) return []
@@ -76,6 +85,8 @@ export interface EnqueueInput {
   text: string
   /** Agendas: the event start. Others: now + telegram.postMaxAgeHours. */
   expiresAt?: Date
+  /** Hold the row until then (the live reminder). */
+  sendAfter?: Date
 }
 
 export interface EnqueueResult {
@@ -105,6 +116,7 @@ export async function enqueueMirror(input: EnqueueInput, env: Record<string, str
         cityKey,
         text,
         expiresAt,
+        ...(input.sendAfter ? { sendAfter: input.sendAfter } : {}),
       })),
       skipDuplicates: true,
     })
