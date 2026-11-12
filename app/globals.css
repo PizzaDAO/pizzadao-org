@@ -389,6 +389,14 @@ body::before {
      same rule as the pizzadao.org mafia-name site). Don't "fix" the clipping. */
   background-size: 115% 130%;
   padding: 0.05em 0.5em;
+  /* One ring around the whole title: an inline box would split the background
+     across lines, so a long title ("Do a favor for the mafia") on a phone lost
+     its circle. inline-block keeps a single ring and wraps text inside it. */
+  display: inline-block;
+  max-width: 100%;
+  box-sizing: border-box;
+  line-height: 1.25;
+  text-wrap: balance;
 }
 
 /* Newspaper grain overlay (applied to relative parent).

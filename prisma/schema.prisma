@@ -2971,3 +2971,26 @@ model CallUpdatesRun {
   @@index([eventId, startsAt])
   @@index([crewId, createdAt])
 }
+
+// Where the crew task update digest (crews.taskUpdatePostsEnabled) stopped for each crew: the last
+// CrewTaskEvent id it covered and when it last posted. Additive; written only by that job.
+model CrewTaskUpdatePost {
+  crewId      String   @id
+  lastEventId Int
+  postedAt    DateTime
+  updatedAt   DateTime @updatedAt
+}
+
+// One row per name-reminder DM an admin sent from /admin/members/names (cooldown + audit).
+model MemberNameReminder {
+  id        String   @id @default(cuid())
+  discordId String
+  memberId  String
+  sentBy    String
+  status    String // SENDING | SENT | CLOSED | FAILED
+  // discordId + cooldown window; unique so concurrent sends cannot double-DM. Null once released (FAILED).
+  claimKey  String?  @unique
+  createdAt DateTime @default(now())
+
+  @@index([discordId, createdAt])
+}
