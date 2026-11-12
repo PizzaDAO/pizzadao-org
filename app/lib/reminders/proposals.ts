@@ -32,7 +32,7 @@ export interface ProposalRunConfig {
 export interface ProposalRunResult {
   dryRun: boolean
   proposals: number
-  /** (member, proposal, kind) pairs that are wanted. */
+  /** Opened (member, proposal) pairs wanted. Closing pairs are never counted before they are claimed. */
   due: number
   sent: number
   skipped: Record<string, number>
@@ -121,7 +121,8 @@ export async function runProposalReminders(d: ProposalRunDeps): Promise<Proposal
     for (const id of voters) {
       if (!wanted.has(id)) continue
       if (!mayRemind(p, id, d.pilot)) {
-        bump(res.skipped, 'pilot')
+        // Closing counters are never logged before a claim: the set is "members with no ballot token".
+        if (!closing) bump(res.skipped, 'pilot')
         continue
       }
       ;(closing ? closingPairs : openedPairs).push({ discordId: id, p, kind: closing ? 'PROPOSAL_CLOSING' : 'PROPOSAL_OPENED' })
@@ -129,7 +130,8 @@ export async function runProposalReminders(d: ProposalRunDeps): Promise<Proposal
   }
   // Closing soon is time-critical; "opened" is not.
   const pairs = [...closingPairs, ...openedPairs]
-  res.due = pairs.length
+  // `due` counts opened pairs only: a closing count would be a token-pickup counter in the logs.
+  res.due = openedPairs.length
   if (dryRun || !pairs.length) return res
 
   const sentToday = await d.store.sentSince([...new Set(pairs.map((x) => x.discordId))], new Date(now.getTime() - DAY_MS))
@@ -141,18 +143,19 @@ export async function runProposalReminders(d: ProposalRunDeps): Promise<Proposal
       break
     }
     const reach = await d.getReach(id)
+    const quiet = kind === 'PROPOSAL_CLOSING' // no counters for closing until the claim succeeds
     if (!canTryDm(reach, now)) {
-      bump(res.skipped, 'dm_closed')
+      if (!quiet) bump(res.skipped, 'dm_closed')
       continue
     }
     const cap = capDecision(sentToday.get(id) ?? [], now, config.maxPerMemberPerDay)
     if (!cap.ok) {
-      bump(res.skipped, 'cap')
+      if (!quiet) bump(res.skipped, 'cap')
       continue
     }
     const claim = await d.store.claimCall(id, p.id, kind)
     if (!claim.claimed) {
-      bump(res.skipped, 'already')
+      if (!quiet) bump(res.skipped, 'already')
       continue
     }
 

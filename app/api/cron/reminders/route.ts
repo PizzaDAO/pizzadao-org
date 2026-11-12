@@ -10,8 +10,9 @@ export const maxDuration = 120
 /**
  * GET /api/cron/reminders — every 5 minutes (Vercel Cron, Bearer CRON_SECRET).
  * Call reminders, then proposal reminders (opened, closing soon), by Discord DM to members who opted in.
- * Each part off (reminders.callsEnabled / reminders.proposalsEnabled, or any preview): answers {skipped:'disabled'} without touching Discord or the database. `?dryRun=1` (still needs the
- * bearer token) runs the full counting path on demand, sending and claiming nothing. Counts only.
+ * Answers {calls, proposals}, each a run result or {skipped}: a part that is off (reminders.callsEnabled /
+ * reminders.proposalsEnabled, or any preview) is skipped without touching Discord or the database. `?dryRun=1`
+ * (still needs the bearer token) runs the full counting path on demand, sending and claiming nothing. Counts only.
  */
 export async function GET(request: NextRequest) {
   if (!isCronAuthorized(request.headers.get('authorization'))) {

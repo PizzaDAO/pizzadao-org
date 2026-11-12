@@ -76,17 +76,22 @@ export async function clearSettledProposalReminders(ids?: readonly string[]): Pr
   const status = new Map(proposals.map((p) => [p.id, p.status]))
   const done = refKeys.filter((k) => status.get(k) !== 'OPEN')
   if (!done.length) return 0
-  for (const id of done) {
-    if (!status.has(id)) continue
-    const mine = rows.filter((r) => r.refKey === id && r.status === 'SENT')
-    const opened = mine.filter((r) => r.kind === 'PROPOSAL_OPENED').length
-    const closing = mine.filter((r) => r.kind === 'PROPOSAL_CLOSING').length
-    if (opened + closing > 0) {
-      await prisma.proposalEvent.create({ data: { proposalId: id, type: 'REMINDERS_SENT', actorDiscordId: null, data: { opened, closing } } })
+  const existing = await prisma.proposalEvent.findMany({ where: { type: 'REMINDERS_SENT', proposalId: { in: done } }, select: { proposalId: true } })
+  const logged = new Set(existing.map((e) => e.proposalId))
+  // One transaction: the aggregate event and the row deletion land together, so a retry never double-logs.
+  return prisma.$transaction(async (tx) => {
+    for (const id of done) {
+      if (!status.has(id) || logged.has(id)) continue
+      const mine = rows.filter((r) => r.refKey === id && r.status === 'SENT')
+      const opened = mine.filter((r) => r.kind === 'PROPOSAL_OPENED').length
+      const closing = mine.filter((r) => r.kind === 'PROPOSAL_CLOSING').length
+      if (opened + closing > 0) {
+        await tx.proposalEvent.create({ data: { proposalId: id, type: 'REMINDERS_SENT', actorDiscordId: null, data: { opened, closing } } })
+      }
     }
-  }
-  const r = await prisma.reminderSend.deleteMany({ where: { kind: { in: [...PROPOSAL_KINDS] }, refKey: { in: done } } })
-  return r.count
+    const r = await tx.reminderSend.deleteMany({ where: { kind: { in: [...PROPOSAL_KINDS] }, refKey: { in: done } } })
+    return r.count
+  })
 }
 
 /** The lifecycle hook (settle, cancel): outside any transaction, never throws. */

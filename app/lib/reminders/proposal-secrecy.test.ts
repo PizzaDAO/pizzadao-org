@@ -32,7 +32,10 @@ vi.mock('@/app/lib/db', () => ({
         return [{ discordId: 'm1' }]
       },
     },
-    proposalEvent: { create: async (a: { data: { proposalId: string; type: string; data: unknown } }) => void state.events.push(a.data) },
+    $transaction: async function (this: unknown, fn: (tx: unknown) => unknown) {
+      return fn(this)
+    },
+    proposalEvent: { findMany: async (a: { where: { proposalId: { in: string[] } } }) => state.events.filter((e) => a.where.proposalId.in.includes(e.proposalId)).map((e) => ({ proposalId: e.proposalId })), create: async (a: { data: { proposalId: string; type: string; data: unknown } }) => void state.events.push(a.data) },
     reminderSend: {
       findMany: async (a: { where: { refKey?: { in: string[] } } }) => {
         const ids = a.where.refKey?.in
@@ -108,6 +111,16 @@ describe('database side', () => {
     // The cron sweep removes leftovers for every proposal that is not OPEN, and never an open one.
     expect(await clearSettledProposalReminders()).toBe(1)
     expect(state.sends.map((r) => r.refKey)).toEqual(['live'])
+  })
+
+  it('writes the aggregate event once even if rows reappear and are swept again', async () => {
+    state.proposals = [{ id: 'done', status: 'PASSED' }]
+    state.sends = [send('m1', 'PROPOSAL_OPENED', 'done')]
+    await clearProposalReminders('done')
+    state.sends = [send('m2', 'PROPOSAL_OPENED', 'done')]
+    await clearProposalReminders('done')
+    expect(state.events).toHaveLength(1)
+    expect(state.sends).toEqual([])
   })
 
   it('a row for an OPEN proposal is never deleted, and the hook never throws', async () => {

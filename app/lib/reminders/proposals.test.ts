@@ -148,6 +148,18 @@ describe('closing reminder and ballot secrecy', () => {
     expect(lastText(d)).not.toMatch(/haven't voted|have not voted/i)
   })
 
+  it('logs no closing counters before a claim: no due, no already, no cap or closed skips', async () => {
+    const a = setup({ proposals: [closing], voters: { p1: [['m1', false], ['m2', true]] }, prefs: [pref('m1'), pref('m2')], over: { config: { enabled: false, closingHours: 24, maxSends: 40, maxPerMemberPerDay: 6 } } })
+    expect(await runProposalReminders(a.d)).toMatchObject({ due: 0, sent: 0, skipped: {} })
+    const b = setup({ proposals: [closing], over: { config: { enabled: true, closingHours: 24, maxSends: 40, maxPerMemberPerDay: 1 } } })
+    b.rows.set('m1|CALL|e1:1', { status: 'SENT', attempts: 0, at: new Date(now.getTime() - HOUR) })
+    expect((await runProposalReminders(b.d)).skipped).toEqual({})
+    const c = setup({ proposals: [closing] })
+    await runProposalReminders(c.d)
+    const again = await runProposalReminders({ ...c.d, now: new Date(now.getTime() + 5 * 60_000) })
+    expect(again).toMatchObject({ sent: 0, due: 0, skipped: {} })
+  })
+
   it('does not send "opened" in the closing window, and needs the closing pref', async () => {
     const { d } = setup({ proposals: [closing], prefs: [pref('m1', { closing: false })] })
     expect((await runProposalReminders(d)).sent).toBe(0)
