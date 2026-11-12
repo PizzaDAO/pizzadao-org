@@ -34,8 +34,30 @@ const callsEnabled: SettingDef<boolean> = {
   confirm: (from, to) => (to && !from ? 'Members who opted in will start getting call reminders by Discord DM.' : null),
 }
 
+const proposalsEnabled: SettingDef<boolean> = {
+  key: 'reminders.proposalsEnabled',
+  area: 'reminders',
+  label: 'Proposal reminders by Discord DM',
+  help: 'DM members who opted in when a proposal opens, and shortly before it closes (the closing reminder goes only to eligible members who never picked up a ballot token). Needs proposals.enabled too; test proposals go only to pilot testers. Each DM has a Stop button. Off: nothing is sent and the scheduler only logs what it would send. The REMINDERS_PROPOSALS_ENABLED env var set to off always wins; previews never send.',
+  schema: z.boolean(),
+  default: false,
+  onReadFailure: { value: false },
+  input: { type: 'bool' },
+  confirm: (from, to) => (to && !from ? 'Members who opted in will start getting proposal reminders by Discord DM.' : null),
+}
+
 export const REMINDERS_SETTINGS = {
   'reminders.callsEnabled': callsEnabled,
+  'reminders.proposalsEnabled': proposalsEnabled,
+  'reminders.proposalClosingHours': int({
+    key: 'reminders.proposalClosingHours',
+    label: 'Proposal "closing soon" lead time (hours)',
+    help: 'How long before a proposal closes the closing reminder goes out. For a window shorter than twice this (a test proposal), it starts halfway through the window.',
+    min: 2,
+    max: 72,
+    default: 24,
+    unit: 'h',
+  }),
   'reminders.callLeadMinutes': int({
     key: 'reminders.callLeadMinutes',
     label: 'Call reminder lead time (minutes)',
