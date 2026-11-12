@@ -23,6 +23,8 @@ export interface RemoteConfig {
    * prefix are sent right away. Only events in eventIds (the crew allowlist) take part.
    */
   liveItems: { audio: boolean; chunkSeconds: number; chat: boolean; prefixes: string[]; eventIds: string[] }
+  /** Spoken "play us out" command (calls.playOutCommandEnabled); needs the end-of-call song to be set up too. */
+  playOut: { enabled: boolean }
   /** Longest a switch to the next crew's event waits while the current call still has people talking; 0 = never wait. */
   supersedeMaxDeferMinutes: number
   /** Spellings for Deepgram to prefer (keyterm prompting); empty = none. */
@@ -45,6 +47,7 @@ export const REMOTE_CONFIG_OFF: RemoteConfig = {
   startBand: { enabled: false, calls: [], maxSongs: 1 },
   crews: [],
   liveItems: { audio: false, chunkSeconds: 150, chat: false, prefixes: [], eventIds: [] },
+  playOut: { enabled: false },
   supersedeMaxDeferMinutes: 0,
   transcriptionKeyterms: [],
   voiceChannels: VOICE_CHANNELS_OFF,
@@ -109,11 +112,12 @@ export function parseRemoteConfig(raw: unknown, previous?: RemoteConfig | null):
     crews,
     liveItems: {
       audio: l.audio === true && eventIds.length > 0,
-      chunkSeconds: int(l.chunkSeconds, d.liveItems.chunkSeconds, 60, 600),
+      chunkSeconds: int(l.chunkSeconds, d.liveItems.chunkSeconds, 30, 600),
       chat: l.chat === true && eventIds.length > 0 && prefixes.length > 0,
       prefixes,
       eventIds,
     },
+    playOut: { enabled: (o.playOut as { enabled?: unknown } | null | undefined)?.enabled === true },
     supersedeMaxDeferMinutes: int(o.supersedeMaxDeferMinutes, d.supersedeMaxDeferMinutes, 0, 120),
     transcriptionKeyterms: normalizeKeyterms(o.transcriptionKeyterms),
     voiceChannels: parseVoiceChannels(o.voiceChannels, previous?.voiceChannels.byEvent),

@@ -133,6 +133,8 @@ describe('settings registry', () => {
       ['calls.startNotice', ''],
       ['calls.endSongTriggerEnabled', false],
       ['calls.endSongMinHumans', 1],
+      ['calls.playOutCommandEnabled', false],
+      ['calls.playOutAnyMember', false],
       ['calls.startBandEnabled', false],
       ['calls.startBandCalls', 'Community Call'],
       ['calls.transcriptionTerms', TRANSCRIPTION_KEYTERMS_DEFAULT],

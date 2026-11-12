@@ -32,6 +32,8 @@ export interface RecorderConfig {
    * The app re-checks everything (allowlist, private post filter) on each request.
    */
   liveItems: { audio: boolean; chunkSeconds: number; chat: boolean; prefixes: string[]; eventIds: string[] }
+  /** Spoken "play us out" command (calls.playOutCommandEnabled): the recorder sends short speech bursts and plays the song when the app says so. */
+  playOut: { enabled: boolean }
   /** Longest a switch to the next crew's event waits while the current call still has people talking; 0 = never wait. */
   supersedeMaxDeferMinutes: number
   /** Spellings for Deepgram to prefer (keyterm prompting); empty = none. */
@@ -54,6 +56,7 @@ export const RECORDER_CONFIG_OFF: RecorderConfig = {
   startBand: { enabled: false, calls: [], maxSongs: 1 },
   crews: [],
   liveItems: { audio: false, chunkSeconds: 150, chat: false, prefixes: [], eventIds: [] },
+  playOut: { enabled: false },
   supersedeMaxDeferMinutes: 0,
   transcriptionKeyterms: [],
   voiceChannels: { allowed: [], byEvent: [] },
@@ -127,6 +130,7 @@ export async function buildRecorderConfig(): Promise<RecorderConfig> {
     },
     crews: await loadCrewLabels(),
     liveItems: await liveItemsConfig(settings),
+    playOut: { enabled: resolveToggle('calls.playOutCommandEnabled', settings) },
     supersedeMaxDeferMinutes: settings.get('calls.supersedeMaxDeferMinutes'),
     transcriptionKeyterms: normalizeKeyterms(parseLines(settings.get('calls.transcriptionTerms'))),
     voiceChannels: await voiceChannelsConfig(settings),
