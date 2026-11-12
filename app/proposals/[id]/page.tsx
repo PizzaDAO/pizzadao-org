@@ -273,7 +273,7 @@ export default async function ProposalPage({ params, searchParams }: { params: P
                 )}
                 {canWithdraw && <WithdrawButton proposalId={p.id} />}
                 {isOpen && (
-                    <VotePanel proposalId={p.id} title={p.title} fingerprint={p.keyFingerprint} open eligible={!!viewer?.eligible} tokenIssued={!!viewer?.tokenIssued} closesAt={p.closesAt} delayMinSeconds={delay.min} delayMaxSeconds={delay.max} />
+                    <VotePanel proposalId={p.id} fingerprint={p.keyFingerprint} open eligible={!!viewer?.eligible} tokenIssued={!!viewer?.tokenIssued} closesAt={p.closesAt} delayMinSeconds={delay.min} delayMaxSeconds={delay.max} />
                 )}
                 {isOpen && <p className="m-0 text-sm text-foreground/70">{t("detail.hidden")}</p>}
                 {!imported && p.result && (
