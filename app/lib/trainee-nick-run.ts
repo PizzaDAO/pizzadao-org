@@ -64,6 +64,7 @@ export interface TraineeNickResult {
   roleStatus?: RoleStatus
   pizzaNoobRoleId?: string | null
   healed?: number
+  healSkippedUnchosen?: number
   skipped?: { bot: number; owner: number; outranked: number; signedUp: number }
   signedUpCount?: number
   forbidden?: number
@@ -204,6 +205,8 @@ export async function runTraineeNicks(opts: {
       roles: m.roles,
       joinedAt: m.joined_at ?? null,
       bot: !!m.user.bot,
+      username: m.user.username ?? null,
+      globalName: m.user.global_name ?? null,
     }))
 
     // Pizza Noob: resolve, and check it is something the bot can assign.
@@ -263,6 +266,7 @@ export async function runTraineeNicks(opts: {
       roleStatus,
       pizzaNoobRoleId,
       healed: 0,
+      healSkippedUnchosen: plan.healSkippedUnchosen,
       skipped: plan.skipped,
       signedUpCount: signedUp.size,
       forbidden: 0,

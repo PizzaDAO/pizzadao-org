@@ -43,6 +43,26 @@ export interface PlanMember {
   /** ISO timestamp; null/unparseable members are never in scope. */
   joinedAt?: string | null
   bot?: boolean
+  /** Discord username and global display name, to spot a Name that was just imported from Discord. */
+  username?: string | null
+  globalName?: string | null
+}
+
+/** Case, spacing, punctuation and emoji-insensitive comparison key (after sanitizeDisplayName). */
+const nameKey = (n?: string | null) => sanitizeDisplayName(n).toLowerCase().replace(/[^\p{L}\p{N}]/gu, '')
+
+/**
+ * The cleaned stored Name when the member plausibly chose it: not the
+ * placeholder and not the same as their Discord username, global name or
+ * current nick. Otherwise null (they keep the placeholder).
+ */
+export function chosenName(name: string | undefined, m: PlanMember): string | null {
+  const clean = truncateForDiscordNick(sanitizeDisplayName(name))
+  if (!clean || isTraineeNick(clean)) return null
+  const key = nameKey(clean)
+  if (!key || key === nameKey(TRAINEE_NICK)) return null
+  if ([m.username, m.globalName, m.nick].some((d) => nameKey(d) === key)) return null
+  return clean
 }
 
 export interface PlanInput {
@@ -70,6 +90,8 @@ export interface SweepItem { id: string }
 
 export interface TraineePlan {
   heal: HealItem[]
+  /** Signed-up members with the placeholder whose stored Name was not chosen (left as is). */
+  healSkippedUnchosen: number
   sweep: SweepItem[]
   enforce: EnforceItem[]
   skipped: { bot: number; owner: number; outranked: number; signedUp: number }
@@ -128,6 +150,7 @@ export function planTraineeNicks(input: PlanInput): TraineePlan {
   const skipped = { bot: 0, owner: 0, outranked: 0, signedUp: 0 }
   const heal: HealItem[] = []
   const sweep: SweepItem[] = []
+  let healSkippedUnchosen = 0
   const enforce: EnforceItem[] = []
   const candidates: Array<{ id: string; setNick: boolean }> = []
   let inScope = 0
@@ -150,8 +173,9 @@ export function planTraineeNicks(input: PlanInput): TraineePlan {
     if (isSignedUp) {
       if (inWindow) skipped.signedUp++
       if (isTraineeNick(m.nick)) {
-        const clean = truncateForDiscordNick(sanitizeDisplayName(signedName))
-        heal.push({ id: m.id, nick: clean && !isTraineeNick(clean) ? clean : null })
+        const chosen = chosenName(signedName, m)
+        if (chosen) heal.push({ id: m.id, nick: chosen })
+        else healSkippedUnchosen++
       }
     }
     if (!inWindow) continue
@@ -179,5 +203,5 @@ export function planTraineeNicks(input: PlanInput): TraineePlan {
   const total = heal.length + sweep.length + enforce.length
   const out = { heal: take(heal), sweep: take(sweep), enforce: take(enforce) }
   const kept = out.heal.length + out.sweep.length + out.enforce.length
-  return { ...out, skipped, overflow: total - kept, alreadyTrainee, inScope, candidates }
+  return { ...out, healSkippedUnchosen, skipped, overflow: total - kept, alreadyTrainee, inScope, candidates }
 }

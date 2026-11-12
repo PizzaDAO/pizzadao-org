@@ -178,7 +178,7 @@ describe('runTraineeNicks: writes', () => {
       { op: { kind: 'nick', userId: 's1', nick: 'Name 1' }, reason: 'anchovy-52918 trainee nickname' },
       { op: { kind: 'removeRole', userId: 'g1', roleId: NOOB }, reason: 'anchovy-52918 completed missions Level 2' },
     ])
-    expect(r).toMatchObject({ healed: 1, roleRemoved: 1 })
+    expect(r).toMatchObject({ healed: 1, roleRemoved: 1, healSkippedUnchosen: 0 })
   })
 
   it('fails closed when the L2 lookup throws: no role adds or removals, nicks still enforced', async () => {

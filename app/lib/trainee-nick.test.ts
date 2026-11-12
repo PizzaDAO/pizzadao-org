@@ -97,21 +97,39 @@ describe('planTraineeNicks: nicknames', () => {
     expect(p.inScope).toBe(6)
   })
 
-  it('heals signed-up members carrying the placeholder, even pre-since; empty Name gives null', () => {
+  it('heals signed-up members carrying the placeholder with a chosen name, even pre-since', () => {
     const p = plan(
       [
-        m('a', { nick: TRAINEE_NICK, joinedAt: BEFORE }),
-        m('b', { nick: TRAINEE_NICK }),
+        m('a', { nick: TRAINEE_NICK, joinedAt: BEFORE, username: 'u_a', globalName: 'Glob A' }),
         m('c', { nick: 'Fine' }),
-        m('d', { nick: TRAINEE_NICK }),
       ],
-      { signedUp: new Map([['a', 'Tony Pepperoni'], ['b', ''], ['c', 'Fine'], ['d', 'Pizza Trainee']]) },
+      { signedUp: new Map([['a', 'Tony Pepperoni'], ['c', 'Fine']]) },
     )
-    expect(p.heal).toEqual([
-      { id: 'a', nick: 'Tony Pepperoni' },
-      { id: 'b', nick: null },
-      { id: 'd', nick: null },
-    ])
+    expect(p.heal).toEqual([{ id: 'a', nick: 'Tony Pepperoni' }])
+    expect(p.healSkippedUnchosen).toBe(0)
+  })
+
+  it('skips (no write) when the Name equals username, global name or nick, case/spacing/emoji-insensitively', () => {
+    const p = plan(
+      [
+        m('u', { nick: TRAINEE_NICK, username: 'cool_dude99' }),
+        m('g', { nick: TRAINEE_NICK, username: 'x', globalName: 'Big  Cheese 🍕' }),
+        m('n', { nick: TRAINEE_NICK, username: 'y' }),
+      ],
+      { signedUp: new Map([['u', 'Cool Dude99'], ['g', 'big cheese'], ['n', ' PIZZA trainee ']]) },
+    )
+    expect(p.heal).toEqual([])
+    expect(p.healSkippedUnchosen).toBe(3)
+    expect(p.enforce).toEqual([])
+  })
+
+  it('skips placeholder and empty Names without clearing the nick', () => {
+    const p = plan(
+      [m('b', { nick: TRAINEE_NICK }), m('d', { nick: TRAINEE_NICK })],
+      { signedUp: new Map([['b', ''], ['d', 'Pizza Trainee']]) },
+    )
+    expect(p.heal).toEqual([])
+    expect(p.healSkippedUnchosen).toBe(2)
   })
 
   it('does not heal outranked signed-up members', () => {
