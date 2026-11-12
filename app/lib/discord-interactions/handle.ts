@@ -11,6 +11,7 @@
  * that deliberately ping one member in plain content (/pay's recipient,
  * /add-money and /remove-money's target).
  */
+import { normalizeStreamLink } from '../calls/stream-link'
 import { ApiError } from '../errors/api-errors'
 import { adminGrantError, normalizeReason, type AdminAdjustResult } from '../pep-admin'
 import type { IncomeResult } from '../pep-earn/income'
@@ -119,6 +120,16 @@ export interface HandlerDeps {
     crewChoices: (query: string) => Promise<Array<{ name: string; value: string }>>
   }
   /**
+   * /live (calls.liveAnnounceCommandEnabled). `enabled` is checked first; `canRun` is the host / admin
+   * role check on the invoker's roles; `defer` posts (once per call) and edits the deferred ephemeral
+   * reply; it must not block (route: after()).
+   */
+  live?: {
+    enabled: () => Promise<boolean>
+    canRun: (roles: string[]) => Promise<boolean>
+    defer: (job: LiveJob) => void
+  }
+  /**
    * /metalhead updates | stop | pause | resume | skip | script (discord.metalheadCommandEnabled).
    * `enabled` is checked first so a disabled command uses no rate limit. `defer` does the work and
    * edits the deferred ephemeral reply; it must not block (route: after()).
@@ -153,6 +164,15 @@ export interface MissionsJob {
   roles: string[]
   applicationId: string
   token: string
+  author?: EmbedAuthor
+}
+
+/** What the deferred /live follow-up needs. */
+export interface LiveJob {
+  applicationId: string
+  token: string
+  /** The stream option, validated (an x.com / twitter.com broadcast or status link). */
+  stream?: string
   author?: EmbedAuthor
 }
 
@@ -461,6 +481,26 @@ async function command(i: Interaction, userId: string, deps: HandlerDeps, cur: s
       })
       // "Metalhead is thinking..." (public); the report is edited in.
       return { type: ResponseType.DEFERRED_CHANNEL_MESSAGE, data: { allowed_mentions: NO_PINGS } }
+    }
+
+    case 'live': {
+      if (!deps.live || !(await deps.live.enabled())) return out.error("/live isn't enabled yet.")
+      if (!i.application_id || !i.token) return out.error('Could not start the command. Please try again.')
+      if (!(await deps.live.canRun(i.member?.roles ?? []))) return out.error('Only hosts and admins can use /live.')
+      const raw = opt(i, 'stream')
+      let stream: string | undefined
+      if (typeof raw === 'string' && raw.trim()) {
+        const link = normalizeStreamLink(raw)
+        if (!link) return out.error('The stream link must be an x.com or twitter.com broadcast or post link (https://x.com/i/broadcasts/...).')
+        stream = link
+      }
+      deps.live.defer({
+        applicationId: i.application_id,
+        token: i.token,
+        ...(stream ? { stream } : {}),
+        author: authorFor(i.member ? { ...i.member, guildId: i.guild_id } : undefined),
+      })
+      return { type: ResponseType.DEFERRED_CHANNEL_MESSAGE, data: { flags: EPHEMERAL, allowed_mentions: NO_PINGS } }
     }
 
     case 'metalhead': {

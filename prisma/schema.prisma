@@ -1577,6 +1577,26 @@ model CallLiveSession {
   @@index([endedAt, lastSeenAt])
 }
 
+// One "we're live" announcement per call occurrence (the claim row: a second /live or the automatic
+// post finds it and does not post again). See app/lib/calls/live-announce.ts.
+model CallLiveAnnounce {
+  occurrenceKey    String    @id // `${eventId}:${local day}` or the recorder session id
+  eventId          String?
+  sessionId        String?
+  voiceChannelId   String?
+  postedChannelId  String?
+  discordMessageId String?
+  streamLink       String?
+  source           String    @db.VarChar(12) // command | auto
+  startedAt        DateTime
+  reminderDueAt    DateTime
+  reminderQueuedAt DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([reminderQueuedAt, reminderDueAt])
+}
+
 // Live Q&A of a call (keyed by the recorder session id, kept after the call: shown on the published
 // call page). authorName is kept for hosts only when anonymous; anonymous askers are never shown to members.
 model CallLiveQuestion {

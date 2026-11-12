@@ -34,8 +34,8 @@ afterEach(() => {
   vi.unstubAllEnvs()
 })
 
-// Booleans where ON is the safe state (dry run): not enable switches, so no env fallback or kill switch.
-const SAFETY_FLAGS: string[] = ['calls.dstFixDryRun', 'calls.attendanceSpeakersAlwaysCount']
+// Booleans that are not enable switches (no env fallback or kill switch): safe-state flags, and the @everyone add-on of a post that has its own switches.
+const SAFETY_FLAGS: string[] = ['calls.dstFixDryRun', 'calls.attendanceSpeakersAlwaysCount', 'calls.liveAnnounceEveryone']
 
 describe('feature switches: env stays the fallback and the kill switch', () => {
   it('every switch in the registry has an env var, and the registry default is the legacy default', () => {

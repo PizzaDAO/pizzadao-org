@@ -46,6 +46,9 @@ export const TOGGLES = {
   'calls.playOutAnyMember': { env: 'CALL_PLAY_OUT_ANY_MEMBER', legacy: ON_WORDS },
   'calls.startBandEnabled': { env: 'CALL_START_BAND_ENABLED', legacy: ON_WORDS },
   'calls.progressReportEnabled': { env: 'CALL_PROGRESS_ENABLED', legacy: ON_WORDS },
+  'calls.liveAnnounceCommandEnabled': { env: 'CALL_LIVE_ANNOUNCE_COMMAND_ENABLED', legacy: ON_WORDS },
+  'calls.liveAnnounceAutoEnabled': { env: 'CALL_LIVE_ANNOUNCE_AUTO_ENABLED', legacy: ON_WORDS },
+  'calls.liveReminderEnabled': { env: 'CALL_LIVE_REMINDER_ENABLED', legacy: ON_WORDS },
   'calls.progressShowFollowups': { env: 'CALL_PROGRESS_FOLLOWUPS_ENABLED', legacy: ON_WORDS },
   // Off unless turned on: spoken call updates and their /metalhead command (plans/metalhead-reads-updates.md).
   'calls.updatesEnabled': { env: 'CALL_UPDATES_ENABLED', legacy: ON_WORDS },

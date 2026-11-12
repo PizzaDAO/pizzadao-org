@@ -147,6 +147,14 @@ export const PEP_COMMANDS = [
     dm_permission: false,
   },
   {
+    // Deferred and ephemeral: posts the "we're live" announcement once per call. Hosts, admins and the live host roles only.
+    // Answers "not enabled" until calls.liveAnnounceCommandEnabled.
+    name: 'live',
+    description: 'Announce that the community call is live (Discord, Telegram) and get the X post text',
+    options: [{ type: STRING, name: 'stream', description: 'X (Twitter) stream link to include', required: false, max_length: 300 }],
+    dm_permission: false,
+  },
+  {
     // Deferred and ephemeral (type 5, flags 64): spoken call updates and their controls. Leads of the
     // call's crew, admins and live hosts only (checked in the handler); answers "not enabled" until
     // discord.metalheadCommandEnabled (and calls.updatesEnabled for the rest).

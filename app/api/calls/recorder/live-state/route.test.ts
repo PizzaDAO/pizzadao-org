@@ -5,6 +5,9 @@ vi.mock('@/app/lib/db', () => ({ prisma: {} }))
 const handle = vi.fn()
 vi.mock('@/app/lib/calls/live-state', async (orig) => ({ ...(await orig<typeof import('@/app/lib/calls/live-state')>()), handleLiveState: (...a: unknown[]) => handle(...a) }))
 
+vi.mock('next/server', async (orig) => ({ ...(await orig<typeof import('next/server')>()), after: () => undefined }))
+vi.mock('@/app/lib/calls/live-announce-command', () => ({ liveTickForSession: vi.fn() }))
+
 import { POST } from './route'
 
 const good = { sessionId: 's-1', startedAt: new Date(0).toISOString(), present: [] }
