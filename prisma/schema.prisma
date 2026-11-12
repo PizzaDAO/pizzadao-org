@@ -2953,3 +2953,17 @@ model CrewTaskUpdatePost {
   postedAt    DateTime
   updatedAt   DateTime @updatedAt
 }
+
+// One row per name-reminder DM an admin sent from /admin/members/names (cooldown + audit).
+model MemberNameReminder {
+  id        String   @id @default(cuid())
+  discordId String
+  memberId  String
+  sentBy    String
+  status    String // SENDING | SENT | CLOSED | FAILED
+  // discordId + cooldown window; unique so concurrent sends cannot double-DM. Null once released (FAILED).
+  claimKey  String?  @unique
+  createdAt DateTime @default(now())
+
+  @@index([discordId, createdAt])
+}
