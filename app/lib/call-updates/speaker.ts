@@ -34,9 +34,9 @@ export interface Speaker {
   /** True for the real adapter, false for the no-op. */
   readonly live: boolean
   play(o: { channelId: string; clips: ClipUrl[]; ifBusy?: 'queue' | 'skip'; pauseMaxMs: number }): Promise<PlayResult>
-  pause(o: { pauseMaxMs: number }): Promise<ControlResult>
-  resume(): Promise<ControlResult>
-  skip(): Promise<ControlResult>
+  pause(o: { channelId: string; pauseMaxMs: number }): Promise<ControlResult>
+  resume(o: { channelId: string }): Promise<ControlResult>
+  skip(o: { channelId: string }): Promise<ControlResult>
   /** Stop whatever pizza-radio is playing in this channel and leave it. */
   stop(o: { channelId: string }): Promise<ControlResult>
   status(): Promise<SpeakerStatus | null>
@@ -96,9 +96,9 @@ export function pizzaRadioSpeaker(env: Record<string, string | undefined> = proc
       const st = r.json.status
       return { status: st === 'queued' ? 'queued' : st === 'skipped' ? 'skipped' : 'playing', ...(typeof r.json.reason === 'string' ? { reason: r.json.reason } : {}) }
     },
-    pause: (o) => control('/pause', { pauseMaxMs: o.pauseMaxMs }),
-    resume: () => control('/resume', {}),
-    skip: () => control('/skip', {}),
+    pause: (o) => control('/pause', { channelId: o.channelId, pauseMaxMs: o.pauseMaxMs }),
+    resume: (o) => control('/resume', { channelId: o.channelId }),
+    skip: (o) => control('/skip', { channelId: o.channelId }),
     async stop(o) {
       // Only what is in this call's channel: a mixtape somewhere else is none of our business.
       const r = await call('POST', '/stop', { leave: true, channelId: o.channelId })

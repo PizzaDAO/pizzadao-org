@@ -76,6 +76,8 @@ import { SITE_URL } from "@/app/lib/site-url";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// The deferred /metalhead work (script, text to speech, pizza-radio) runs in after(): allow it a minute.
+export const maxDuration = 60;
 
 async function getWallet(discordId: string): Promise<number> {
   // Read-only: looking someone up must not create rows for them.

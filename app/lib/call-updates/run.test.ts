@@ -37,15 +37,20 @@ function memStore(initial: Array<{ seq: number; status: string }> = []): RunStor
   const rows = initial.map((r, i) => ({ id: `r${i}`, ...r })) as Array<{ id: string; seq: number; status: string; [k: string]: unknown }>
   return {
     rows,
-    countActive: async () => rows.filter((r) => r.status !== 'skipped').length,
-    nextSeq: async () => rows.reduce((m, r) => Math.max(m, r.seq), -1) + 1,
-    create: async (row) => {
-      if (rows.some((r) => r.seq === row.seq)) throw Object.assign(new Error('dup'), { code: 'P2002' })
-      const r = { id: `r${rows.length}`, status: 'queued', ...row }
-      rows.push(r)
-      return { id: r.id }
+    claim: async (row, max) => {
+      for (let seq = 0; seq < max; seq++) {
+        if (rows.some((r) => r.seq === seq)) continue
+        const r = { id: `r${rows.length}`, status: 'queued', seq, ...row }
+        rows.push(r)
+        return { id: r.id, seq }
+      }
+      return null
     },
-    update: async (id, data) => void Object.assign(rows.find((r) => r.id === id)!, data),
+    update: async (id, data) => {
+      const r = rows.find((x) => x.id === id)!
+      Object.assign(r, data)
+      if (data.status === 'skipped') r.seq = -1 - rows.length // a skipped run frees its slot
+    },
     latest: async (sessionId) => {
       const r = [...rows].filter((x) => x.status !== 'skipped').sort((a, b) => b.seq - a.seq)[0]
       return r ? { id: r.id, sessionId, seq: r.seq, status: r.status } : null
@@ -121,12 +126,18 @@ describe('startUpdates', () => {
   })
 
   it('caps runs per call (skipped runs do not count)', async () => {
-    const d = deps({ store: memStore([{ seq: 0, status: 'done' }, { seq: 1, status: 'skipped' }, { seq: 2, status: 'stopped' }, { seq: 3, status: 'done' }]) })
+    const d = deps({ store: memStore([{ seq: 0, status: 'done' }, { seq: 1, status: 'stopped' }, { seq: 2, status: 'done' }]) })
     expect((await startUpdates(CALL, START, d)).reason).toBe('cap')
     expect(MAX_RUNS_PER_CALL).toBe(3)
-    const d2 = deps({ store: memStore([{ seq: 0, status: 'done' }, { seq: 1, status: 'skipped' }]) })
+    // a skipped run (parked on a negative seq) leaves its slot free
+    const d2 = deps({ store: memStore([{ seq: 0, status: 'done' }, { seq: -5, status: 'skipped' }, { seq: 2, status: 'done' }]) })
     expect((await startUpdates(CALL, START, d2)).status).toBe('playing')
-    expect(d2.store.rows.at(-1)!.seq).toBe(2)
+    expect(d2.store.rows.at(-1)!.seq).toBe(1)
+    // concurrent requests cannot exceed the cap
+    const d3 = deps({ store: memStore() })
+    const results = await Promise.all(Array.from({ length: 6 }, () => startUpdates(CALL, START, d3)))
+    expect(results.filter((r) => r.status === 'playing')).toHaveLength(3)
+    expect(results.filter((r) => r.reason === 'cap')).toHaveLength(3)
   })
 
   it('an empty or excluded script plays nothing and uses no cap slot', async () => {
@@ -136,19 +147,6 @@ describe('startUpdates', () => {
       expect(d.render).not.toHaveBeenCalled()
       expect(d.store.rows).toHaveLength(0)
     }
-  })
-
-  it('claim idempotency: a lost unique race is retried once, then reported busy', async () => {
-    const store = memStore()
-    let calls = 0
-    store.create = async () => {
-      calls++
-      throw Object.assign(new Error('dup'), { code: 'P2002' })
-    }
-    const d = deps({ store })
-    expect(await startUpdates(CALL, START, d)).toEqual({ status: 'skipped', reason: 'busy' })
-    expect(calls).toBe(2)
-    expect(d.render).not.toHaveBeenCalled()
   })
 
   it('a pizza-radio busy-elsewhere answer becomes skipped with the reason', async () => {
@@ -205,9 +203,11 @@ describe('controlUpdates', () => {
   it('stop is scoped to the call channel and leaves; pause passes the settings limit', async () => {
     const d = deps()
     await controlUpdates('stop', CALL, ACTOR, d)
+    await controlUpdates('skip', CALL, ACTOR, d)
+    expect(d.speaker.skip).toHaveBeenCalledWith({ channelId: CALL.channelId })
     expect(d.speaker.stop).toHaveBeenCalledWith({ channelId: CALL.channelId })
     await controlUpdates('pause', CALL, ACTOR, d)
-    expect(d.speaker.pause).toHaveBeenCalledWith({ pauseMaxMs: 300000 })
+    expect(d.speaker.pause).toHaveBeenCalledWith({ channelId: CALL.channelId, pauseMaxMs: 300000 })
   })
 
   it('nothing playing: reports it, posts nothing', async () => {

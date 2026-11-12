@@ -39,7 +39,6 @@ export type StartReason =
   | 'hidden'
   | 'preview'
   | 'cap'
-  | 'busy'
   | 'crew-unknown'
   | 'excluded'
   | 'filter-unreadable'
@@ -65,11 +64,12 @@ export interface RunRow {
 }
 
 export interface RunStore {
-  /** Runs that count against the cap (everything but skipped). */
-  countActive(sessionId: string): Promise<number>
-  nextSeq(sessionId: string): Promise<number>
-  /** Throws an error with code P2002 when (sessionId, seq) is taken. */
-  create(row: { sessionId: string; seq: number; eventId: string | null; startsAt: Date; crewId: string; channelId: string; trigger: string; startedBy: string | null }): Promise<{ id: string }>
+  /**
+   * Atomically claim one of the call's run slots (seq 0..maxSlots-1, a unique (sessionId, seq) insert, so
+   * concurrent requests cannot exceed the cap). Null when every slot is taken. A run that ends "skipped"
+   * gives its slot back (update moves it to a negative seq).
+   */
+  claim(row: { sessionId: string; eventId: string | null; startsAt: Date; crewId: string; channelId: string; trigger: string; startedBy: string | null }, maxSlots: number): Promise<{ id: string; seq: number } | null>
   update(id: string, data: Record<string, unknown>): Promise<void>
   latest(sessionId: string): Promise<RunRow | null>
 }
@@ -85,12 +85,24 @@ export interface RunDeps {
   announce: (channelId: string, text: string) => Promise<void>
 }
 
+const isUniqueViolation = (err: unknown) => typeof err === 'object' && err !== null && (err as { code?: string }).code === 'P2002'
+
 export const prismaRunStore: RunStore = {
-  countActive: (sessionId) => prisma.callUpdatesRun.count({ where: { sessionId, status: { not: 'skipped' } } }),
-  nextSeq: async (sessionId) => ((await prisma.callUpdatesRun.aggregate({ where: { sessionId }, _max: { seq: true } }))._max.seq ?? -1) + 1,
-  create: (row) => prisma.callUpdatesRun.create({ data: row, select: { id: true } }),
+  claim: async (row, maxSlots) => {
+    for (let seq = 0; seq < maxSlots; seq++) {
+      try {
+        const r = await prisma.callUpdatesRun.create({ data: { ...row, seq }, select: { id: true } })
+        return { id: r.id, seq }
+      } catch (err) {
+        if (!isUniqueViolation(err)) throw err
+      }
+    }
+    return null
+  },
   update: async (id, data) => {
-    await prisma.callUpdatesRun.update({ where: { id }, data })
+    // A skipped run frees its slot: park it on a random negative seq (unique per session in practice).
+    const d = data.status === 'skipped' ? { ...data, seq: -1 - Math.floor(Math.random() * 2_000_000_000) } : data
+    await prisma.callUpdatesRun.update({ where: { id }, data: d })
   },
   latest: (sessionId) => prisma.callUpdatesRun.findFirst({ where: { sessionId, status: { not: 'skipped' } }, orderBy: { seq: 'desc' }, select: { id: true, sessionId: true, seq: true, status: true } }),
 }
@@ -119,8 +131,6 @@ export function defaultRunDeps(env: Record<string, string | undefined> = process
   }
 }
 
-const isUniqueViolation = (err: unknown) => typeof err === 'object' && err !== null && (err as { code?: string }).code === 'P2002'
-
 export function voiceFrom(settings: Settings): Voice {
   return { voice: settings.get('calls.updatesVoice'), instructions: settings.get('calls.updatesVoiceInstructions') }
 }
@@ -140,33 +150,19 @@ export async function startUpdates(call: CallRef, o: { trigger: 'command' | 'aut
     await deps.speaker.play({ channelId: call.channelId, clips: [], pauseMaxMs: 0 }) // logs "preview, not speaking"
     return skip('preview')
   }
-  if ((await deps.store.countActive(call.sessionId)) >= MAX_RUNS_PER_CALL) return skip('cap')
 
   const script = await deps.build(call.crewId, settings)
   if (script.kind === 'none') return skip(script.reason === 'error' ? 'script-error' : script.reason)
 
-  // Claim before any paid work: a concurrent run loses the unique constraint.
-  let runId: string | null = null
-  for (let attempt = 0; attempt < 2 && !runId; attempt++) {
-    try {
-      const row = await deps.store.create({
-        sessionId: call.sessionId,
-        seq: await deps.store.nextSeq(call.sessionId),
-        eventId: call.eventId,
-        startsAt: call.startedAt,
-        crewId: call.crewId,
-        channelId: call.channelId,
-        trigger: o.trigger,
-        startedBy: o.startedBy,
-      })
-      runId = row.id
-    } catch (err) {
-      if (!isUniqueViolation(err)) throw err
-    }
-  }
-  if (!runId) return skip('busy')
+  // Claim a slot before any paid work. The claim is atomic, so concurrent requests cannot exceed the cap.
+  const claimed = await deps.store.claim(
+    { sessionId: call.sessionId, eventId: call.eventId, startsAt: call.startedAt, crewId: call.crewId, channelId: call.channelId, trigger: o.trigger, startedBy: o.startedBy },
+    MAX_RUNS_PER_CALL,
+  )
+  if (!claimed) return skip('cap')
+  const runId = claimed.id
   const finish = async (status: string, reason?: string) => {
-    await deps.store.update(runId!, { status, reason: reason ?? null, scriptHash: script.hash, sectionCount: script.sections.length, estSeconds: script.estSeconds }).catch(() => undefined)
+    await deps.store.update(runId, { status, reason: reason ?? null, scriptHash: script.hash, sectionCount: script.sections.length, estSeconds: script.estSeconds }).catch(() => undefined)
   }
 
   let clips: ClipUrl[]
@@ -216,13 +212,13 @@ export async function controlUpdates(action: ControlAction, call: Pick<CallRef, 
   try {
     switch (action) {
       case 'pause':
-        r = await deps.speaker.pause({ pauseMaxMs: settings.get('calls.updatesPauseMaxMinutes') * 60_000 })
+        r = await deps.speaker.pause({ channelId: call.channelId, pauseMaxMs: settings.get('calls.updatesPauseMaxMinutes') * 60_000 })
         break
       case 'resume':
-        r = await deps.speaker.resume()
+        r = await deps.speaker.resume({ channelId: call.channelId })
         break
       case 'skip':
-        r = await deps.speaker.skip()
+        r = await deps.speaker.skip({ channelId: call.channelId })
         break
       case 'stop':
         r = await deps.speaker.stop({ channelId: call.channelId })

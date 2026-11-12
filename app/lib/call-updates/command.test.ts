@@ -91,9 +91,7 @@ function runDeps(over: Partial<RunDeps> = {}): RunDeps {
       status: vi.fn(async () => null),
     },
     store: {
-      countActive: async () => 0,
-      nextSeq: async () => 0,
-      create: async () => ({ id: 'r0' }),
+      claim: async () => ({ id: 'r0', seq: 0 }),
       update: async () => undefined,
       latest: async () => null,
     },

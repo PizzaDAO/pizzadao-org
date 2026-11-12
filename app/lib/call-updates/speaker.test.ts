@@ -60,10 +60,10 @@ describe('pizzaRadioSpeaker', () => {
 
   it('pause, resume and skip act on the updates tag; 409 means nothing playing', async () => {
     const { f, speaker } = make(json(200, { paused: true }), json(409, { error: 'nothing-playing' }), json(200))
-    expect(await speaker.pause({ pauseMaxMs: 1000 })).toEqual({ ok: true })
-    expect(call(f, 0).body).toEqual({ tag: 'updates', pauseMaxMs: 1000 })
-    expect(await speaker.resume()).toEqual({ ok: false, reason: 'nothing-playing' })
-    expect(await speaker.skip()).toEqual({ ok: true })
+    expect(await speaker.pause({ channelId: '55', pauseMaxMs: 1000 })).toEqual({ ok: true })
+    expect(call(f, 0).body).toEqual({ tag: 'updates', channelId: '55', pauseMaxMs: 1000 })
+    expect(await speaker.resume({ channelId: '55' })).toEqual({ ok: false, reason: 'nothing-playing' })
+    expect(await speaker.skip({ channelId: '55' })).toEqual({ ok: true })
     expect(call(f, 2).url).toBe('https://radio.example/skip')
   })
 
