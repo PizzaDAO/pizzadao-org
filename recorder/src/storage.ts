@@ -1,6 +1,6 @@
 /** Private R2 bucket (S3 API), same client shape as PizzaDAO/pizza-radio src/services/r2-sync.js. */
 import { readFile } from 'node:fs/promises'
-import { DeleteObjectsCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { DeleteObjectCommand, DeleteObjectsCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import type { Config } from './config.js'
 
 export interface Uploader {
@@ -11,6 +11,8 @@ export interface Uploader {
    * `prefix` must be a `calls/<sessionId>/` prefix. Needs list + delete on the token.
    */
   pruneExcept(prefix: string, keep: ReadonlySet<string>): Promise<number>
+  /** Best-effort delete of one object (play-out bursts, right after their check). Absent on fakes. */
+  remove?(key: string): Promise<void>
 }
 
 export function createR2Uploader(r2: Config['r2']): Uploader {
@@ -24,6 +26,9 @@ export function createR2Uploader(r2: Config['r2']): Uploader {
       const body = await readFile(file)
       await client.send(new PutObjectCommand({ Bucket: r2.bucket, Key: key, Body: body, ContentType: contentType }))
       return body.length
+    },
+    async remove(key) {
+      await client.send(new DeleteObjectCommand({ Bucket: r2.bucket, Key: key }))
     },
     async pruneExcept(prefix, keep) {
       assertSessionPrefix(prefix)
@@ -62,5 +67,7 @@ export function sessionKeys(sessionId: string) {
     track: (userId: string) => `calls/${sessionId}/tracks/${userId}.ogg`,
     /** A speech segment sent during the call for live action items (pruned with the other leftovers at finalize). */
     live: (userId: string, startMs: number) => `calls/${sessionId}/live/${userId}/${startMs}.ogg`,
+    /** A burst sent for the spoken play-out command; deleted right after its check. */
+    cmd: (userId: string, startMs: number) => `calls/${sessionId}/cmd/${userId}/${startMs}.ogg`,
   }
 }

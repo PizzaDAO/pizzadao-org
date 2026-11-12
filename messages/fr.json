@@ -1036,6 +1036,7 @@
       "actionItemsRestricted": "Les actions à mener sont réservées aux membres de niveau {level} et plus.",
       "suggestedBy": "suggéré par {name}",
       "suggestedAndOwns": "{name} · l'a suggéré et s'en charge",
+      "actionDone": "Fait",
       "chaptersRestricted": "Les chapitres sont réservés aux membres de niveau {level} et plus.",
       "chatLine": "Écrit dans le chat de l'appel",
       "unknownSpeaker": "Intervenant",
@@ -1049,7 +1050,8 @@
       "qaVotes": "{count, plural, one {# vote} other {# votes}}",
       "qaBy": "Posée par {name}",
       "pollsTitle": "Résultats des sondages",
-      "pollTotal": "{count, plural, one {# vote} other {# votes}}"
+      "pollTotal": "{count, plural, one {# vote} other {# votes}}",
+      "crewPage": "Ouvrir la page de la crew {crew}"
     },
     "readRecordings": "Lisez les résumés et transcriptions des appels passés.",
     "live": {
@@ -1144,13 +1146,35 @@
       "streamLabel": "Lien du stream (x.com)",
       "streamSave": "Enregistrer",
       "streamCancel": "Annuler",
-      "bannerMore": "En direct : {title} et {count, plural, one {# autre appel} other {# autres appels}}"
+      "bannerMore": "En direct : {title} et {count, plural, one {# autre appel} other {# autres appels}}",
+      "crewPage": "Ouvrir la page de la crew {crew}",
+      "crewTitle": "À propos de cette crew",
+      "crewGoals": "Objectifs",
+      "crewTasks": "Tâches ouvertes ({count})",
+      "crewMoreTasks": "et {count} de plus sur la page de la crew",
+      "crewLeads": "Responsables",
+      "crewNone": "Rien n'est encore listé pour cette crew.",
+      "inviteTitle": "Amenez quelqu'un",
+      "inviteBody": "Vous connaissez quelqu'un que ça intéresserait ? Envoyez-lui le lien du direct.",
+      "inviteCopy": "Copier le lien",
+      "inviteCopied": "Lien copié",
+      "inviteShare": "Partager"
     }
   },
   "communityTerms": {
     "missions": "Des tâches guidées pour commencer à participer à PizzaDAO.",
     "pep": "Les PEP sont les points communautaires de PizzaDAO. Gagnez-en en contribuant et découvrez comment les dépenser.",
     "poaps": "Les POAP sont des badges numériques collectés lors d’événements communautaires."
+  },
+  "crewPage": {
+    "joinDiscord": "Rejoindre sur Discord",
+    "joinUs": "rejoignez-nous",
+    "goalTasks": "{count, plural, =0 {Aucune tâche} one {# tâche} other {# tâches}}",
+    "goalDone": "{count, plural, =0 {} one {# terminée} other {# terminées}}",
+    "goalAllDone": "Toutes les tâches de cet objectif sont terminées.",
+    "goalNoTasks": "Aucune tâche n'est encore liée à cet objectif.",
+    "lead": "Responsable",
+    "due": "Échéance"
   },
   "crewGettingStarted": {
     "title": "Participer",
@@ -1377,6 +1401,7 @@
     "redactConfirm": "Masquer toutes les lignes de cet intervenant sur la page publique et dans les résumés ? Rien n’est supprimé et vous pouvez les rétablir. Un appel publié repasse en relecture. Le résumé n’est pas réécrit.",
     "processingNote": "Le résumé est en cours de génération. Rechargez dans une minute.",
     "actionItemsHint": "Une par ligne. Responsable facultatif après une barre verticale, puis \"by: Nom\" pour qui l'a suggéré : Envoyer la présentation | Ann | by: Bob",
+    "actionItemDone": "Fait",
     "suggestedBy": "suggéré par {name}",
     "chaptersHint": "Une par ligne : heure de début puis titre, par exemple 12:30 Point budget",
     "restoreLines": "Rétablir ses lignes",
@@ -2535,5 +2560,24 @@
     "tooMany": "Trop d''essais. Patientez un instant.",
     "dashLink": "Récupérer le PEP du jour",
     "getRoleEvery": "Obtenez le rôle {role} pour gagner {amount} PEP toutes les {hours} heures."
+  },
+  "memberCard": {
+    "loading": "Chargement…",
+    "unavailable": "Profil indisponible",
+    "level": "Niveau {level}",
+    "crews": "Crews",
+    "viewProfile": "Voir le profil"
+  },
+  "profileShare": {
+    "share": "Partager le profil",
+    "copyLink": "Copier le lien",
+    "copied": "Lien copié",
+    "copyFailed": "Impossible de copier le lien"
+  },
+  "collectionStats": {
+    "aria": "Totaux de la collection",
+    "poaps": "{count, plural, one {# POAP} other {# POAP}}",
+    "nfts": "{count, plural, one {# NFT} other {# NFT}} dans {collections, plural, one {# collection} other {# collections}}",
+    "tickets": "{count, plural, one {# billet} other {# billets}}"
   }
 }

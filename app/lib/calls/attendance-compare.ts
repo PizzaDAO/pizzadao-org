@@ -8,6 +8,7 @@
 import { prisma } from '@/app/lib/db'
 import { rebuildAttendanceSummaries } from '@/app/lib/attendance'
 import { attendanceCrewId, crewIdsFor, loadCrewAliases } from './crew-alias'
+import { loadAttendanceExcludes } from './attendance-exclude'
 import { callDay, countedAttendees, loadAttendanceThresholds, type AttendanceThresholds, type CountedRecording } from './attendance-from-recordings'
 
 export interface ComparePerson {
@@ -73,7 +74,7 @@ export async function buildCompareReport(opts: { days: number; thresholds?: Atte
   const days = Math.min(Math.max(Math.trunc(opts.days) || 30, 1), COMPARE_MAX_DAYS)
   const since = new Date((opts.now ?? new Date()).getTime() - days * 86_400_000)
   const sinceDay = callDay(since)
-  const [aliases, thresholds] = await Promise.all([loadCrewAliases(), opts.thresholds ?? loadAttendanceThresholds()])
+  const [aliases, thresholds, exclude] = await Promise.all([loadCrewAliases(), opts.thresholds ?? loadAttendanceThresholds(), loadAttendanceExcludes()])
 
   const recs = await prisma.callRecording.findMany({
     where: { crewId: { not: null }, status: { not: 'REJECTED' }, startedAt: { gte: sinceDay } },
@@ -119,9 +120,9 @@ export async function buildCompareReport(opts: { days: number; thresholds?: Atte
   for (const b of buckets.values()) {
     const removed = new Set([...b.latest].filter(([, action]) => action === 'remove').map(([id]) => id))
     const split = compareDay({
-      recording: countedAttendees(b.recs, thresholds),
-      sheet: [...b.sheet].map(([discordId, displayName]) => ({ discordId, displayName })),
-      manual: [...b.manual].map(([discordId, displayName]) => ({ discordId, displayName })),
+      recording: countedAttendees(b.recs, thresholds, exclude),
+      sheet: [...b.sheet].filter(([id]) => !exclude.has(id)).map(([discordId, displayName]) => ({ discordId, displayName })),
+      manual: [...b.manual].filter(([id]) => !exclude.has(id)).map(([discordId, displayName]) => ({ discordId, displayName })),
       removed,
     })
     out.push({ crewId: b.crewId, crewLabel: b.crewLabel, date: b.date, recordings: b.recs.length, ...split })
@@ -156,6 +157,7 @@ export async function editAttendance(input: AttendanceEditInput): Promise<Attend
   const where = { crewId: { in: crewIds }, callDate: day, discordId: input.discordId }
 
   if (input.action === 'add') {
+    if ((await loadAttendanceExcludes()).has(input.discordId)) return { ok: false, status: 400, error: 'That account is excluded from attendance' }
     const existing = await prisma.callAttendance.findFirst({ where, select: { id: true } })
     if (existing) return { ok: false, status: 409, error: 'Already counted for that crew and day' }
     const [labelRow, nameRow] = await Promise.all([

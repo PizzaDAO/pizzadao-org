@@ -19,6 +19,7 @@ import { fetchGviz } from "@/app/lib/sheets/gviz";
 import { SHEET_IDS } from "@/app/lib/sheets/config";
 import { getSheetData } from "@/app/lib/sheets/member-repository";
 import { crewIdsFor, loadCrewAliases } from "@/app/lib/calls/crew-alias";
+import { loadAttendanceExcludes } from "@/app/lib/calls/attendance-exclude";
 import promiseLimit from "promise-limit";
 
 // ---------------------------------------------------------------------------
@@ -52,7 +53,7 @@ export interface AttendanceResult {
     string,
     { crewLabel: string; count: number; lastAttended?: string }
   >;
-  recentCalls: { date: string; crew: string; crewId: string }[];
+  recentCalls: { date: string; crew: string; crewId: string; /** set by the attendance API when a published recording exists */ recordingId?: string }[];
 }
 
 export interface SyncStats {
@@ -360,6 +361,7 @@ async function syncCrewAttendance(
   const affectedDiscordIds = new Set<string>();
 
   const aliases = await loadCrewAliases();
+  const excluded = await loadAttendanceExcludes();
   for (const result of results) {
     if (!result) continue;
     const { entry, attendees } = result;
@@ -378,7 +380,7 @@ async function syncCrewAttendance(
 
     // Bulk insert attendance records (skip duplicates via unique constraint)
     const created = await prisma.callAttendance.createMany({
-      data: attendees.filter((a) => !fromRecordings.has(a.discordId)).map((a) => ({
+      data: attendees.filter((a) => !fromRecordings.has(a.discordId) && !excluded.has(a.discordId)).map((a) => ({
         discordId: a.discordId,
         displayName: a.displayName || null,
         crewId,
@@ -620,6 +622,9 @@ export async function rebuildAttendanceSummaries(
     ids = rows.map((r) => r.discordId);
   }
 
+  // Excluded accounts (bots) get no summary; existing rows are left as they are.
+  const excluded = await loadAttendanceExcludes();
+  ids = ids.filter((id) => !excluded.has(id));
   if (ids.length === 0) return 0;
 
   let upserted = 0;
