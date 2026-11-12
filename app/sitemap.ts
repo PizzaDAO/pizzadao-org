@@ -8,6 +8,15 @@ import { HANDBOOK_PAGES } from "@/content/handbook";
 // sheet outage still yields the static routes.
 export const revalidate = 3600;
 
+/** A hung DB or sheet read must not stall the build's prerender (Next gives up after 60s). */
+const SECTION_TIMEOUT_MS = 15_000;
+function withTimeout<T>(p: Promise<T>): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error("sitemap section timed out")), SECTION_TIMEOUT_MS)),
+  ]);
+}
+
 const STATIC_ROUTES: Array<{ path: string; priority: number; changeFrequency: "daily" | "weekly" | "monthly" }> = [
   { path: "/", priority: 1, changeFrequency: "weekly" },
   { path: "/join", priority: 0.9, changeFrequency: "monthly" },
@@ -37,13 +46,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }));
 
   const [articles, crews] = await Promise.allSettled([
-    prisma.article.findMany({
-      where: { status: "PUBLISHED" },
-      select: { slug: true, updatedAt: true },
-      orderBy: { publishedAt: "desc" },
-      take: 1000,
-    }),
-    getCrewMappings(),
+    withTimeout(
+      prisma.article.findMany({
+        where: { status: "PUBLISHED" },
+        select: { slug: true, updatedAt: true },
+        orderBy: { publishedAt: "desc" },
+        take: 1000,
+      }),
+    ),
+    withTimeout(getCrewMappings()),
   ]);
 
   if (articles.status === "fulfilled") {
