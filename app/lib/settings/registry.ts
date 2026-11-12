@@ -1702,6 +1702,12 @@ export const SETTINGS = {
     label: 'Trainee nickname sync',
     help: 'Apply the trainee nickname and role changes in Discord. Off: dry run. The TRAINEE_NICK_ENABLED env var set to off always wins.',
   }),
+  'onboarding.traineeNickHealEnabled': boolSetting({
+    key: 'onboarding.traineeNickHealEnabled',
+    area: 'features',
+    label: 'Restore chosen names on Pizza Trainee members',
+    help: 'Restore the name a member chose on signed-up members who are still nicknamed Pizza Trainee (names that just match their Discord name are left alone). Off: they keep Pizza Trainee until they claim a name. Needs the trainee nickname sync on. The TRAINEE_NICK_HEAL_ENABLED env var set to off always wins.',
+  }),
   'names.requireThemed': boolSetting({
     key: 'names.requireThemed',
     area: 'mafia',

@@ -193,6 +193,7 @@ describe('settings registry', () => {
       ['disavow.enabled', false],
       ['reengage.enabled', false],
       ['onboarding.traineeNickEnabled', false],
+      ['onboarding.traineeNickHealEnabled', false],
       ['names.requireThemed', false],
       ['mafia.rankFreshHours', 26],
       ['profile.collectionStatsFreshHours', 26],
