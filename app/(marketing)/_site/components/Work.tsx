@@ -34,7 +34,7 @@ const PILLARS: Pillar[] = [
       { k: "Cities", v: "420+" },
       { k: "Since", v: "2021" },
     ],
-    href: "https://gpp2026.lovable.app",
+    href: "https://globalpizza.party",
     cta: "Visit the event",
     external: true,
   },

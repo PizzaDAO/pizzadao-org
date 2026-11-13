@@ -49,7 +49,7 @@ export const AREA_LABELS: Record<SettingArea, string> = {
   reminders: 'Reminders',
   crews: 'Crew rosters',
   members: 'Members',
-  marketing: 'Website forms and calendar',
+  marketing: 'Website forms',
 }
 
 /** What a reader gets when the stored value cannot be used (DB down, row fails its schema). */

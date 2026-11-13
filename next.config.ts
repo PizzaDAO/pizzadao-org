@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
 import { REMOTE_IMAGE_PATTERNS } from "./app/lib/image-hosts";
+import { legacyAssetRedirects, legacyDashboardRedirects } from "./app/lib/legacy-paths";
 import { marketingHomeAtRoot } from "./app/lib/marketing-site";
 import { hstsHeaderValue } from "./app/lib/hsts";
 import { SITE_URL } from "./app/lib/site-url";
@@ -101,7 +102,9 @@ const nextConfig: NextConfig = {
     };
   },
   async redirects() {
-    return marketingHomeAtRoot() ? [{ source: "/home", destination: "/", permanent: false }] : [];
+    // The old site's /dashboard/<section> prototype pages go to "/" before /dashboard/[id] can read them as a member id.
+    const legacy = [...legacyDashboardRedirects(), ...legacyAssetRedirects()];
+    return marketingHomeAtRoot() ? [...legacy, { source: "/home", destination: "/", permanent: false }] : legacy;
   },
   async headers() {
     return [
