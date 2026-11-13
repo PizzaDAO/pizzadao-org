@@ -81,6 +81,8 @@ export interface EnqueueInput {
   crewId?: string | null
   /** The crew's label, kept for the send-time exclusion check. */
   crewLabel?: string | null
+  /** Extra city keys added to the live announcement's own groups (its random group). */
+  extraCityKeys?: string[]
   /** The Discord text (markup is converted here). */
   text: string
   /** Agendas: the event start. Others: now + telegram.postMaxAgeHours. */
@@ -102,7 +104,7 @@ export async function enqueueMirror(input: EnqueueInput, env: Record<string, str
     if (!resolveToggle('telegram.cityPostsEnabled', settings, env) || !resolveToggle(KIND_TOGGLE[input.kind], settings, env)) {
       return { queued: 0, reason: 'switch-off' }
     }
-    const cities = targetCityKeys(input.kind, input.crewId, settings)
+    const cities = [...new Set([...targetCityKeys(input.kind, input.crewId, settings), ...(input.kind === 'live' ? (input.extraCityKeys ?? []) : [])])]
     if (cities.length === 0) return { queued: 0, reason: 'no-cities' }
     const text = toPlainPost(input.text)
     if (!text) return { queued: 0, reason: 'empty' }

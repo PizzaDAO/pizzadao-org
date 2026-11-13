@@ -1587,6 +1587,7 @@ model CallLiveAnnounce {
   postedChannelId  String?
   discordMessageId String?
   streamLink       String?
+  randomCityKey    String? // the random Telegram group picked for this call (kept so a retry never re-picks)
   source           String    @db.VarChar(12) // command | auto
   startedAt        DateTime
   reminderDueAt    DateTime
