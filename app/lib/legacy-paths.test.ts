@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { LEGACY_ASSET_PATHS, LEGACY_DASHBOARD_SECTIONS, legacyAssetRedirects, legacyDashboardRedirects } from "./legacy-paths";
 
@@ -32,8 +34,6 @@ describe("legacy dashboard prototype redirects", () => {
 
 describe("legacy asset redirects", () => {
   it("sends each old asset URL to an existing /marketing copy", () => {
-    const fs = require("node:fs") as typeof import("node:fs");
-    const path = require("node:path") as typeof import("node:path");
     const rules = legacyAssetRedirects();
     expect(rules).toHaveLength(LEGACY_ASSET_PATHS.length);
     for (const r of rules) {
