@@ -461,7 +461,7 @@ export const W9Form: React.FC<W9FormProps> = ({
           <IconInput
           icon={MapPin}
           type="text"
-          placeholder="Address (number, street, apt / suite)"
+          placeholder="Address (number, street, apt / suite) *"
           value={value.address ?? ""}
           onChange={(e) => set("address", e.target.value)}
         />

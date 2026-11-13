@@ -363,7 +363,7 @@ export const W8BENEForm: React.FC<W8BENEFormProps> = ({ value, onChange, disable
         <IconInput
           icon={MapPin}
           type="text"
-          placeholder="Street, apt / suite"
+          placeholder="Street, apt / suite *"
           value={value.permanentAddress ?? ''}
           onChange={(e) => set("permanentAddress", e.target.value)}
           disabled={disabled}

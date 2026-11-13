@@ -182,7 +182,7 @@ export const W8BENForm: React.FC<W8BENFormProps> = ({ value, onChange, disabled,
         <IconInput
           icon={MapPin}
           type="text"
-          placeholder="Street, apt / suite"
+          placeholder="Street, apt / suite *"
           value={value.permanentAddress ?? ''}
           onChange={(e) => set("permanentAddress", e.target.value)}
           disabled={disabled}
@@ -364,15 +364,19 @@ export const W8BENForm: React.FC<W8BENFormProps> = ({ value, onChange, disabled,
           onChange={(e) => set('referenceNumbers', e.target.value)}
           disabled={disabled}
         />
-        <IconInput
-          icon={CalendarDays}
-          type="date"
-          placeholder="Date of birth"
-          value={value.dateOfBirth ?? ''}
-          onChange={(e) => set('dateOfBirth', e.target.value)}
-          disabled={disabled}
-          required
-        />
+        <label className="block space-y-1">
+          <span className="text-xs text-muted-foreground">Date of birth *</span>
+          <IconInput
+            icon={CalendarDays}
+            type="date"
+            placeholder="Date of birth"
+            aria-label="Date of birth"
+            value={value.dateOfBirth ?? ''}
+            onChange={(e) => set('dateOfBirth', e.target.value)}
+            disabled={disabled}
+            required
+          />
+        </label>
       </div>
 
       <div className="space-y-2">
