@@ -55,4 +55,57 @@ describe('/live', () => {
     expect(r.data?.flags).toBe(64)
     expect(l.defer).toHaveBeenCalledWith(expect.objectContaining({ applicationId: 'app1', token: 'tok', stream: 'https://twitter.com/i/broadcasts/abc' }))
   })
+
+  it('with no stream option: shows the modal (type 9) after the enabled and role checks, defers nothing', async () => {
+    const { deps, l } = make()
+    const r = await handleInteraction(run(), deps)
+    expect(r.type).toBe(9)
+    expect(r.data?.custom_id).toBe('live:stream')
+    expect(JSON.stringify(r.data?.components)).toMatch(/X stream link/)
+    expect(l.canRun).toHaveBeenCalledWith(['1'])
+    expect(l.defer).not.toHaveBeenCalled()
+  })
+
+  it('no modal for a member who may not run /live', async () => {
+    const { deps } = make({ canRun: vi.fn(async () => false) })
+    expect((await handleInteraction(run(), deps)).type).toBe(4)
+  })
+
+  describe('modal submit', () => {
+    const submit = (value: string | undefined, roles: string[] = ['1']) => ({
+      ...run(undefined, roles),
+      type: 5,
+      data: { custom_id: 'live:stream', components: [{ type: 1, components: [{ type: 4, custom_id: 'stream', value }] }] },
+    })
+
+    it('valid link: defers an ephemeral reply with the normalized link', async () => {
+      const { deps, l } = make()
+      const r = await handleInteraction(submit(' https://x.com/i/broadcasts/abc '), deps)
+      expect(r.type).toBe(5)
+      expect(r.data?.flags).toBe(64)
+      expect(l.defer).toHaveBeenCalledWith(expect.objectContaining({ applicationId: 'app1', token: 'tok', stream: 'https://x.com/i/broadcasts/abc' }))
+    })
+
+    it('blank: announces without a link', async () => {
+      const { deps, l } = make()
+      expect((await handleInteraction(submit('  '), deps)).type).toBe(5)
+      expect(l.defer).toHaveBeenCalledWith(expect.not.objectContaining({ stream: expect.anything() }))
+    })
+
+    it('invalid link: ephemeral error, nothing deferred', async () => {
+      const { deps, l } = make()
+      const r = await handleInteraction(submit('https://youtube.com/watch?v=1'), deps)
+      expect(r.data?.embeds?.[0].description).toMatch(/x\.com or twitter\.com/)
+      expect(l.defer).not.toHaveBeenCalled()
+    })
+
+    it('enforces the role check and the toggle again on submit', async () => {
+      const denied = make({ canRun: vi.fn(async () => false) })
+      expect((await handleInteraction(submit('https://x.com/a/status/1'), denied.deps)).data?.embeds?.[0].description).toMatch(/Only hosts and admins/)
+      expect(denied.l.defer).not.toHaveBeenCalled()
+      const off = make({ enabled: vi.fn(async () => false) })
+      expect((await handleInteraction(submit(undefined), off.deps)).data?.embeds?.[0].description).toMatch(/isn't enabled/)
+      expect(off.l.defer).not.toHaveBeenCalled()
+    })
+  })
 })

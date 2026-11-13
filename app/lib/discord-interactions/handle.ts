@@ -305,6 +305,10 @@ export async function handleInteraction(i: Interaction, deps: HandlerDeps): Prom
     if (i.type === InteractionType.AUTOCOMPLETE) return await autocomplete(i, deps)
     if (i.type === InteractionType.MESSAGE_COMPONENT) return await component(i, userId, deps, cur, out)
     if (i.type === InteractionType.MODAL_SUBMIT) {
+      if (i.data?.custom_id === LIVE_MODAL_ID) {
+        const value = i.data.components?.flatMap((r) => r.components ?? []).find((c) => c.custom_id === LIVE_STREAM_INPUT_ID)?.value
+        return await startLive(i, deps, out, value)
+      }
       if (!deps.missionReview) return out.error('Unknown form.')
       return await handleReviewModal(i, userId, deps.missionReview, (h, b) => out.error(h, b))
     }
@@ -314,6 +318,29 @@ export async function handleInteraction(i: Interaction, deps: HandlerDeps): Prom
     if (err instanceof ApiError && err.statusCode < 500) return out.error(err.message)
     throw err
   }
+}
+
+const LIVE_MODAL_ID = 'live:stream'
+const LIVE_STREAM_INPUT_ID = 'stream'
+
+/** /live proper (the option, or the modal's answer): checks, validates the stream link (blank = none), defers. */
+async function startLive(i: Interaction, deps: HandlerDeps, out: Out, raw: unknown): Promise<InteractionResponse> {
+  if (!deps.live || !(await deps.live.enabled())) return out.error("/live isn't enabled yet.")
+  if (!i.application_id || !i.token) return out.error('Could not start the command. Please try again.')
+  if (!(await deps.live.canRun(i.member?.roles ?? []))) return out.error('Only hosts and admins can use /live.')
+  let stream: string | undefined
+  if (typeof raw === 'string' && raw.trim()) {
+    const link = normalizeStreamLink(raw)
+    if (!link) return out.error('The stream link must be an x.com or twitter.com broadcast or post link (https://x.com/i/broadcasts/...).')
+    stream = link
+  }
+  deps.live.defer({
+    applicationId: i.application_id,
+    token: i.token,
+    ...(stream ? { stream } : {}),
+    author: authorFor(i.member ? { ...i.member, guildId: i.guild_id } : undefined),
+  })
+  return { type: ResponseType.DEFERRED_CHANNEL_MESSAGE, data: { flags: EPHEMERAL, allowed_mentions: NO_PINGS } }
 }
 
 async function command(i: Interaction, userId: string, deps: HandlerDeps, cur: string, out: Out): Promise<InteractionResponse> {
@@ -484,23 +511,28 @@ async function command(i: Interaction, userId: string, deps: HandlerDeps, cur: s
     }
 
     case 'live': {
-      if (!deps.live || !(await deps.live.enabled())) return out.error("/live isn't enabled yet.")
-      if (!i.application_id || !i.token) return out.error('Could not start the command. Please try again.')
-      if (!(await deps.live.canRun(i.member?.roles ?? []))) return out.error('Only hosts and admins can use /live.')
       const raw = opt(i, 'stream')
-      let stream: string | undefined
-      if (typeof raw === 'string' && raw.trim()) {
-        const link = normalizeStreamLink(raw)
-        if (!link) return out.error('The stream link must be an x.com or twitter.com broadcast or post link (https://x.com/i/broadcasts/...).')
-        stream = link
+      // No stream option: ask for the link in a modal (the checks run again on submit).
+      if (!(typeof raw === 'string' && raw.trim())) {
+        if (!deps.live || !(await deps.live.enabled())) return out.error("/live isn't enabled yet.")
+        if (!(await deps.live.canRun(i.member?.roles ?? []))) return out.error('Only hosts and admins can use /live.')
+        return {
+          type: ResponseType.MODAL,
+          data: {
+            custom_id: LIVE_MODAL_ID,
+            title: 'Go live',
+            components: [
+              {
+                type: 1,
+                components: [
+                  { type: 4, custom_id: LIVE_STREAM_INPUT_ID, style: 1, label: 'X stream link', placeholder: 'https://x.com/...', max_length: 300, required: false },
+                ],
+              },
+            ],
+          },
+        }
       }
-      deps.live.defer({
-        applicationId: i.application_id,
-        token: i.token,
-        ...(stream ? { stream } : {}),
-        author: authorFor(i.member ? { ...i.member, guildId: i.guild_id } : undefined),
-      })
-      return { type: ResponseType.DEFERRED_CHANNEL_MESSAGE, data: { flags: EPHEMERAL, allowed_mentions: NO_PINGS } }
+      return startLive(i, deps, out, raw)
     }
 
     case 'metalhead': {
