@@ -248,6 +248,7 @@ describe('settings registry', () => {
       ['discord.spotlightChannelId', ''],
       ['discord.suggestionsChannelId', ''],
       ['discord.welcomeChannelId', ''],
+      ['discord.traineeWelcomeChannelId', ''],
       ['discord.proposalsPingRoleId', ''],
       ['missions.slaPingRoleId', ''],
       ['missions.reviewerRoleIds', []],

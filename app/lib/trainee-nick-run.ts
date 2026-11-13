@@ -1,5 +1,6 @@
 import { prisma } from './db'
 import { toggleEnabled } from './settings/toggles'
+import { savedChannelId } from './settings/channels'
 import {
   getBotUserId,
   getGuildInfo,
@@ -90,6 +91,8 @@ export interface TraineeNickDeps {
   /** onboarding.traineeNickHealEnabled (fail closed). */
   healEnabled: () => Promise<boolean>
   welcome: (userId: string, text: string, channelId: string | null) => Promise<WelcomeResult>
+  /** discord.traineeWelcomeChannelId ('' when unset or unreadable). */
+  welcomeChannelSetting: () => Promise<string>
   /** Which of these ids already have a TraineeWelcome row. */
   welcomedIds: (ids: string[]) => Promise<Set<string>>
   /** Insert the row; false when it already exists (someone else claimed it). */
@@ -128,6 +131,7 @@ const defaultDeps = (): TraineeNickDeps => ({
   write: (op, reason) => writeGuildMember(op, reason),
   healEnabled: () => toggleEnabled('onboarding.traineeNickHealEnabled'),
   welcome: (userId, text, channelId) => sendWelcome(userId, text, channelId),
+  welcomeChannelSetting: () => savedChannelId('discord.traineeWelcomeChannelId'),
   welcomedIds: async (ids) => {
     if (ids.length === 0) return new Set()
     const rows = await prisma.traineeWelcome.findMany({ where: { discordId: { in: ids } }, select: { discordId: true } })
@@ -287,7 +291,9 @@ export async function runTraineeNicks(opts: {
     }
 
     // oregano-41907: welcome each new trainee once (see welcomeStep).
-    const welcomeChannelId = (env.TRAINEE_WELCOME_CHANNEL_ID ?? '').trim() || guild.systemChannelId || null
+    // Env var, else the saved setting, else the server's system channel.
+    const welcomeChannelId =
+      (env.TRAINEE_WELCOME_CHANNEL_ID ?? '').trim() || (await deps.welcomeChannelSetting().catch(() => '')).trim() || guild.systemChannelId || null
 
     // 4. Dry run: report only.
     if (dryRun) {

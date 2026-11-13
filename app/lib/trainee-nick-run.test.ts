@@ -54,6 +54,7 @@ function setup(over: Partial<TraineeNickDeps> = {}, env: Record<string, string> 
       return ok
     }),
     welcome: vi.fn(async () => W_OK),
+    welcomeChannelSetting: vi.fn(async () => ''),
     welcomedIds: vi.fn(async (ids: string[]) => new Set(ids.filter((i) => store.has(i)))),
     claimWelcome: vi.fn(async (id: string) => (store.has(id) ? false : (store.add(id), true))),
     releaseWelcome: vi.fn(async (id: string) => {
@@ -382,6 +383,18 @@ describe('oregano-41907 welcome', () => {
     const again = setup({}, { TRAINEE_WELCOME_CHANNEL_ID: 'chan1' }, new Set(['u1', 'u2']))
     await runTraineeNicks({ dryRun: false, deps: again.deps })
     expect(again.deps.welcome).not.toHaveBeenCalled()
+  })
+
+  it('posts in the saved welcome channel when the env var is unset; the env var wins', async () => {
+    const a = setup({ guildInfo: vi.fn(async () => ({ ownerId: 'owner', roles: ROLES, systemChannelId: 'sys' })), welcomeChannelSetting: vi.fn(async () => 'saved') })
+    await runTraineeNicks({ dryRun: false, deps: a.deps })
+    expect(a.deps.welcome).toHaveBeenCalledWith('u1', TEXT, 'saved')
+    const b = setup({ welcomeChannelSetting: vi.fn(async () => 'saved') }, { TRAINEE_WELCOME_CHANNEL_ID: 'env' })
+    await runTraineeNicks({ dryRun: false, deps: b.deps })
+    expect(b.deps.welcome).toHaveBeenCalledWith('u1', TEXT, 'env')
+    const c = setup({ guildInfo: vi.fn(async () => ({ ownerId: 'owner', roles: ROLES, systemChannelId: 'sys' })) })
+    await runTraineeNicks({ dryRun: false, deps: c.deps })
+    expect(c.deps.welcome).toHaveBeenCalledWith('u1', TEXT, 'sys')
   })
 
   it('welcomes even when the role is unassignable or the L2 lookup failed', async () => {
