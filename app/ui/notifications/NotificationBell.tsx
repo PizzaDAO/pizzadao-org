@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { NotificationItem, NotificationData } from "./NotificationItem";
 import { useSession } from "@/app/lib/hooks/use-session";
@@ -55,12 +56,14 @@ function badge(): React.CSSProperties {
   };
 }
 
-function dropdown(): React.CSSProperties {
+function dropdown(pos: { top: number; right: number }): React.CSSProperties {
   return {
-    position: "absolute",
-    top: "100%",
-    right: 0,
-    marginTop: 8,
+    // Rendered in a portal on document.body with fixed positioning so no
+    // ancestor stacking context (the hero's fade-up animation) or
+    // overflow clip can hide it behind later sections.
+    position: "fixed",
+    top: pos.top,
+    right: pos.right,
     // sicilian-41551: 320px would clip on narrow viewports. Cap to viewport
     // minus a small gutter so the dropdown never overflows the screen.
     width: 320,
@@ -72,7 +75,7 @@ function dropdown(): React.CSSProperties {
     border: "1px solid hsl(var(--rule) / 0.12)",
     borderRadius: "var(--radius)",
     boxShadow: "0 8px 30px hsl(var(--ink) / 0.12)",
-    zIndex: 1000,
+    zIndex: 2000,
   };
 }
 
@@ -126,6 +129,31 @@ export function NotificationBell({ pollInterval = 30000 }: NotificationBellProps
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, right: 12 });
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  const updatePos = useCallback(() => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setPos({
+      top: rect.bottom + 8,
+      right: Math.max(12, window.innerWidth - rect.right),
+    });
+  }, []);
+
+  // Keep the fixed dropdown anchored to the bell on scroll/resize.
+  useEffect(() => {
+    if (!isOpen) return;
+    updatePos();
+    window.addEventListener("resize", updatePos);
+    window.addEventListener("scroll", updatePos, true);
+    return () => {
+      window.removeEventListener("resize", updatePos);
+      window.removeEventListener("scroll", updatePos, true);
+    };
+  }, [isOpen, updatePos]);
 
   // Only poll while signed in: after logout the cached session flips to
   // authenticated:false (markLoggedOut) and the effects below tear down, so
@@ -168,7 +196,12 @@ export function NotificationBell({ pollInterval = 30000 }: NotificationBellProps
   // Close dropdown on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(target) &&
+        !dropdownRef.current?.contains(target)
+      ) {
         setIsOpen(false);
       }
     }
@@ -260,8 +293,8 @@ export function NotificationBell({ pollInterval = 30000 }: NotificationBellProps
         )}
       </button>
 
-      {isOpen && (
-        <div style={dropdown()}>
+      {isOpen && mounted && createPortal(
+        <div ref={dropdownRef} style={dropdown(pos)}>
           <div style={header()}>
             <h3 style={headerTitle()}>Notifications</h3>
             {unreadCount > 0 && (
@@ -289,7 +322,8 @@ export function NotificationBell({ pollInterval = 30000 }: NotificationBellProps
               ))}
             </div>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
