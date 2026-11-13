@@ -38,6 +38,15 @@ const eslintConfig = defineConfig([
     },
   },
   {
+    // The ported marketing pages (app/(marketing)/_site) keep the upstream copy and markup as is:
+    // typographic quotes in prose and plain <img> tags (the files are static and pre-sized).
+    files: ["app/(marketing)/_site/**/*.{ts,tsx}"],
+    rules: {
+      "react/no-unescaped-entities": "off",
+      "@next/next/no-img-element": "off",
+    },
+  },
+  {
     // CommonJS files (e.g. the e2e/local Node preload) legitimately use require().
     files: ["**/*.cjs"],
     rules: { "@typescript-eslint/no-require-imports": "off" },

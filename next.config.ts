@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
 import { REMOTE_IMAGE_PATTERNS } from "./app/lib/image-hosts";
+import { marketingHomeAtRoot } from "./app/lib/marketing-site";
 import { hstsHeaderValue } from "./app/lib/hsts";
 import { SITE_URL } from "./app/lib/site-url";
 
@@ -39,7 +40,7 @@ const CSP_REPORT_ONLY = [
   "object-src 'none'",
   "form-action 'self' https://discord.com",
   `frame-ancestors ${FRAME_ANCESTORS}`,
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live https://va.vercel-scripts.com",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live https://va.vercel-scripts.com https://us-assets.i.posthog.com https://eu-assets.i.posthog.com",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' data: https://fonts.gstatic.com https://vercel.live",
   "img-src 'self' data: blob: https:",
@@ -60,6 +61,9 @@ const CSP_REPORT_ONLY = [
     "https://vercel.live wss://ws-us3.pusher.com",
     // rsv-pizza API (payee tax-form page /tax-form)
     "https://api.rsv.pizza",
+    // Marketing pages (app/(marketing)): PostHog, film posters (Wikipedia), world map data (jsDelivr)
+    "https://us.i.posthog.com https://us-assets.i.posthog.com https://eu.i.posthog.com https://eu-assets.i.posthog.com",
+    "https://en.wikipedia.org https://cdn.jsdelivr.net",
   ].join(" "),
   "frame-src 'self' https://verify.walletconnect.com https://verify.walletconnect.org https://vercel.live",
   "worker-src 'self' blob:",
@@ -85,6 +89,19 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["ogg-opus-decoder"],
   images: {
     remotePatterns: REMOTE_IMAGE_PATTERNS,
+  },
+  // The marketing home page lives at /home. While NEXT_PUBLIC_MARKETING_HOME_AT_ROOT is on, "/" serves
+  // it (a rewrite, so the address stays "/") and /home redirects to "/"; the onboarding wizard is
+  // always at /start. Off (the default), "/" is the wizard exactly as before.
+  async rewrites() {
+    return {
+      beforeFiles: marketingHomeAtRoot() ? [{ source: "/", destination: "/home" }] : [],
+      afterFiles: [],
+      fallback: [],
+    };
+  },
+  async redirects() {
+    return marketingHomeAtRoot() ? [{ source: "/home", destination: "/", permanent: false }] : [];
   },
   async headers() {
     return [

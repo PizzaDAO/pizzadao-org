@@ -108,6 +108,10 @@ export const RATE_LIMITS = {
   "collect-income-status": { limit: 60, windowSec: 10 * 60 },
   // Live call Q&A and poll votes, per member.
   "live-vote": { limit: 40, windowSec: 60 },
+  // The marketing pages' public forms (newsletter, contact/partners) and calendar, per IP.
+  "marketing-newsletter": { limit: 10, windowSec: 10 * 60 },
+  "marketing-contact": { limit: 5, windowSec: 10 * 60 },
+  "marketing-calendar": { limit: 60, windowSec: 60 },
 } as const satisfies Record<string, RateLimitRule>;
 
 export type RateLimitName = keyof typeof RATE_LIMITS;

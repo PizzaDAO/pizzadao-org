@@ -161,6 +161,22 @@
   --color-danger:             hsl(0 84% 60%);
 }
 
+/* Editorial type scale used by the marketing pages (app/(marketing)): text-mega, text-display-1/2, text-headline. */
+@theme {
+  --text-mega: clamp(3.25rem, min(14vw, 11rem), 14rem);
+  --text-mega--line-height: 0.88;
+  --text-mega--letter-spacing: -0.01em;
+  --text-display-1: clamp(2.5rem, min(9vw, 6.5rem), 8rem);
+  --text-display-1--line-height: 0.92;
+  --text-display-1--letter-spacing: -0.01em;
+  --text-display-2: clamp(2rem, min(6vw, 4.25rem), 5rem);
+  --text-display-2--line-height: 0.96;
+  --text-display-2--letter-spacing: -0.01em;
+  --text-headline: clamp(1.625rem, min(3.4vw, 2.5rem), 3rem);
+  --text-headline--line-height: 1.05;
+  --text-headline--letter-spacing: -0.005em;
+}
+
 @theme inline {
   /* Raw palette → Tailwind utilities (bg-cream, text-tomato, border-rule, etc.) */
   --color-cream:        hsl(var(--cream));

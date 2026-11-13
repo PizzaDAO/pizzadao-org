@@ -258,6 +258,11 @@ describe('settings registry', () => {
       ['site.hostRedirectEnabled', false],
       ['site.hostRedirectPermanent', false],
       ['site.sessionBridgeEnabled', false],
+      ['marketing.newsletterEnabled', false],
+      ['marketing.contactEnabled', false],
+      ['marketing.calendarEnabled', false],
+      ['marketing.contactNotifyEmail', ''],
+      ['marketing.calendarIcsUrl', ''],
     ])
   })
 

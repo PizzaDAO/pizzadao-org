@@ -3015,3 +3015,29 @@ model MemberNameReminder {
 
   @@index([discordId, createdAt])
 }
+
+// A newsletter signup from the marketing pages (footer and journal forms). The address is stored
+// lower-cased, so the unique index makes a repeat signup a no-op ("already on the list").
+model NewsletterSubscriber {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  source    String   @default("journal")
+  status    String   @default("subscribed")
+  createdAt DateTime @default(now())
+}
+
+// A message sent through the marketing contact and partners forms. `emailed` records whether the
+// notification to the team went out (the row is kept either way).
+model ContactSubmission {
+  id           String   @id @default(cuid())
+  name         String
+  organization String?
+  email        String
+  message      String
+  intents      String[] @default([])
+  status       String   @default("received")
+  emailed      Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+}

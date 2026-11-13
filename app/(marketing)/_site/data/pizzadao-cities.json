@@ -1,0 +1,4212 @@
+[
+  {
+    "name": "Abeokuta",
+    "description": "address: Buckingham Mall, Kofesu Street, Alabata Road, opposite Zenith Bank, Abeokuta, NigeriaEvent Link: https://app.unlock-protocol.com/event/global-pizza-par",
+    "coords": [
+      3.4520284,
+      7.2274007
+    ],
+    "key": "abeokuta-566",
+    "country": "566"
+  },
+  {
+    "name": "Abia",
+    "description": "address: Kilimanjaro Fast Food, Factory Road, Aba, NigeriaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-abia-city-74Chat: https://t.me/+y",
+    "coords": [
+      7.3703984,
+      5.1174976
+    ],
+    "key": "abia-566",
+    "country": "566"
+  },
+  {
+    "name": "Abidjan",
+    "description": "address: Mama Doble Bar à Tapas, Rue Marconi, Abidjan, Côte d'IvoireEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-abidjanChat: https://t.",
+    "coords": [
+      -3.9785237,
+      5.2881257
+    ],
+    "key": "abidjan-384",
+    "country": "384"
+  },
+  {
+    "name": "Abuja",
+    "description": "address: Genesis Restaurant, 1st Avenue, Gwarinpa, NigeriaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-nigeria-abuja-16Chat: https://t.m",
+    "coords": [
+      7.4133388,
+      9.0911771
+    ],
+    "key": "abuja-566",
+    "country": "566"
+  },
+  {
+    "name": "Accra",
+    "description": "address: Accra Mall, Spintex Road, Accra, GhanaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-accraChat: https://t.me/+fEIgyRNvfJM1NzJhCou",
+    "coords": [
+      -0.1733501,
+      5.6221003
+    ],
+    "key": "accra-288",
+    "country": "288"
+  },
+  {
+    "name": "Addis Ababa",
+    "description": "address: Magnolia Hotel & Conference Center | Bole Atlas | ማግኖሊያ ሆቴል | ቦሌ አትላስ, Addis Ababa, EthiopiaEvent Link: https://app.unlock-protocol.com/event/bitcoin-p",
+    "coords": [
+      38.7805625,
+      9.0004375
+    ],
+    "key": "addis-ababa-231",
+    "country": "231"
+  },
+  {
+    "name": "Agartala",
+    "description": "address: Pizza'ria, BK Road, opp. Women's college, Palace Compound, Indranagar, Agartala, Tripura, IndiaEvent Link: https://app.unlock-protocol.com/event/global",
+    "coords": [
+      91.2849213,
+      23.8358138
+    ],
+    "key": "agartala-356",
+    "country": "356"
+  },
+  {
+    "name": "Agra",
+    "description": "address: Newton's Pizza, Pashupati Colony, Khandari, Agra, Uttar Pradesh, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-agraChat: ht",
+    "coords": [
+      77.9984852,
+      27.2074075
+    ],
+    "key": "agra-356",
+    "country": "356"
+  },
+  {
+    "name": "Ahmedabad",
+    "description": "address: K's Charcoal, Sindhu Bhavan Marg, PRL Colony, Thaltej, Ahmedabad, Gujarat, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-ah",
+    "coords": [
+      72.4943592,
+      23.036465
+    ],
+    "key": "ahmedabad-356",
+    "country": "356"
+  },
+  {
+    "name": "Ahmednagar",
+    "description": "address: Crazy Cheesy Cafe - Ahilyanagar, Manmad Road, opp. Padmavati Petrol Pump Nagar, Savedi, Ahilya Nagar, Maharashtra, IndiaEvent Link: https://app.unlock-",
+    "coords": [
+      74.724146,
+      19.1310279
+    ],
+    "key": "ahmednagar-356",
+    "country": "356"
+  },
+  {
+    "name": "Aizawl",
+    "description": "address: Groovy Bites, Chanmari Road, Chaltlang, Aizawl, Mizoram, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-aizawl-1Chat: https:",
+    "coords": [
+      92.7172213,
+      23.7390453
+    ],
+    "key": "aizawl-356",
+    "country": "356"
+  },
+  {
+    "name": "Aklan",
+    "description": "address: Grande Villa Delgado Resort, New Washington, Aklan, PhilippinesEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-aklanChat: https://",
+    "coords": [
+      122.4770195,
+      11.6179261
+    ],
+    "key": "aklan-608",
+    "country": "608"
+  },
+  {
+    "name": "Akure",
+    "description": "address: Cakes 'N' Pastries Plaza, Futa Campus Main Road, Akure, NigeriaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-akureChat: https://",
+    "coords": [
+      5.1551377,
+      7.2899135
+    ],
+    "key": "akure-566",
+    "country": "566"
+  },
+  {
+    "name": "Akwa Ibom",
+    "description": "address: The Concave, General Edet Akpan Avenue, Uyo, NigeriaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-akwa-ibomChat: https://t.me/+v",
+    "coords": [
+      7.9459335,
+      5.0058529
+    ],
+    "key": "akwa-ibom-566",
+    "country": "566"
+  },
+  {
+    "name": "Alexandria",
+    "description": "address: Pizza Queen, Alex، Smoha Sq., Ezbet Saad, Sidi Gaber, EgyptEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-alexandriaChat: https:/",
+    "coords": [
+      29.9490617,
+      31.2186264
+    ],
+    "key": "alexandria-818",
+    "country": "818"
+  },
+  {
+    "name": "Aligarh",
+    "description": "address: Antares Cafe- आंतरेज़ कैफ़े, Marris Road, Krishnapuram, Hari Om Nagar, Civil Lines, Aligarh, Uttar Pradesh, IndiaEvent Link: https://app.unlock-protoco",
+    "coords": [
+      78.0799048,
+      27.8926903
+    ],
+    "key": "aligarh-356",
+    "country": "356"
+  },
+  {
+    "name": "Almaty",
+    "description": "address: Pikapika, Kurmangazy Street, Almaty, KazakhstanEvent Link: https://app.unlock-protocol.com/event/bitcoin-pizza-day-almatyChat: https://t.me/+dD3f-1zEh9",
+    "coords": [
+      76.9504935,
+      43.2450549
+    ],
+    "key": "almaty-398",
+    "country": "398"
+  },
+  {
+    "name": "Ambala",
+    "description": "address: HUNGRY HUB 2, Manav Chowk, Ambala, Haryana, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-ambalaChat: https://t.me/+KS32ziR",
+    "coords": [
+      76.7660062,
+      30.3671572
+    ],
+    "key": "ambala-356",
+    "country": "356"
+  },
+  {
+    "name": "Amritsar",
+    "description": "address: Hangries Amritsar, Sultanwind Road, near Kalra Hospital, Ajit Nagar, Katra Ahluwalia, Amritsar, Punjab, IndiaEvent Link: https://app.unlock-protocol.co",
+    "coords": [
+      74.8869978,
+      31.6177304
+    ],
+    "key": "amritsar-356",
+    "country": "356"
+  },
+  {
+    "name": "Amsterdam",
+    "description": "address: NFT Playground, Eerste Weteringdwarsstraat, Amsterdam, NetherlandsEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-amsterdam-12Chat",
+    "coords": [
+      4.8906425,
+      52.3617125
+    ],
+    "key": "amsterdam-528",
+    "country": "528"
+  },
+  {
+    "name": "Anambra",
+    "description": "address: ZARA STORE 🏬🏪 AWKA, Awka, NigeriaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-anambra-2025Chat: https://t.me/+nFsu2DXq_y5jZDQ",
+    "coords": [
+      7.0609554,
+      6.2171944
+    ],
+    "key": "anambra-566",
+    "country": "566"
+  },
+  {
+    "name": "Antigua",
+    "description": "address: Green Apple, Five Islands village, Antigua and BarbudaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-near-antigua-1Chat: https://",
+    "coords": [
+      -61.8817001,
+      17.1184261
+    ],
+    "key": "antigua-028",
+    "country": "028"
+  },
+  {
+    "name": "Antwerp",
+    "description": "address: Wolf Sharing Food Market | Felix Pakhuis, Godefriduskaai, Antwerpen, BelgiumEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-antwer",
+    "coords": [
+      4.4077035,
+      51.2279206
+    ],
+    "key": "antwerp-056",
+    "country": "056"
+  },
+  {
+    "name": "Arua",
+    "description": "address: Rojey Creamery Arua, Pakwach Road, Arua, UgandaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-aruaChat: Country: UgandaRegion: Af",
+    "coords": [
+      30.9129422,
+      3.0108404
+    ],
+    "key": "arua-800",
+    "country": "800"
+  },
+  {
+    "name": "Arusha",
+    "description": "address: Arusha, TanzaniaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-arusha-1Chat: https://t.me/+tW1qWy1RioEzZDg5Country: TanzaniaRegio",
+    "coords": [
+      36.6829927,
+      -3.3869254
+    ],
+    "key": "arusha-834",
+    "country": "834"
+  },
+  {
+    "name": "Asaba",
+    "description": "address: Kilimanjaro Restaurant, Asaba, NigeriaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-asaba-11Chat: https://t.me/+XlCTV_yt36llMDlh",
+    "coords": [
+      6.6959317,
+      6.2060187
+    ],
+    "key": "asaba-566",
+    "country": "566"
+  },
+  {
+    "name": "Asheville",
+    "description": "address: 47 Bryant St, Asheville, NC 28806, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-ashevilleChat: https://t.me/+twziZvY06SdiYTc",
+    "coords": [
+      -82.585142,
+      35.5829141
+    ],
+    "key": "asheville-840",
+    "country": "840"
+  },
+  {
+    "name": "Astana",
+    "description": "address: Nasha Pitstsa, Prospekt Mangilik Yel. 52, 020000 Astana, КазахстанEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-astana-4Chat: ht",
+    "coords": [
+      71.4271173,
+      51.0930708
+    ],
+    "key": "astana-398",
+    "country": "398"
+  },
+  {
+    "name": "Athens",
+    "description": "address: SuiHub, Agiou Markou, Athens, GreeceEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-athens-1Chat: https://t.me/+C-J2NaCcDMI2YmI5Co",
+    "coords": [
+      23.729095,
+      37.978615
+    ],
+    "key": "athens-300",
+    "country": "300"
+  },
+  {
+    "name": "Atlanta",
+    "description": "address: Atlanta Blockchain Center, Old Ivy Road Northeast, Atlanta, GA, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-atlanta-1Chat: ",
+    "coords": [
+      -84.3812136,
+      33.8541967
+    ],
+    "key": "atlanta-840",
+    "country": "840"
+  },
+  {
+    "name": "Atlantic City",
+    "description": "address: Tony Boloney's - Atlantic City, Oriental Avenue, Atlantic City, NJ, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-atlantic-ci",
+    "coords": [
+      -74.4125549,
+      39.3648549
+    ],
+    "key": "atlantic-city-840",
+    "country": "840"
+  },
+  {
+    "name": "Auburn",
+    "description": "address: 104 S 8th St, Opelika, AL, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-auburnChat: https://t.me/+SXEG2-K0W7JjMjMxCountry: U",
+    "coords": [
+      -85.3788422,
+      32.6482138
+    ],
+    "key": "auburn-840",
+    "country": "840"
+  },
+  {
+    "name": "Austin",
+    "description": "address: 2907 East 12th Street, Austin, TX, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-austinChat: https://t.me/+leFse3SJr8s1M2Y5Co",
+    "coords": [
+      -97.7070115,
+      30.2756409
+    ],
+    "key": "austin-840",
+    "country": "840"
+  },
+  {
+    "name": "Ayodhya",
+    "description": "address: Tipsy Town, near cmo office, Civil Line, Ayodhya, Uttar Pradesh, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-ayodhya-1Cha",
+    "coords": [
+      82.1234156,
+      26.7700444
+    ],
+    "key": "ayodhya-356",
+    "country": "356"
+  },
+  {
+    "name": "Bali",
+    "description": "address: Jalan Batu Mejan Canggu, Canggu, Kec. Kuta Utara, Kabupatén Badung, Bali 80351, IndonesiaEvent Link: https://app.unlock-protocol.com/event/global-pizza",
+    "coords": [
+      115.1316781,
+      -8.6521294
+    ],
+    "key": "bali-360",
+    "country": "360"
+  },
+  {
+    "name": "Baltimore",
+    "description": "address: Riverside Taphouse, Light Street, Baltimore, MD, USAEvent Link: https://app.unlock-protocol.com/event/bitcoin-pizza-day-party-with-pizza-daoChat: https",
+    "coords": [
+      -76.6117028,
+      39.2717594
+    ],
+    "key": "baltimore-840",
+    "country": "840"
+  },
+  {
+    "name": "Bangalore",
+    "description": "address: Zo House, S.T. Bed, 1st Block Koramangala, Koramangala, Bengaluru, Karnataka, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party",
+    "coords": [
+      77.6345008,
+      12.9329578
+    ],
+    "key": "bangalore-356",
+    "country": "356"
+  },
+  {
+    "name": "Bangkok",
+    "description": "address: Chef Bing Pizza, Soi Ruam Rudi 2, Lumphini, Pathum Wan, Bangkok, ThailandEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-bangkok-1",
+    "coords": [
+      100.5507585,
+      13.7382354
+    ],
+    "key": "bangkok-764",
+    "country": "764"
+  },
+  {
+    "name": "Bar Harbor",
+    "description": "address: 20 State St, Ellsworth, ME 04605, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-acadiaChat: https://t.me/+fZHiSsqXJzkxMWNhCou",
+    "coords": [
+      -68.4256456,
+      44.5421049
+    ],
+    "key": "bar-harbor-840",
+    "country": "840"
+  },
+  {
+    "name": "Barcelona",
+    "description": "address: Barcelona SpainEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-barcelona-1Chat: https://t.me/+NQ07jFmUgTUwMjExCountry: SpainRegion",
+    "coords": [
+      2.168568,
+      41.3873974
+    ],
+    "key": "barcelona-724",
+    "country": "724"
+  },
+  {
+    "name": "Beirut",
+    "description": "address: Bavaglino, Beirut, LebanonEvent Link: https://app.unlock-protocol.com/event/beirut-global-pizza-party-2025Chat: https://t.me/+h-cVQMfuH_tkOWMxCountry: ",
+    "coords": [
+      35.5155539,
+      33.8936991
+    ],
+    "key": "beirut-422",
+    "country": "422"
+  },
+  {
+    "name": "Belize City",
+    "description": "address: Leo Bradley Library, Princess Margaret Drive, Belize City, BelizeEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-belize-city-10Cha",
+    "coords": [
+      -88.1966856,
+      17.5060973
+    ],
+    "key": "belize-city-084",
+    "country": "084"
+  },
+  {
+    "name": "Belo Horizonte",
+    "description": "address: 2blackbeer - Avenida Assis Chateaubriand - Centro, Belo Horizonte - MG, BrasilEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-belo",
+    "coords": [
+      -43.9359697,
+      -19.9205943
+    ],
+    "key": "belo-horizonte-076",
+    "country": "076"
+  },
+  {
+    "name": "Benin City",
+    "description": "address: Benin City NigeriaEvent Link: https://app.unlock-protocol.com/event/global-bitcoin-pizza-day-edoChat: https://t.me/+qSuotV0sPglmMDZhCountry: NigeriaReg",
+    "coords": [
+      5.6037465,
+      6.334986
+    ],
+    "key": "benin-city-566",
+    "country": "566"
+  },
+  {
+    "name": "Berlin",
+    "description": "address: Berlin, GermanyEvent Link: https://app.unlock-protocol.com/event/berlin-bitcoin-pizza-party-1Chat: https://t.me/+cPd97vNeP6AxMzFiCountry: GermanyRegion",
+    "coords": [
+      13.404954,
+      52.5200066
+    ],
+    "key": "berlin-276",
+    "country": "276"
+  },
+  {
+    "name": "Bhilai",
+    "description": "address: Ek Saath Specialty Coffee & Pizzeria, Vidya Vihar Colony, Nehru Nagar, Bhilai, Chhattisgarh, IndiaEvent Link: https://app.unlock-protocol.com/event/glo",
+    "coords": [
+      81.32,
+      21.2073756
+    ],
+    "key": "bhilai-356",
+    "country": "356"
+  },
+  {
+    "name": "Bhopal",
+    "description": "address: S.PACE, 10 No. Stop, E-3, Arera Colony, Bhopal, Madhya Pradesh, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-bhopalChat: h",
+    "coords": [
+      77.4369615,
+      23.2134493
+    ],
+    "key": "bhopal-356",
+    "country": "356"
+  },
+  {
+    "name": "Bhubnasewar",
+    "description": "address: TERRA ROSSO, Janpath Road, beside Bocca Cafe, Master Canteen Area, Kharvela Nagar, Bhubaneswar, Odisha, IndiaEvent Link: https://app.unlock-protocol.co",
+    "coords": [
+      85.8415598,
+      20.2692588
+    ],
+    "key": "bhubnasewar-356",
+    "country": "356"
+  },
+  {
+    "name": "Bogota",
+    "description": "address: Bogota ColombiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-bogot-1Chat: https://t.me/+OsL4g8b52KBiOWIxCountry: ColombiaRegion:",
+    "coords": [
+      -74.072092,
+      4.7109886
+    ],
+    "key": "bogota-170",
+    "country": "170"
+  },
+  {
+    "name": "Boise",
+    "description": "address: Anzalone Pizza, South 8th Street, Boise, ID, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-boise-idahoChat: https://t.me/+Azb",
+    "coords": [
+      -116.2050799,
+      43.6136107
+    ],
+    "key": "boise-840",
+    "country": "840"
+  },
+  {
+    "name": "Bordeaux",
+    "description": "address: Backyard, Allées d'Orléans, Bordeaux, FranceEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-bordeaux-5Chat: https://t.me/+o-Ol66rg",
+    "coords": [
+      -0.5737706,
+      44.8436579
+    ],
+    "key": "bordeaux-250",
+    "country": "250"
+  },
+  {
+    "name": "Boston",
+    "description": "address: Lala's Neapolitan-ish Pizza, Park Drive, Boston, MA, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-with-boston-dao-pizza-dao-",
+    "coords": [
+      -71.1022758,
+      42.3441874
+    ],
+    "key": "boston-840",
+    "country": "840"
+  },
+  {
+    "name": "Boulder",
+    "description": "address: Boulder, CO, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-boulderChat: https://t.me/+hrSOTJFmDKxlNDhhCountry: USARegion: Nor",
+    "coords": [
+      -105.2747406,
+      40.0189728
+    ],
+    "key": "boulder-840",
+    "country": "840"
+  },
+  {
+    "name": "Bowie",
+    "description": "address: Anthony's NY Pizza & Pasta House, Annapolis Road, Bowie, MD, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-bowieChat: https:/",
+    "coords": [
+      -76.7343528,
+      38.9804469
+    ],
+    "key": "bowie-840",
+    "country": "840"
+  },
+  {
+    "name": "Brasilia",
+    "description": "address: SMPW quadra 05 Q 5 Nação Club Complexo Esportivo-Águas Claras | Crossfit | Futvolei | Tênis | Funcional | Contra Turno | Futebol | Academia - Parque Wa",
+    "coords": [
+      -48.0077075,
+      -15.8330139
+    ],
+    "key": "brasilia-076",
+    "country": "076"
+  },
+  {
+    "name": "Bratislava",
+    "description": "address: The Spot, Bottova, Bratislava, SlovakiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-bratislavaChat: https://t.me/+TYU9KL2TKB8xN",
+    "coords": [
+      17.1262059,
+      48.1435945
+    ],
+    "key": "bratislava-703",
+    "country": "703"
+  },
+  {
+    "name": "Brisbane",
+    "description": "address: Felons Brewing Co, Boundary Street, Brisbane City QLD, AustraliaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-brisbane-2Chat: ht",
+    "coords": [
+      153.0361616,
+      -27.462407
+    ],
+    "key": "brisbane-036",
+    "country": "036"
+  },
+  {
+    "name": "Brno",
+    "description": "address: ArtBar Druhý Pád, Štefánikova, Brno-střed-Veveří, CzechiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-brnoChat: https://t.me/+1",
+    "coords": [
+      16.6037854,
+      49.2077077
+    ],
+    "key": "brno-203",
+    "country": "203"
+  },
+  {
+    "name": "Brussels",
+    "description": "address: Silversquare Bailli - Espace de coworking à Bruxelles, Avenue Louise, Bruxelles, BelgiqueEvent Link: https://app.unlock-protocol.com/event/global-pizza",
+    "coords": [
+      4.3651416,
+      50.8255775
+    ],
+    "key": "brussels-056",
+    "country": "056"
+  },
+  {
+    "name": "Bucharest",
+    "description": "address: Pe Baricade, Strada Radu Vodă, București, RomâniaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-bucharestChat: https://t.me/+_PBg",
+    "coords": [
+      26.1075064,
+      44.424979
+    ],
+    "key": "bucharest-642",
+    "country": "642"
+  },
+  {
+    "name": "Budapest",
+    "description": "address: Budapest, Este11, Villányi út, MagyarországEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-budapestChat: https://t.me/+t0seZhjvXVo",
+    "coords": [
+      19.0424983,
+      47.4776346
+    ],
+    "key": "budapest-348",
+    "country": "348"
+  },
+  {
+    "name": "Buenos Aires",
+    "description": "address: DUNE PARK, Aráoz, Ciudad Autónoma de Buenos Aires, ArgentinaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-buenos-airesChat: http",
+    "coords": [
+      -58.4334377,
+      -34.5974787
+    ],
+    "key": "buenos-aires-032",
+    "country": "032"
+  },
+  {
+    "name": "Buffalo",
+    "description": "address: Eli Fish Brewing Co., Main Street, Batavia, NY, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-buffaloChat: Country: USARegion",
+    "coords": [
+      -78.1824829,
+      42.9972688
+    ],
+    "key": "buffalo-840",
+    "country": "840"
+  },
+  {
+    "name": "Bulawayo",
+    "description": "address: Hillside Walk, Percy Avenue, Bulawayo, ZimbabweEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-bulawayo-2Chat: https://t.me/+3hjtB",
+    "coords": [
+      28.5954099,
+      -20.1990579
+    ],
+    "key": "bulawayo-716",
+    "country": "716"
+  },
+  {
+    "name": "Butwal",
+    "description": "address: El Dorado Avenue, Butwal, NepalEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-butwalChat: https://t.me/+t_B61lffzgU3OWIxCountry: ",
+    "coords": [
+      83.4621997,
+      27.6784517
+    ],
+    "key": "butwal-524",
+    "country": "524"
+  },
+  {
+    "name": "Búzios",
+    "description": "address: Belli Belli Clube de Praia Aretê - Avenida José Bento Ribeiro Dantas - Vila Luiza, Armação dos Búzios - RJ, BrasilEvent Link: https://app.unlock-protoc",
+    "coords": [
+      -41.9435137,
+      -22.7577602
+    ],
+    "key": "buzios-076",
+    "country": "076"
+  },
+  {
+    "name": "Cairo",
+    "description": "address: What the Crust, Ezbet Fahmy, El Basatin, EgyptEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-cairoChat: https://t.me/+Uuex2EX2rxE",
+    "coords": [
+      31.2751326,
+      29.9698068
+    ],
+    "key": "cairo-818",
+    "country": "818"
+  },
+  {
+    "name": "Calabar",
+    "description": "address: Alyce ice, Ndidem Usang Iso Road, Calabar, NigeriaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-calabarChat: https://t.me/+TU93R",
+    "coords": [
+      8.338034,
+      4.949974
+    ],
+    "key": "calabar-566",
+    "country": "566"
+  },
+  {
+    "name": "Calavi",
+    "description": "address: Calavi BeninEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-calaviChat: https://t.me/+NfSwNeX1R2Y1YzdhCountry: BeninRegion: Africa",
+    "coords": [
+      2.3468195,
+      6.4503024
+    ],
+    "key": "calavi-204",
+    "country": "204"
+  },
+  {
+    "name": "Calgary",
+    "description": "address: 1212 9th Avenue Southeast, Inglewood, Calgary, AB, CanadaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-calgaryChat: https://t.me",
+    "coords": [
+      -114.0359142,
+      51.042172
+    ],
+    "key": "calgary-124",
+    "country": "124"
+  },
+  {
+    "name": "Cali",
+    "description": "address: Albahaca Terraza, Carrera 5, San Nicolas, Cali, Valle del Cauca, ColombiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-caliChat:",
+    "coords": [
+      -76.5258443,
+      3.4546352
+    ],
+    "key": "cali-170",
+    "country": "170"
+  },
+  {
+    "name": "Campinas",
+    "description": "address: Rua Doutor Buarque de Macedo, 815 - Vila Nova, Campinas - State of São Paulo, BrazilEvent Link: https://app.unlock-protocol.com/event/global-pizza-part",
+    "coords": [
+      -47.0661904,
+      -22.8823419
+    ],
+    "key": "campinas-076",
+    "country": "076"
+  },
+  {
+    "name": "Cannes",
+    "description": "address: La Pizza Cresci - Cannes, Quai Saint-Pierre, Cannes, FranceEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-cannesChat: https://t.m",
+    "coords": [
+      7.0119269,
+      43.5504977
+    ],
+    "key": "cannes-250",
+    "country": "250"
+  },
+  {
+    "name": "Cape Town",
+    "description": "address: Pizza Shed Bree, Bree Street, Cape Town City Centre, Cape Town, South AfricaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-cape-t",
+    "coords": [
+      18.4131011,
+      -33.9259257
+    ],
+    "key": "cape-town-710",
+    "country": "710"
+  },
+  {
+    "name": "Caracas",
+    "description": "address: foodkart candelaria, Avenida Este 0, Caracas, Distrito Capital, VenezuelaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-caracas-1",
+    "coords": [
+      -66.9016322,
+      10.504863
+    ],
+    "key": "caracas-862",
+    "country": "862"
+  },
+  {
+    "name": "Cartagena de Indias",
+    "description": "address: Mama's Pizza, Calle 35, El Centro, Cartagena de Indias, Provincia de Cartagena, Bolívar, ColombiaEvent Link: https://app.unlock-protocol.com/event/glob",
+    "coords": [
+      -75.5487997,
+      10.4242298
+    ],
+    "key": "cartagena-de-indias-170",
+    "country": "170"
+  },
+  {
+    "name": "Casablanca",
+    "description": "address: Casablanca MoroccoEvent Link: https://app.unlock-protocol.com/event/pizza-dao-global-pizza-day-2025-casablancaChat: https://t.me/+bZT_3pcvEWtiOTkxCount",
+    "coords": [
+      -7.5898434,
+      33.5731104
+    ],
+    "key": "casablanca-504",
+    "country": "504"
+  },
+  {
+    "name": "Catania",
+    "description": "address: SCALO Catania, Presso Vecchia Dogana, Via Cardinale Dusmet, Catania, CT, ItaliaEvent Link: https://app.unlock-protocol.com/event/pineapple-and-jalapeno",
+    "coords": [
+      15.0933662,
+      37.5006763
+    ],
+    "key": "catania-380",
+    "country": "380"
+  },
+  {
+    "name": "Cayman Islands",
+    "description": "address: KARoo Restaurant & Bar, The Crescent, Cayman IslandsEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-2025-cayman-islands-20Chat: ht",
+    "coords": [
+      -81.3773325,
+      19.322021
+    ],
+    "key": "cayman-islands-136",
+    "country": "136"
+  },
+  {
+    "name": "Cedar Rapids",
+    "description": "address: The Pines Pizza and Pub, River Ridge Drive Northeast, Cedar Rapids, IA, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-cedar-r",
+    "coords": [
+      -91.6987076,
+      42.021208
+    ],
+    "key": "cedar-rapids-840",
+    "country": "840"
+  },
+  {
+    "name": "Chandigarh",
+    "description": "address: Antier Solutions Pvt. Ltd, Phase 8B, Industrial Area, Sector 74, Sahibzada Ajit Singh Nagar, Punjab, IndiaEvent Link: https://app.unlock-protocol.com/e",
+    "coords": [
+      76.6860888,
+      30.7074933
+    ],
+    "key": "chandigarh-356",
+    "country": "356"
+  },
+  {
+    "name": "Charleston",
+    "description": "address: Charleston USAEvent Link: https://beeple-studios.xyz/event/bitcoinpizzaday/Chat: https://t.me/+j42gKZ3zj9NjYTk5Country: USARegion: North America",
+    "coords": [
+      -79.9319664,
+      32.7833163
+    ],
+    "key": "charleston-840",
+    "country": "840"
+  },
+  {
+    "name": "Charlotte",
+    "description": "address: 412 West Palmer Street, Charlotte, NC, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-charlotte-north-carolina-1Chat: https://",
+    "coords": [
+      -80.8565581,
+      35.2223793
+    ],
+    "key": "charlotte-840",
+    "country": "840"
+  },
+  {
+    "name": "Chengdu",
+    "description": "address: Chengdu ChinaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-chengduChat: https://t.me/+UG4LYZ0OouZkODc5Country: ChinaRegion: Asia",
+    "coords": [
+      104.0665099,
+      30.5722599
+    ],
+    "key": "chengdu-156",
+    "country": "156"
+  },
+  {
+    "name": "Chennai",
+    "description": "address: Café Manana, 21st Street, L Block, Annanagar East, Chennai, Tamil Nadu, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-chenn",
+    "coords": [
+      80.2249012,
+      13.0910814
+    ],
+    "key": "chennai-356",
+    "country": "356"
+  },
+  {
+    "name": "Chiang Mai",
+    "description": "address: Why Pizza (Moon Muang), Moon Muang Road Soi 9, Si Phum, Muang Chiang Mai, ThailandEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-",
+    "coords": [
+      98.9934344,
+      18.7937537
+    ],
+    "key": "chiang-mai-764",
+    "country": "764"
+  },
+  {
+    "name": "Chicago",
+    "description": "address: 406 North Sangamon Street, Chicago, IL, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-chicagoChat: https://t.me/+4nPNFdwz4jpl",
+    "coords": [
+      -87.6512054,
+      41.8892373
+    ],
+    "key": "chicago-840",
+    "country": "840"
+  },
+  {
+    "name": "Chongqing",
+    "description": "address: Chongqing, ChinaEvent Link: https://app.unlock-protocol.com/event/bitcoin-pizza-day-chongqing-2025Chat: https://t.me/+3dG3-6FQeb00ZDY5Country: ChinaReg",
+    "coords": [
+      106.5511838,
+      29.5656843
+    ],
+    "key": "chongqing-156",
+    "country": "156"
+  },
+  {
+    "name": "Christchurch",
+    "description": "address: Rehua, University of Canterbury, Forestry and Arts, Ilam, Christchurch, New ZealandEvent Link: https://app.unlock-protocol.com/event/global-pizza-party",
+    "coords": [
+      172.584499,
+      -43.52323
+    ],
+    "key": "christchurch-554",
+    "country": "554"
+  },
+  {
+    "name": "Cincinnati",
+    "description": "address: Mikey's Late Night Slice, Elm Street, Cincinnati, OH, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-cincinnatiChat: https://t",
+    "coords": [
+      -84.5203323,
+      39.1181056
+    ],
+    "key": "cincinnati-840",
+    "country": "840"
+  },
+  {
+    "name": "Cleveland",
+    "description": "address: Pizza (216), Euclid Avenue, Cleveland, OH, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-clevelandChat: https://t.me/+DwiKB0v",
+    "coords": [
+      -81.690206,
+      41.499983
+    ],
+    "key": "cleveland-840",
+    "country": "840"
+  },
+  {
+    "name": "Cluj",
+    "description": "address: Cluj RomaniaEvent Link: https://app.unlock-protocol.com/event/eth-cluj-x-pizza-dao-global-pizza-partyChat: https://t.me/+gGrrM1kdJrgyNTc0Country: Roman",
+    "coords": [
+      23.6236353,
+      46.7712101
+    ],
+    "key": "cluj-642",
+    "country": "642"
+  },
+  {
+    "name": "Cochabamba",
+    "description": "address: Trotamundos Recoleta Video BAR, Cochabamba, BoliviaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-cochabamba-2025-3Chat: https://",
+    "coords": [
+      -66.152316,
+      -17.378669
+    ],
+    "key": "cochabamba-068",
+    "country": "068"
+  },
+  {
+    "name": "Coimbatore",
+    "description": "address: AIC RAISE Business Incubator, Rathinam Techzone, Eachanari, Coimbatore, Tamil Nadu, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza",
+    "coords": [
+      76.9717074,
+      10.9283089
+    ],
+    "key": "coimbatore-356",
+    "country": "356"
+  },
+  {
+    "name": "Colombo",
+    "description": "address: CeyCube - Sri Lanka's Premier Web3.0 Co-working Space, Park Street, Colombo, Sri LankaEvent Link: https://app.unlock-protocol.com/event/global-pizza-pa",
+    "coords": [
+      79.8588758,
+      6.9177326
+    ],
+    "key": "colombo-144",
+    "country": "144"
+  },
+  {
+    "name": "Columbus",
+    "description": "address: Pins Mechanical Co., Riverside Drive, Dublin, OH, USAEvent Link: https://app.unlock-protocol.com/event/bitcoin-pizza-day-columbus-squadChat: https://t.",
+    "coords": [
+      -83.1098568,
+      40.1012163
+    ],
+    "key": "columbus-840",
+    "country": "840"
+  },
+  {
+    "name": "Copenhagen",
+    "description": "address: Vester Voldgade 7B, København, DanmarkEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-34Chat: https://t.me/+LG9DLtgq2nxlMmQxCountr",
+    "coords": [
+      12.567107,
+      55.678406
+    ],
+    "key": "copenhagen-208",
+    "country": "208"
+  },
+  {
+    "name": "Córdoba",
+    "description": "address: Bro Bar, Belgrano, Córdoba, ArgentinaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-crdoba-10Chat: https://t.me/+oK58UluVeuFhZjgx",
+    "coords": [
+      -64.1913065,
+      -31.4225101
+    ],
+    "key": "cordoba-032",
+    "country": "032"
+  },
+  {
+    "name": "Craiova",
+    "description": "address: Craiova RomaniaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-craiova-9Chat: https://t.me/+pwlLgytvbYE5ZjdkCountry: RomaniaRegion",
+    "coords": [
+      23.7948807,
+      44.3301785
+    ],
+    "key": "craiova-642",
+    "country": "642"
+  },
+  {
+    "name": "Cuenca",
+    "description": "address: Facultad de Ciencia y Tecnologia UDA, Avenida 24 de Mayo, Cuenca, EcuadorEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-cuenca-20",
+    "coords": [
+      -79.0017371,
+      -2.9191939
+    ],
+    "key": "cuenca-218",
+    "country": "218"
+  },
+  {
+    "name": "Culiacán",
+    "description": "address: PEIS ITESM, Congreso del Estado, Culiacán, Sinaloa, MéxicoEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-culiacnChat: https://t.m",
+    "coords": [
+      -107.420605,
+      24.7988707
+    ],
+    "key": "culiacan-484",
+    "country": "484"
+  },
+  {
+    "name": "Curitiba",
+    "description": "address: Fumaçônica Brewery - Rua Simão Bolívar - Hugo Lange, Curitiba - PR, BrasilEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-curitiba",
+    "coords": [
+      -49.243164,
+      -25.420216
+    ],
+    "key": "curitiba-076",
+    "country": "076"
+  },
+  {
+    "name": "Cuzco",
+    "description": "address: Paraninfo Universitario (Cuzco), Cusco, PeruEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-cusco-5Chat: https://t.me/+M1MwSfps-WU",
+    "coords": [
+      -71.9783998,
+      -13.5175709
+    ],
+    "key": "cuzco-604",
+    "country": "604"
+  },
+  {
+    "name": "Da Nang",
+    "description": "address: Da Nang, VietnamEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-da-nang-1Chat: https://t.me/+WlRVOj6tmFRiNjlhCountry: VietnamRegio",
+    "coords": [
+      108.2021667,
+      16.0544068
+    ],
+    "key": "da-nang-704",
+    "country": "704"
+  },
+  {
+    "name": "Dali",
+    "description": "address: Dali, Yunnan, ChinaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-daliChat: https://t.me/+xg1rEtf7m7o3Y2IxCountry: ChinaRegion: A",
+    "coords": [
+      100.26764,
+      25.6064799
+    ],
+    "key": "dali-156",
+    "country": "156"
+  },
+  {
+    "name": "Dallas",
+    "description": "address: Arcade 92 Retro Arcade, Bar and Restaurant, International Parkway, Flower Mound, TX, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-",
+    "coords": [
+      -97.0632798,
+      32.9914905
+    ],
+    "key": "dallas-840",
+    "country": "840"
+  },
+  {
+    "name": "Dar es Salaam",
+    "description": "address: Dar es Salaam, TanzaniaEvent Link: https://app.unlock-protocol.com/event/bitcoinsafari-tz-bitcoin-pizza-day-hangout-11Chat: https://t.me/+yJJu6C0dO0cwY",
+    "coords": [
+      39.2894367,
+      -6.8165054
+    ],
+    "key": "dar-es-salaam-834",
+    "country": "834"
+  },
+  {
+    "name": "Dehradun",
+    "description": "address: ENSO - Sourdough Pizza by Nomad - Dehradun, Nigam, Subhash Road, Race Course, Dehradun, Uttarakhand, IndiaEvent Link: https://app.unlock-protocol.com/e",
+    "coords": [
+      78.0468858,
+      30.3154217
+    ],
+    "key": "dehradun-356",
+    "country": "356"
+  },
+  {
+    "name": "Delhi",
+    "description": "address: The Immigrant Café, Block B, Connaught Place, New Delhi, Delhi, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-new-delhi-2Ch",
+    "coords": [
+      77.2188579,
+      28.6341813
+    ],
+    "key": "delhi-356",
+    "country": "356"
+  },
+  {
+    "name": "Denver",
+    "description": "address: Mirus Gallery & Art Bar Denver, Broadway Street, Denver, CO, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-denver-2Chat: http",
+    "coords": [
+      -104.9872297,
+      39.7347116
+    ],
+    "key": "denver-840",
+    "country": "840"
+  },
+  {
+    "name": "Detroit",
+    "description": "address: The Norwood, Woodward Avenue, Detroit, MI, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-detroitChat: https://t.me/+wh1VsLXGZ",
+    "coords": [
+      -83.073206,
+      42.3694879
+    ],
+    "key": "detroit-840",
+    "country": "840"
+  },
+  {
+    "name": "Diani",
+    "description": "address: Leonardo's Restaurant, Diani Beach Road, Diani Beach, KenyaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-dianiChat: https://t.me",
+    "coords": [
+      39.586991,
+      -4.287741
+    ],
+    "key": "diani-404",
+    "country": "404"
+  },
+  {
+    "name": "Doha",
+    "description": "address: Yellow Cab Pizza، Khalifa Street, Doha, QatarEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-dohaChat: https://t.me/+X1RVyILxrZMzM",
+    "coords": [
+      51.4953333,
+      25.3186996
+    ],
+    "key": "doha-634",
+    "country": "634"
+  },
+  {
+    "name": "Dubai",
+    "description": "address: PizzaExpress, Dubai World Trade Centre - Sheikh Zayed Road - Dubai - United Arab EmiratesEvent Link: https://app.unlock-protocol.com/event/global-pizza",
+    "coords": [
+      55.2852632,
+      25.2245263
+    ],
+    "key": "dubai-784",
+    "country": "784"
+  },
+  {
+    "name": "Dublin",
+    "description": "address: 53 Capel Street, North City, Dublin, IrelandEvent Link: https://app.unlock-protocol.com/event/proof-of-craic-pizza-party-10Chat: https://t.me/+U-ejTzqW",
+    "coords": [
+      -6.2688237,
+      53.3491652
+    ],
+    "key": "dublin-372",
+    "country": "372"
+  },
+  {
+    "name": "Durban",
+    "description": "address: 394 Esther Roberts Road, Glenwood, Durban, South AfricaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-durban-south-africaChat: ht",
+    "coords": [
+      30.9914354,
+      -29.8718348
+    ],
+    "key": "durban-710",
+    "country": "710"
+  },
+  {
+    "name": "Durham",
+    "description": "address: Ponysaurus Brewing Co., Hood Street, Durham, NC, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-durhamChat: https://t.me/+SjD_",
+    "coords": [
+      -78.8952183,
+      35.9894948
+    ],
+    "key": "durham-840",
+    "country": "840"
+  },
+  {
+    "name": "Dusseldorf",
+    "description": "address: Enzos Trattoria, Akademiestraße, Düsseldorf, GermanyEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-dsseldorfChat: Country: German",
+    "coords": [
+      6.7716371,
+      51.2245391
+    ],
+    "key": "dusseldorf-276",
+    "country": "276"
+  },
+  {
+    "name": "Ebonyi",
+    "description": "address: Osborne La Palm Extension, Abakaliki, NigeriaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-ebonyiChat: https://t.me/+nPtJoG7-JMM",
+    "coords": [
+      8.0962642,
+      6.3380092
+    ],
+    "key": "ebonyi-566",
+    "country": "566"
+  },
+  {
+    "name": "Edmonton",
+    "description": "address: 9620 152 Street Northwest, Edmonton, AB, CanadaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-2025-edmontonChat: https://t.me/+LJ",
+    "coords": [
+      -113.5839743,
+      53.5335996
+    ],
+    "key": "edmonton-124",
+    "country": "124"
+  },
+  {
+    "name": "El Hatillo",
+    "description": "address: Vida Verde, Vida Verde, Calle Corralito, Caracas, Miranda, VenezuelaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-el-hatilloChat",
+    "coords": [
+      -66.8057195,
+      10.4063266
+    ],
+    "key": "el-hatillo-862",
+    "country": "862"
+  },
+  {
+    "name": "Entebbe",
+    "description": "address: DVIC ESTATE, UgandaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-entebbe-1Chat: Country: UgandaRegion: Africa",
+    "coords": [
+      32.4239527,
+      0.1591738
+    ],
+    "key": "entebbe-800",
+    "country": "800"
+  },
+  {
+    "name": "Enugu City",
+    "description": "address: Cafe One Enugu, Okpara Avenue, Enugu, NigeriaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-enugu-2025Chat: https://t.me/+FN-o8aM",
+    "coords": [
+      7.4905916,
+      6.4428705
+    ],
+    "key": "enugu-city-566",
+    "country": "566"
+  },
+  {
+    "name": "Faridabad",
+    "description": "address: Cafe Parmesan, Sector 15, Faridabad, Haryana, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-faridabad-2Chat: https://t.me/+",
+    "coords": [
+      77.323582,
+      28.3952498
+    ],
+    "key": "faridabad-356",
+    "country": "356"
+  },
+  {
+    "name": "Faryab",
+    "description": "address: Shirin Tagab, AfghanistanEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-faryab-1Chat: Country: AfghanistanRegion: Middle East",
+    "coords": [
+      64.8644455,
+      36.2382799
+    ],
+    "key": "faryab-004",
+    "country": "004"
+  },
+  {
+    "name": "Florence",
+    "description": "address: Il Conventino Caffè Letterario, Arte e Artigianato, Via Giano della Bella, Firenze, FI, ItaliaEvent Link: https://app.unlock-protocol.com/event/a-iperi",
+    "coords": [
+      11.2399589,
+      43.7649912
+    ],
+    "key": "florence-380",
+    "country": "380"
+  },
+  {
+    "name": "Florianopolis",
+    "description": "address: Founder Haus - Jurere In - Avenida dos Merlins - Jurerê Internacional, Florianópolis - State of Santa Catarina, BrazilEvent Link: https://app.unlock-pr",
+    "coords": [
+      -48.4995384,
+      -27.4386827
+    ],
+    "key": "florianopolis-076",
+    "country": "076"
+  },
+  {
+    "name": "Fort Lauderdale",
+    "description": "address: LauderAle Brewery, Southeast 14th Avenue, Fort Lauderdale, FL, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-fort-lauderdaleC",
+    "coords": [
+      -80.1289479,
+      26.0837197
+    ],
+    "key": "fort-lauderdale-840",
+    "country": "840"
+  },
+  {
+    "name": "Fortaleza",
+    "description": "address: Itália Beach Restaurante Italiano | Aqui em Porto das Dunas - Rua Agua Viva - Porto das Dunas, Fortaleza - CE, BrasilEvent Link: https://app.unlock-pro",
+    "coords": [
+      -38.3946627,
+      -3.8435532
+    ],
+    "key": "fortaleza-076",
+    "country": "076"
+  },
+  {
+    "name": "Francistown",
+    "description": "address: Francistown, BotswanaEvent Link: https://app.unlock-protocol.com/event/francistown-pizza-partyChat: https://t.me/+KLqD4B7ryLAyZjA0Country: BotswanaRegi",
+    "coords": [
+      27.5143603,
+      -21.1661005
+    ],
+    "key": "francistown-072",
+    "country": "072"
+  },
+  {
+    "name": "Frankfurt",
+    "description": "address: Napolimania Da Salvatore, Gaußstraße, Frankfurt am Main-Innenstadt III, GermanyEvent Link: https://app.unlock-protocol.com/event/pizza-day-frankfurt-20",
+    "coords": [
+      8.6897888,
+      50.1207675
+    ],
+    "key": "frankfurt-276",
+    "country": "276"
+  },
+  {
+    "name": "Gaborone",
+    "description": "address: Bull & Bush, Gaborone, BotswanaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-gaboroneChat: https://t.me/+ymH9l-lc8oNlYmUxCountry",
+    "coords": [
+      25.9103281,
+      -24.6399625
+    ],
+    "key": "gaborone-072",
+    "country": "072"
+  },
+  {
+    "name": "Galle",
+    "description": "address: Pizza Den, Wakwella Road, Galle, Sri LankaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-galle-17Chat: https://t.me/+Y26Ba6VmwVQy",
+    "coords": [
+      80.2048328,
+      6.0568913
+    ],
+    "key": "galle-144",
+    "country": "144"
+  },
+  {
+    "name": "Gandhinagar",
+    "description": "address: La Milano Pizzeria, near Reliance Cross Road, Kudasan, Gandhinagar, Gujarat, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-",
+    "coords": [
+      72.6307728,
+      23.1850233
+    ],
+    "key": "gandhinagar-356",
+    "country": "356"
+  },
+  {
+    "name": "Gangtok",
+    "description": "address: Lhasa Newar, Road, Bakthang, Gangtok, Sikkim, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-gangtok-2Chat: Country: IndiaRe",
+    "coords": [
+      88.621843,
+      27.3632048
+    ],
+    "key": "gangtok-356",
+    "country": "356"
+  },
+  {
+    "name": "General Santos",
+    "description": "address: Edsai Café, NLSA Road, General Santos City, South Cotabato, PhilippinesEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-general-san",
+    "coords": [
+      125.1913251,
+      6.1298536
+    ],
+    "key": "general-santos-608",
+    "country": "608"
+  },
+  {
+    "name": "Ghaziabad",
+    "description": "address: The Flying Dutchman, Habitat Centre, Ahinsa Khand 1, Indirapuram, Ghaziabad, Uttar Pradesh, IndiaEvent Link: https://app.unlock-protocol.com/event/glob",
+    "coords": [
+      77.3686902,
+      28.6402307
+    ],
+    "key": "ghaziabad-356",
+    "country": "356"
+  },
+  {
+    "name": "Goa",
+    "description": "address: The Coworking Space Goa - Meeting Rooms & Co working, Old Market, opp. District and Sessions Court, Fatorda, Madgaon, Goa, IndiaEvent Link: https://app",
+    "coords": [
+      73.9577247,
+      15.284413
+    ],
+    "key": "goa-356",
+    "country": "356"
+  },
+  {
+    "name": "Gorakhpur",
+    "description": "address: La Pino'z Pizza - Medical Road Gorakhpur, Medical Road, near Khajanchi Chauraha, Khajanchi Chauraha, RailVihar Ph-2 Colony, Chargawa,, Gorakhpur, Uttar",
+    "coords": [
+      83.3893477,
+      26.7974376
+    ],
+    "key": "gorakhpur-356",
+    "country": "356"
+  },
+  {
+    "name": "Goshen",
+    "description": "address: Venturi, East Lincoln Avenue, Goshen, IN, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-goshenChat: https://t.me/+l4cuG3fzVpw",
+    "coords": [
+      -85.8334748,
+      41.5866625
+    ],
+    "key": "goshen-840",
+    "country": "840"
+  },
+  {
+    "name": "Göteborg",
+    "description": "address: Consid, Vasagatan, Göteborg, ŠvedskaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-gteborgChat: https://t.me/+FTFIURURfNplYzAxCou",
+    "coords": [
+      11.973819,
+      57.7006211
+    ],
+    "key": "goteborg-752",
+    "country": "752"
+  },
+  {
+    "name": "Gotemba",
+    "description": "address: 日本、静岡県御殿場市新橋１９８８ ザ・ゴテンバカン（ＴＨＥ・ＧＯＴＥＭＢＡＫＡＮ） レストラン グランテラッセEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-in-gotembaChat: https://t.m",
+    "coords": [
+      138.9338928,
+      35.3008647
+    ],
+    "key": "gotemba-392",
+    "country": "392"
+  },
+  {
+    "name": "Guadalajara",
+    "description": "address: Sofy Boom Chapalita, Avenida Guadalupe, Chapalita Oriente, Zapopan, Jalisco, MéxicoEvent Link: https://app.unlock-protocol.com/event/global-pizza-party",
+    "coords": [
+      -103.4036256,
+      20.6658578
+    ],
+    "key": "guadalajara-484",
+    "country": "484"
+  },
+  {
+    "name": "Gualeguaychú Entre Ríos",
+    "description": "address: Bar del Mercado Frigorífico Gualeguaychú, Gualeguaychú, Entre Ríos, ArgentinaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-guale",
+    "coords": [
+      -58.5094879,
+      -33.0278221
+    ],
+    "key": "gualeguaychu-entre-rios-032",
+    "country": "032"
+  },
+  {
+    "name": "Guangzhou",
+    "description": "address: China, Guangdong Province, Guangzhou, Haizhu District, Yuejiang West Road, 广州塔Event Link: https://app.unlock-protocol.com/event/global-pizza-party-guan",
+    "coords": [
+      113.3401572,
+      23.107481
+    ],
+    "key": "guangzhou-156",
+    "country": "156"
+  },
+  {
+    "name": "Guatemala City",
+    "description": "address: Salones Colonia Centro América, 31 Avenida, Guatemala City, GuatemalaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-ciudad-de-gua",
+    "coords": [
+      -90.5559264,
+      14.633098
+    ],
+    "key": "guatemala-city-320",
+    "country": "320"
+  },
+  {
+    "name": "Guayaquil",
+    "description": "address: Salinerito, Victor Emilio Estrada, Guayaquil, EcuadorEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-guayaquil-2025Chat: https://t",
+    "coords": [
+      -79.9188249,
+      -2.1619679
+    ],
+    "key": "guayaquil-218",
+    "country": "218"
+  },
+  {
+    "name": "Guaynabo",
+    "description": "address: La Rotonda Pizza from Scratch, Puerto Rico 833, Guaynabo, Puerto RicoEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-guaynabo-city",
+    "coords": [
+      -66.1317816,
+      18.3744502
+    ],
+    "key": "guaynabo-630",
+    "country": "630"
+  },
+  {
+    "name": "Gurgaon",
+    "description": "address: Kolaba - Specialty Coffee And Pizzeria, Badshahpur Sohna Road Highway, Block C, Sector 48, Gurugram, Haryana, IndiaEvent Link: https://app.unlock-proto",
+    "coords": [
+      77.039337,
+      28.4180177
+    ],
+    "key": "gurgaon-356",
+    "country": "356"
+  },
+  {
+    "name": "Guwahati",
+    "description": "address: Nuts and Brew, GS Road, above Forever 21, in front of Novotel Hotel, Rukmini Gaon, Guwahati, Assam, IndiaEvent Link: https://app.unlock-protocol.com/ev",
+    "coords": [
+      91.7984168,
+      26.1385675
+    ],
+    "key": "guwahati-356",
+    "country": "356"
+  },
+  {
+    "name": "Gwalior",
+    "description": "address: ZUDIO - Keshar towers, Gwalior, Racecourse Rd, Railway Colony, LNUPE Campus, Gwalior, Madhya Pradesh 474002, IndiaEvent Link: https://app.unlock-protoc",
+    "coords": [
+      78.1876472,
+      26.2193778
+    ],
+    "key": "gwalior-356",
+    "country": "356"
+  },
+  {
+    "name": "Gyumri",
+    "description": "address: Berlin ART Hotel, Haghtanaki Avenue, Gyumri, ArmeniaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-gyumri-8Chat: https://t.me/+pu",
+    "coords": [
+      43.8458252,
+      40.7836151
+    ],
+    "key": "gyumri-051",
+    "country": "051"
+  },
+  {
+    "name": "Haifa",
+    "description": "address: Chester Kittchen - Live Music & Testy Food & Friends, Ha-Namal Street, Haifa, IsraelEvent Link: https://app.unlock-protocol.com/event/haifa-pizza-party",
+    "coords": [
+      34.9983417,
+      32.8207003
+    ],
+    "key": "haifa-376",
+    "country": "376"
+  },
+  {
+    "name": "Halifax",
+    "description": "address: Freeman's Little New York, Grafton Street, Halifax, Nova Scotia, CanadaEvent Link: https://app.unlock-protocol.com/event/btc-pizza-day-halifaxChat: htt",
+    "coords": [
+      -63.5757995,
+      44.6474006
+    ],
+    "key": "halifax-124",
+    "country": "124"
+  },
+  {
+    "name": "Hamburg",
+    "description": "address: Alte Rabenstraße 32, Eimsbüttel, DeutschlandEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-hamburg-7Chat: https://t.me/+3zcD3mEHK",
+    "coords": [
+      10.0002985,
+      53.5675734
+    ],
+    "key": "hamburg-276",
+    "country": "276"
+  },
+  {
+    "name": "Hangzhou",
+    "description": "address: 中国浙江省杭州市滨江区南环路4287号Event Link: https://app.unlock-protocol.com/event/global-pizza-party-2025-hangzhou-cityChat: https://t.me/+Va-EpaETUd5jNDYxCountry: ",
+    "coords": [
+      120.30812,
+      30.21908
+    ],
+    "key": "hangzhou-156",
+    "country": "156"
+  },
+  {
+    "name": "Hanoi",
+    "description": "address: COGO Coworking Space, Phố Thái Hà, Trung Liệt, Đống Đa, Hanoi, VietnamEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-hanoiChat: h",
+    "coords": [
+      105.82358,
+      21.009282
+    ],
+    "key": "hanoi-704",
+    "country": "704"
+  },
+  {
+    "name": "Harare",
+    "description": "address: Stable Sports, Kingsmead Road, Harare, ZimbabweEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-harareChat: https://t.me/+i06gg9ln7",
+    "coords": [
+      31.0926105,
+      -17.7638552
+    ],
+    "key": "harare-716",
+    "country": "716"
+  },
+  {
+    "name": "Hardoi",
+    "description": "address: S1 pizza 99, Sandi - Shahabad Road, Nawabganj, Sandi, Mirzapur, Uttar Pradesh, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-part",
+    "coords": [
+      79.9637755,
+      27.2943253
+    ],
+    "key": "hardoi-356",
+    "country": "356"
+  },
+  {
+    "name": "Helsinki",
+    "description": "address: Kruunuvuorenkatu 4, Helsinki, FinlandEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-helsinki-1Chat: https://t.me/+e8GY4JBLtM4zMjI",
+    "coords": [
+      24.9652824,
+      60.1665019
+    ],
+    "key": "helsinki-246",
+    "country": "246"
+  },
+  {
+    "name": "Ho Chi Minh City",
+    "description": "address: Ho Chi Minh, Ho Chi Minh City, VietnamEvent Link: https://app.unlock-protocol.com/event/offchain-saigon-pizza-dao-global-pizza-party-bitcoin-pizza-day-",
+    "coords": [
+      106.6296638,
+      10.8230989
+    ],
+    "key": "ho-chi-minh-city-704",
+    "country": "704"
+  },
+  {
+    "name": "Hong Kong",
+    "description": "address: Emmer Pizzeria & Café, Shop, Queensway, Admiralty, Hong KongEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-hong-kongChat: https:/",
+    "coords": [
+      114.164897,
+      22.2775707
+    ],
+    "key": "hong-kong-344",
+    "country": "344"
+  },
+  {
+    "name": "Honolulu",
+    "description": "address: Treehouse Coworking, Kilauea Avenue, Honolulu, HI, USAEvent Link: https://app.unlock-protocol.com/event/honolulu-btc-pizza-dayChat: https://t.me/+xQfXJ",
+    "coords": [
+      -157.7838828,
+      21.2790165
+    ],
+    "key": "honolulu-840",
+    "country": "840"
+  },
+  {
+    "name": "Houston",
+    "description": "address: The Cannon West Houston, The Cannon at West Houston, Brittmoore Road, Houston, TX, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-pa",
+    "coords": [
+      -95.5689387,
+      29.7955188
+    ],
+    "key": "houston-840",
+    "country": "840"
+  },
+  {
+    "name": "Huancayo",
+    "description": "address: 365-NEPTUNO, Jirón Antonio Lobato, Huancayo, PerúEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-huancayoChat: https://t.me/+KPSP3",
+    "coords": [
+      -75.2149596,
+      -12.0583253
+    ],
+    "key": "huancayo-604",
+    "country": "604"
+  },
+  {
+    "name": "Hue City",
+    "description": "address: Bèo Tấm, Đường Lê Đức Anh, Thủy Vân, Huế, Thành phố Huế, Việt NamEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-hue-4Chat: https:",
+    "coords": [
+      107.6088006,
+      16.4811451
+    ],
+    "key": "hue-city-704",
+    "country": "704"
+  },
+  {
+    "name": "Hyderabad",
+    "description": "address: La Pino'z Pizza - Madhapur, Telangana, Mindspace, Centre, Madhapur, Hyderabad, Telangana, IndiaEvent Link: https://app.unlock-protocol.com/event/global",
+    "coords": [
+      78.3762995,
+      17.4414533
+    ],
+    "key": "hyderabad-356",
+    "country": "356"
+  },
+  {
+    "name": "Ibadan",
+    "description": "address: University of Ibadan Second Gate,, Ojoo-Samonda Expressway, Ibadan, NigeriaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-ibadan-",
+    "coords": [
+      3.9072107,
+      7.4516453
+    ],
+    "key": "ibadan-566",
+    "country": "566"
+  },
+  {
+    "name": "Idaho Falls",
+    "description": "address: Papa Tom's Pizza, South Woodruff Avenue, Idaho Falls, ID, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-idaho-fallsChat: http",
+    "coords": [
+      -112.0012825,
+      43.4808181
+    ],
+    "key": "idaho-falls-840",
+    "country": "840"
+  },
+  {
+    "name": "Ijoko",
+    "description": "address: TUNEX HOTEL AND LOUNGE, local government, Agbado-Ijoko Road, Ijoko, NigeriaEvent Link: https://app.unlock-protocol.com/event/ijoko-global-pizza-partyCh",
+    "coords": [
+      3.2783132,
+      6.7315738
+    ],
+    "key": "ijoko-566",
+    "country": "566"
+  },
+  {
+    "name": "Ilocos",
+    "description": "address: Amare La Cucina, Bantay, Ilocos Sur, Brgy, National Highway, Bantay, Ilocos Sur, PhilippinesEvent Link: https://app.unlock-protocol.com/event/global-pi",
+    "coords": [
+      120.3956408,
+      17.5798535
+    ],
+    "key": "ilocos-608",
+    "country": "608"
+  },
+  {
+    "name": "Imphal",
+    "description": "address: uspizza imphal, Airport Road, Thouda Bhavok Leikai, Keishamthong, Imphal, Manipur, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-",
+    "coords": [
+      93.9285662,
+      24.7933831
+    ],
+    "key": "imphal-356",
+    "country": "356"
+  },
+  {
+    "name": "Indianapolis",
+    "description": "address: 329 Massachusetts Avenue, Indianapolis, IN, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-indianapolisChat: https://t.me/+Pqv",
+    "coords": [
+      -86.1534673,
+      39.7714497
+    ],
+    "key": "indianapolis-840",
+    "country": "840"
+  },
+  {
+    "name": "Indore",
+    "description": "address: Kafka's, LIG Square, Anoop Nagar, Indore, Madhya Pradesh 452001, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-indore-1Chat",
+    "coords": [
+      75.8911285,
+      22.7337004
+    ],
+    "key": "indore-356",
+    "country": "356"
+  },
+  {
+    "name": "Isla Margarita",
+    "description": "address: Oxygen Bar, Porlamar Mariño, Nueva Esparta, VenezuelaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-valencia-isla-margarita-venez",
+    "coords": [
+      -63.8274533,
+      10.9519951
+    ],
+    "key": "isla-margarita-862",
+    "country": "862"
+  },
+  {
+    "name": "Islamabad",
+    "description": "address: Islamabad, PakistanEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-islamabad-1Chat: https://t.me/+kVImvt5_UfY3NTIxCountry: Pakista",
+    "coords": [
+      73.0362897,
+      33.6995086
+    ],
+    "key": "islamabad-586",
+    "country": "586"
+  },
+  {
+    "name": "Istanbul",
+    "description": "address: Pablo Pub, Caferağa, Pavlonya Sokak, Kadıköy/İstanbul, TürkiyeEvent Link: https://app.unlock-protocol.com/event/istanbul-global-pizza-party-2025Chat: h",
+    "coords": [
+      29.0261952,
+      40.9896068
+    ],
+    "key": "istanbul-792",
+    "country": "792"
+  },
+  {
+    "name": "Itahari",
+    "description": "address: Chhaano Restro & Bakery, Mahendra Highway, Itahari, NepalEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-itahariChat: https://t.me",
+    "coords": [
+      87.2614539,
+      26.6664207
+    ],
+    "key": "itahari-524",
+    "country": "524"
+  },
+  {
+    "name": "Itanagar",
+    "description": "address: Asian Flavours Restaurant, opposite icici Bank, Doni colony, ItanagarEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-itanagar-1Cha",
+    "coords": [
+      93.6160678,
+      27.0915464
+    ],
+    "key": "itanagar-356",
+    "country": "356"
+  },
+  {
+    "name": "Jabalpur",
+    "description": "address: MPIDC RO Jabalpur, Howbagh Railway Station Road, MCI Colony, Gorakhpur, Jabalpur, Madhya Pradesh, IndiaEvent Link: https://app.unlock-protocol.com/even",
+    "coords": [
+      79.9357267,
+      23.147008
+    ],
+    "key": "jabalpur-356",
+    "country": "356"
+  },
+  {
+    "name": "Jacksonville",
+    "description": "address: V Pizza + Sidecar - Gate Parkway, Gate Parkway, Jacksonville, FL, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-jacksonvilleC",
+    "coords": [
+      -81.5208382,
+      30.2441828
+    ],
+    "key": "jacksonville-840",
+    "country": "840"
+  },
+  {
+    "name": "Jaipur",
+    "description": "address: La Pino'z Pizza Malviya Nagar, Jaipur, SL Marg, opposite cafe lazymojo, Lal Bahadur Nagar, Chandrakala Colony, Malviya Nagar, Jaipur, Rajasthan, IndiaE",
+    "coords": [
+      75.8006803,
+      26.8492145
+    ],
+    "key": "jaipur-356",
+    "country": "356"
+  },
+  {
+    "name": "Jakarta",
+    "description": "address: Mewatu Coffee & Gallery, Jl. KH. Ahmad Dahlan, RT.1/RW.1, Kramat Pela, South Jakarta City, Jakarta, IndonesiaEvent Link: https://app.unlock-protocol.co",
+    "coords": [
+      106.791869,
+      -6.2437987
+    ],
+    "key": "jakarta-360",
+    "country": "360"
+  },
+  {
+    "name": "Jalandhar",
+    "description": "address: Love Italy - Lounge & Restaurant, Gujral Nagar, Jalandhar, Punjab, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-jalandhar-",
+    "coords": [
+      75.566024,
+      31.3211988
+    ],
+    "key": "jalandhar-356",
+    "country": "356"
+  },
+  {
+    "name": "Jammu",
+    "description": "address: Pizza Wings | Bahu Plaza (Jammu), Bahu Road, Vidhata Nagar, Preet Nagar, JammuEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-jamm",
+    "coords": [
+      74.8724867,
+      32.7052406
+    ],
+    "key": "jammu-356",
+    "country": "356"
+  },
+  {
+    "name": "Jamshedpur",
+    "description": "address: Laziz Pizza, Laziz pizza, Purulia Road, Jawahar Nagar, Mango, Jamshedpur, Jharkhand, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizz",
+    "coords": [
+      86.2121667,
+      22.8372302
+    ],
+    "key": "jamshedpur-356",
+    "country": "356"
+  },
+  {
+    "name": "Janakpur",
+    "description": "address: Folsom Cafe and Restaurant, Shiva Chowk, Janakpur, NepalEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-janakpurChat: https://t.me",
+    "coords": [
+      85.928968,
+      26.7294588
+    ],
+    "key": "janakpur-524",
+    "country": "524"
+  },
+  {
+    "name": "Jhansi",
+    "description": "address: La pino'z pizza, Station Road, Civil Lines, Jhansi, Uttar Pradesh, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-jhansi-4Ch",
+    "coords": [
+      78.5655487,
+      25.4438305
+    ],
+    "key": "jhansi-356",
+    "country": "356"
+  },
+  {
+    "name": "Jinja",
+    "description": "address: Chicken Papa, Iganga Road, Jinja, UgandaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-jinjaChat: Country: UgandaRegion: Africa",
+    "coords": [
+      33.2100117,
+      0.4279492
+    ],
+    "key": "jinja-800",
+    "country": "800"
+  },
+  {
+    "name": "Johannesberg",
+    "description": "address: The Wild Side Restaurant, 6 Burnside Ave, Craighall Park, Randburg, 2196, South AfricaEvent Link: https://app.unlock-protocol.com/event/global-pizza-pa",
+    "coords": [
+      28.0225656,
+      -26.1143536
+    ],
+    "key": "johannesberg-710",
+    "country": "710"
+  },
+  {
+    "name": "Kabul",
+    "description": "address: Shahr-e-Naw Hotel (Wedding Hall), Kabul, AfghanistanEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-kabulChat: WhatsAppCountry: Af",
+    "coords": [
+      69.167156,
+      34.5407947
+    ],
+    "key": "kabul-004",
+    "country": "004"
+  },
+  {
+    "name": "Kaduna",
+    "description": "address: CBAE, Epitome hotel, besides, Congo Street, Kaduna, NigeriaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-kadunaChat: https://t.m",
+    "coords": [
+      7.4336327,
+      10.4689473
+    ],
+    "key": "kaduna-566",
+    "country": "566"
+  },
+  {
+    "name": "Kampala",
+    "description": "address: Thrones Lounge Bar & Restaurant, Bandali Rise, Kampala, UgandaEvent Link: https://app.unlock-protocol.com/event/pizza-dao-5th-global-pizza-party-2025-3",
+    "coords": [
+      32.622006,
+      0.3178246
+    ],
+    "key": "kampala-800",
+    "country": "800"
+  },
+  {
+    "name": "Kandy",
+    "description": "address: Vito Wood Fired Pizza - Peradeniya, Peradeniya Road, Kandy, Sri LankaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-kandy-1Chat: ",
+    "coords": [
+      80.6244448,
+      7.2846957
+    ],
+    "key": "kandy-144",
+    "country": "144"
+  },
+  {
+    "name": "Kanpur",
+    "description": "address: Pizza Hut | Swaroop Nagar, Kanpur, opposite Shiv Mandir, Scheme No 7, Khalasi Line, Swaroop Nagar, Kanpur, Uttar Pradesh, IndiaEvent Link: https://app.",
+    "coords": [
+      80.3164557,
+      26.4810725
+    ],
+    "key": "kanpur-356",
+    "country": "356"
+  },
+  {
+    "name": "Kansas City",
+    "description": "address: 900 West 39th Street, Kansas City, MO, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-kansas-cityChat: https://t.me/+8QNU8o2wA",
+    "coords": [
+      -94.5974927,
+      39.0573858
+    ],
+    "key": "kansas-city-840",
+    "country": "840"
+  },
+  {
+    "name": "Kara",
+    "description": "address: Kara, Togo, TogoEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-lome-1Chat: https://t.me/+YFhbTCqVoQwyMGZhCountry: TogoRegion: Afr",
+    "coords": [
+      1.1977158,
+      9.5486112
+    ],
+    "key": "kara-768",
+    "country": "768"
+  },
+  {
+    "name": "Karachi",
+    "description": "address: Rosati Bistro, Shahra-e-Faisal, KDA Scheme #1 Karsaz KDA Scheme 1, Karachi, PakistanEvent Link: https://app.unlock-protocol.com/event/global-pizza-part",
+    "coords": [
+      67.0951109,
+      24.8752942
+    ],
+    "key": "karachi-586",
+    "country": "586"
+  },
+  {
+    "name": "Kathmandu",
+    "description": "address: Vinoliva Restaurant & Bar, Narayanhiti Palace Museum North Gate Rd, Kathmandu, NepalEvent Link: https://app.unlock-protocol.com/event/global-pizza-part",
+    "coords": [
+      85.3211928,
+      27.7179539
+    ],
+    "key": "kathmandu-524",
+    "country": "524"
+  },
+  {
+    "name": "Keffi",
+    "description": "address: Bingham University, Abuja-Keffi Rd, New Karu, NigeriaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-nasarawa-1Chat: https://t.me/",
+    "coords": [
+      7.6996436,
+      8.9564876
+    ],
+    "key": "keffi-566",
+    "country": "566"
+  },
+  {
+    "name": "Kelowna",
+    "description": "address: DunnEnzies Pizza Mission, Lakeshore Road, Kelowna, BC, CanadaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-kelownaChat: https://",
+    "coords": [
+      -119.4956226,
+      49.8164925
+    ],
+    "key": "kelowna-124",
+    "country": "124"
+  },
+  {
+    "name": "Kigali",
+    "description": "address: DTC, Kigali, RwandaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-kigali-2025-4Chat: https://t.me/+08IUt0my5kI5MzZkCountry: Rwand",
+    "coords": [
+      30.1071327,
+      -2.0152949
+    ],
+    "key": "kigali-646",
+    "country": "646"
+  },
+  {
+    "name": "Kilifi",
+    "description": "address: Distant Relatives Ecolodge & Backpackers, Kilifi Town, KenyaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-kilifiChat: https://t.",
+    "coords": [
+      39.834938,
+      -3.621596
+    ],
+    "key": "kilifi-404",
+    "country": "404"
+  },
+  {
+    "name": "Kisumu",
+    "description": "address: Mega Cinemas, Kisumu, KenyaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-kisumu-city-1Chat: https://t.me/+GqJNj0CgIc4xNzQ0Countr",
+    "coords": [
+      34.7699371,
+      -0.1072075
+    ],
+    "key": "kisumu-404",
+    "country": "404"
+  },
+  {
+    "name": "Kitwe",
+    "description": "address: The Copperbelt University, Jambo Drive, Kitwe, ZambiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-kitwe-1Chat: https://t.me/+KG",
+    "coords": [
+      28.239582,
+      -12.8054705
+    ],
+    "key": "kitwe-894",
+    "country": "894"
+  },
+  {
+    "name": "Kochi",
+    "description": "address: Sijis Pizza Street, opp. Manjooran's Moon Stone Appartment, Palarivattom, Ernakulam, Kerala, IndiaEvent Link: https://app.unlock-protocol.com/event/glo",
+    "coords": [
+      76.3075593,
+      9.9982971
+    ],
+    "key": "kochi-356",
+    "country": "356"
+  },
+  {
+    "name": "Koh Phangan",
+    "description": "address: NASHE MESTO, PX5V, Ko Pha-ngan, Koh Phangan, Surat Thani, ThailandEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-koh-phangan-1Cha",
+    "coords": [
+      99.9984736,
+      9.7126955
+    ],
+    "key": "koh-phangan-764",
+    "country": "764"
+  },
+  {
+    "name": "Kohima",
+    "description": "address: Ooopar, Jail Colony, Kohima, Nagaland, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-kohima-1Chat: https://t.me/+RBN7jw6VWG",
+    "coords": [
+      94.0959615,
+      25.6572502
+    ],
+    "key": "kohima-356",
+    "country": "356"
+  },
+  {
+    "name": "Kolkata",
+    "description": "address: Chai Break Foreshoreroad, 99, Foreshore Rd, 1A, Shibpur, Howrah, West Bengal 711102, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizz",
+    "coords": [
+      88.3270388,
+      22.563838
+    ],
+    "key": "kolkata-356",
+    "country": "356"
+  },
+  {
+    "name": "Kollam",
+    "description": "address: Supreme Uppercrust Kollam, Supreme Experienza, TOWN LIMIT, Bavana Nagar, Kollam, Kerala, IndiaEvent Link: https://app.unlock-protocol.com/event/global-",
+    "coords": [
+      76.6081582,
+      8.8954122
+    ],
+    "key": "kollam-356",
+    "country": "356"
+  },
+  {
+    "name": "Kosice",
+    "description": "address: Tabačka Kulturfabrik, Gorkého, Old Town, Košice, SlovakiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-day-koiceChat: https://t.me/+kO",
+    "coords": [
+      21.2559752,
+      48.7289906
+    ],
+    "key": "kosice-703",
+    "country": "703"
+  },
+  {
+    "name": "Kota",
+    "description": "address: Morgans-The Italian Pizzaria, Kamla Udhyan Road, Kunadi, Electricity Board Area, Kota, Rajasthan, IndiaEvent Link: https://app.unlock-protocol.com/even",
+    "coords": [
+      75.8313793,
+      25.2059711
+    ],
+    "key": "kota-356",
+    "country": "356"
+  },
+  {
+    "name": "Kozhikode",
+    "description": "address: Mac's Cafe Steak House & Pizzeria, Balan K Nair Road, St. Vincent Colony, Kozhikode, Kerala, IndiaEvent Link: https://app.unlock-protocol.com/event/glo",
+    "coords": [
+      75.787114,
+      11.2651518
+    ],
+    "key": "kozhikode-356",
+    "country": "356"
+  },
+  {
+    "name": "Kuala Lumpur",
+    "description": "address: VSING Mi Bar - Sri Petaling, Jalan Radin Bagus 3, Bandar Baru Sri Petaling, Kuala Lumpur, Federal Territory of Kuala Lumpur, MalaysiaEvent Link: https:",
+    "coords": [
+      101.6938055,
+      3.0700809
+    ],
+    "key": "kuala-lumpur-458",
+    "country": "458"
+  },
+  {
+    "name": "Kumamoto",
+    "description": "address: Kumamoto JapanEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-2025-kumamoto-1Chat: https://t.me/+mn4Hv6M-QFRjZjY5Country: JapanReg",
+    "coords": [
+      130.7079369,
+      32.8032164
+    ],
+    "key": "kumamoto-392",
+    "country": "392"
+  },
+  {
+    "name": "Kwara",
+    "description": "address: Kwara NigeriaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-kwara-city-1Chat: https://t.me/+fznrs_gQK7o4Yzc0Country: NigeriaRegio",
+    "coords": [
+      4.3874051,
+      8.9668961
+    ],
+    "key": "kwara-566",
+    "country": "566"
+  },
+  {
+    "name": "Kyiv",
+    "description": "address: WORKIT Space, вулиця Марка Безручка, Київ, УкраїнаEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-kyivChat: https://t.me/+RXGufr6x",
+    "coords": [
+      30.4135476,
+      50.4615108
+    ],
+    "key": "kyiv-804",
+    "country": "804"
+  },
+  {
+    "name": "La Paz",
+    "description": "address: La Paz, BoliviaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-la-pazChat: https://t.me/+tiNxBYnwRx83MDIxCountry: BoliviaRegion: S",
+    "coords": [
+      -68.1212091,
+      -16.494359
+    ],
+    "key": "la-paz-068",
+    "country": "068"
+  },
+  {
+    "name": "La Plata",
+    "description": "address: Blunt Bar La Plata, Calle 57, La Plata, Provincia de Buenos Aires, ArgentinaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-la-pla",
+    "coords": [
+      -57.9503368,
+      -34.9239165
+    ],
+    "key": "la-plata-032",
+    "country": "032"
+  },
+  {
+    "name": "Laax",
+    "description": "address: rocksresort, Via Murschetg, Laax, SwitzerlandEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-zuitzerlandChat: https://t.me/+GXLksc",
+    "coords": [
+      9.264986,
+      46.8189616
+    ],
+    "key": "laax-756",
+    "country": "756"
+  },
+  {
+    "name": "Lagos",
+    "description": "address: The base lounge and restaurants, Of, Awolowo Road, bachuss bustop, Lagos, NigeriaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-3",
+    "coords": [
+      3.4174549,
+      6.4413507
+    ],
+    "key": "lagos-566",
+    "country": "566"
+  },
+  {
+    "name": "Laguna",
+    "description": "address: Yohji Ridgeway Resort, South Barretto Road, Calamba, Laguna, PhilippinesEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-lagunaChat",
+    "coords": [
+      121.1819133,
+      14.1809635
+    ],
+    "key": "laguna-608",
+    "country": "608"
+  },
+  {
+    "name": "Lahore",
+    "description": "address: Caprinos Pizza DHA Raya, Lahore, Fairways Commercial Raya, CP-35, Defence Raya Golf Resort Sector M DHA Phase 6, Lahore, PakistanEvent Link: https://ap",
+    "coords": [
+      74.4694048,
+      31.4732702
+    ],
+    "key": "lahore-586",
+    "country": "586"
+  },
+  {
+    "name": "Lamu",
+    "description": "address: Sailors Joint, Corniche Path, Lamu, KenyaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-lamu-5Chat: Country: KenyaRegion: Africa",
+    "coords": [
+      40.90262,
+      -2.2683596
+    ],
+    "key": "lamu-404",
+    "country": "404"
+  },
+  {
+    "name": "Las Palmas de Gran Canaria",
+    "description": "address: Restaurante La Pizza, Calle Tomás Miller, Las Palmas de Gran Canaria, SpainEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-gran-ca",
+    "coords": [
+      -19.9249708,
+      11.641798
+    ],
+    "key": "las-palmas-de-gran-canaria-724",
+    "country": "724"
+  },
+  {
+    "name": "Las Pinas",
+    "description": "address: BF Resort Park, Ligaya Pascual, Las Piñas, Metro Manila, PhilippinesEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-las-pinasChat:",
+    "coords": [
+      120.9820099,
+      14.4345932
+    ],
+    "key": "las-pinas-608",
+    "country": "608"
+  },
+  {
+    "name": "Las Vegas",
+    "description": "address: Velocity Esports Las Vegas, South Las Vegas Boulevard, Las Vegas, NV, USAEvent Link: https://app.unlock-protocol.com/event/vegas-global-bitcoin-pizza-d",
+    "coords": [
+      -115.1785856,
+      36.068177
+    ],
+    "key": "las-vegas-840",
+    "country": "840"
+  },
+  {
+    "name": "León",
+    "description": "address: Bigfoot Hostel & Volcano Boarding, León, NicaraguaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-len-1Chat: https://t.me/+uL9hke2",
+    "coords": [
+      -86.8760037,
+      12.4368418
+    ],
+    "key": "leon-558",
+    "country": "558"
+  },
+  {
+    "name": "Lima",
+    "description": "address: Calle Esperanza 335, Miraflores, PerúEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-limaChat: https://t.me/+8QnRNKTE77Q5YzBhCount",
+    "coords": [
+      -77.0264497,
+      -12.1203231
+    ],
+    "key": "lima-604",
+    "country": "604"
+  },
+  {
+    "name": "Limassol",
+    "description": "address: Limassol AGORA, Saripolou, Limassol, КипрEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-limassolChat: https://t.me/+nt-7Y0JFQysyM",
+    "coords": [
+      33.0430537,
+      34.6766336
+    ],
+    "key": "limassol-196",
+    "country": "196"
+  },
+  {
+    "name": "Lisbon",
+    "description": "address: O Javali, Avenida 5 de Outubro, Lisbona, PortogalloEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-lisbon-1Chat: https://t.me/+Ise",
+    "coords": [
+      -9.1505422,
+      38.7476311
+    ],
+    "key": "lisbon-620",
+    "country": "620"
+  },
+  {
+    "name": "Lokoja City",
+    "description": "address: RAFIKI FOODS, Lokoja, NigeriaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-lokoja-city-25Chat: https://t.me/+Ox5H1huZpjdiMjUxCou",
+    "coords": [
+      6.7039912,
+      7.7930273
+    ],
+    "key": "lokoja-city-566",
+    "country": "566"
+  },
+  {
+    "name": "Lomé",
+    "description": "address: 55VR+JPQ Lomé, TogoEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-lomeChat: https://t.me/+SIk1s_i7r5kyZWVhCountry: TogoRegion: Af",
+    "coords": [
+      1.1918594,
+      6.1940875
+    ],
+    "key": "lome-768",
+    "country": "768"
+  },
+  {
+    "name": "London",
+    "description": "address: Westbourne Studios, Acklam Road, London, UKEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-londonChat: https://t.me/+A1RZij0a-B80Y",
+    "coords": [
+      -0.2030599,
+      51.5213649
+    ],
+    "key": "london-826",
+    "country": "826"
+  },
+  {
+    "name": "Los Angeles",
+    "description": "address: 7207 Melrose Ave, Los Angeles, CA 90046, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-los-angeles-1Chat: https://t.me/+RkBpp",
+    "coords": [
+      -118.3465829,
+      34.0837044
+    ],
+    "key": "los-angeles-840",
+    "country": "840"
+  },
+  {
+    "name": "Lucknow",
+    "description": "address: Mashup 2.0 - Sports Bar and Night Club, Vibhuti Khand, Gomti Nagar, Lucknow, Uttar Pradesh, IndiaEvent Link: https://app.unlock-protocol.com/event/glob",
+    "coords": [
+      81.0120006,
+      26.8649612
+    ],
+    "key": "lucknow-356",
+    "country": "356"
+  },
+  {
+    "name": "Ludhiana",
+    "description": "address: FreakBaker, Sunet, GHS Sunet, Bhai Randhir Singh Nagar, Ludhiana, Punjab, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-lud",
+    "coords": [
+      75.8035843,
+      30.8870302
+    ],
+    "key": "ludhiana-356",
+    "country": "356"
+  },
+  {
+    "name": "Lusaka",
+    "description": "address: Try Rooftop ZM, Great East Road, Lusaka, ZambiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-lusaka-1Chat: https://t.me/+01kAFec",
+    "coords": [
+      28.315071,
+      -15.3928488
+    ],
+    "key": "lusaka-894",
+    "country": "894"
+  },
+  {
+    "name": "Luxembourg",
+    "description": "address: Al 21Restaurant, Avenue de la Liberté, Gare LuxembourgEvent Link: https://app.unlock-protocol.com/event/bitcoin-pizza-dayChat: https://t.me/+PdqHLV7b_l",
+    "coords": [
+      6.1302604,
+      49.6049141
+    ],
+    "key": "luxembourg-442",
+    "country": "442"
+  },
+  {
+    "name": "Lviv",
+    "description": "address: Pizza Celentano Drive, вулиця Кульпарківська, Львів, Lviv Oblast, УкраїнаEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-lvivChat:",
+    "coords": [
+      23.9832309,
+      49.811661
+    ],
+    "key": "lviv-804",
+    "country": "804"
+  },
+  {
+    "name": "Macaé",
+    "description": "address: R. Marco Antônio Aguiar Azevedo, 125 - Riviera Fluminense, Macaé - RJ, 27937-340, BrasilEvent Link: https://app.unlock-protocol.com/event/global-pizza-",
+    "coords": [
+      -41.7901757,
+      -22.3957033
+    ],
+    "key": "macae-076",
+    "country": "076"
+  },
+  {
+    "name": "Madrid",
+    "description": "address: C. de Joaquín Costa, 27, Chamartín, 28002 Madrid, EspañaEvent Link: https://app.unlock-protocol.com/event/pizza-dao-madrid-bitcoin-party-2025Chat: http",
+    "coords": [
+      -3.6866274,
+      40.4461898
+    ],
+    "key": "madrid-724",
+    "country": "724"
+  },
+  {
+    "name": "Madurai",
+    "description": "address: Phil's Bistro, 9th Main Road, Managiri, Madurai, Tamil Nadu, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-madurai-2Chat: C",
+    "coords": [
+      78.1479601,
+      9.9325562
+    ],
+    "key": "madurai-356",
+    "country": "356"
+  },
+  {
+    "name": "Málaga",
+    "description": "address: Regus, Avenida Juan Sebastián Elcano, Málaga, SpainEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-malaga-1Chat: https://t.me/+Br0",
+    "coords": [
+      -4.3785555,
+      36.7220103
+    ],
+    "key": "malaga-724",
+    "country": "724"
+  },
+  {
+    "name": "Manchester",
+    "description": "address: L'Antica Pizzeria da Michele, King Street, Manchester, UKEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-manchesterChat: https://t",
+    "coords": [
+      -2.2443473,
+      53.481169
+    ],
+    "key": "manchester-826",
+    "country": "826"
+  },
+  {
+    "name": "Mangalore",
+    "description": "address: The Loft, Nandigudda Road, Attavar, Mangaluru, Karnataka, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-mangalore-1Chat: ht",
+    "coords": [
+      74.8468173,
+      12.8628
+    ],
+    "key": "mangalore-356",
+    "country": "356"
+  },
+  {
+    "name": "Manila",
+    "description": "address: Good Sh*t Coffee, Enriquez, Makati, Metro Manila, PhilippinesEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-manilaChat: https://t",
+    "coords": [
+      121.0319369,
+      14.5641625
+    ],
+    "key": "manila-608",
+    "country": "608"
+  },
+  {
+    "name": "Maracaibo",
+    "description": "address: Pa Que Masitas, Calle 84, Maracaibo, Zulia, VenezuelaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-maracaiboChat: https://t.me/+",
+    "coords": [
+      -71.6274497,
+      10.6567598
+    ],
+    "key": "maracaibo-862",
+    "country": "862"
+  },
+  {
+    "name": "Markudi",
+    "description": "address: College of Health Science Library, Gboko-Makurdi Road, Makurdi, NigeriaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-35Chat: htt",
+    "coords": [
+      8.5602245,
+      7.7258279
+    ],
+    "key": "markudi-566",
+    "country": "566"
+  },
+  {
+    "name": "Mathura",
+    "description": "address: Göttlich - Pizzeria & Cafe, Mathura, Uttar Pradesh, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-mathuraChat: https://t.me",
+    "coords": [
+      77.5925465,
+      27.6046202
+    ],
+    "key": "mathura-356",
+    "country": "356"
+  },
+  {
+    "name": "Maullin",
+    "description": "address: Maullin, Maullín, ChileEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-maullnChat: https://t.me/+kkaBTQya8YVmNTYxCountry: ChileReg",
+    "coords": [
+      -73.6016737,
+      -41.6183881
+    ],
+    "key": "maullin-152",
+    "country": "152"
+  },
+  {
+    "name": "Mazar-e-Sharif",
+    "description": "address: Rawza e Mubarak Museum, Mazar-i-Sharif, AfghanistanEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-mazar-e-sharifChat: https://t.m",
+    "coords": [
+      67.1109831,
+      36.7091602
+    ],
+    "key": "mazar-e-sharif-004",
+    "country": "004"
+  },
+  {
+    "name": "Mbarara",
+    "description": "address: Acacia Country Inn, Mbarara, UgandaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-mbarara-2Chat: https://t.me/+3ClPOPm_xrdhNjA0Co",
+    "coords": [
+      30.6472789,
+      -0.5943867
+    ],
+    "key": "mbarara-800",
+    "country": "800"
+  },
+  {
+    "name": "Mechelen",
+    "description": "address: Mechelen, BelgiumEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-mechelen-1Chat: https://t.me/+ZjQb1HSSQxwxMjJkCountry: BelgiumReg",
+    "coords": [
+      4.4793443,
+      51.0279827
+    ],
+    "key": "mechelen-056",
+    "country": "056"
+  },
+  {
+    "name": "Medellin",
+    "description": "address: Hash House Club, Carrera 32d, El Poblado, Medellín, Antioquia, ColombiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-medellinCha",
+    "coords": [
+      -75.5641844,
+      6.2077896
+    ],
+    "key": "medellin-170",
+    "country": "170"
+  },
+  {
+    "name": "Melbourne",
+    "description": "address: 10-20 Gwynne St, Cremorne VIC 3121, AustraliaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-melbourneChat: https://t.me/+VMUXCL1I",
+    "coords": [
+      144.9932271,
+      -37.8270136
+    ],
+    "key": "melbourne-036",
+    "country": "036"
+  },
+  {
+    "name": "Memphis",
+    "description": "address: Court Square Park, North Main Street, Memphis, TN, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-memphis-3Chat: https://t.me/",
+    "coords": [
+      -90.05177,
+      35.1460383
+    ],
+    "key": "memphis-840",
+    "country": "840"
+  },
+  {
+    "name": "Mendoza",
+    "description": "address: Cerveza Patagonia - Refugio Aristides, Arístides Villanueva, Mendoza, ArgentinaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-men",
+    "coords": [
+      -68.8526267,
+      -32.8925639
+    ],
+    "key": "mendoza-032",
+    "country": "032"
+  },
+  {
+    "name": "Merida",
+    "description": "address: Zavi Pizza, Calle 25, Colonia México, México Oriente, Mérida, Yucatán, MéxicoEvent Link: https://app.unlock-protocol.com/event/bitcoin-pizza-day-2025-m",
+    "coords": [
+      -89.60584,
+      20.9974112
+    ],
+    "key": "merida-484",
+    "country": "484"
+  },
+  {
+    "name": "Mexico City",
+    "description": "address: Anticlub House, Calle 3, Francisco I. Madero, Ciudad de México, CDMX, MéxicoEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-mexico",
+    "coords": [
+      -99.2030612,
+      19.4462898
+    ],
+    "key": "mexico-city-484",
+    "country": "484"
+  },
+  {
+    "name": "Miami",
+    "description": "address: Batch Gastropub, Southwest 12th Street, Miami, FL, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-33Chat: https://t.me/+vN4-DU",
+    "coords": [
+      -80.1939746,
+      25.7624025
+    ],
+    "key": "miami-840",
+    "country": "840"
+  },
+  {
+    "name": "Milan",
+    "description": "address: LUX Gourmet Social Club, Via Eugenio Carpi, Milan, Metropolitan City of Milan, ItalyEvent Link: https://app.unlock-protocol.com/event/global-pizza-part",
+    "coords": [
+      9.2332598,
+      45.486801
+    ],
+    "key": "milan-380",
+    "country": "380"
+  },
+  {
+    "name": "Milwaukee",
+    "description": "address: Transfer Pizzeria Café, West Mitchell Street, Milwaukee, WI, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-milwaukeeChat: htt",
+    "coords": [
+      -87.9112601,
+      43.0121754
+    ],
+    "key": "milwaukee-840",
+    "country": "840"
+  },
+  {
+    "name": "Minna",
+    "description": "address: IBB Library Complex, Baganakwo, NigeriaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-minnaChat: https://t.me/+__7LS9ExqJ5hNWIxCo",
+    "coords": [
+      6.4528437,
+      9.5353015
+    ],
+    "key": "minna-566",
+    "country": "566"
+  },
+  {
+    "name": "Minneapolis",
+    "description": "address: New Hope, MN, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-minneapolis-1Chat: https://t.me/+ozZADc9SdDo1NjI5Country: USARegi",
+    "coords": [
+      -93.3866185,
+      45.0380201
+    ],
+    "key": "minneapolis-840",
+    "country": "840"
+  },
+  {
+    "name": "Misiones",
+    "description": "address: Alfonso de Arrechea 3300, N3301 Posadas, Misiones, ArgentinaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-misionesChat: https://",
+    "coords": [
+      -55.8910854,
+      -27.3580709
+    ],
+    "key": "misiones-032",
+    "country": "032"
+  },
+  {
+    "name": "Mobile",
+    "description": "address: Lost Pizza Co. Mobile Midtown, Old Shell Road, Mobile, AL, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-mobile-alabama-1Chat",
+    "coords": [
+      -88.0995747,
+      30.6913296
+    ],
+    "key": "mobile-840",
+    "country": "840"
+  },
+  {
+    "name": "Mombasa",
+    "description": "address: Tudor Water Sports Marina, Tom Mboya Road, Mombasa, KenyaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-mombasaChat: https://t.me",
+    "coords": [
+      39.663709,
+      -4.0310307
+    ],
+    "key": "mombasa-404",
+    "country": "404"
+  },
+  {
+    "name": "Monaco",
+    "description": "address: Neptune Monaco Beach, Monaco-Ville, MonakoEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-monaco-2Chat: https://t.me/+G4HJGaXFsuxh",
+    "coords": [
+      7.4332049,
+      43.7461723
+    ],
+    "key": "monaco-492",
+    "country": "492"
+  },
+  {
+    "name": "Monterrey",
+    "description": "address: LaCuraduria, Calle Hidalgo Nte, La Fama, Ciudad Santa Catarina, N.L., MéxicoEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-monter",
+    "coords": [
+      -100.4227627,
+      25.6698271
+    ],
+    "key": "monterrey-484",
+    "country": "484"
+  },
+  {
+    "name": "Montevideo",
+    "description": "address: Roderichs Crypto House - Transferencias Cripto Seguras - Exchange Activos Digitales, Doctor Mario Cassinoni, Montevideo Departamento de Montevideo, Uru",
+    "coords": [
+      -56.1661267,
+      -34.8966888
+    ],
+    "key": "montevideo-858",
+    "country": "858"
+  },
+  {
+    "name": "Montgomery, AL",
+    "description": "address: 39 Dexter Avenue, Montgomery, AL, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-montgomeryChat: https://t.me/+2Uq2tmJtvuYwNzQ",
+    "coords": [
+      -86.3081585,
+      32.3778754
+    ],
+    "key": "montgomery-al-840",
+    "country": "840"
+  },
+  {
+    "name": "Montreal",
+    "description": "address: Brigade pizzeria Montreal (Stanley), Stanley Street, Montreal, QC, CanadaEvent Link: https://app.unlock-protocol.com/event/bitcoin-pizza-day-2025-in-mo",
+    "coords": [
+      -73.5744414,
+      45.4995395
+    ],
+    "key": "montreal-124",
+    "country": "124"
+  },
+  {
+    "name": "Moscow",
+    "description": "address: Депо \"Три Вокзала\", Ооо, Новорязанская улица, Москва, РоссияEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-moscowChat: https://t.",
+    "coords": [
+      37.6632006,
+      55.7723362
+    ],
+    "key": "moscow-643",
+    "country": "643"
+  },
+  {
+    "name": "Mt. Rainier",
+    "description": "address: 3311 Rhode Island Avenue, Mount Rainier, MD, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-mt-rainerChat: https://t.me/+bgUeO",
+    "coords": [
+      -76.9611139,
+      38.9358945
+    ],
+    "key": "mt-rainier-840",
+    "country": "840"
+  },
+  {
+    "name": "Mumbai",
+    "description": "address: Mumbai, Maharashtra, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-mumbai-cityChat: https://t.me/+h9Bcpt-O94g5MTQxCountry: ",
+    "coords": [
+      72.8776559,
+      19.0759837
+    ],
+    "key": "mumbai-356",
+    "country": "356"
+  },
+  {
+    "name": "Munich",
+    "description": "address: Impact Hub Munich, Gotzinger Straße, Munich, GermanyEvent Link: https://app.unlock-protocol.com/event/pizza-party-munich-2025-1Chat: https://t.me/+Ln0I",
+    "coords": [
+      11.5502336,
+      48.1213828
+    ],
+    "key": "munich-276",
+    "country": "276"
+  },
+  {
+    "name": "Mwanza",
+    "description": "address: The Breeze, Mwanza, TanzaniaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-mwanza-37Chat: https://t.me/+KPm9D-X2GExiNzcxCountry: ",
+    "coords": [
+      32.9409494,
+      -2.4764339
+    ],
+    "key": "mwanza-834",
+    "country": "834"
+  },
+  {
+    "name": "Mysore",
+    "description": "address: PIZZAIOLO, Gokulam Main Road, Jayalakshmipuram, Mysuru, Karnataka, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-mysoreChat",
+    "coords": [
+      76.6228453,
+      12.3228911
+    ],
+    "key": "mysore-356",
+    "country": "356"
+  },
+  {
+    "name": "Nagpur",
+    "description": "address: ZINQ - Kitchen. Bar. Bistro, beside Hislop College Road, Dobhi Nagar, Civil Lines, Nagpur, Maharashtra, IndiaEvent Link: https://app.unlock-protocol.co",
+    "coords": [
+      79.070747,
+      21.1482445
+    ],
+    "key": "nagpur-356",
+    "country": "356"
+  },
+  {
+    "name": "Naples",
+    "description": "address: Vico Lungo Teatro Nuovo, 39, 80134 Napoli, NA, ItalyEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-naples-1Chat: https://t.me/+VZ",
+    "coords": [
+      14.2476744,
+      40.8416432
+    ],
+    "key": "naples-380",
+    "country": "380"
+  },
+  {
+    "name": "Nashik",
+    "description": "address: The D Pizza, College Road, Yeolekar Mala, Ramdas Colony, Nashik, Maharashtra, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party",
+    "coords": [
+      73.7638187,
+      20.0038683
+    ],
+    "key": "nashik-356",
+    "country": "356"
+  },
+  {
+    "name": "Nashville",
+    "description": "address: 1401 4th Avenue South, Nashville, TN, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-nashville-tennessee-1Chat: https://t.me/+",
+    "coords": [
+      -86.76354,
+      36.1399265
+    ],
+    "key": "nashville-840",
+    "country": "840"
+  },
+  {
+    "name": "Natal",
+    "description": "address: Cervejaria Resistência - Rua Leonora Armstrong - Ponta Negra, Natal - RN, BrasilEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-na",
+    "coords": [
+      -35.1801767,
+      -5.8739825
+    ],
+    "key": "natal-076",
+    "country": "076"
+  },
+  {
+    "name": "Neath",
+    "description": "address: The Duke Of Wellington, 8 Old Market St, Neath SA11 3NA, UKEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-neathChat: https://t.me",
+    "coords": [
+      -3.8035579,
+      51.6644636
+    ],
+    "key": "neath-826",
+    "country": "826"
+  },
+  {
+    "name": "Network State",
+    "description": "address: Forest City Marina Hotel, Pulau Satu, Gelang Patah, Johor, MalesiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-network-school-1",
+    "coords": [
+      103.5938319,
+      1.3359945
+    ],
+    "key": "network-state-458",
+    "country": "458"
+  },
+  {
+    "name": "New Haven",
+    "description": "address: 410 Blake St #5, New Haven, CT 06515, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-new-haven-2Chat: https://t.me/+X91wtHELfV",
+    "coords": [
+      -72.9564474,
+      41.3281905
+    ],
+    "key": "new-haven-840",
+    "country": "840"
+  },
+  {
+    "name": "New Orleans",
+    "description": "address: The Nieux, Saint Charles Avenue, New Orleans, LA, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-new-orleansChat: https://t.me",
+    "coords": [
+      -90.0790581,
+      29.9343354
+    ],
+    "key": "new-orleans-840",
+    "country": "840"
+  },
+  {
+    "name": "New York City",
+    "description": "address: Racket NYC, West 16th Street, New York, NY, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-2025-nycChat: https://t.me/+GqDSZQk",
+    "coords": [
+      -74.0057291,
+      40.7430869
+    ],
+    "key": "new-york-city-840",
+    "country": "840"
+  },
+  {
+    "name": "Noida",
+    "description": "address: Technopolis IT Hub, C Block, Phase 2, Industrial Area, Sector 62, Noida, Uttar Pradesh, IndiaEvent Link: https://app.unlock-protocol.com/event/global-p",
+    "coords": [
+      77.3634592,
+      28.6134206
+    ],
+    "key": "noida-356",
+    "country": "356"
+  },
+  {
+    "name": "Nsukka",
+    "description": "address: University Of Nigeria Nsukka Bookshop, Nsukka, NigeriaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-nsukkaChat: https://t.me/+rT",
+    "coords": [
+      7.4068594,
+      6.8628471
+    ],
+    "key": "nsukka-566",
+    "country": "566"
+  },
+  {
+    "name": "Numazu",
+    "description": "address: 日本、静岡県沼津市高島町２８−１５ わたらいクリーニング・ぬまつー(仮)基地Event Link: https://app.unlock-protocol.com/event/global-pizza-party-in-numazu-pizza-dao-1Chat: https://t.me/+PNE",
+    "coords": [
+      138.8582131,
+      35.1061054
+    ],
+    "key": "numazu-392",
+    "country": "392"
+  },
+  {
+    "name": "Oakland",
+    "description": "address: Square Pie Guys, Dr Huey P. Newton Wy, 9th Street, Oakland, CA, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-oaklandChat: ht",
+    "coords": [
+      -122.2745325,
+      37.8012082
+    ],
+    "key": "oakland-840",
+    "country": "840"
+  },
+  {
+    "name": "Ojeda",
+    "description": "address: Pizza House Club, Ciudad Ojeda, Zulia, VenezuelaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-ojeda-4Chat: https://t.me/+oxLXGv7",
+    "coords": [
+      -71.3196223,
+      10.2033069
+    ],
+    "key": "ojeda-862",
+    "country": "862"
+  },
+  {
+    "name": "Oklahoma City",
+    "description": "address: 2200 N Bryant Ave, Oklahoma City, OK 73121, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-oklahoma-cityChat: https://t.me/+yQ",
+    "coords": [
+      -97.4586773,
+      35.4912589
+    ],
+    "key": "oklahoma-city-840",
+    "country": "840"
+  },
+  {
+    "name": "Olomouc",
+    "description": "address: Long Story Short Hostel, Koželužská, Olomouc 9, CzechiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-olomoucChat: https://t.me/+",
+    "coords": [
+      17.2582576,
+      49.5978962
+    ],
+    "key": "olomouc-203",
+    "country": "203"
+  },
+  {
+    "name": "Omaha",
+    "description": "address: Williamsburg Pizza Omaha, Audrey Street, Omaha, NE, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-omaha-1Chat: https://t.me/+",
+    "coords": [
+      -96.1786168,
+      41.1890636
+    ],
+    "key": "omaha-840",
+    "country": "840"
+  },
+  {
+    "name": "Orlando",
+    "description": "address: 150 South Magnolia Avenue, Orlando, FL, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-orlandoChat: https://t.me/+MJXe-gLvWp1k",
+    "coords": [
+      -81.377648,
+      28.540765
+    ],
+    "key": "orlando-840",
+    "country": "840"
+  },
+  {
+    "name": "Oslo",
+    "description": "address: Brugata 17, Oslo, NorwayEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-oslo-2Chat: Country: NorwayRegion: Western Europe",
+    "coords": [
+      10.7575618,
+      59.9136992
+    ],
+    "key": "oslo-578",
+    "country": "578"
+  },
+  {
+    "name": "Osogbo",
+    "description": "address: Osogbo NigeriaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-osogboChat: https://t.me/+uhZa8PpO4wg0YzkxCountry: NigeriaRegion: Af",
+    "coords": [
+      4.5418141,
+      7.7826709
+    ],
+    "key": "osogbo-566",
+    "country": "566"
+  },
+  {
+    "name": "Ottawa",
+    "description": "address: Happy Fish Elgin, Elgin Street, Ottawa, ON, CanadaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-ottawa-2025Chat: https://t.me/+2",
+    "coords": [
+      -75.6889807,
+      45.4159778
+    ],
+    "key": "ottawa-124",
+    "country": "124"
+  },
+  {
+    "name": "Ouagadougou",
+    "description": "address: RESTAURANT THE NILE, Ouagadougou, Burkina FasoEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-ouagadougou-12Chat: https://t.me/+oF",
+    "coords": [
+      -1.4795418,
+      12.3931732
+    ],
+    "key": "ouagadougou-854",
+    "country": "854"
+  },
+  {
+    "name": "Owerri",
+    "description": "address: The Pizza Jungle, Owerri - Orlu Road, Owerri, NigeriaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-owerriChat: Country: NigeriaR",
+    "coords": [
+      7.0254866,
+      5.496276
+    ],
+    "key": "owerri-566",
+    "country": "566"
+  },
+  {
+    "name": "Pachuca",
+    "description": "address: Avenida Piracantos 1507, Fraccionamiento Alborada, Pachuca de Soto, Hgo., MéxicoEvent Link: https://app.unlock-protocol.com/event/blobal-pizza-party-pa",
+    "coords": [
+      -98.7734285,
+      20.1142391
+    ],
+    "key": "pachuca-484",
+    "country": "484"
+  },
+  {
+    "name": "Palermo",
+    "description": "address: Arte e Tradizione, Via Santa Teresa, 2, 90133 Palermo, PA, ItaliaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-palermoChat: http",
+    "coords": [
+      13.3726417,
+      38.115594
+    ],
+    "key": "palermo-380",
+    "country": "380"
+  },
+  {
+    "name": "Palm Beach",
+    "description": "address: Copperpoint Brewing Company, Commerce Road, Boynton Beach, FL, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-boynton-beachCha",
+    "coords": [
+      -80.0730631,
+      26.5591793
+    ],
+    "key": "palm-beach-840",
+    "country": "840"
+  },
+  {
+    "name": "Palo Alto",
+    "description": "address: Heritage Park, Homer Avenue, Palo Alto, CA, USAEvent Link: https://app.unlock-protocol.com/event/slices-chains-bitcoin-pizza-day-special-1Chat: https:/",
+    "coords": [
+      -122.1567263,
+      37.4444161
+    ],
+    "key": "palo-alto-840",
+    "country": "840"
+  },
+  {
+    "name": "Panama City",
+    "description": "address: Rock&Folk PTY, Calle 49 Este, Panama City, PanamaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-panama-cityChat: https://t.me/+hh",
+    "coords": [
+      -79.525751,
+      8.9784539
+    ],
+    "key": "panama-city-591",
+    "country": "591"
+  },
+  {
+    "name": "Papeete",
+    "description": "address: Jardin de Paofai, Papeete, Polynésie françaiseEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-papeeteChat: https://t.me/+qMxQM8diA",
+    "coords": [
+      -149.5753998,
+      -17.5428967
+    ],
+    "key": "papeete-258",
+    "country": "258"
+  },
+  {
+    "name": "Paris",
+    "description": "address: Paris FranceEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-paris-1Chat: https://t.me/+OXkspPnYexhhYmExCountry: FranceRegion: West",
+    "coords": [
+      2.3513765,
+      48.8575475
+    ],
+    "key": "paris-250",
+    "country": "250"
+  },
+  {
+    "name": "Patna",
+    "description": "address: Rare Window, More, beside Kamini Center, Patliputra Colony, Patna, Bihar, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-pat",
+    "coords": [
+      85.1086817,
+      25.6219931
+    ],
+    "key": "patna-356",
+    "country": "356"
+  },
+  {
+    "name": "Pensacola",
+    "description": "address: 5 Via De Luna Dr suite g, Pensacola Beach, Gulf Breeze, FL 32561, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-pensacola-flo",
+    "coords": [
+      -87.1373569,
+      30.3345948
+    ],
+    "key": "pensacola-840",
+    "country": "840"
+  },
+  {
+    "name": "Petrozavodsk",
+    "description": "address: улица Кирова, 2, Петрозаводск, РоссияEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-in-petrozavodsk-progress-club-1Chat: https://",
+    "coords": [
+      34.3757792,
+      61.7881509
+    ],
+    "key": "petrozavodsk-643",
+    "country": "643"
+  },
+  {
+    "name": "Philadelphia",
+    "description": "address: Indy Hall Clubhouse, North 2nd Street, Philadelphia, PA, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-philadelphiaChat: http",
+    "coords": [
+      -75.1409133,
+      39.9622373
+    ],
+    "key": "philadelphia-840",
+    "country": "840"
+  },
+  {
+    "name": "Phnom Penh",
+    "description": "address: Limoncello Pizzeria., Samdach Phuong St. (264), Phnom Penh, CambodiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-phnom-penhChat",
+    "coords": [
+      104.9306996,
+      11.558466
+    ],
+    "key": "phnom-penh-116",
+    "country": "116"
+  },
+  {
+    "name": "Phoenix",
+    "description": "address: Flavor Eatery and Lounge, South Mill Avenue, Tempe, AZ, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-phoenix-4Chat: https://",
+    "coords": [
+      -111.9407967,
+      33.4266296
+    ],
+    "key": "phoenix-840",
+    "country": "840"
+  },
+  {
+    "name": "Phuket",
+    "description": "address: MARNI, Montri Road, Talad yai, Mueang Phuket District, Phuket, ThailandEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-phuketChat:",
+    "coords": [
+      98.3921388,
+      7.8812181
+    ],
+    "key": "phuket-764",
+    "country": "764"
+  },
+  {
+    "name": "Piura",
+    "description": "address: GOTINI PIZZA & GRILL, Piura, PerúEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-piuraChat: Country: PeruRegion: South America",
+    "coords": [
+      -80.6604727,
+      -5.168176
+    ],
+    "key": "piura-604",
+    "country": "604"
+  },
+  {
+    "name": "Port Harcourt",
+    "description": "address: Port Harcourt NigeriaEvent Link: https://app.unlock-protocol.com/event/bitcoin-pizza-day-ph-1Chat: https://t.me/+s4A7qfjC6ZxhYTY5Country: NigeriaRegion",
+    "coords": [
+      6.974604,
+      4.8472226
+    ],
+    "key": "port-harcourt-566",
+    "country": "566"
+  },
+  {
+    "name": "Portland ME",
+    "description": "address: Brickyard Hollow Brewing Company, Commercial Street, Portland, ME, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-portland-mai",
+    "coords": [
+      -70.248928,
+      43.6591401
+    ],
+    "key": "portland-me-840",
+    "country": "840"
+  },
+  {
+    "name": "Portland Oregon",
+    "description": "address: openHAUS coworking + shared workspace, Northeast Martin Luther King Junior Boulevard, Portland, OR, USAEvent Link: https://app.unlock-protocol.com/even",
+    "coords": [
+      -122.6611259,
+      45.5594196
+    ],
+    "key": "portland-oregon-840",
+    "country": "840"
+  },
+  {
+    "name": "Porto Alegre",
+    "description": "address: Rua Olavo Bilac, 251 - Azenha, Porto Alegre - RS, BrasilEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-porto-alegreChat: https://",
+    "coords": [
+      -51.2167792,
+      -30.0429928
+    ],
+    "key": "porto-alegre-076",
+    "country": "076"
+  },
+  {
+    "name": "Portoviejo",
+    "description": "address: Iglesia Fuente de Paz, C. Alamos, Portoviejo, EcuadorEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-portoviejoChat: https://t.me/",
+    "coords": [
+      -80.4630165,
+      -1.0403158
+    ],
+    "key": "portoviejo-218",
+    "country": "218"
+  },
+  {
+    "name": "Prague",
+    "description": "address: Cross Club, Plynární, Praha 7-Holešovice, ČeskoEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-5th-bitcoin-pizza-day-pragueChat: h",
+    "coords": [
+      14.4433027,
+      50.1081734
+    ],
+    "key": "prague-203",
+    "country": "203"
+  },
+  {
+    "name": "Prayagraj",
+    "description": "address: INCOLA'S PIZZA, Naini, Prayagraj, Uttar Pradesh, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-prayagrajChat: https://t.me/",
+    "coords": [
+      81.8636412,
+      25.3916093
+    ],
+    "key": "prayagraj-356",
+    "country": "356"
+  },
+  {
+    "name": "Prilep",
+    "description": "address: Monarca Gastrobar, Orde Kabeco, Prilep, Macedonia del NordEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-prilepChat: https://t.me",
+    "coords": [
+      21.5497213,
+      41.344502
+    ],
+    "key": "prilep-807",
+    "country": "807"
+  },
+  {
+    "name": "Providence",
+    "description": "address: 378 Main St, East Greenwich, RI, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-providence-1Chat: https://t.me/+cZm6wCyBFe9jZD",
+    "coords": [
+      -71.4501793,
+      41.6585215
+    ],
+    "key": "providence-840",
+    "country": "840"
+  },
+  {
+    "name": "Puebla",
+    "description": "address: Thinkhub Coworking, Vía Atlixcáyotl, Reserva Territorial Atlixcáyotl, Villas de Atlixco, San Bernardino Tlaxcalancingo, Pue., MéxicoEvent Link: https:/",
+    "coords": [
+      -98.2365828,
+      19.0258812
+    ],
+    "key": "puebla-484",
+    "country": "484"
+  },
+  {
+    "name": "Pune",
+    "description": "address: Da Nonna's Pizzeria, Doctor Ketkar Road, Shreeman Society, Shivaji Nagar, Deccan Gymkhana, Pune, Maharashtra, IndiaEvent Link: https://app.unlock-proto",
+    "coords": [
+      73.833697,
+      18.5178704
+    ],
+    "key": "pune-356",
+    "country": "356"
+  },
+  {
+    "name": "Punta del Este",
+    "description": "address: Este Lugar, Lourdes, Punta del Este Departamento de Maldonado, UruguayEvent Link: https://app.unlock-protocol.com/event/btc-pizza-day-on-este-lugarChat",
+    "coords": [
+      -54.9411989,
+      -34.9286418
+    ],
+    "key": "punta-del-este-858",
+    "country": "858"
+  },
+  {
+    "name": "Quetzaltenango",
+    "description": "address: Pizza Project | Detroit Style en Guatemala, Quetzaltenango, GuatemalaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-2025-xela-que",
+    "coords": [
+      -91.5253458,
+      14.8494017
+    ],
+    "key": "quetzaltenango-320",
+    "country": "320"
+  },
+  {
+    "name": "Quezon",
+    "description": "address: 51 Magiting, Diliman, Quezon City, Metro Manila, PhilippinesEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-quezonChat: https://t.",
+    "coords": [
+      121.0597234,
+      14.6470271
+    ],
+    "key": "quezon-608",
+    "country": "608"
+  },
+  {
+    "name": "Quito",
+    "description": "address: IMPAQTO Coworking- La Carolina, y, Quito, EcuadorEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-quito-2025Chat: https://t.me/+a4w",
+    "coords": [
+      -78.4811699,
+      -0.1788172
+    ],
+    "key": "quito-218",
+    "country": "218"
+  },
+  {
+    "name": "Raipur",
+    "description": "address: Nukkad's Bihan Cafe, VIP Road, Raipur, Chhattisgarh, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-raipur-1Chat: https://t.",
+    "coords": [
+      81.6994135,
+      21.211191
+    ],
+    "key": "raipur-356",
+    "country": "356"
+  },
+  {
+    "name": "Rajkot",
+    "description": "address: Pizza Zone, AP Park, Nana Mava, Rajkot, Gujarat, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-rajkotChat: Country: IndiaRe",
+    "coords": [
+      70.7763103,
+      22.2788408
+    ],
+    "key": "rajkot-356",
+    "country": "356"
+  },
+  {
+    "name": "Ranchi",
+    "description": "address: Little Italiano, Hotel Yuvraj, near Rajendra Chowk, Forest Officers' Colony, Doranda, Ranchi, Jharkhand, IndiaEvent Link: https://app.unlock-protocol.c",
+    "coords": [
+      85.3253727,
+      23.3443301
+    ],
+    "key": "ranchi-356",
+    "country": "356"
+  },
+  {
+    "name": "Reading",
+    "description": "address: Spencers Wood, Reading, UKEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-readingChat: https://t.me/+ShPIN5zPxWw5ZTQxCountry: Unit",
+    "coords": [
+      -0.9697061,
+      51.3948166
+    ],
+    "key": "reading-826",
+    "country": "826"
+  },
+  {
+    "name": "Red River Gorge",
+    "description": "address: Miguel's Pizza, Natural Bridge Road, Slade, KY, USAEvent Link: https://app.unlock-protocol.com/event/miguels-x-pizza-dao-global-pizza-partyChat: https:",
+    "coords": [
+      -83.6828738,
+      37.7830532
+    ],
+    "key": "red-river-gorge-840",
+    "country": "840"
+  },
+  {
+    "name": "Richmond Virginia",
+    "description": "address: Black Iris Social Club, West Broad Street, Richmond, VA, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-2025Chat: https://t.me",
+    "coords": [
+      -77.4454642,
+      37.5473329
+    ],
+    "key": "richmond-virginia-840",
+    "country": "840"
+  },
+  {
+    "name": "Rio Claro",
+    "description": "address: Avenida 57, 1323 - Jardim Kennedy, Rio Claro - State of São Paulo, BrazilEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-rio-claro",
+    "coords": [
+      -47.565686,
+      -22.4366498
+    ],
+    "key": "rio-claro-076",
+    "country": "076"
+  },
+  {
+    "name": "Rio de Janeiro",
+    "description": "address: Porto Maravalley - Avenida Professor Pereira Reis - Santo Cristo, Rio de Janeiro - RJ, BrasilEvent Link: https://app.unlock-protocol.com/event/global-p",
+    "coords": [
+      -43.2039592,
+      -22.8980602
+    ],
+    "key": "rio-de-janeiro-076",
+    "country": "076"
+  },
+  {
+    "name": "Rivera",
+    "description": "address: La Tuna Empanadas & Bistro, José Enrique Rodó, Rivera Departamento de Rivera, UruguayEvent Link: https://app.unlock-protocol.com/event/global-pizza-par",
+    "coords": [
+      -55.5406398,
+      -30.9017976
+    ],
+    "key": "rivera-858",
+    "country": "858"
+  },
+  {
+    "name": "Rome",
+    "description": "address: Urbe Hub, Largo Dino Frisullo, Roma, RM, ItaliaEvent Link: https://app.unlock-protocol.com/event/pizza-day-rome-3Chat: https://t.me/+dR9DUtKAmp4xY2IxCo",
+    "coords": [
+      12.4721642,
+      41.8743579
+    ],
+    "key": "rome-380",
+    "country": "380"
+  },
+  {
+    "name": "Roorkee",
+    "description": "address: The White Rabbit, Boat Club Road, near axis bank, Civil Lines, Roorkee, Uttarakhand, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizz",
+    "coords": [
+      77.8871471,
+      29.8689368
+    ],
+    "key": "roorkee-356",
+    "country": "356"
+  },
+  {
+    "name": "Rosario",
+    "description": "address: Mitico bar, Oroño Boulevard, Rosario, Santa Fe Province, ArgentinaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-rosario-1Chat: h",
+    "coords": [
+      -60.651064,
+      -32.9356859
+    ],
+    "key": "rosario-032",
+    "country": "032"
+  },
+  {
+    "name": "Rourkela",
+    "description": "address: Moksha, Kachery Road, Udit Nagar, Rourkela, Odisha, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-rourkelaChat: Country: In",
+    "coords": [
+      84.8625107,
+      22.2247772
+    ],
+    "key": "rourkela-356",
+    "country": "356"
+  },
+  {
+    "name": "Sacramento",
+    "description": "address: Giovanni's Old World New York Pizzeria, Folsom Boulevard, Sacramento, CA, USAEvent Link: https://app.unlock-protocol.com/event/bitcoin-pizza-party-sacr",
+    "coords": [
+      -121.430473,
+      38.5551526
+    ],
+    "key": "sacramento-840",
+    "country": "840"
+  },
+  {
+    "name": "Saint Petersburg",
+    "description": "address: OVERSIZE pizza club, Гражданская улица, Санкт-Петербург, РоссияEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-st-petersburgChat: ",
+    "coords": [
+      30.3123668,
+      59.9284705
+    ],
+    "key": "saint-petersburg-643",
+    "country": "643"
+  },
+  {
+    "name": "Salamá",
+    "description": "address: El Puente, Salamá, GuatemalaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-salamChat: https://t.me/+QTj4EN2BMu9hNzBhCountry: Guat",
+    "coords": [
+      -90.3174881,
+      15.1041633
+    ],
+    "key": "salama-320",
+    "country": "320"
+  },
+  {
+    "name": "Salt Lake City",
+    "description": "address: Velvet Headquarters, Pierpont Avenue, Salt Lake City, UT, USAEvent Link: https://app.unlock-protocol.com/event/pizza-slcChat: https://t.me/+WD_p-cvJKBQ",
+    "coords": [
+      -111.9018061,
+      40.7636404
+    ],
+    "key": "salt-lake-city-840",
+    "country": "840"
+  },
+  {
+    "name": "Salvador Bahia",
+    "description": "address: R. da Fonte do Boi, 5 - Rio Vermelho, Salvador - Bahia, BrasilEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-bahia-crypto-hubChat",
+    "coords": [
+      -38.4858752,
+      -13.0140475
+    ],
+    "key": "salvador-bahia-076",
+    "country": "076"
+  },
+  {
+    "name": "San Carlos",
+    "description": "address: Carmel's Inn and Restaurant, San Carlos City, Negros Occidental, PhilippinesEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-san-ca",
+    "coords": [
+      123.413646,
+      10.4837646
+    ],
+    "key": "san-carlos-608",
+    "country": "608"
+  },
+  {
+    "name": "San Diego",
+    "description": "address: The Sandbox, Garnet Avenue, San Diego, CA, USAEvent Link: https://app.unlock-protocol.com/event/san-diego-x-pizza-dao-global-pizza-party-1Chat: https:/",
+    "coords": [
+      -117.2431943,
+      32.7994321
+    ],
+    "key": "san-diego-840",
+    "country": "840"
+  },
+  {
+    "name": "San Francisco",
+    "description": "address: Frontier Tower | Berlinhouse, Market Street, San Francisco, CA, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-san-francisco-1",
+    "coords": [
+      -122.4099607,
+      37.7822672
+    ],
+    "key": "san-francisco-840",
+    "country": "840"
+  },
+  {
+    "name": "San Juan",
+    "description": "address: Miramar 101, Centro de Seguros, Avenida Juan Ponce de León, San Juan, Puerto RicoEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-s",
+    "coords": [
+      -66.0833495,
+      18.4562249
+    ],
+    "key": "san-juan-630",
+    "country": "630"
+  },
+  {
+    "name": "San Pedro de Sula",
+    "description": "address: AQV, 9 Calle South, San Pedro Sula, HondurasEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-san-pedro-sulaChat: https://t.me/+TT8z",
+    "coords": [
+      -88.0423737,
+      15.5007417
+    ],
+    "key": "san-pedro-de-sula-340",
+    "country": "340"
+  },
+  {
+    "name": "San Salvador",
+    "description": "address: Simmer Down • Sivar, Bulevar Del Hipodromo, San Salvador, El SalvadorEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-san-salvador-",
+    "coords": [
+      -89.2437251,
+      13.692928
+    ],
+    "key": "san-salvador-222",
+    "country": "222"
+  },
+  {
+    "name": "Santa Barbara",
+    "description": "address: 17 W Ortega St, Santa Barbara, CA 93101, USAEvent Link: https://app.unlock-protocol.com/event/santa-barbara-pizza-party-1Chat: https://t.me/+i_bI6WuiBi",
+    "coords": [
+      -119.6984853,
+      34.417947
+    ],
+    "key": "santa-barbara-840",
+    "country": "840"
+  },
+  {
+    "name": "Santiago",
+    "description": "address: Avenida Vicuña Mackenna 7320, La Florida, ChileEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-santiago-5Chat: https://t.me/+oAq1W",
+    "coords": [
+      -70.6016955,
+      -33.5210961
+    ],
+    "key": "santiago-152",
+    "country": "152"
+  },
+  {
+    "name": "Sao Paulo",
+    "description": "address: Bless Skateshop & BarberShop - Santana - Rua Ezequiel Freire - Santana, São Paulo - SP, BrasilEvent Link: https://app.unlock-protocol.com/event/global-",
+    "coords": [
+      -46.6234411,
+      -23.500052
+    ],
+    "key": "sao-paulo-076",
+    "country": "076"
+  },
+  {
+    "name": "Saskatoon",
+    "description": "address: 505a Nelson Rd, Saskatoon, SK S7S 1P4, CanadaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-saskatoon-1Chat: https://t.me/+LjPOB1",
+    "coords": [
+      -106.568746,
+      52.1508292
+    ],
+    "key": "saskatoon-124",
+    "country": "124"
+  },
+  {
+    "name": "Seattle",
+    "description": "address: Stoup Brewing - Capitol Hill, Broadway, Seattle, WA, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-seattleChat: https://t.me/",
+    "coords": [
+      -122.3205222,
+      47.6127981
+    ],
+    "key": "seattle-840",
+    "country": "840"
+  },
+  {
+    "name": "Seoul",
+    "description": "address: 823-21 Yeoksam-dong, Gangnam District, Seoul, South KoreaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-seoul-2Chat: https://t.me",
+    "coords": [
+      127.0323061,
+      37.4990532
+    ],
+    "key": "seoul-410",
+    "country": "410"
+  },
+  {
+    "name": "Shahjahanpur",
+    "description": "address: D.S.VIRK TOWER, near Ghanta Ghar, Ghanta Ghar, Shahjahanpur, Uttar Pradesh, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-s",
+    "coords": [
+      79.9112283,
+      27.8770174
+    ],
+    "key": "shahjahanpur-356",
+    "country": "356"
+  },
+  {
+    "name": "Shanghai",
+    "description": "address: 35 Yongjia Road, Huangpu, Shanghai, ChinaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-shanghai-1Chat: https://t.me/+BHjrUZdqcAc",
+    "coords": [
+      121.46311,
+      31.21064
+    ],
+    "key": "shanghai-156",
+    "country": "156"
+  },
+  {
+    "name": "Sharjah",
+    "description": "address: Madam Road - Sharjah - United Arab EmiratesEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-sharjah-3Chat: https://t.me/+Ie-FLlCfVh",
+    "coords": [
+      55.7157344,
+      24.9544532
+    ],
+    "key": "sharjah-784",
+    "country": "784"
+  },
+  {
+    "name": "Sheberghan",
+    "description": "address: Sheberghan, AfghanistanEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-sheberghanChat: Country: AfghanistanRegion: Middle East",
+    "coords": [
+      65.7490624,
+      36.6817149
+    ],
+    "key": "sheberghan-004",
+    "country": "004"
+  },
+  {
+    "name": "Shenzhen",
+    "description": "address: China, Guangdong Province, Shenzhen, Nanshan, Liyumen Street, 前海深港青年梦工场Event Link: https://app.unlock-protocol.com/event/pizza-dao-x-offchain-shenzhen-",
+    "coords": [
+      113.90172,
+      22.51806
+    ],
+    "key": "shenzhen-156",
+    "country": "156"
+  },
+  {
+    "name": "Shillong",
+    "description": "address: Tring Tring - Shillong, Police Bazar, Shillong, Meghalaya, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-shillongChat: http",
+    "coords": [
+      91.8868448,
+      25.5807491
+    ],
+    "key": "shillong-356",
+    "country": "356"
+  },
+  {
+    "name": "Shimla",
+    "description": "address: Cafe Simla Times : Cafe, Biergarten & Bar on the Mall Road Shimla ( Awarded Most Instagrammable Cafe of Himachal), the Cafe, Bemloi, Shimla, Himachal P",
+    "coords": [
+      77.1763075,
+      31.1009306
+    ],
+    "key": "shimla-356",
+    "country": "356"
+  },
+  {
+    "name": "Singapore",
+    "description": "address: Stamford Road, SMU Connexion, Active Learning Classroom 3-2 SingaporeEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-singapore-1Ch",
+    "coords": [
+      103.8496329,
+      1.2952203
+    ],
+    "key": "singapore-702",
+    "country": "702"
+  },
+  {
+    "name": "Siwan",
+    "description": "address: Siwan, Bihar, IndiaEvent Link: https://app.unlock-protocol.com/event/pizza-dao-siwan-1Chat: https://t.me/+9M30D9llBktkMzMxCountry: IndiaRegion: Asia",
+    "coords": [
+      84.3599953,
+      26.2243204
+    ],
+    "key": "siwan-356",
+    "country": "356"
+  },
+  {
+    "name": "Sofia",
+    "description": "address: Barter Community Hub, Sofia, BulgariaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-sofia-2Chat: https://t.me/+BzYbFevfR9k0NjVhCo",
+    "coords": [
+      23.3179759,
+      42.6615715
+    ],
+    "key": "sofia-100",
+    "country": "100"
+  },
+  {
+    "name": "Solukumbhu",
+    "description": "address: HighCamp Cafe, Namche Marg, Namche, NepalEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-solukumbhu-1Chat: https://t.me/+AlE5Q0DFN",
+    "coords": [
+      86.7105281,
+      27.8045263
+    ],
+    "key": "solukumbhu-524",
+    "country": "524"
+  },
+  {
+    "name": "Split",
+    "description": "address: The Rabbit Hole cafe&bar, rooseveltova, Split, HrvatskaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-split-1Chat: https://t.me/+",
+    "coords": [
+      16.4568058,
+      43.5022921
+    ],
+    "key": "split-191",
+    "country": "191"
+  },
+  {
+    "name": "Stockholm",
+    "description": "address: Deglabbet Vasastan, Upplandsgatan, Stockholm, SwedenEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-stockholm-1Chat: https://t.me/",
+    "coords": [
+      18.0537108,
+      59.33724
+    ],
+    "key": "stockholm-752",
+    "country": "752"
+  },
+  {
+    "name": "Surat",
+    "description": "address: La Milano Pizzeria, Surat - Kamrej Hwy, Sarthana Jakat Naka, Subhash Nagar, Nana Varachha, Surat, Khadsad, Gujarat 395006, IndiaEvent Link: https://app",
+    "coords": [
+      72.9028061,
+      21.2308476
+    ],
+    "key": "surat-356",
+    "country": "356"
+  },
+  {
+    "name": "Sydney",
+    "description": "address: Sydney AustraliaEvent Link: https://app.unlock-protocol.com/event/bitcoin-pizza-day-sydneyChat: https://t.me/+j_xPt-6TXgQ0NmRhCountry: AustraliaRegion:",
+    "coords": [
+      151.2092955,
+      -33.8688197
+    ],
+    "key": "sydney-036",
+    "country": "036"
+  },
+  {
+    "name": "Taipei",
+    "description": "address: 台湾台北市中山区玉门街Roos Pizza BarEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-taipeiChat: https://t.me/+ZxoowO2hW_tjYTMxCountry: Taiwan",
+    "coords": [
+      121.5220462,
+      25.0700938
+    ],
+    "key": "taipei-158",
+    "country": "158"
+  },
+  {
+    "name": "Tallinn",
+    "description": "address: Carlo’s Kitchen Porto Franco, Kai tänav, Tallinn, EstoniaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-2025-tallinnChat: https:/",
+    "coords": [
+      24.7558323,
+      59.4428714
+    ],
+    "key": "tallinn-233",
+    "country": "233"
+  },
+  {
+    "name": "Tamarindo",
+    "description": "address: Potrero Brewing Company, 100m Oeste de Bar La Perla, Ruta 911, Guanacaste Province, Playa Potrero, Costa RicaEvent Link: https://app.unlock-protocol.co",
+    "coords": [
+      -85.7697371,
+      10.4466332
+    ],
+    "key": "tamarindo-188",
+    "country": "188"
+  },
+  {
+    "name": "Tangier",
+    "description": "address: Iberia, Tangier, MoroccoEvent Link: https://app.unlock-protocol.com/event/pizza-dao-global-pizza-day-2025-tangierChat: https://t.me/+iHAnygD0L_Y1MGYxCo",
+    "coords": [
+      -5.8202208,
+      35.7807602
+    ],
+    "key": "tangier-504",
+    "country": "504"
+  },
+  {
+    "name": "Tatu",
+    "description": "address: Cascade Kitchens, Tatu City, Kiambu County Province, KenyaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-tatu-cityChat: https://t",
+    "coords": [
+      36.9064839,
+      -1.152199
+    ],
+    "key": "tatu-404",
+    "country": "404"
+  },
+  {
+    "name": "Tegucigalpa",
+    "description": "address: Vita Restaurante, Tegucigalpa, HondurasEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-tguChat: https://t.me/+S98DeFzxOIlmMjUxCoun",
+    "coords": [
+      -87.1843211,
+      14.0961331
+    ],
+    "key": "tegucigalpa-340",
+    "country": "340"
+  },
+  {
+    "name": "Tel Aviv",
+    "description": "address: Tel Aviv IsraelEvent Link: https://app.unlock-protocol.com/event/yalla-bitcoin-pizza-party?a=1Chat: https://t.me/+r4DLeAksHldkYjExCountry: IsraelRegion",
+    "coords": [
+      34.7817676,
+      32.0852999
+    ],
+    "key": "tel-aviv-376",
+    "country": "376"
+  },
+  {
+    "name": "Thiruvananthapuram",
+    "description": "address: Dotspace, Devaswom Board Junction, Pandits Colony Extension, Kowdiar, Thiruvananthapuram, Kerala, IndiaEvent Link: https://app.unlock-protocol.com/even",
+    "coords": [
+      76.9600097,
+      8.5193947
+    ],
+    "key": "thiruvananthapuram-356",
+    "country": "356"
+  },
+  {
+    "name": "Thrissur",
+    "description": "address: Thrissur IT Park, Mahatma Gandhi Road, Marar Road Area, Thrissur, Kerala, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-thr",
+    "coords": [
+      76.2097641,
+      10.5235714
+    ],
+    "key": "thrissur-356",
+    "country": "356"
+  },
+  {
+    "name": "Tirana",
+    "description": "address: The Taproom by Pan’s Microbrewery, Rruga Komuna e Parisit, Tiranë, AlbaniaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-tirana-4",
+    "coords": [
+      19.809874,
+      41.3212284
+    ],
+    "key": "tirana-008",
+    "country": "008"
+  },
+  {
+    "name": "Tokyo",
+    "description": "address: 日本、東京都渋谷区恵比寿南３丁目５−７ Crypto Cafe&Bar クリプトカフェアンドバーEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-tokyoChat: https://t.me/+5I5rAu6Ho",
+    "coords": [
+      139.7037819,
+      35.6461743
+    ],
+    "key": "tokyo-392",
+    "country": "392"
+  },
+  {
+    "name": "Tomas Morato",
+    "description": "address: CTTM SQUARE, Timog Avenue, Diliman, Quezon City, Metro Manila, PhilippinesEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-tomas-mo",
+    "coords": [
+      121.0355628,
+      14.634499
+    ],
+    "key": "tomas-morato-608",
+    "country": "608"
+  },
+  {
+    "name": "Toronto",
+    "description": "address: Christie Pits Park, Bloor Street West, Toronto, ON, CanadaEvent Link: https://app.unlock-protocol.com/event/2025-global-pizza-party-toronto-1Chat: http",
+    "coords": [
+      -79.4206753,
+      43.6645885
+    ],
+    "key": "toronto-124",
+    "country": "124"
+  },
+  {
+    "name": "Trujillo",
+    "description": "address: LA VANGUARDIA, Las Magnolias, Víctor Larco Herrera, PerúEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-trujillo-6Chat: https://t.",
+    "coords": [
+      -79.0383399,
+      -8.1310285
+    ],
+    "key": "trujillo-604",
+    "country": "604"
+  },
+  {
+    "name": "Tucson",
+    "description": "address: 6612 East Tanque Verde Road, Tucson, AZ, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-tucson-1Chat: https://t.me/+anxfwcEJIZ",
+    "coords": [
+      -110.8513752,
+      32.2466051
+    ],
+    "key": "tucson-840",
+    "country": "840"
+  },
+  {
+    "name": "Tucumcari",
+    "description": "address: Art City, 10134 New Mexico 104, Tucumcari, NM, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-tucumcariChat: https://t.me/+bY6",
+    "coords": [
+      -103.7721358,
+      35.2338349
+    ],
+    "key": "tucumcari-840",
+    "country": "840"
+  },
+  {
+    "name": "Tulum",
+    "description": "address: NFT BOUTIQUE, Tulum Centro, Colonia Huracanes, Tulum, Quintana Roo, MexicoEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-tulum-1C",
+    "coords": [
+      -87.4522712,
+      20.2104845
+    ],
+    "key": "tulum-484",
+    "country": "484"
+  },
+  {
+    "name": "Tunis",
+    "description": "address: Le Matignon, Rue Ibn Hazm, Tunis, TunisiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-tunisChat: https://t.me/+0F9F_J8xfYtiMWZh",
+    "coords": [
+      10.1787644,
+      36.8253242
+    ],
+    "key": "tunis-788",
+    "country": "788"
+  },
+  {
+    "name": "Udaipur",
+    "description": "address: Pizzeria by the lake (PBTL), Ambamata, Udaipur, Rajasthan, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-udaipur-1Chat: htt",
+    "coords": [
+      73.6770176,
+      24.5914585
+    ],
+    "key": "udaipur-356",
+    "country": "356"
+  },
+  {
+    "name": "Ulaanbaatar",
+    "description": "address: Sukhbaatar Street Elixir Coffee & Wine Bar, CHD - 1 khoroo, Ulaanbaatar, MongoliaEvent Link: https://app.unlock-protocol.com/event/global-pizza-day-ula",
+    "coords": [
+      106.9157785,
+      47.9196533
+    ],
+    "key": "ulaanbaatar-496",
+    "country": "496"
+  },
+  {
+    "name": "Vadodara",
+    "description": "address: The Brewery., BIDC Gorwa Estate, Gorwa, Vadodara, Gujarat 390003, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-vadodraChat",
+    "coords": [
+      73.1716354,
+      22.3250471
+    ],
+    "key": "vadodara-356",
+    "country": "356"
+  },
+  {
+    "name": "Valencia",
+    "description": "address: Startup Valencia, Base 2, La Marina de Valencia, Calle de la Travesía, Valencia, SpainEvent Link: https://app.unlock-protocol.com/event/global-pizza-pa",
+    "coords": [
+      -0.3290805,
+      39.4566529
+    ],
+    "key": "valencia-724",
+    "country": "724"
+  },
+  {
+    "name": "Valencia",
+    "description": "address: ZAVOOCLUB, Avenida Monseñor Adams, Valencia, Carabobo, VenezuelaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-valencia-6Chat: ht",
+    "coords": [
+      -68.0125005,
+      10.2141517
+    ],
+    "key": "valencia-862",
+    "country": "862"
+  },
+  {
+    "name": "Vanadzor",
+    "description": "address: 40.812778, 44.477278Event Link: https://app.unlock-protocol.com/event/global-pizza-party-vanadzor-101Chat: https://t.me/+vgsVb0Gw_Bs0MjdhCountry: Armen",
+    "coords": [
+      44.4773223,
+      40.8123507
+    ],
+    "key": "vanadzor-051",
+    "country": "051"
+  },
+  {
+    "name": "Vancouver",
+    "description": "address: 565 Great Northern Way, Vancouver, BC, CanadaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-vancouver-1Chat: https://t.me/+1h_LYj",
+    "coords": [
+      -123.0915527,
+      49.2671447
+    ],
+    "key": "vancouver-124",
+    "country": "124"
+  },
+  {
+    "name": "Varanasi",
+    "description": "address: Roma's Cafe Diner, near Ravidas Gate, Lanka, Varanasi, Uttar Pradesh, IndiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-varanas",
+    "coords": [
+      83.0032861,
+      25.2812364
+    ],
+    "key": "varanasi-356",
+    "country": "356"
+  },
+  {
+    "name": "Veracruz",
+    "description": "address: UV Facultad de Administracion, Calle Puesta del Sol, Vistamar, Veracruz, MéxicoEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-ver",
+    "coords": [
+      -96.1421,
+      19.1694941
+    ],
+    "key": "veracruz-484",
+    "country": "484"
+  },
+  {
+    "name": "Vienna",
+    "description": "address: Museum of Applied Arts, Stubenring, Vienna, AustriaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-viennaChat: https://t.me/+Z8xFw",
+    "coords": [
+      16.3815476,
+      48.2076148
+    ],
+    "key": "vienna-040",
+    "country": "040"
+  },
+  {
+    "name": "Vijayawada",
+    "description": "address: The Cowork Spaces - Benz Circle, Screw Bridge, beside National Highway 16, Patamatalanka, Vijayawada, Andhra Pradesh, IndiaEvent Link: https://app.unlo",
+    "coords": [
+      80.6505825,
+      16.4951088
+    ],
+    "key": "vijayawada-356",
+    "country": "356"
+  },
+  {
+    "name": "Vinnytsia",
+    "description": "address: Celentano, проспект Коцюбинського, Вінниця, Вінницька область, УкраїнаEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-vinnytsiaCha",
+    "coords": [
+      28.4905298,
+      49.2382211
+    ],
+    "key": "vinnytsia-804",
+    "country": "804"
+  },
+  {
+    "name": "Visakhapatnam",
+    "description": "address: Ciros pizzeria vizag, beside More Super Market, Dutt Island, Siripuram, Visakhapatnam, Andhra Pradesh, IndiaEvent Link: https://app.unlock-protocol.com",
+    "coords": [
+      83.3181152,
+      17.7240938
+    ],
+    "key": "visakhapatnam-356",
+    "country": "356"
+  },
+  {
+    "name": "Wa",
+    "description": "address: FUGITIVE PUB, Wa, GhanaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-wa-1Chat: https://t.me/+0G0yxQkwy1ZiOWQxCountry: GhanaRegio",
+    "coords": [
+      -2.4987027,
+      10.0455938
+    ],
+    "key": "wa-288",
+    "country": "288"
+  },
+  {
+    "name": "Warri",
+    "description": "address: MEGROASTY FOODS, DELTA, Hospital Road, Ekpan, NigeriaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-deltaChat: https://t.me/+le84",
+    "coords": [
+      5.7660534,
+      5.5628453
+    ],
+    "key": "warri-566",
+    "country": "566"
+  },
+  {
+    "name": "Warsaw",
+    "description": "address: Restauracja Giovanni Rubino, Krakowskie Przedmieście, Warsaw, PolandEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-warsaw-2Chat: ",
+    "coords": [
+      21.0137957,
+      52.2442561
+    ],
+    "key": "warsaw-616",
+    "country": "616"
+  },
+  {
+    "name": "Washington DC",
+    "description": "address: Wunder Garten, First Street Northeast, Washington, DC, USAEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-washington-d-cChat: http",
+    "coords": [
+      -77.0054177,
+      38.9039902
+    ],
+    "key": "washington-dc-840",
+    "country": "840"
+  },
+  {
+    "name": "Waterloo",
+    "description": "address: 333 King Street North, Waterloo, ON, CanadaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-waterlooChat: https://t.me/+37Ad0EN10OR",
+    "coords": [
+      -80.5260567,
+      43.4796084
+    ],
+    "key": "waterloo-124",
+    "country": "124"
+  },
+  {
+    "name": "Wayanad",
+    "description": "address: Crossroads hostel, Varadoor - Kallenchira Palam Road, Kaniyambetta, Kalpetta, Kerala, IndiaEvent Link: https://app.unlock-protocol.com/event/global-piz",
+    "coords": [
+      76.10213,
+      11.6975847
+    ],
+    "key": "wayanad-356",
+    "country": "356"
+  },
+  {
+    "name": "Windhoek",
+    "description": "address: Windhoek, NamibiaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-windhoekChat: https://t.me/+a7we9IRuu_FkY2ExCountry: NamibiaRegio",
+    "coords": [
+      17.0842147,
+      -22.5649344
+    ],
+    "key": "windhoek-516",
+    "country": "516"
+  },
+  {
+    "name": "Yangon",
+    "description": "address: Impact Hub Yangon, Inya Yeiktha Street, Yangon, Myanmar (Burma)Event Link: https://app.unlock-protocol.com/event/global-pizza-party-yangon-2Chat: https",
+    "coords": [
+      96.1553514,
+      16.8380111
+    ],
+    "key": "yangon-104",
+    "country": "104"
+  },
+  {
+    "name": "Yenagoa",
+    "description": "address: Ebitare Hotels, Yenagoa, NigeriaEvent Link: https://app.unlock-protocol.com/event/global-bitcoin-pizza-day-bayelsaChat: https://t.me/+yZkp7kEtqVNiOWVhC",
+    "coords": [
+      6.3158357,
+      4.9398577
+    ],
+    "key": "yenagoa-566",
+    "country": "566"
+  },
+  {
+    "name": "Yerevan",
+    "description": "address: Meridian Exhibition Center, Voskerichneri Street, Yerevan, ArmeniaEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-yerevan-3Chat: h",
+    "coords": [
+      44.5006263,
+      40.1672569
+    ],
+    "key": "yerevan-051",
+    "country": "051"
+  },
+  {
+    "name": "Zagreb",
+    "description": "address: HoB, Slavonska Avenija, Zagreb, HırvatistanEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-zagreb-2025-1Chat: https://t.me/+4f4f6b",
+    "coords": [
+      15.9699511,
+      45.7929353
+    ],
+    "key": "zagreb-191",
+    "country": "191"
+  },
+  {
+    "name": "Zug",
+    "description": "address: CV Labs Zug, Dammstrasse, Zug, SwitzerlandEvent Link: https://app.unlock-protocol.com/event/global-pizza-party-zug-1Chat: https://t.me/+N4Gs0Ki8fuE3NDE",
+    "coords": [
+      8.5146765,
+      47.1757579
+    ],
+    "key": "zug-756",
+    "country": "756"
+  }
+]

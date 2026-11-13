@@ -1,0 +1,698 @@
+/*
+ * Marketing site styles (pizzadao.org pages), imported only by app/(marketing)/layout.tsx.
+ *
+ * Ported from the marketing site's index.css and tailwind.config.ts (Tailwind 3). The app's own
+ * globals.css already carries the same colour tokens, fonts and many of the editorial utilities,
+ * so everything here is scoped under `.mk` (the marketing layout wrapper) and cannot change how an
+ * app page looks. Utilities Tailwind 4 names or sizes differently from Tailwind 3 are re-created
+ * under `.mk` below so the pages keep their original look.
+ */
+@reference "../globals.css";
+
+/*
+ * Marketing values of tokens the app defines slightly differently. Utilities read these variables
+ * (rounded-2xl is var(--radius-2xl)), so responsive and state variants keep working.
+ */
+.mk {
+  --tomato-deep: 0 70% 50%;
+  --muted-foreground: 0 0% 30%;
+  --ring: var(--ink);
+  --radius: 1rem;
+  /* Tailwind 3 radius scale (the marketing config re-pointed these to --radius). */
+  --radius-sm: calc(var(--radius) - 6px);
+  --radius-md: calc(var(--radius) - 4px);
+  --radius-lg: var(--radius);
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.5rem;
+  --radius-3xl: 2rem;
+  /* The marketing site sets every serif/sans utility to Asap. */
+  --font-serif: var(--font-sans), 'Asap', system-ui, sans-serif;
+}
+
+/* Tailwind 3 names that Tailwind 4 dropped or renamed, and the Tailwind 3 container. */
+@layer utilities {
+  .mk .backdrop-blur { backdrop-filter: blur(8px); }
+  .mk .outline-none { outline: 2px solid transparent; outline-offset: 2px; }
+  .mk .container { width: 100%; margin-inline: auto; padding-inline: 1.25rem; }
+  @media (min-width: 640px) { .mk .container { max-width: 640px; padding-inline: 1.5rem; } }
+  @media (min-width: 768px) { .mk .container { max-width: 768px; padding-inline: 2.25rem; } }
+  @media (min-width: 1024px) { .mk .container { max-width: 1024px; padding-inline: 2.5rem; } }
+  @media (min-width: 1280px) { .mk .container { max-width: 1280px; } }
+  @media (min-width: 1440px) { .mk .container { max-width: 1440px; } }
+  .mk .animate-marquee { animation: marquee 40s linear infinite; }
+}
+
+/* ================================================================
+   PizzaDAO, Editorial Design System
+   Vice + Intercept + Complex + UNICEF + MrBeast + Mad Magazine
+   Swiss editorial discipline. High contrast. Cultural legitimacy.
+   ================================================================ */
+
+@layer base {
+  .mk * { border-color: hsl(var(--border)); }
+  .mk {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans), 'Asap', system-ui, sans-serif;
+    font-weight: 400;
+    font-feature-settings: "kern", "liga";
+    text-rendering: optimizeLegibility;
+    position: relative;
+  }
+  /* Site-wide ultra-faint paper grain - printed institution, not pattern */
+  .mk h1, .mk h2, .mk h3, .mk h4, .mk h5, .mk h6, .mk .display {
+    font-family: var(--font-display), 'Asap Condensed', 'Asap', system-ui, sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.012em;
+    line-height: 0.94;
+    text-transform: none;
+    text-wrap: balance;
+  }
+  .mk p { text-wrap: pretty; line-height: 1.62; }
+  .mk .ui {
+    font-family: var(--font-sans), 'Asap', system-ui, sans-serif;
+    font-feature-settings: "kern", "liga";
+  }
+  /* Touch device parity - neutralize desktop hover transforms/shadows on tablets
+     and phones so the site doesn't get stuck in a half-hover state after a tap. */
+  @media (hover: none) and (pointer: coarse) {
+    .mk a, .mk button { -webkit-tap-highlight-color: hsl(var(--tomato) / 0.15); }
+    /* Strip any :hover-only transform/scale/translate. Color/opacity hovers
+       are left intact because they double as focus affordances. */
+    .mk *:hover {
+      transform: none !important;
+    }
+    /* Allow opt-out for components that genuinely need hover transforms on touch */
+    .mk .allow-touch-hover:hover { transform: revert !important; }
+  }
+  .mk ::selection { background: hsl(var(--tomato)); color: hsl(var(--cream)); }
+
+  /* Editorial transition default - cinematic, never bouncy */
+  .mk a, .mk button, .mk [role="button"] {
+    transition-timing-function: var(--ease-editorial);
+    transition-duration: var(--dur-fast);
+  }
+
+  /* Sitewide button radius safeguard - utilities can still opt into larger pills */
+  .mk button, .mk [role="button"] {
+    border-radius: var(--button-radius, 0.5rem);
+  }
+}
+
+@layer components {
+  /* Editorial overline label */
+  .mk .mk-overline {
+    font-family: var(--font-sans), 'Asap', system-ui, sans-serif;
+    @apply uppercase tracking-[0.18em] text-[11px] font-semibold;
+  }
+
+  /* Hairline rule */
+  .mk .mk-rule { @apply border-t border-foreground/15; }
+  .mk .mk-rule-thick { @apply border-t-2 border-foreground; }
+
+  /* Rounded pill CTAs, friendly, confident */
+  .mk .mk-btn-pill {
+    font-family: var(--font-sans), 'Asap', system-ui, sans-serif;
+    @apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full px-6 py-3 text-sm font-semibold tracking-normal transition-all;
+  }
+  .mk .mk-btn-pill-lg {
+    font-family: var(--font-sans), 'Asap', system-ui, sans-serif;
+    @apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full px-7 py-4 text-base font-semibold tracking-normal transition-all;
+  }
+
+  /* Vertical infinite scroll for Mafia names */
+  @keyframes scrollY {
+    from { transform: translateY(0); }
+    to { transform: translateY(-50%); }
+  }
+  .mk .mk-scroll-y-track {
+    animation: scrollY 60s linear infinite;
+    will-change: transform;
+  }
+  .mk .mk-mask-fade-y {
+    -webkit-mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent);
+            mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent);
+  }
+
+  /* Marquee tape */
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+  .mk .mk-marquee-track {
+    animation: marquee 40s linear infinite;
+    will-change: transform;
+  }
+
+  /* Fade-up reveal */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .mk .mk-fade-up { animation: fadeUp 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+
+  /* Handwritten accents - use sparingly */
+  .mk .mk-handwritten {
+    font-family: var(--font-handwritten), 'Rock Salt', 'Asap', cursive;
+    font-weight: 400;
+    letter-spacing: 0;
+    line-height: 1.1;
+  }
+  /* Tablet safety: handwritten marker type at iPad widths often collides with
+     headlines because Rock Salt is wider than its declared metrics. Trim a hair
+     of size + tighten tracking only at md so accents stay inside their gutters. */
+  @media (min-width: 768px) and (max-width: 1023px) {
+    .mk .mk-handwritten {
+      font-size: 0.94em;
+      letter-spacing: -0.01em;
+    }
+  }
+
+  /* Tablet body measure - caps paragraph width to ~60ch at md so prose doesn't
+     stretch into uncomfortably long lines on iPad landscape. Opt-in only. */
+  .mk .measure-tablet {
+    max-width: 60ch;
+  }
+  @media (min-width: 768px) and (max-width: 1023px) {
+    .mk .measure-tablet { max-width: 56ch; }
+  }
+
+  /* Hand-drawn underline */
+  .mk .mk-underline-scribble {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 12' preserveAspectRatio='none'><path d='M2 7 Q 50 1 100 6 T 198 5' fill='none' stroke='%23F83A3A' stroke-width='2.5' stroke-linecap='round'/></svg>");
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    background-size: 100% 0.4em;
+    padding-bottom: 0.15em;
+  }
+
+  /* Hand-drawn circle wrap */
+  .mk .mk-circle-scribble {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 80' preserveAspectRatio='none'><path d='M100 6 C 40 6 6 22 6 40 C 6 60 50 74 100 74 C 160 74 194 58 194 40 C 194 22 150 6 100 6 Z' fill='none' stroke='%23F83A3A' stroke-width='2.5' stroke-linecap='round'/></svg>");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 115% 130%;
+    padding: 0.05em 0.5em;
+  }
+
+  /* Newspaper grain */
+  .mk .mk-grain {
+    position: relative;
+  }
+  .mk .mk-grain::after {
+    content: "";
+    position: absolute; inset: 0;
+    pointer-events: none;
+    opacity: 0.06;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.6 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+
+  /* Soft tactile paper noise - Community-page surfaces only.
+     Apply by adding the class to cards/containers. Tuned for "matte paper"
+     emotional register: visible after a beat, never patterned. */
+  .mk .mk-paper-soft {
+    position: relative;
+    isolation: isolate;
+  }
+  .mk .mk-paper-soft::before {
+    content: "";
+    position: absolute; inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.17;
+    mix-blend-mode: multiply;
+    border-radius: inherit;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='320'><filter id='p'><feTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.24  0 0 0 0 0.14  0 0 0 0 0.02  0 0 0 0.78 0'/></filter><rect width='100%' height='100%' filter='url(%23p)'/></svg>");
+  }
+  /* Soft tonal wash - adds analog warmth/depth on top of grain. */
+  .mk .mk-paper-soft::after {
+    content: "";
+    position: absolute; inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    border-radius: inherit;
+    background:
+      radial-gradient(120% 80% at 18% 12%, hsl(var(--cream) / 0.35), transparent 55%),
+      radial-gradient(120% 90% at 88% 92%, hsl(var(--tomato) / 0.05), transparent 60%);
+    mix-blend-mode: multiply;
+    opacity: 0.85;
+  }
+  /* Inverse for dark surfaces - warm light grain over ink */
+  .mk .mk-paper-soft-dark::before {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='320'><filter id='pd'><feTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 0.92  0 0 0 0 0.78  0 0 0 0.6 0'/></filter><rect width='100%' height='100%' filter='url(%23pd)'/></svg>");
+    mix-blend-mode: screen;
+    opacity: 0.11;
+  }
+  .mk .mk-paper-soft-dark::after { display: none; }
+  .mk .mk-paper-soft > * { position: relative; z-index: 1; }
+
+  /* Ultra-light photocopy print noise - adds a faint toner-fleck breath.
+     Pair with .mk-paper-soft on light surfaces, or use alone on flat blocks. */
+  .mk .mk-print-noise { position: relative; isolation: isolate; }
+  .mk .mk-print-noise::after {
+    content: "";
+    position: absolute; inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.05;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='pn'><feTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.5 0'/></filter><rect width='100%' height='100%' filter='url(%23pn)'/></svg>");
+  }
+  .mk .mk-print-noise > * { position: relative; z-index: 1; }
+
+  /* Faint halftone - soft printed-dot field. Tuned to read as "press"
+     rather than pattern. Best on cream / butter / tinted blocks. */
+  .mk .mk-halftone-soft { position: relative; isolation: isolate; }
+  .mk .mk-halftone-soft::after {
+    content: "";
+    position: absolute; inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.045;
+    mix-blend-mode: multiply;
+    background-image: radial-gradient(hsl(var(--ink)) 0.6px, transparent 1.1px);
+    background-size: 6px 6px;
+  }
+  .mk .mk-halftone-soft > * { position: relative; z-index: 1; }
+
+  /* Ink spread - extremely soft ink-bleed gradient on edges of dark blocks. */
+  .mk .mk-ink-spread { position: relative; isolation: isolate; }
+  .mk .mk-ink-spread::after {
+    content: "";
+    position: absolute; inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.55;
+    background:
+      radial-gradient(120% 80% at 10% 0%, hsl(var(--tomato) / 0.06), transparent 55%),
+      radial-gradient(110% 70% at 90% 100%, hsl(var(--butter) / 0.05), transparent 55%);
+  }
+  .mk .mk-ink-spread > * { position: relative; z-index: 1; }
+
+  /* Print-shop crop marks - tiny L's at the four corners, outside the box.
+     Use on figures / posters / flyer cards. Subtle, never decorative. */
+  .mk .crop-marks { position: relative; }
+  .mk .crop-marks::before, .mk .crop-marks::after {
+    content: "";
+    position: absolute;
+    width: 14px; height: 14px;
+    pointer-events: none;
+    z-index: 2;
+    opacity: 0.55;
+  }
+  .mk .crop-marks::before {
+    top: -8px; left: -8px;
+    border-top: 1px solid hsl(var(--ink) / 0.5);
+    border-left: 1px solid hsl(var(--ink) / 0.5);
+  }
+  .mk .crop-marks::after {
+    bottom: -8px; right: -8px;
+    border-bottom: 1px solid hsl(var(--ink) / 0.5);
+    border-right: 1px solid hsl(var(--ink) / 0.5);
+  }
+  .mk .crop-marks-dark::before { border-color: hsl(var(--cream) / 0.45); }
+  .mk .crop-marks-dark::after  { border-color: hsl(var(--cream) / 0.45); }
+
+  /* Registration crosshair - 4-color print alignment mark. Tiny, monochrome. */
+  .mk .reg-mark {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border-radius: 9999px;
+    border: 1px solid hsl(var(--ink) / 0.45);
+    position: relative;
+    opacity: 0.7;
+  }
+  .mk .reg-mark::before, .mk .reg-mark::after {
+    content: "";
+    position: absolute;
+    background: hsl(var(--ink) / 0.45);
+  }
+  .mk .reg-mark::before { left: 50%; top: -3px; bottom: -3px; width: 1px; transform: translateX(-50%); }
+  .mk .reg-mark::after  { top: 50%; left: -3px; right: -3px; height: 1px; transform: translateY(-50%); }
+
+  /* Production stamp - soft outlined label, rotated, low-contrast. */
+  .mk .prod-stamp {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    padding: 0.35em 0.7em;
+    border: 1px solid hsl(var(--ink) / 0.35);
+    color: hsl(var(--ink) / 0.55);
+    font-family: var(--font-sans), 'Asap', system-ui, sans-serif;
+    font-size: 9.5px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.24em;
+    border-radius: 2px;
+    opacity: 0.85;
+  }
+  .mk .prod-stamp-dark {
+    border-color: hsl(var(--cream) / 0.3);
+    color: hsl(var(--cream) / 0.65);
+  }
+
+  /* Tape corner - translucent washi tape strip, anchored to a corner. */
+  .mk .tape-corner { position: relative; }
+  .mk .tape-corner::after {
+    content: "";
+    position: absolute;
+    top: -6px;
+    left: 12%;
+    width: 56px; height: 14px;
+    background: hsl(var(--butter) / 0.55);
+    box-shadow: 0 1px 2px hsl(var(--ink) / 0.18);
+    transform: rotate(-4deg);
+    pointer-events: none;
+    z-index: 3;
+  }
+
+
+  /* Marker bleed - applies a soft analog ink halo to handwritten/red type.
+     Ultra-tight, opaque core, faint warm edge - not a glow. */
+  .mk .marker-bleed {
+    text-shadow:
+      0 0 0.6px hsl(var(--tomato) / 0.95),
+      0 0 1.5px hsl(var(--tomato) / 0.55),
+      0 0 4px hsl(var(--tomato) / 0.18);
+  }
+  .mk .marker-bleed-butter {
+    text-shadow:
+      0 0 0.6px hsl(var(--butter) / 0.95),
+      0 0 1.5px hsl(var(--butter) / 0.55),
+      0 0 4px hsl(var(--butter) / 0.2);
+  }
+
+  /* Calendar live-row pulse */
+  @keyframes liveRowPulse {
+    0%, 100% { box-shadow: 0 8px 24px -12px hsl(var(--tomato) / 0.35); }
+    50%      { box-shadow: 0 14px 32px -10px hsl(var(--tomato) / 0.55); }
+  }
+  .mk .live-pulse { animation: liveRowPulse 2.8s ease-in-out infinite; }
+
+  /* Pizzeria checker tape - subtle tablecloth nod for dividers/edge accents.
+     Use sparingly: thin strips, tape ends, hover edges. Never as filler bg. */
+  .mk .checker-tape {
+    background-image:
+      linear-gradient(45deg, hsl(var(--tomato) / 0.85) 25%, transparent 25%),
+      linear-gradient(-45deg, hsl(var(--tomato) / 0.85) 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, hsl(var(--tomato) / 0.85) 75%),
+      linear-gradient(-45deg, transparent 75%, hsl(var(--tomato) / 0.85) 75%);
+    background-size: 14px 14px;
+    background-position: 0 0, 0 7px, 7px -7px, -7px 0;
+    background-color: hsl(var(--cream));
+  }
+  .mk .checker-tape-sm {
+    background-image:
+      linear-gradient(45deg, hsl(var(--ink) / 0.88) 25%, transparent 25%),
+      linear-gradient(-45deg, hsl(var(--ink) / 0.88) 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, hsl(var(--ink) / 0.88) 75%),
+      linear-gradient(-45deg, transparent 75%, hsl(var(--ink) / 0.88) 75%);
+    background-size: 8px 8px;
+    background-position: 0 0, 0 4px, 4px -4px, -4px 0;
+    background-color: hsl(var(--cream));
+  }
+
+  /* Taped photo - a slightly rotated figure with translucent tape corners. */
+  .mk .taped {
+    position: relative;
+  }
+  .mk .taped::before, .mk .taped::after {
+    content: "";
+    position: absolute;
+    width: 78px; height: 20px;
+    background: hsl(46 60% 88% / 0.72);
+    border: 1px solid hsl(0 0% 0% / 0.05);
+    box-shadow: 0 1px 3px hsl(0 0% 0% / 0.08);
+    pointer-events: none;
+    z-index: 2;
+  }
+  .mk .taped::before { top: -10px; left: 8%; transform: rotate(-6deg); }
+  .mk .taped::after  { top: -10px; right: 8%; transform: rotate(5deg); }
+
+  /* Ambient texture drift - extremely subtle, cinematic. */
+  @keyframes grainDrift {
+    0%   { background-position: 0 0; }
+    100% { background-position: 320px 240px; }
+  }
+  .mk .mk-paper-soft.paper-drift::before { animation: grainDrift 32s linear infinite; }
+
+  /* Hero ambient warmth - slow, almost imperceptible breathing */
+  @keyframes heroGlow {
+    0%, 100% { transform: translate3d(0,0,0) scale(1); opacity: 0.09; }
+    50%      { transform: translate3d(0,-12px,0) scale(1.04); opacity: 0.13; }
+  }
+  .mk .hero-glow { animation: heroGlow 14s ease-in-out infinite; will-change: transform, opacity; }
+  @media (prefers-reduced-motion: reduce) { .mk .hero-glow { animation: none; } }
+
+  /* Photo hover micro-motion */
+  .mk .photo-hover {
+    transition: transform 900ms cubic-bezier(0.2, 0.7, 0.2, 1), filter 900ms ease;
+    will-change: transform;
+  }
+  .mk .photo-hover:hover { transform: scale(1.018) translateY(-2px); filter: saturate(1.05); }
+
+  /* Margin annotation - looks like a marker note in the gutter */
+  .mk .margin-note {
+    font-family: var(--font-handwritten), 'Rock Salt', 'Asap', cursive;
+    color: hsl(var(--tomato));
+    font-size: 0.78rem;
+    line-height: 1.15;
+    letter-spacing: 0;
+    transform: rotate(-3deg);
+    display: inline-block;
+  }
+
+  /* Ink stamp - looks like a hand-stamped archival mark */
+  .mk .stamp {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0.7rem 0.3rem;
+    border: 2px solid hsl(var(--tomato));
+    color: hsl(var(--tomato));
+    font-family: var(--font-sans), 'Asap', system-ui, sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    font-size: 0.66rem;
+    text-transform: uppercase;
+    border-radius: 2px;
+    transform: rotate(-3.5deg);
+    opacity: 0.92;
+    background: hsl(var(--cream) / 0.4);
+    box-shadow: inset 0 0 0 1px hsl(var(--cream));
+  }
+  .mk .stamp-ink {
+    border-color: hsl(var(--ink));
+    color: hsl(var(--ink));
+  }
+
+  /* ============================================================
+     Global hardening utilities - applied via existing classnames
+     ============================================================ */
+
+  /* Unified editorial surface - soft warm border + ambient depth.
+     Use on cards/panels/modules to replace ad-hoc borders+shadows. */
+  .mk .surface-editorial {
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--rule-warm) / 0.6);
+    border-radius: 1rem;
+    box-shadow: var(--shadow-soft);
+    transition: box-shadow var(--dur-base) var(--ease-editorial),
+                transform var(--dur-base) var(--ease-editorial),
+                border-color var(--dur-base) var(--ease-editorial);
+  }
+  .mk .surface-editorial:hover {
+    box-shadow: var(--shadow-lifted);
+    border-color: hsl(var(--rule-warm) / 0.9);
+  }
+
+  /* Soften every shadow utility globally so SaaS drop-shadows can't surface */
+  .mk .shadow-sm   { box-shadow: 0 1px 2px hsl(30 20% 12% / 0.04) !important; }
+  .mk .shadow, .mk .shadow-md   { box-shadow: var(--shadow-soft) !important; }
+  .mk .shadow-lg, .mk .shadow-xl, .mk .shadow-2xl  { box-shadow: var(--shadow-lifted) !important; }
+
+  /* Tame default hover/transform micro-bounces site-wide */
+  .mk .transition, .mk .transition-all, .mk .transition-transform, .mk .transition-colors {
+    transition-timing-function: var(--ease-editorial);
+  }
+
+  /* Editorial divider - warm hairline, replaces hard black rules where used */
+  .mk .mk-rule-warm { border-top: 1px solid hsl(var(--rule-warm) / 0.55); }
+
+  /* ============================================================
+     DASHBOARD WINDOW CHROME
+     Each dashboard card is a "window" sitting on a warm desk.
+     Layered shadow + hairline title bar + soft pill corners.
+     Tones: cream (default), butter (warmth), paper, ink (dark).
+     ============================================================ */
+  .mk .window {
+    position: relative;
+    border-radius: 28px;
+    background: hsl(var(--cream));
+    border: 1px solid hsl(var(--rule-warm) / 0.55);
+    box-shadow:
+      0 1px 0 hsl(var(--cream-warm)) inset,
+      0 1px 2px hsl(30 25% 12% / 0.05),
+      0 12px 28px -18px hsl(30 25% 12% / 0.22),
+      0 36px 64px -40px hsl(30 25% 12% / 0.28);
+    transition:
+      box-shadow var(--dur-base) var(--ease-editorial),
+      transform var(--dur-base) var(--ease-editorial);
+  }
+  .mk .window-butter { background: hsl(46 100% 88%); border-color: hsl(40 50% 70% / 0.45); }
+  .mk .window-paper  { background: hsl(44 60% 96%); border-color: hsl(var(--rule-warm) / 0.45); }
+  .mk .window-ink {
+    background: hsl(var(--ink));
+    border-color: hsl(0 0% 100% / 0.08);
+    color: hsl(var(--cream));
+  }
+  .mk .window:hover {
+    box-shadow:
+      0 1px 0 hsl(var(--cream-warm)) inset,
+      0 2px 4px hsl(30 25% 12% / 0.06),
+      0 18px 40px -20px hsl(30 25% 12% / 0.26),
+      0 50px 80px -44px hsl(30 25% 12% / 0.32);
+  }
+
+  .mk .window-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.875rem 1.25rem;
+    border-bottom: 1px solid hsl(var(--rule-warm) / 0.45);
+  }
+  .mk .window-ink .window-bar { border-bottom-color: hsl(var(--cream) / 0.12); }
+  .mk .window-bar-label {
+    font-family: var(--font-sans), 'Asap', system-ui, sans-serif;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: hsl(var(--ink) / 0.55);
+  }
+  .mk .window-ink .window-bar-label { color: hsl(var(--cream) / 0.6); }
+
+  .mk .window-body { padding: 1.5rem; }
+  @media (min-width: 768px) { .mk .window-body { padding: 2rem; } }
+
+  .mk .window-dots {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 6px 8px;
+    border-radius: 9999px;
+    color: hsl(var(--ink) / 0.35);
+    transition: color var(--dur-fast) var(--ease-editorial),
+                background var(--dur-fast) var(--ease-editorial);
+  }
+  .mk .window-dots:hover { color: hsl(var(--ink) / 0.7); background: hsl(var(--ink) / 0.04); }
+  .mk .window-ink .window-dots { color: hsl(var(--cream) / 0.4); }
+  .mk .window-ink .window-dots:hover { color: hsl(var(--cream) / 0.85); background: hsl(var(--cream) / 0.06); }
+  .mk .window-dots i {
+    display: inline-block;
+    width: 3px; height: 3px;
+    border-radius: 9999px;
+    background: currentColor;
+  }
+
+  .mk .window-sticker {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px; height: 22px;
+    border-radius: 9999px;
+    background: hsl(var(--butter));
+    color: hsl(var(--ink));
+    box-shadow: 0 1px 0 hsl(var(--ink) / 0.06) inset,
+                0 1px 2px hsl(30 25% 12% / 0.12);
+    font-size: 12px;
+    line-height: 1;
+  }
+}
+
+/* ================================================================
+   GLOBAL MOBILE HARDENING
+   Applied site-wide via existing classnames. Goal: cinematic editorial
+   rhythm on handheld - calmer spacing, larger touch, safer handwritten
+   accents, and one dominant type moment per viewport.
+   ================================================================ */
+@layer utilities {
+  @media (max-width: 767px) {
+    /* Container - safe-area gutters for notched devices */
+    .mk .container {
+      padding-left: max(1.25rem, env(safe-area-inset-left));
+      padding-right: max(1.25rem, env(safe-area-inset-right));
+    }
+
+    /* Touch ergonomics - comfortable targets everywhere */
+    .mk a, .mk button, .mk [role="button"], .mk summary, .mk label[for] {
+      -webkit-tap-highlight-color: hsl(var(--tomato) / 0.18);
+    }
+    .mk .mk-btn-pill {
+      min-height: 48px;
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+      font-size: 0.95rem;
+    }
+    .mk .mk-btn-pill-lg {
+      min-height: 54px;
+      padding-left: 1.75rem;
+      padding-right: 1.75rem;
+      font-size: 1rem;
+    }
+
+    /* Typography - softer letter-spacing + balanced line-heights on phones */
+    .mk h1, .mk h2, .mk h3, .mk .display { letter-spacing: -0.015em; }
+    .mk h1 { line-height: 0.92; }
+    .mk h2, .mk h3 { line-height: 0.96; }
+    .mk p { line-height: 1.65; }
+
+    /* Handwritten accent safety - never clip, never crowd UI */
+    .mk .mk-handwritten {
+      display: inline-block;
+      padding: 0.02em 0.05em;
+      line-height: 1.05;
+    }
+    .mk .mk-underline-scribble { background-size: 100% 0.36em; }
+
+    /* Card surfaces - unified radius rhythm */
+    .mk .rounded-2xl, .mk .rounded-xl, .mk .rounded-3xl, .mk .surface-editorial {
+      border-radius: 1.1rem;
+    }
+
+    /* Hairline rules - warmer, softer on small screens */
+    .mk .border-ink\/15, .mk .border-ink\/20 { border-color: hsl(var(--rule-warm) / 0.55); }
+    .mk .border-cream\/15, .mk .border-cream\/20 { border-color: hsl(var(--cream) / 0.18); }
+
+    /* Section rhythm - calmer breathing room.
+       Normalizes the most common section padding patterns. */
+    .mk .py-20 { padding-top: 4.5rem; padding-bottom: 4.5rem; }
+    .mk .py-24 { padding-top: 5rem;   padding-bottom: 5rem; }
+    .mk .py-28 { padding-top: 5.25rem; padding-bottom: 5.25rem; }
+    .mk .py-32 { padding-top: 5.5rem;  padding-bottom: 5.5rem; }
+    .mk .pt-20 { padding-top: 4.5rem; }
+    .mk .pb-20 { padding-bottom: 4.5rem; }
+    .mk .pt-24, .mk .pt-28 { padding-top: 5rem; }
+    .mk .pb-24, .mk .pb-28 { padding-bottom: 5rem; }
+
+    /* Grid gaps - tighter card stacks, more breathing between major rows */
+    .mk .gap-y-10 { row-gap: 2.25rem; }
+    .mk .gap-y-12 { row-gap: 2.75rem; }
+    .mk .gap-y-16 { row-gap: 3.25rem; }
+    .mk .gap-5  { gap: 0.875rem; }
+    .mk .gap-6  { gap: 1rem; }
+
+    /* Texture - keep the paper warmth alive on OLED phones */
+    .mk .mk-grain::after { opacity: 0.075; }
+    .mk .mk-paper-soft::before { opacity: 0.20; }
+
+    /* Motion - reduce jitter on touch */
+    .mk .photo-hover:hover { transform: none; filter: none; }
+    .mk .hero-glow { animation-duration: 22s; }
+  }
+
+  /* Safe-area padding for the fixed site nav on notched devices */
+  @supports(padding: max(0px)) {
+    .mk header.fixed { padding-top: env(safe-area-inset-top); }
+  }
+}
