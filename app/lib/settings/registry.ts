@@ -1849,7 +1849,8 @@ export const SETTINGS = {
     key: 'discord.welcomeDeleteOnLeaveEnabled',
     area: 'features',
     label: 'Delete the welcome post when a member leaves',
-    help: 'When someone leaves the server, delete the bot\'s welcome post for them in the channel (DMs are untouched). Off: the run only counts how many would be deleted. The WELCOME_DELETE_ON_LEAVE_ENABLED env var set to off always wins.',
+    help: 'When someone leaves the server, delete the bot\'s welcome post for them in the channel (DMs are untouched). Off: the run only counts how many would be deleted. Needs the trainee nickname sync on. The WELCOME_DELETE_ON_LEAVE_ENABLED env var set to off always wins.',
+    confirmOn: 'Welcome posts for members who left will be deleted on the next run.',
   }),
   'onboarding.traineeNickEnabled': boolSetting({
     key: 'onboarding.traineeNickEnabled',

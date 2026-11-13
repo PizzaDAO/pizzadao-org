@@ -81,6 +81,7 @@ describe('deleteChannelMessage', () => {
       deleteChannelMessage('c', 'm', { fetchImpl: (async () => new Response(null, { status })) as unknown as typeof fetch })
     expect(await run(204)).toBe('deleted')
     expect(await run(404)).toBe('gone')
+    expect(await run(403)).toBe('gone')
     expect(await run(429)).toBe('rateLimited')
     expect(await run(500)).toBe('failed')
   })

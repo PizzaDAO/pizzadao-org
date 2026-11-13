@@ -592,7 +592,8 @@ export async function deleteChannelMessage(
       signal: AbortSignal.timeout(WELCOME_TIMEOUT_MS),
     })
     if (r.ok) return "deleted"
-    if (r.status === 404) return "gone"
+    // 404: already deleted. 403: the bot can no longer reach that channel, so it never will.
+    if (r.status === 404 || r.status === 403) return "gone"
     if (r.status === 429) return "rateLimited"
     console.warn(`[welcome] delete failed: HTTP ${r.status}`)
     return "failed"
