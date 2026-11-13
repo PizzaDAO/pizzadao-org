@@ -2099,6 +2099,11 @@ export const SETTINGS = {
     label: 'Welcome channel',
     help: 'Where welcome and profile-update posts go. Empty falls back to the old Discord webhook sheet row.',
   }),
+  'discord.traineeWelcomeChannelId': channelSetting({
+    key: 'discord.traineeWelcomeChannelId',
+    label: 'New member welcome channel',
+    help: 'Where the "Welcome to PizzaDAO" post for each new member goes. Empty falls back to the server\'s system channel. The TRAINEE_WELCOME_CHANNEL_ID env var, when set, wins.',
+  }),
   'discord.proposalsPingRoleId': proposalsPingRole,
   'missions.slaPingRoleId': slaPingRole,
   'missions.reviewerRoleIds': reviewerRoles,
