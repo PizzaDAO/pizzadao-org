@@ -77,8 +77,9 @@ describe("TaxFormClient", () => {
     renderWithIntl(<TaxFormClient token={TOKEN} />);
     expect(await screen.findByText(/TIN \/ sensitive details on file/)).toBeTruthy();
     expect((screen.getByDisplayValue("Draft Name") as HTMLInputElement).value).toBe("Draft Name");
-    const ssn = document.querySelector('input[placeholder^="SSN"]') as HTMLInputElement | null;
-    if (ssn) expect(ssn.value).toBe("");
+    const ssn = document.querySelector('input[placeholder="XXX-XX-XXXX"]') as HTMLInputElement | null;
+    expect(ssn).not.toBeNull();
+    expect(ssn!.value).toBe("");
   });
 
   it("picks W-9, then Save draft posts {formType, formData}", async () => {

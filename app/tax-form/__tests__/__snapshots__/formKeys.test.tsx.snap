@@ -44,4 +44,17 @@ exports[`form emitted keys > W8BEN-E 1`] = `
 ]
 `;
 
-exports[`form emitted keys > W9 1`] = `[]`;
+exports[`form emitted keys > W9 1`] = `
+[
+  "address",
+  "businessName",
+  "city",
+  "date",
+  "name",
+  "signature",
+  "ssn",
+  "state",
+  "taxClassification",
+  "zipCode",
+]
+`;
