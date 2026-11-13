@@ -10,13 +10,13 @@ const MomentReel = () => {
       {/* Ambient WenPizza video layer - same source as the phone, softened and yellow-tinted */}
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden bg-butter">
         <video
-          src="https://www.dropbox.com/scl/fi/c2zu0k44nsh753zaaseri/Video-Apr-26-2023-1-18-01-AM.mov?rlkey=bqnbkqjqxdm2nze2xeqgdcjnx&raw=1"
+          src="/media/video/wen-pizza-nyc.mp4"
           poster={party}
           autoPlay
           muted
           loop
           playsInline
-          preload="metadata"
+          preload="none"
           aria-hidden="true"
           tabIndex={-1}
           className="h-full w-full scale-[1.08] object-cover opacity-90 blur-[6px] saturate-[0.85] contrast-90 brightness-110"
@@ -83,13 +83,13 @@ const MomentReel = () => {
                     {/* Notch */}
                     <div className="absolute left-1/2 top-2 z-10 h-5 w-24 -translate-x-1/2 rounded-full bg-ink/95" />
                     <video
-                      src="https://www.dropbox.com/scl/fi/c2zu0k44nsh753zaaseri/Video-Apr-26-2023-1-18-01-AM.mov?rlkey=bqnbkqjqxdm2nze2xeqgdcjnx&raw=1"
+                      src="/media/video/wen-pizza-nyc.mp4"
                       poster={party}
                       autoPlay
                       muted
                       loop
                       playsInline
-                      preload="metadata"
+                      preload="none"
                       aria-label="PizzaDAO moments"
                       className="h-full w-full object-cover"
                     />

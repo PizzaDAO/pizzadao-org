@@ -6,7 +6,6 @@ const create = vi.fn();
 const contactCreate = vi.fn();
 const contactUpdate = vi.fn();
 const sendEmail = vi.fn();
-const upcomingEvents = vi.fn();
 const enforceRateLimit = vi.fn();
 
 vi.mock("@/app/lib/settings", () => ({ loadSettings: () => loadSettings() }));
@@ -21,19 +20,15 @@ vi.mock("@/app/lib/reengage/mailer", () => ({
   oneLine: (s: string) => s,
   sendEmail: (...a: unknown[]) => sendEmail(...a),
 }));
-vi.mock("@/app/lib/marketing/calendar", () => ({ upcomingEvents: (...a: unknown[]) => upcomingEvents(...a) }));
 
 import { POST as newsletter } from "./newsletter/route";
 import { POST as contact } from "./contact/route";
-import { GET as calendar } from "./calendar/route";
 
 const settings = (over: Record<string, unknown> = {}) => {
   const values: Record<string, unknown> = {
     "marketing.newsletterEnabled": true,
     "marketing.contactEnabled": true,
-    "marketing.calendarEnabled": true,
     "marketing.contactNotifyEmail": "",
-    "marketing.calendarIcsUrl": "https://example.org/cal.ics",
     ...over,
   };
   return { readFailed: false, invalidKeys: [], isSet: () => true, get: (k: string) => values[k] };
@@ -41,11 +36,11 @@ const settings = (over: Record<string, unknown> = {}) => {
 const post = (body: unknown) => new Request("https://x/api", { method: "POST", body: JSON.stringify(body), headers: { "content-type": "application/json" } });
 
 beforeEach(() => {
-  for (const m of [loadSettings, create, contactCreate, contactUpdate, sendEmail, upcomingEvents, enforceRateLimit]) m.mockReset();
+  for (const m of [loadSettings, create, contactCreate, contactUpdate, sendEmail, enforceRateLimit]) m.mockReset();
   enforceRateLimit.mockResolvedValue(null);
   loadSettings.mockResolvedValue(settings());
   vi.stubEnv("VERCEL_ENV", "production");
-  for (const k of ["MARKETING_NEWSLETTER_ENABLED", "MARKETING_CONTACT_ENABLED", "MARKETING_CALENDAR_ENABLED"]) vi.stubEnv(k, "");
+  for (const k of ["MARKETING_NEWSLETTER_ENABLED", "MARKETING_CONTACT_ENABLED"]) vi.stubEnv(k, "");
 });
 
 describe("POST /api/public/newsletter", () => {
@@ -129,31 +124,5 @@ describe("POST /api/public/contact", () => {
     expect((await contact(post({ ...body, email: "x" }))).status).toBe(400);
     contactCreate.mockRejectedValue(new Error("db"));
     expect((await contact(post(body))).status).toBe(500);
-  });
-});
-
-describe("GET /api/public/calendar", () => {
-  const req = () => new Request("https://x/api/public/calendar");
-
-  it("returns an empty list while off or with no feed, without fetching", async () => {
-    loadSettings.mockResolvedValue(settings({ "marketing.calendarEnabled": false }));
-    expect(await (await calendar(req())).json()).toEqual({ events: [] });
-    loadSettings.mockResolvedValue(settings({ "marketing.calendarIcsUrl": "" }));
-    expect(await (await calendar(req())).json()).toEqual({ events: [] });
-    expect(upcomingEvents).not.toHaveBeenCalled();
-  });
-
-  it("returns the events with a public cache header", async () => {
-    upcomingEvents.mockResolvedValue([{ title: "Call" }]);
-    const res = await calendar(req());
-    expect((await res.json()).events).toEqual([{ title: "Call" }]);
-    expect(res.headers.get("Cache-Control")).toContain("s-maxage=300");
-  });
-
-  it("an unreadable feed is an empty list, not an error status", async () => {
-    upcomingEvents.mockRejectedValue(new Error("boom"));
-    const res = await calendar(req());
-    expect(res.status).toBe(200);
-    expect((await res.json()).events).toEqual([]);
   });
 });

@@ -120,10 +120,9 @@ export const TOGGLES = {
   'crews.taskUpdatePostsEnabled': { env: 'CREWS_TASK_UPDATE_POSTS_ENABLED', legacy: ON_WORDS },
   // Off unless turned on: past attendees as Cold bench rows on the crew page.
   'crews.rosterBenchEnabled': { env: 'CREWS_ROSTER_BENCH_ENABLED', legacy: ON_WORDS },
-  // Off unless turned on: the marketing pages' forms and calendar (plans/pizzadao-org-to-vercel.md, Phase 2).
+  // Off unless turned on: the marketing pages' forms (plans/pizzadao-org-to-vercel.md, Phase 2).
   'marketing.newsletterEnabled': { env: 'MARKETING_NEWSLETTER_ENABLED', legacy: ON_WORDS },
   'marketing.contactEnabled': { env: 'MARKETING_CONTACT_ENABLED', legacy: ON_WORDS },
-  'marketing.calendarEnabled': { env: 'MARKETING_CALENDAR_ENABLED', legacy: ON_WORDS },
   // Off unless turned on: redirect page requests on the old app host to the main site, and carry the login across.
   'site.hostRedirectEnabled': { env: 'SITE_HOST_REDIRECT_ENABLED', legacy: ON_WORDS },
   'site.sessionBridgeEnabled': { env: 'SITE_SESSION_BRIDGE_ENABLED', legacy: ON_WORDS },

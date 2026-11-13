@@ -260,9 +260,7 @@ describe('settings registry', () => {
       ['site.sessionBridgeEnabled', false],
       ['marketing.newsletterEnabled', false],
       ['marketing.contactEnabled', false],
-      ['marketing.calendarEnabled', false],
       ['marketing.contactNotifyEmail', ''],
-      ['marketing.calendarIcsUrl', ''],
     ])
   })
 

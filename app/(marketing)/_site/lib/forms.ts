@@ -1,11 +1,10 @@
 "use client";
 
 /**
- * Same-origin calls to the app's public marketing endpoints (/api/public/newsletter, contact,
- * calendar). Resolves to { data, error } so the ported components keep the shape they had with the
+ * Same-origin calls to the app's public marketing endpoints (/api/public/newsletter, contact). Resolves to { data, error } so the ported components keep the shape they had with the
  * old hosted functions: `error` is set for any failure or a non-2xx answer, and never throws.
  */
-export async function invokeForm<T = Record<string, unknown> & { ok?: boolean; already?: boolean; events?: unknown[] }>(
+export async function invokeForm<T = Record<string, unknown> & { ok?: boolean; already?: boolean }>(
   path: string,
   opts: { body?: unknown } = {},
 ): Promise<{ data: T | null; error: Error | null }> {

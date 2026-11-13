@@ -64,7 +64,6 @@ export const EVT = {
   COMMUNITY_BUILD_EMBED_OPENED: "community.build_embed_opened",
   COMMUNITY_GALLERY_OPENED: "community.gallery_opened",
   COMMUNITY_GALLERY_NAVIGATED: "community.gallery_navigated",
-  COMMUNITY_CALENDAR_OPENED: "community.calendar_opened",
 
   // --- Pre-launch (Transmission) ------------------------------------------
   TRANSMISSION_CTA: "transmission.cta_clicked",

@@ -382,13 +382,6 @@
       0 0 4px hsl(var(--butter) / 0.2);
   }
 
-  /* Calendar live-row pulse */
-  @keyframes liveRowPulse {
-    0%, 100% { box-shadow: 0 8px 24px -12px hsl(var(--tomato) / 0.35); }
-    50%      { box-shadow: 0 14px 32px -10px hsl(var(--tomato) / 0.55); }
-  }
-  .mk .live-pulse { animation: liveRowPulse 2.8s ease-in-out infinite; }
-
   /* Pizzeria checker tape - subtle tablecloth nod for dividers/edge accents.
      Use sparingly: thin strips, tape ends, hover edges. Never as filler bg. */
   .mk .checker-tape {

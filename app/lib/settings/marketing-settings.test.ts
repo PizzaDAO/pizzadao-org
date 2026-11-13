@@ -19,12 +19,11 @@ describe("marketing settings", () => {
     for (const k of Object.keys(MARKETING_SETTINGS)) expect((SETTINGS as Record<string, { area: string }>)[k].area).toBe("marketing");
   });
 
-  it("default to the safe state: switches off, no notify address, no calendar feed", () => {
-    for (const k of ["marketing.newsletterEnabled", "marketing.contactEnabled", "marketing.calendarEnabled"] as const) {
+  it("default to the safe state: switches off, no notify address", () => {
+    for (const k of ["marketing.newsletterEnabled", "marketing.contactEnabled"] as const) {
       expect(SETTINGS[k].default).toBe(false);
     }
     expect(SETTINGS["marketing.contactNotifyEmail"].default).toBe("");
-    expect(SETTINGS["marketing.calendarIcsUrl"].default).toBe("");
   });
 
   it("the text settings accept empty and valid values and reject bad ones", () => {
@@ -32,10 +31,6 @@ describe("marketing settings", () => {
     expect(email.safeParse("").success).toBe(true);
     expect(email.safeParse("team@example.org").success).toBe(true);
     expect(email.safeParse("not an email").success).toBe(false);
-    const url = SETTINGS["marketing.calendarIcsUrl"].schema;
-    expect(url.safeParse("").success).toBe(true);
-    expect(url.safeParse("https://example.org/a.ics").success).toBe(true);
-    expect(url.safeParse("http://example.org/a.ics").success).toBe(false);
   });
 
   it("a switch needs the setting in production, and the env var turns it off or on on previews", () => {

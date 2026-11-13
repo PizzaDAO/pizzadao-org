@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { HOME_PATH } from "@/app/(marketing)/_site/lib/router";
-import { ArrowUpRight, Sparkles, Pizza, Wrench, Palette, Users, Code2, MapPin, CalendarDays } from "lucide-react";
+import { ArrowUpRight, Sparkles, Pizza, Wrench, Palette, Users, Code2, MapPin } from "lucide-react";
 import SiteNav from "@/app/(marketing)/_site/components/SiteNav";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/app/(marketing)/_site/components/ui/dialog";
 import Footer from "@/app/(marketing)/_site/components/Footer";
@@ -226,7 +226,6 @@ const BUILDS: Build[] = [
 ];
 
 const CommunityPage = () => {
-  const [calOpen, setCalOpen] = useState(false);
   const [activeBuild, setActiveBuild] = useState<number | null>(null);
   const [embedSite, setEmbedSite] = useState<{ name: string; url: string } | null>(null);
   const [galleryOpen, setGalleryOpen] = useState(false);
@@ -245,11 +244,6 @@ const CommunityPage = () => {
   const openEmbed = (site: { name: string; url: string }) => {
     track(EVT.COMMUNITY_BUILD_EMBED_OPENED, site);
     setEmbedSite(site);
-  };
-
-  const openCalendar = (surface: string) => {
-    track(EVT.COMMUNITY_CALENDAR_OPENED, { surface });
-    setCalOpen(true);
   };
 
   const navigateGallery = (i: number) => {
@@ -614,30 +608,6 @@ const CommunityPage = () => {
           </ul>
         </div>
       </section>
-
-
-
-
-
-
-      {/* THIS WEEK, stylized weekly calendar + featured events */}
-      <ThisWeekSection onOpenCalendar={() => openCalendar("this_week")} />
-
-      <Dialog open={calOpen} onOpenChange={setCalOpen}>
-        <DialogContent className="max-w-4xl bg-cream p-0">
-          <DialogHeader className="border-b border-ink/15 px-6 py-4">
-            <DialogTitle className="font-display text-2xl font-extrabold">Full PizzaDAO calendar</DialogTitle>
-          </DialogHeader>
-          <div className="aspect-[4/3] w-full">
-            <iframe
-              title="PizzaDAO Google Calendar"
-              src="https://calendar.google.com/calendar/embed?src=lolibebt0pv7da9lv35dviqasg%40group.calendar.google.com&ctz=UTC"
-              className="h-full w-full border-0"
-              loading="lazy"
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* VOICES, magazine pull-quotes on butter */}
       <section className="bg-butter py-16 text-ink md:py-24">
@@ -1403,9 +1373,9 @@ const CommunityPage = () => {
                     {
                       n: "02",
                       title: "Attend an event",
-                      note: "Find one near you on the chapter calendar.",
-                      cta: "See this week",
-                      href: "#ways-in",
+                      note: "Find one near you through your local chapter.",
+                      cta: "Find a chapter",
+                      href: `${HOME_PATH}#reach`,
                       primary: false,
                     },
                     {
@@ -1555,12 +1525,12 @@ type HeroTile = {
 
 const HERO_IMAGES: HeroTile[] = [
   {
-    video: "https://www.dropbox.com/scl/fi/wfok0d7b9qn1xnj7ren78/NYC-RP-Reveal-Teaser_v.4.mov?rlkey=kuy6lxzvgpffq66wfvyeo5ied&raw=1",
+    video: "/media/video/nyc-rp-teaser.mp4",
     poster: "/marketing/media/nyc-rp-teaser-poster.jpg",
     caption: "New York City · RP Reveal",
   },
   {
-    video: "https://www.dropbox.com/scl/fi/c2zu0k44nsh753zaaseri/Video-Apr-26-2023-1-18-01-AM.mov?rlkey=bqnbkqjqxdm2nze2xeqgdcjnx&raw=1",
+    video: "/media/video/wen-pizza-nyc.mp4",
     poster: "/marketing/media/wen-pizza-nyc-poster.jpg",
     caption: "New York City · Wen Pizza",
   },
@@ -1713,7 +1683,7 @@ const HeroSection = () => {
                       muted
                       loop
                       playsInline
-                      preload="metadata"
+                      preload="none"
                       aria-label={t.caption}
                       className="h-full w-full object-cover"
                     />
@@ -1740,7 +1710,7 @@ const HeroSection = () => {
               { k: "Active members", v: "3,000+" },
               { k: "Chapters", v: "60+" },
               { k: "Open experiments", v: "Always" },
-              { k: "This week", v: "12 events" },
+              { k: "Weekly calls", v: "Open to all" },
             ].map((m) => (
               <div key={m.k} className="px-1">
                 <dt className="ui text-[10px] font-semibold uppercase tracking-[0.18em] text-ink/55">
@@ -1757,337 +1727,5 @@ const HeroSection = () => {
     </section>
   );
 };
-
-type CalEvent = {
-  start: string;
-  end: string | null;
-  title: string;
-  location: string;
-  description: string;
-  recurring?: boolean;
-};
-
-const eventTags = (ev: CalEvent): string[] => {
-  const loc = (ev.location || "").toLowerCase();
-  const desc = (ev.description || "").toLowerCase();
-  const onlineHints = ["http", "zoom", "meet.google", "google meet", "online", "discord", "twitch", "x.com", "youtube", "stream"];
-  const isOnline = onlineHints.some((h) => loc.includes(h) || desc.includes(h));
-  const tags: string[] = [];
-  if (isOnline) tags.push("online");
-  else if (ev.location?.trim()) tags.push("IRL");
-  if (ev.recurring) tags.push("recurring");
-  if (/lab|workshop|build/i.test(desc) || /lab|workshop/i.test(ev.title)) tags.push("pizza lab");
-  if (/chapter|crew/i.test(desc + " " + ev.title)) tags.push("community-run");
-  return tags;
-};
-
-const stripHtml = (input: string): string => {
-  if (!input) return "";
-  const decoded = input
-    .replace(/<br\s*\/?>(\s*)/gi, "\n")
-    .replace(/<\/p>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
-  return decoded.replace(/\n{3,}/g, "\n\n").trim();
-};
-
-const isUrlish = (s: string) => /^https?:\/\//i.test(s.trim());
-
-const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-const useCalendarEvents = () => {
-  const [events, setEvents] = useState<CalEvent[] | null>(null);
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    let alive = true;
-    import("@/app/(marketing)/_site/lib/forms").then(({ invokeForm }) => {
-      invokeForm("/api/public/calendar")
-        .then(({ data, error }) => {
-          if (!alive) return;
-          if (error || !data?.events) setEvents([]);
-          else setEvents(data.events as CalEvent[]);
-        })
-        .catch(() => alive && setEvents([]))
-        .finally(() => alive && setLoading(false));
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
-  return { events: events ?? [], loading };
-};
-
-const buildWeek = (events: CalEvent[]) => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(today);
-    d.setDate(today.getDate() + i);
-    const next = new Date(d);
-    next.setDate(d.getDate() + 1);
-    const dayEvents = events.filter((e) => {
-      const s = new Date(e.start);
-      return s >= d && s < next;
-    });
-    return {
-      d: DAY_LABELS[d.getDay()],
-      date: d.getDate(),
-      events: dayEvents,
-    };
-  });
-};
-
-const formatDayTime = (iso: string) => {
-  const d = new Date(iso);
-  const day = DAY_LABELS[d.getDay()];
-  const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  return `${day} · ${time}`;
-};
-
-const ThisWeekSection = ({ onOpenCalendar }: { onOpenCalendar: () => void }) => {
-  const { events, loading } = useCalendarEvents();
-  // Dates depend on the visitor's clock and zone, so they are computed after mount (the server
-  // render and first client render show the empty week) to keep hydration matching.
-  const [now, setNow] = useState<Date | null>(null);
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setNow(new Date());
-  }, []);
-  const week = useMemo(() => (now ? buildWeek(events) : []), [events, now]);
-  const featured = events.slice(0, 3);
-
-  const today = now ?? new Date(0);
-  const monthLabel = now ? today.toLocaleDateString([], { month: "short" }) : "";
-  const weekStart = now ? today.getDate() : "";
-  const weekEndDate = new Date(today);
-  weekEndDate.setDate(today.getDate() + 6);
-  const weekEnd = now ? weekEndDate.getDate() : "";
-
-  return (
-    <section className="relative overflow-hidden bg-cream py-16 md:py-24">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(50% 60% at 15% 0%, hsl(var(--butter) / 0.45), transparent 70%)",
-        }}
-      />
-      <div className="mk-grain pointer-events-none absolute inset-0" aria-hidden />
-
-      <div className="container relative">
-        <div className="border-t-2 border-ink pt-8 md:pt-10">
-          <div className="grid grid-cols-12 items-end gap-x-6 gap-y-6">
-            <div className="col-span-12 md:col-span-8">
-              <p className="mk-overline inline-flex items-center gap-2 text-tomato">
-                <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-tomato opacity-60" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-tomato" />
-                </span>
-                § C.04, Live this week
-              </p>
-              <h2 className="font-display mt-5 text-[clamp(2.5rem,6vw,5rem)] font-extrabold leading-[0.9]">
-                This week
-                <br />
-                <span className="text-tomato">in PizzaDAO.</span>
-              </h2>
-            </div>
-            <div className="col-span-12 md:col-span-4 md:pl-8">
-              <p className="text-base leading-relaxed text-ink/75 md:text-lg">
-                Open calls, chapter syncs, long tables. The shared rhythm
-                that holds the Mafia together - pinned for the next seven days.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-12 grid grid-cols-12 gap-6 md:mt-16 md:gap-8">
-          {/* Calendar - printed poster aesthetic */}
-          <div className="col-span-12 md:col-span-5">
-            <div
-              className="mk-paper-soft relative rounded-2xl bg-cream-warm p-6 shadow-[0_24px_60px_-30px_hsl(var(--ink)/0.35)] md:p-8"
-              style={{ transform: "rotate(-0.6deg)" }}
-            >
-              <div className="flex items-baseline justify-between">
-                <p className="ui text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55">
-                  Next 7 days · {monthLabel}
-                </p>
-                <p className="ui text-[10px] tabular-nums text-ink/40">
-                  {String(weekStart).padStart(2, "0")} - {String(weekEnd).padStart(2, "0")}
-                </p>
-              </div>
-              <h3 className="font-display mt-3 text-3xl font-extrabold leading-[0.95] md:text-4xl">
-                Upcoming
-                <br />
-                community events.
-              </h3>
-
-              {loading ? (
-                <p className="ui mt-7 text-sm text-ink/55">Loading community calendar…</p>
-              ) : (() => {
-                const activeDays = week.filter((d) => d.events.length > 0);
-                if (activeDays.length === 0) {
-                  return (
-                    <p className="ui mt-7 text-sm text-ink/55">
-                      No upcoming events yet. Check the full calendar.
-                    </p>
-                  );
-                }
-                return (
-                  <ul className="mt-7 space-y-2">
-                    {activeDays.map((d, idx) => {
-                      const first = d.events[0];
-                      const more = d.events.length - 1;
-                      const tags = eventTags(first);
-                      return (
-                        <li
-                          key={`${d.d}-${idx}`}
-                          className={`group flex items-start gap-4 rounded-xl px-4 py-3 transition-all duration-300 hover:-translate-y-0.5 ${idx === 0 ? "bg-butter shadow-[0_10px_28px_-16px_hsl(var(--butter)/0.85)]" : "bg-butter/55 hover:bg-butter/75"}`}
-                        >
-                          <div className="ui w-10 shrink-0 pt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink/55">
-                            {d.d}
-                          </div>
-                          <div className="font-display w-8 shrink-0 pt-0.5 text-2xl font-extrabold tabular-nums leading-none">
-                            {d.date}
-                          </div>
-                          <div className="min-w-0 flex-1 text-sm leading-snug text-ink/85">
-                            <span className="block break-words">
-                              {first.title}
-                              {more > 0 && (
-                                <span className="ml-2 text-[11px] text-ink/55">+{more} more</span>
-                              )}
-                            </span>
-                            {tags.length > 0 && (
-                              <div className="mt-1.5 flex flex-wrap gap-1">
-                                {tags.map((t) => (
-                                  <span
-                                    key={t}
-                                    className="ui rounded-full bg-ink/[0.06] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-ink/65"
-                                  >
-                                    {t}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                          {idx === 0 && (
-                            <span className="ui mt-1 shrink-0 text-[9px] font-semibold uppercase tracking-[0.22em] text-tomato/80" aria-hidden>
-                              live
-                            </span>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                );
-              })()}
-
-
-
-              <button
-                onClick={onOpenCalendar}
-                className="ui mt-7 inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-ink/70 hover:text-tomato"
-              >
-                <CalendarDays className="h-4 w-4" />
-                View full calendar →
-              </button>
-            </div>
-          </div>
-
-          {/* Featured events */}
-          <div className="col-span-12 md:col-span-7">
-            <div className="space-y-5">
-              {loading ? (
-                <div className="rounded-2xl bg-cream-warm p-8 text-ink/55">
-                  Loading community calendar…
-                </div>
-              ) : featured.length === 0 ? (
-                <div className="rounded-2xl bg-cream-warm p-8 text-ink/70">
-                  No upcoming events yet. Check the full calendar.
-                </div>
-              ) : (
-                featured.map((ev, i) => (
-                  <article
-                    key={`${ev.start}-${ev.title}`}
-                    className="mk-paper-soft group relative rounded-2xl bg-cream-warm p-6 shadow-[0_18px_40px_-24px_hsl(var(--ink)/0.3)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_28px_60px_-22px_hsl(var(--tomato)/0.35)] md:p-8"
-                    style={{ transform: `rotate(${(i % 2 === 0 ? 0.4 : -0.5)}deg)` }}
-                  >
-                    <div className="flex items-baseline justify-between">
-                      <p className="ui text-[10px] font-semibold uppercase tracking-[0.22em] text-tomato">
-                        {formatDayTime(ev.start)}
-                      </p>
-                      {i === 0 && (
-                        <p className="ui inline-flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.22em] text-ink/50">
-                          <span className="h-1.5 w-1.5 rounded-full bg-tomato/70" aria-hidden />
-                          this week
-                        </p>
-                      )}
-                    </div>
-                    <h3 className="font-display mt-4 break-words text-[clamp(1.5rem,2.4vw,2.25rem)] font-extrabold leading-[1.05] tracking-[-0.005em]">
-                      {ev.title}
-                    </h3>
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      {ev.location?.trim() ? (
-                        isUrlish(ev.location) ? (
-                          <a
-                            href={ev.location.trim()}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="ui max-w-full truncate text-[11px] normal-case tracking-normal text-ink/55 underline-offset-2 hover:text-tomato hover:underline"
-                          >
-                            {ev.location.trim().replace(/^https?:\/\//i, "").replace(/\/$/, "")}
-                          </a>
-                        ) : (
-                          <p className="ui text-[11px] uppercase tracking-[0.2em] text-ink/55">
-                            {ev.location.trim()}
-                          </p>
-                        )
-                      ) : (
-                        <p className="ui text-[11px] uppercase tracking-[0.2em] text-ink/55">
-                          Location TBD
-                        </p>
-                      )}
-                      {eventTags(ev).map((t) => (
-                        <span
-                          key={t}
-                          className="ui rounded-full bg-ink/8 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-ink/70"
-                        >
-                          {t}
-                        </span>
-                      ))}
-                    </div>
-                    <p className="mt-4 whitespace-pre-line break-words text-base leading-relaxed text-ink/80">
-                      {(() => {
-                        const clean = stripHtml(ev.description || "");
-                        if (!clean) return "Details coming soon.";
-                        return clean.length > 180 ? clean.slice(0, 180) + "…" : clean;
-                      })()}
-                    </p>
-
-                    <ArrowUpRight className="absolute right-6 top-6 h-5 w-5 text-ink/40 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-tomato" />
-                  </article>
-                ))
-              )}
-
-              <button
-                onClick={onOpenCalendar}
-                className="mk-btn-pill-lg w-full bg-ink text-cream hover:bg-tomato"
-              >
-                View full calendar
-                <ArrowUpRight className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-};
-
 
 export default CommunityPage;
