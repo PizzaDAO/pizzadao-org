@@ -2588,5 +2588,33 @@
     "poaps": "{count, plural, one {# POAP} other {# POAP}}",
     "nfts": "{count, plural, one {# NFT} other {# NFT}} dans {collections, plural, one {# collection} other {# collections}}",
     "tickets": "{count, plural, one {# billet} other {# billets}}"
+  },
+  "taxForm": {
+    "meta": "Formulaire fiscal",
+    "title": "Formulaire fiscal",
+    "intro": "{requester} demande un formulaire fiscal pour les paiements qui vous sont versés.",
+    "payee": "Bénéficiaire : {payee}",
+    "loading": "Chargement...",
+    "invalidTitle": "Ce lien n'est pas valide",
+    "invalidBody": "Il a peut-être été révoqué ou mal saisi. Veuillez contacter la personne qui vous l'a envoyé.",
+    "loadError": "Une erreur s'est produite. Veuillez réessayer.",
+    "thanks": "Merci, {requester} a bien reçu votre formulaire.",
+    "lockedTitle": "Formulaire déjà envoyé",
+    "lockedBody": "{requester} a votre formulaire {form}. Si quelque chose doit changer, veuillez les contacter.",
+    "lockedBodyGeneric": "{requester} a votre formulaire fiscal. Si quelque chose doit changer, veuillez les contacter.",
+    "rejected": "Votre formulaire précédent a été rejeté. Veuillez le remplir à nouveau.",
+    "rejectedReason": "Votre formulaire précédent a été rejeté : {reason} Veuillez le remplir à nouveau.",
+    "tinOnFile": "NIF / données sensibles enregistrés. Ne les saisissez à nouveau que pour les modifier. Veuillez ressaisir votre signature avant l'envoi.",
+    "pickerHeading": "Quel formulaire vous concerne ?",
+    "suggested": "Suggéré pour vous : {form}",
+    "formHeading": "Formulaire {form}",
+    "changeForm": "Changer de type de formulaire",
+    "saveDraft": "Enregistrer le brouillon",
+    "submit": "Signer et envoyer",
+    "draftSaved": "Brouillon enregistré.",
+    "saveFailed": "Échec de l'enregistrement du brouillon",
+    "submitFailed": "Échec de l'envoi du formulaire fiscal",
+    "rateLimited": "Trop de requêtes. Veuillez patienter quelques minutes puis réessayer.",
+    "networkError": "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez."
   }
 }

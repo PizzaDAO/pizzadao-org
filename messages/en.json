@@ -2588,5 +2588,33 @@
     "poaps": "{count, plural, one {# POAP} other {# POAPs}}",
     "nfts": "{count, plural, one {# NFT} other {# NFTs}} in {collections, plural, one {# collection} other {# collections}}",
     "tickets": "{count, plural, one {# ticket} other {# tickets}}"
+  },
+  "taxForm": {
+    "meta": "Tax form",
+    "title": "Tax form",
+    "intro": "{requester} is requesting a tax form for payments made to you.",
+    "payee": "Payee: {payee}",
+    "loading": "Loading...",
+    "invalidTitle": "This link isn't valid",
+    "invalidBody": "It may have been revoked or mistyped. Please contact the person who sent it to you.",
+    "loadError": "Something went wrong. Please try again.",
+    "thanks": "Thanks, {requester} has your form.",
+    "lockedTitle": "Form already submitted",
+    "lockedBody": "{requester} has your {form} form. If something needs to change, please contact them.",
+    "lockedBodyGeneric": "{requester} has your tax form. If something needs to change, please contact them.",
+    "rejected": "Your previous form was rejected. Please fill it in again.",
+    "rejectedReason": "Your previous form was rejected: {reason} Please fill it in again.",
+    "tinOnFile": "TIN / sensitive details on file. Re-enter only to change. Please re-type your signature before submitting.",
+    "pickerHeading": "Which form applies to you?",
+    "suggested": "Suggested for you: {form}",
+    "formHeading": "{form} form",
+    "changeForm": "Change form type",
+    "saveDraft": "Save draft",
+    "submit": "Sign and submit",
+    "draftSaved": "Draft saved.",
+    "saveFailed": "Failed to save draft",
+    "submitFailed": "Failed to submit tax form",
+    "rateLimited": "Too many requests. Please wait a few minutes and try again.",
+    "networkError": "Could not reach the server. Please check your connection and try again."
   }
 }

@@ -1,0 +1,33 @@
+// Drift guard: the keys each form emits are what the rsv-pizza PDF service reads.
+// If this snapshot changes, the backend contract changed: update rsv-pizza and these forms together.
+import React, { useState } from "react";
+import { describe, it, expect } from "vitest";
+import { render, fireEvent } from "@testing-library/react";
+import { W9Form } from "../_components/W9Form";
+import { W8BENForm } from "../_components/W8BENForm";
+import { W8BENEForm } from "../_components/W8BENEForm";
+
+function fillAll(Form: React.ComponentType<any>) {
+  const latest: { current: Record<string, any> } = { current: {} };
+  const Wrapper = () => {
+    const [v, setV] = useState<Record<string, any>>({});
+    const onChange = (n: Record<string, any>) => {
+      latest.current = n;
+      setV(n);
+    };
+    return <Form value={v} onChange={onChange} onSwitchFormType={() => {}} />;
+  };
+  const { container } = render(<Wrapper />);
+  const fields = Array.from(container.querySelectorAll("input[type=text], input[type=date], textarea"));
+  for (const el of fields) {
+    const input = el as HTMLInputElement;
+    fireEvent.change(input, { target: { value: input.type === "date" ? "2026-01-01" : "x" } });
+  }
+  return Object.keys(latest.current).sort();
+}
+
+describe("form emitted keys", () => {
+  it("W9", () => expect(fillAll(W9Form)).toMatchSnapshot());
+  it("W8BEN", () => expect(fillAll(W8BENForm)).toMatchSnapshot());
+  it("W8BEN-E", () => expect(fillAll(W8BENEForm)).toMatchSnapshot());
+});
