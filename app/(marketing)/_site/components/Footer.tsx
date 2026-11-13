@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 const logoLight = "/marketing/assets/logo-light.svg";
-import { invokeForm } from "@/app/(marketing)/_site/lib/forms";
+import { invokeForm, honeypot } from "@/app/(marketing)/_site/lib/forms";
+import Honeypot from "@/app/(marketing)/_site/components/Honeypot";
 import { useToast } from "@/app/(marketing)/_site/hooks/use-toast";
 import { identifyByEmail, track } from "@/app/(marketing)/_site/lib/analytics/posthog";
 import { EVT } from "@/app/(marketing)/_site/lib/analytics/events";
@@ -67,7 +68,7 @@ const NewsletterSignup = () => {
     setStatus("loading");
     try {
       const { data, error } = await invokeForm("/api/public/newsletter", {
-        body: { email: trimmed, source: "footer" },
+        body: { email: trimmed, source: "footer", website: honeypot(e) },
       });
       if (error || !data?.ok) throw error ?? new Error("Subscribe failed");
       void identifyByEmail(trimmed, { newsletter_source: "footer" });
@@ -97,6 +98,7 @@ const NewsletterSignup = () => {
         Newsletter
       </p>
       <form onSubmit={handleSubmit} className="mt-3 flex items-center gap-2 border-b border-cream/25 pb-2 focus-within:border-butter/70">
+        <Honeypot />
         <input
           type="email"
           required

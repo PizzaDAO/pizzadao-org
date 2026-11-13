@@ -15,8 +15,30 @@ import type { EventName } from "./events";
 
 let initialized = false;
 
+// False while the visitor is on an app page (the provider only mounts under the marketing layout).
+let active = true;
+
 export function isEnabled(): boolean {
-  return initialized && Boolean(POSTHOG_KEY);
+  return initialized && active && Boolean(POSTHOG_KEY);
+}
+
+/**
+ * Turn capturing (events, autocapture, session recording) off or back on. The provider calls this
+ * with false when the marketing layout unmounts, so soft navigation into the app never tracks.
+ */
+export function setActive(on: boolean): void {
+  active = on;
+  if (!initialized || !POSTHOG_KEY) return;
+  try {
+    if (on) {
+      posthog.opt_in_capturing();
+    } else {
+      posthog.stopSessionRecording();
+      posthog.opt_out_capturing();
+    }
+  } catch {
+    /* noop */
+  }
 }
 
 export function initPostHog(): void {
@@ -112,7 +134,8 @@ export async function identifyByEmail(
   if (!isEnabled()) return;
   if (!email) return;
   const id = await hashEmail(email);
-  posthog.identify(id, { email, ...properties });
+  // Hashed id only: the raw address is never sent as a person property.
+  posthog.identify(id, { ...properties });
 }
 
 export function registerOnce(props: Record<string, unknown>): void {

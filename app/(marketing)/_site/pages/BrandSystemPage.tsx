@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import {  } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/app/(marketing)/_site/components/ui/tabs";
 import SiteNav from "@/app/(marketing)/_site/components/SiteNav";
 import SectionNav from "@/app/(marketing)/_site/components/SectionNav";
@@ -15,12 +15,10 @@ import { useTrackOutbound } from "@/app/(marketing)/_site/lib/analytics/useTrack
 
 const moltoBenny = "/marketing/assets/brand/molto-benny-color.png";
 const moltoBennyPrintRun = "/marketing/assets/brand/molto-benny-print-run.jpg";
-const moltoBennyToken = "/marketing/assets/brand/molto-benny-token.svg";
 const wildPoster = "/marketing/assets/wild-poster.jpg";
 const wildMerch = "/marketing/assets/wild-merch.jpg";
 const wildTaxi = "/marketing/assets/wild-taxi.jpg";
 const wildEvent = "/marketing/assets/wild-event.jpg";
-const wildSocial = "/marketing/assets/wild-social.jpg";
 const wildProjection = "/marketing/assets/brand/wild/projection-mafia.jpg";
 const wildBoxes = "/marketing/assets/brand/wild/pizza-boxes.jpg";
 const wildTee = "/marketing/assets/brand/wild/bazaar-tee.jpg";

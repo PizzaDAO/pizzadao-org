@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
 import { REMOTE_IMAGE_PATTERNS } from "./app/lib/image-hosts";
 import { marketingHomeAtRoot } from "./app/lib/marketing-site";
+import { hstsHeaderValue } from "./app/lib/hsts";
+import { SITE_URL } from "./app/lib/site-url";
 
 // Points next-intl at the request-config module that resolves locale + loads
 // the messages catalog on every request.
@@ -38,7 +40,7 @@ const CSP_REPORT_ONLY = [
   "object-src 'none'",
   "form-action 'self' https://discord.com",
   `frame-ancestors ${FRAME_ANCESTORS}`,
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live https://va.vercel-scripts.com",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live https://va.vercel-scripts.com https://us-assets.i.posthog.com https://eu-assets.i.posthog.com",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' data: https://fonts.gstatic.com https://vercel.live",
   "img-src 'self' data: blob: https:",
@@ -77,7 +79,8 @@ const SECURITY_HEADERS = [
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   // Nothing in the app uses the camera, microphone or geolocation.
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), browsing-topics=()" },
-  { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
+  // No includeSubDomains when this build is the apex (see app/lib/hsts.ts).
+  { key: "Strict-Transport-Security", value: hstsHeaderValue(SITE_URL) },
 ];
 
 const nextConfig: NextConfig = {

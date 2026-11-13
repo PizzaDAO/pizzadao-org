@@ -82,6 +82,16 @@ describe("POST /api/public/newsletter", () => {
   });
 });
 
+describe("honeypot", () => {
+  it("a filled website field is answered ok and stored nowhere", async () => {
+    expect(await (await newsletter(post({ email: "a@b.co", website: "http://spam" }))).json()).toEqual({ ok: true });
+    expect(create).not.toHaveBeenCalled();
+    const res = await contact(post({ name: "A", email: "a@b.co", message: "m", website: "x" }));
+    expect((await res.json()).ok).toBe(true);
+    expect(contactCreate).not.toHaveBeenCalled();
+  });
+});
+
 describe("POST /api/public/contact", () => {
   const body = { name: "Ada", email: "ada@example.org", message: "hello", intents: ["Partnership"] };
 

@@ -5,6 +5,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import {
   captureAttribution,
   initPostHog,
+  setActive,
   trackPageView,
 } from "./posthog";
 
@@ -19,7 +20,10 @@ const PostHogProvider = ({ children }: { children: ReactNode }) => {
   // Init once on mount.
   useEffect(() => {
     initPostHog();
+    setActive(true);
     captureAttribution();
+    // Leaving the marketing layout (soft navigation into the app) stops all capturing.
+    return () => setActive(false);
   }, []);
 
   // Capture pageview on every route change.

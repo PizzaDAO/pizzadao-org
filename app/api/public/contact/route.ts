@@ -3,7 +3,7 @@ import { prisma } from "@/app/lib/db";
 import { enforceRateLimit } from "@/app/lib/rate-limit";
 import { loadSettings } from "@/app/lib/settings";
 import { resolveToggle } from "@/app/lib/settings/toggles";
-import { contactEmail, parseContact } from "@/app/lib/marketing/forms";
+import { contactEmail, isHoneypotFilled, parseContact } from "@/app/lib/marketing/forms";
 import { oneLine, sendEmail } from "@/app/lib/reengage/mailer";
 
 export const runtime = "nodejs";
@@ -25,6 +25,7 @@ export async function POST(req: Request) {
     if (limited) return limited;
 
     const body = await req.json().catch(() => null);
+    if (isHoneypotFilled(body)) return NextResponse.json({ ok: true, emailed: false });
     const parsed = parseContact(body);
     if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
     const c = parsed.value;

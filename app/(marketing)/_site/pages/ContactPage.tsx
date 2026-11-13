@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { invokeForm } from "@/app/(marketing)/_site/lib/forms";
+import { invokeForm, honeypot } from "@/app/(marketing)/_site/lib/forms";
+import Honeypot from "@/app/(marketing)/_site/components/Honeypot";
 import SiteNav from "@/app/(marketing)/_site/components/SiteNav";
 import Footer from "@/app/(marketing)/_site/components/Footer";
 import PageHero from "@/app/(marketing)/_site/components/PageHero";
@@ -115,6 +116,7 @@ const ContactPage = () => {
             email: email.trim(),
             message: message.trim(),
             intents,
+            website: honeypot(ev),
           },
         },
       );
@@ -122,8 +124,6 @@ const ContactPage = () => {
       if (invokeError) throw invokeError;
       // Identify after explicit submit (consent boundary).
       void identifyByEmail(email.trim(), {
-        name: name.trim(),
-        organization: organization.trim() || undefined,
         intents,
         source_page: "/contact",
       });
@@ -193,6 +193,7 @@ const ContactPage = () => {
                 </div>
               ) : (
                 <form onSubmit={onSubmit} noValidate>
+                  <Honeypot />
                   <p className="ui text-[11px] font-semibold uppercase tracking-[0.2em] text-tomato">
                     § The form
                   </p>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import SiteNav from "@/app/(marketing)/_site/components/SiteNav";
 import Footer from "@/app/(marketing)/_site/components/Footer";
 import Sponsorship from "@/app/(marketing)/_site/components/Sponsorship";
@@ -9,7 +9,8 @@ import PartnerActivations from "@/app/(marketing)/_site/components/PartnerActiva
 import RegistrationMarks from "@/app/(marketing)/_site/components/RegistrationMarks";
 import { track } from "@/app/(marketing)/_site/lib/analytics/posthog";
 import { EVT } from "@/app/(marketing)/_site/lib/analytics/events";
-import { invokeForm } from "@/app/(marketing)/_site/lib/forms";
+import { invokeForm, honeypot } from "@/app/(marketing)/_site/lib/forms";
+import Honeypot from "@/app/(marketing)/_site/components/Honeypot";
 
 
 
@@ -366,6 +367,7 @@ const PartnersPage = () => {
                       email: form.email.trim(),
                       message: form.brief.trim(),
                       intents: ["Partnership"],
+                      website: honeypot(e),
                     },
                   });
                   if (error) throw error;
@@ -381,6 +383,7 @@ const PartnersPage = () => {
               }}
               className="col-span-12 grid grid-cols-2 gap-x-5 gap-y-6 md:col-span-7 md:pl-8 lg:pl-12"
             >
+              <Honeypot />
               {submitted ? (
                 <div className="col-span-2">
                   <div className="ui text-[9.5px] font-medium uppercase tracking-[0.24em] text-butter">

@@ -22,3 +22,9 @@ export async function invokeForm<T = Record<string, unknown> & { ok?: boolean; a
     return { data: null, error: e instanceof Error ? e : new Error("Request failed") };
   }
 }
+
+/** The honeypot field's value from a submitted form (empty for real visitors). */
+export const honeypot = (e: { currentTarget: EventTarget | null }): string => {
+  const form = e.currentTarget;
+  return form instanceof HTMLFormElement ? String(new FormData(form).get("website") ?? "") : "";
+};

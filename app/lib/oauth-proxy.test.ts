@@ -22,7 +22,12 @@ describe('validateReturnTo', () => {
     expect(validateReturnTo('https://onboarding-abc123xyz-pizza-dao.vercel.app')).toBe(true)
     expect(validateReturnTo('https://onboarding-git-feature-x-pizza-dao.vercel.app/')).toBe(true)
     expect(validateReturnTo('https://onboarding-v7lj-abc123xyz-pizza-dao.vercel.app')).toBe(true)
-    expect(validateReturnTo('https://app.pizzadao.org')).toBe(true)
+  })
+
+  it('does not accept production itself (no plain transfer tokens aimed at it)', () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    expect(validateReturnTo('https://app.pizzadao.org')).toBe(false)
+    expect(validateReturnTo('https://pizzadao.org')).toBe(false)
   })
 
   it('rejects arbitrary vercel.app hosts and lookalikes', () => {
@@ -32,7 +37,11 @@ describe('validateReturnTo', () => {
     expect(validateReturnTo('https://onboarding-x.evil-pizza-dao.vercel.app')).toBe(false)
     expect(validateReturnTo('https://onboarding-abc-pizza-dao.vercel.app.evil.com')).toBe(false)
     expect(validateReturnTo('http://onboarding-abc-pizza-dao.vercel.app')).toBe(false)
-    expect(validateReturnTo('https://pizzadao.org')).toBe(false)
+    expect(validateReturnTo('https://pizzadao.org.evil.com')).toBe(false)
+    expect(validateReturnTo('https://evil.pizzadao.org')).toBe(false)
+    expect(validateReturnTo('https://www.pizzadao.org')).toBe(false)
+    expect(validateReturnTo('http://pizzadao.org')).toBe(false)
+    expect(validateReturnTo('https://user@pizzadao.org')).toBe(false)
     expect(validateReturnTo('https://evil.app.pizzadao.org')).toBe(false)
     expect(validateReturnTo('https://user@app.pizzadao.org')).toBe(false)
   })

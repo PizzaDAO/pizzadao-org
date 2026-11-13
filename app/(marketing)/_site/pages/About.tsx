@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import {  } from "react";
 import SiteNav from "@/app/(marketing)/_site/components/SiteNav";
 import Footer from "@/app/(marketing)/_site/components/Footer";
 import ArchivalWall from "@/app/(marketing)/_site/components/ArchivalWall";

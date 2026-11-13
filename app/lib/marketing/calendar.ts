@@ -15,6 +15,7 @@ const CACHE_TTL_MS = 10 * 60 * 1000; // fresh for 10 minutes
 const STALE_TTL_MS = 6 * 60 * 60 * 1000; // served stale for up to 6 hours when Google throttles (429)
 const HORIZON_MS = 60 * 24 * 60 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 10_000;
+const MAX_FEED_BYTES = 2 * 1024 * 1024;
 
 // Warm-instance cache: Google rate limits the feed hard.
 let cache: { url: string; at: number; text: string } | null = null;
@@ -23,10 +24,35 @@ export function __resetCalendarCache() {
   cache = null;
 }
 
+/** Reads the body, refusing more than MAX_FEED_BYTES. */
+async function readCapped(res: Response): Promise<string> {
+  if (!res.body) {
+    const text = await res.text();
+    if (text.length > MAX_FEED_BYTES) throw new Error("ICS feed too large");
+    return text;
+  }
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > MAX_FEED_BYTES) {
+      await reader.cancel();
+      throw new Error("ICS feed too large");
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
 async function loadFeed(url: string, fetchImpl: typeof fetch, now: number): Promise<string> {
   if (cache && cache.url === url && now - cache.at < CACHE_TTL_MS) return cache.text;
   const res = await fetchImpl(url, {
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    // The feed address comes from a setting: never follow a redirect to somewhere else.
+    redirect: "error",
     headers: {
       // A browser-ish agent is treated more kindly than the default one.
       "User-Agent": "Mozilla/5.0 (compatible; PizzaDAO-Calendar/1.0; +https://pizzadao.org)",
@@ -35,7 +61,9 @@ async function loadFeed(url: string, fetchImpl: typeof fetch, now: number): Prom
   });
   if (res.status === 429 && cache && cache.url === url && now - cache.at < STALE_TTL_MS) return cache.text;
   if (!res.ok) throw new Error(`ICS fetch failed: ${res.status}`);
-  const text = await res.text();
+  const declared = Number(res.headers?.get?.("content-length") ?? 0);
+  if (declared > MAX_FEED_BYTES) throw new Error("ICS feed too large");
+  const text = await readCapped(res);
   cache = { url, at: now, text };
   return text;
 }

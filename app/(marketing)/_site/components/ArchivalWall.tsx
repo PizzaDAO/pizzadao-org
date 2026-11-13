@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ARCHIVE, type PizzaPhoto } from "@/app/(marketing)/_site/lib/pizzadaoPhotos";
 
 type Slot = {

@@ -3,7 +3,7 @@ import { prisma } from "@/app/lib/db";
 import { enforceRateLimit } from "@/app/lib/rate-limit";
 import { loadSettings } from "@/app/lib/settings";
 import { resolveToggle } from "@/app/lib/settings/toggles";
-import { parseNewsletter } from "@/app/lib/marketing/forms";
+import { isHoneypotFilled, parseNewsletter } from "@/app/lib/marketing/forms";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,6 +22,7 @@ export async function POST(req: Request) {
     if (limited) return limited;
 
     const body = await req.json().catch(() => null);
+    if (isHoneypotFilled(body)) return NextResponse.json({ ok: true });
     const parsed = parseNewsletter(body);
     if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
 

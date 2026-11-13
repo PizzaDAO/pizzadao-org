@@ -3,7 +3,8 @@
 import { useState } from "react";
 const lead = "/marketing/assets/journal-lead.png";
 const jAi = "/marketing/assets/journal-ai-community.png";
-import { invokeForm } from "@/app/(marketing)/_site/lib/forms";
+import { invokeForm, honeypot } from "@/app/(marketing)/_site/lib/forms";
+import Honeypot from "@/app/(marketing)/_site/components/Honeypot";
 import { useToast } from "@/app/(marketing)/_site/hooks/use-toast";
 import { identifyByEmail, track } from "@/app/(marketing)/_site/lib/analytics/posthog";
 import { EVT } from "@/app/(marketing)/_site/lib/analytics/events";
@@ -64,7 +65,7 @@ const Journal = () => {
     setStatus("loading");
     try {
       const { data, error } = await invokeForm("/api/public/newsletter", {
-        body: { email: trimmed, source: "journal" },
+        body: { email: trimmed, source: "journal", website: honeypot(e) },
       });
       if (error || !data?.ok) throw error ?? new Error("Subscribe failed");
       void identifyByEmail(trimmed, { newsletter_source: "journal" });
@@ -234,6 +235,7 @@ const Journal = () => {
               className="col-span-12 md:col-span-5"
               onSubmit={handleSubscribe}
             >
+              <Honeypot />
               <div className="flex flex-col gap-3 sm:flex-row">
                 <label className="sr-only" htmlFor="journal-email">Email</label>
                 <input

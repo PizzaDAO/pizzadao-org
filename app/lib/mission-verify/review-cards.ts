@@ -42,6 +42,7 @@ import { CHECK_ID_KEYS, mentionFor } from './check-labels'
 import { DEFAULT_HOLD_POLICY, holdLabel, loadHoldPolicy, type HoldPolicy } from './policy'
 import { getSignalViews, type AccountSignalView } from './review-extras'
 import { reviewButtonId, type CardRef } from './review-ids'
+import { SITE_URL } from '@/app/lib/site-url'
 
 export type { CardRef } from './review-ids'
 
@@ -455,5 +456,5 @@ export const defaultReviewCardDeps: ReviewCardDeps = {
   resolveChannel: () => resolveConfiguredChannel('discord.missionReviewChannelId', 'work', 'MISSION_REVIEW_CHANNEL_ID'),
   post: (channelId, msg) => postDiscordMessage({ kind: 'bot', channelId, botToken: botToken() }, msg),
   edit: (card, msg) => editDiscordMessage({ ...card, botToken: botToken() }, msg),
-  appUrl: () => (process.env.NEXT_PUBLIC_APP_URL?.trim() || 'https://app.pizzadao.org').replace(/\/$/, ''),
+  appUrl: () => (process.env.NEXT_PUBLIC_APP_URL?.trim() || SITE_URL).replace(/\/$/, ''),
 }

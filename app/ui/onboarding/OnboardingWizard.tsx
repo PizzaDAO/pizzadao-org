@@ -26,6 +26,7 @@ import { NameStep } from "./steps/NameStep";
 import { CityStep } from "./steps/CityStep";
 import { RolesStep } from "./steps/RolesStep";
 import { MemberIdStep } from "./steps/MemberIdStep";
+import { marketingHomeAtRoot } from "@/app/lib/marketing-site";
 import { CrewsStep } from "./steps/CrewsStep";
 import { ReviewStep } from "./steps/ReviewStep";
 import { InvitedByStep } from "./steps/InvitedByStep";
@@ -58,6 +59,9 @@ export type OnboardingWizardProps = {
    */
   initialFlow?: FlowState;
 };
+
+// Where the wizard itself lives: "/" today, "/start" once the marketing home takes over "/".
+const WIZARD_HOME = marketingHomeAtRoot() ? "/start" : "/";
 
 export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
   const t = useTranslations("onboarding.chrome");
@@ -545,7 +549,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
       localStorage.removeItem(PENDING_CLAIM_KEY);
       setData(p => ({ ...p, memberId: String(memberId) }));
       localStorage.removeItem(LS_KEY);
-      const redirectTo = memberId ? `/dashboard/${memberId}` : "/";
+      const redirectTo = memberId ? `/dashboard/${memberId}` : WIZARD_HOME;
       setFlow({ type: "success", redirectTo });
     } catch (e: unknown) {
       setIsSubmitting(false);
@@ -621,7 +625,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
         <MagicLoginFlow
           onBack={() => {
             setLoginError(null);
-            router.push("/");
+            router.push(WIZARD_HOME);
           }}
           loginError={loginError}
         />

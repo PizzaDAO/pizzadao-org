@@ -18,7 +18,6 @@ export const POSTHOG_HOST: string = process.env.NEXT_PUBLIC_POSTHOG_HOST || "htt
 /** Routes that get 100% session-replay sampling (the rest get the global rate). */
 export const HIGH_INTENT_PATHS = [
   "/contact",
-  "/get-your-mafia-name",
   "/partners",
   "/community",
 ];

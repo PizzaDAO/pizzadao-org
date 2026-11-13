@@ -30,6 +30,7 @@ import { makeEmbed } from '../discord-interactions/embeds'
 import { PIZZA_CAPO_ROLE_ID } from '@/app/ui/constants'
 import { reviewCardsEnabled, missionLabel } from './review-cards'
 import { loadSettings } from '../settings'
+import { SITE_URL } from '@/app/lib/site-url'
 
 /** Code default for `missions.slaHours`. */
 export const SLA_HOURS = 48
@@ -223,5 +224,5 @@ export const defaultSlaDeps: SlaDeps = {
     return postDiscordMessage({ kind: 'bot', channelId, botToken: process.env.DISCORD_BOT_TOKEN?.trim() ?? '' }, body)
   },
   guildId: () => process.env.DISCORD_GUILD_ID?.trim() || null,
-  appUrl: () => (process.env.NEXT_PUBLIC_APP_URL?.trim() || 'https://app.pizzadao.org').replace(/\/$/, ''),
+  appUrl: () => (process.env.NEXT_PUBLIC_APP_URL?.trim() || SITE_URL).replace(/\/$/, ''),
 }

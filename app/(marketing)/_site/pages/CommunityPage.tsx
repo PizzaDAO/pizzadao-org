@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { HOME_PATH } from "@/app/(marketing)/_site/lib/router";
-import { ArrowUpRight, Sparkles, Pizza, Wrench, Palette, Users, Code2, MapPin, CalendarDays, X } from "lucide-react";
+import { ArrowUpRight, Sparkles, Pizza, Wrench, Palette, Users, Code2, MapPin, CalendarDays } from "lucide-react";
 import SiteNav from "@/app/(marketing)/_site/components/SiteNav";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/app/(marketing)/_site/components/ui/dialog";
 import Footer from "@/app/(marketing)/_site/components/Footer";
@@ -1851,15 +1851,22 @@ const formatDayTime = (iso: string) => {
 
 const ThisWeekSection = ({ onOpenCalendar }: { onOpenCalendar: () => void }) => {
   const { events, loading } = useCalendarEvents();
-  const week = useMemo(() => buildWeek(events), [events]);
+  // Dates depend on the visitor's clock and zone, so they are computed after mount (the server
+  // render and first client render show the empty week) to keep hydration matching.
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setNow(new Date());
+  }, []);
+  const week = useMemo(() => (now ? buildWeek(events) : []), [events, now]);
   const featured = events.slice(0, 3);
 
-  const today = new Date();
-  const monthLabel = today.toLocaleDateString([], { month: "short" });
-  const weekStart = today.getDate();
+  const today = now ?? new Date(0);
+  const monthLabel = now ? today.toLocaleDateString([], { month: "short" }) : "";
+  const weekStart = now ? today.getDate() : "";
   const weekEndDate = new Date(today);
   weekEndDate.setDate(today.getDate() + 6);
-  const weekEnd = weekEndDate.getDate();
+  const weekEnd = now ? weekEndDate.getDate() : "";
 
   return (
     <section className="relative overflow-hidden bg-cream py-16 md:py-24">

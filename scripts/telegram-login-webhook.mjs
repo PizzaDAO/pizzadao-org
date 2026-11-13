@@ -9,7 +9,9 @@
 // from the environment and never prints the first two. Refuses when the bot behind the token is not the
 // configured login bot, so the shared rsv.pizza bot can never be pointed at this app.
 
-const WEBHOOK_URL = "https://app.pizzadao.org/api/telegram/login-bot/webhook";
+// Origin of the app: NEXT_PUBLIC_APP_URL, else NEXT_PUBLIC_SITE_URL (same order as app/lib/site-url.ts), else the legacy host.
+const APP_ORIGIN = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://app.pizzadao.org").replace(/\/$/, "");
+const WEBHOOK_URL = `${APP_ORIGIN}/api/telegram/login-bot/webhook`;
 
 const token = process.env.TELEGRAM_LOGIN_BOT_TOKEN?.trim();
 const secret = process.env.TELEGRAM_LOGIN_WEBHOOK_SECRET?.trim();

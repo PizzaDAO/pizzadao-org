@@ -9,6 +9,11 @@ export type Parsed<T> = { ok: true; value: T } | { ok: false; error: string };
 
 const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
 
+/** The hidden "website" field: only bots fill it. The routes answer ok and store nothing. */
+export function isHoneypotFilled(body: unknown): boolean {
+  return !!body && typeof body === "object" && str((body as Record<string, unknown>).website) !== "";
+}
+
 export interface NewsletterInput {
   email: string;
   source: string;
