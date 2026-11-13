@@ -19,7 +19,7 @@ import { prisma } from '@/app/lib/db'
 import { loadSettings, type Settings } from '@/app/lib/settings'
 import { resolveToggle } from '@/app/lib/settings/toggles'
 import { editDiscordMessage, postDiscordMessage } from '@/app/lib/discord-rest'
-import { enqueueMirror, type EnqueueInput, type EnqueueResult } from '@/app/lib/telegram/city-posts'
+import { enqueueMirror, targetCityKeys, type EnqueueInput, type EnqueueResult } from '@/app/lib/telegram/city-posts'
 import { normalizeStreamLink } from './live-state'
 import { parseRoleLines } from './live-access'
 
@@ -137,6 +137,8 @@ export interface AnnounceRow {
   postedChannelId: string | null
   discordMessageId: string | null
   streamLink: string | null
+  /** The random Telegram group picked for this call (null = none). */
+  randomCityKey: string | null
   source: string
   startedAt: Date
   reminderDueAt: Date
@@ -153,6 +155,8 @@ export interface LiveStore {
   claimReminder(key: string, now: Date): Promise<boolean>
   dueReminders(now: Date, onlyKey?: string): Promise<AnnounceRow[]>
   setSessionStream(sessionId: string, link: string): Promise<void>
+  /** The random groups picked for the most recent calls, newest first (at most `limit`). */
+  recentRandomCities(limit: number): Promise<string[]>
 }
 
 export const prismaLiveStore: LiveStore = {
@@ -188,6 +192,30 @@ export const prismaLiveStore: LiveStore = {
   async setSessionStream(sessionId, link) {
     await prisma.callLiveSession.updateMany({ where: { sessionId, endedAt: null }, data: { streamLinkOverride: link } })
   },
+  async recentRandomCities(limit) {
+    if (limit <= 0) return []
+    const rows = await prisma.callLiveAnnounce.findMany({ orderBy: { startedAt: 'desc' }, take: limit, select: { randomCityKey: true } })
+    return rows.map((r) => r.randomCityKey).filter((k): k is string => !!k)
+  },
+}
+
+/**
+ * One city key from `pool` for this call: never one of the fixed groups, and avoiding the keys of the
+ * most recent calls (`recent`, newest first) as far as the pool allows. Null when nothing is left.
+ */
+export function pickRandomCity(pool: readonly string[], recent: readonly string[], fixed: readonly string[], random: () => number = Math.random): string | null {
+  const norm = (k: string) => k.trim().toLowerCase()
+  const skip = new Set(fixed.map(norm))
+  const candidates = [...new Set(pool.map(norm))].filter((k) => k && !skip.has(k))
+  if (candidates.length === 0) return null
+  const recentN = recent.map(norm)
+  // Drop the oldest recent picks first until something is left to choose from.
+  for (let n = recentN.length; n >= 0; n--) {
+    const avoid = new Set(recentN.slice(0, n))
+    const ok = candidates.filter((k) => !avoid.has(k))
+    if (ok.length) return ok[Math.min(ok.length - 1, Math.floor(random() * ok.length))]
+  }
+  return null
 }
 
 export interface LiveDeps {
@@ -203,6 +231,8 @@ export interface LiveDeps {
   /** How long to wait (ms) for a concurrent winner to record its Discord message id. */
   sleep?: (ms: number) => Promise<void>
   /** The Discord event of the call channel, for a session whose recorder did not report an event id. */
+  /** Random source for the random city pick (tests). */
+  random?: () => number
   resolveEvent?: (channelId: string) => Promise<{ id: string; startsAt: Date } | null>
 }
 
@@ -298,6 +328,7 @@ export async function runLiveAnnounce(
     postedChannelId: null,
     discordMessageId: null,
     streamLink: stream,
+    randomCityKey: null,
     source: input.mode,
     startedAt: input.ctx.startedAt,
     reminderDueAt: new Date(now.getTime() + (settings.get('calls.liveReminderMinutes') as number) * 60_000),
@@ -305,6 +336,18 @@ export async function runLiveAnnounce(
   }
   // Previews never post and never write the claim.
   if (!may) return { status: 'preview', xText: xFor(row), streamLink: stream, discord: 'skipped', telegram: 'skipped' }
+
+  // The random group is picked once, here, and stored on the claim row: a retry or a second /live reuses it.
+  const pool = (settings.get('calls.liveRandomCityKeys') as string[] | undefined) ?? []
+  if (pool.length) {
+    try {
+      const noRepeat = (settings.get('calls.liveRandomCityNoRepeat') as number | undefined) ?? 0
+      const recent = await store.recentRandomCities(noRepeat)
+      row.randomCityKey = pickRandomCity(pool, recent, targetCityKeys('live', null, settings), deps.random)
+    } catch (err) {
+      console.error('[live-announce] random city pick failed:', err instanceof Error ? err.message : err)
+    }
+  }
 
   if (!(await store.claim(row))) {
     // Lost the race: the winner is posting. Wait briefly for its message id, then treat it as the existing row
@@ -356,7 +399,7 @@ export async function runLiveAnnounce(
   const tgText = renderTemplate(settings.get('calls.liveAnnounceTelegramTemplate'), buildVars(row, 'plain', env))
   if (tgText) {
     const q = await (deps.enqueue ?? enqueueMirror)(
-      { kind: 'live', sourceId: key, text: tgText, expiresAt: new Date(input.ctx.startedAt.getTime() + LIVE_POST_TTL_MS) },
+      { kind: 'live', sourceId: key, text: tgText, ...(row.randomCityKey ? { extraCityKeys: [row.randomCityKey] } : {}), expiresAt: new Date(input.ctx.startedAt.getTime() + LIVE_POST_TTL_MS) },
       env,
     )
     result.telegramQueued = q.queued
@@ -364,6 +407,20 @@ export async function runLiveAnnounce(
     if (q.queued > 0) await deps.kick?.().catch(() => undefined)
   } else {
     result.telegram = 'none'
+  }
+
+  // Automatic announcement only: ask the hosts (once, with the claim) to run /live with the X stream link.
+  const askChannel = ((settings.get('calls.liveStreamAskChannelId') as string | undefined) ?? '').trim()
+  if (input.mode === 'auto' && askChannel) {
+    const t = discordTarget(askChannel, env)
+    const text = ((settings.get('calls.liveStreamAskTemplate') as string | undefined) ?? '').trim()
+    if (t && text) {
+      try {
+        await (deps.postDiscord ?? postDiscordMessage)({ kind: 'bot', channelId: t.channelId, botToken: t.botToken }, { content: text, allowed_mentions: { parse: [] } })
+      } catch (err) {
+        console.error('[live-announce] stream link ask failed:', err instanceof Error ? err.message : err)
+      }
+    }
   }
   return result
 }

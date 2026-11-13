@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest'
 import type { Settings } from '@/app/lib/settings'
 
 vi.mock('@/app/lib/db', () => ({ prisma: {} }))
-vi.mock('@/app/lib/telegram/city-posts', () => ({ enqueueMirror: vi.fn(), processOutbox: vi.fn() }))
+vi.mock('@/app/lib/telegram/city-posts', async (orig) => ({ ...(await orig<typeof import('@/app/lib/telegram/city-posts')>()), enqueueMirror: vi.fn(), processOutbox: vi.fn() }))
 const crewsMock = vi.fn()
 vi.mock('@/app/lib/crew-mappings', () => ({ getCrewMappings: () => crewsMock() }))
 const sessionsMock = vi.fn(async () => [] as unknown[])
@@ -18,6 +18,7 @@ import {
   renderTemplate,
   runLiveAnnounce,
   runLiveReminders,
+  pickRandomCity,
   type AnnounceRow,
   type LiveStore,
 } from './live-announce'
@@ -45,6 +46,8 @@ const DEFAULTS: Record<string, unknown> = {
   'calls.liveAnnounceTelegramTemplate': 'TG live {eventLink}[[ stream {streamLink}]]',
   'calls.liveAnnounceXTemplate': 'X live {eventLink}[[ also {streamLink}]]',
   'calls.liveReminderTemplate': 'Reminder {eventLink}',
+  'calls.liveTelegramCityKeys': [],
+  'telegram.announceCityKeys': [],
 }
 const settings = (over: Record<string, unknown> = {}): Settings => ({ get: (k: string) => ({ ...DEFAULTS, ...over })[k], isSet: () => true, readFailed: false, invalidKeys: [] }) as unknown as Settings
 
@@ -64,6 +67,7 @@ function memStore() {
     },
     dueReminders: async (now, only) => [...rows.values()].filter((r) => !r.reminderQueuedAt && r.reminderDueAt <= now && (!only || r.occurrenceKey === only)),
     setSessionStream: async (id, l) => void (sessionStream[id] = l),
+    recentRandomCities: async (n) => [...rows.values()].sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime()).slice(0, n).map((r) => r.randomCityKey).filter((k): k is string => !!k),
   }
   return { store, rows, sessionStream }
 }
@@ -315,7 +319,7 @@ describe('review fixes', () => {
     const h = harness()
     const winner: AnnounceRow = {
       occurrenceKey: KEY, eventId: '777', sessionId: 's1', voiceChannelId: '888', postedChannelId: '999', discordMessageId: null,
-      streamLink: null, source: 'auto', startedAt: START, reminderDueAt: NOW, reminderQueuedAt: null,
+      streamLink: null, randomCityKey: null, source: 'auto', startedAt: START, reminderDueAt: NOW, reminderQueuedAt: null,
     }
     let gets = 0
     h.store.get = async () => {
@@ -336,7 +340,7 @@ describe('review fixes', () => {
 
   it('a lost race without a stream link replies "already", and the wait is bounded', async () => {
     const h = harness()
-    const winner = { occurrenceKey: KEY, eventId: '777', sessionId: 's1', voiceChannelId: '888', postedChannelId: null, discordMessageId: null, streamLink: null, source: 'auto', startedAt: START, reminderDueAt: NOW, reminderQueuedAt: null }
+    const winner = { occurrenceKey: KEY, eventId: '777', sessionId: 's1', voiceChannelId: '888', postedChannelId: null, discordMessageId: null, streamLink: null, randomCityKey: null, source: 'auto', startedAt: START, reminderDueAt: NOW, reminderQueuedAt: null }
     let first = true
     h.store.get = async () => (first ? ((first = false), null) : { ...winner })
     h.store.claim = async () => false
@@ -391,5 +395,84 @@ describe('review fixes', () => {
     ;(currentCallEvent as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ id: '777', name: 'Community Call', startsAt: START })
     expect(await resolveSessionEvent('1')).toEqual({ id: '777', startsAt: START }) // default call channel is mocked as '1'
     expect(await resolveSessionEvent('other')).toBeNull()
+  })
+})
+
+describe('pickRandomCity', () => {
+  it('avoids recent picks and the fixed groups', () => {
+    for (let i = 0; i < 20; i++) expect(pickRandomCity(['a', 'b', 'c', 'd'], ['a', 'b'], ['c'], () => i / 20)).toBe('d')
+  })
+  it('avoids as many recent picks as it can when the pool is small', () => {
+    expect(pickRandomCity(['a', 'b'], ['b', 'a'], [])).toBe('a')
+    expect(pickRandomCity(['a', 'b'], ['a', 'b'], [])).toBe('b')
+  })
+  it('returns null for an empty pool or when only fixed groups remain', () => {
+    expect(pickRandomCity([], [], [])).toBeNull()
+    expect(pickRandomCity(['a'], [], ['A'])).toBeNull()
+  })
+})
+
+describe('random city group', () => {
+  const POOL = { 'calls.liveRandomCityKeys': ['paris', 'rome', 'oslo'], 'calls.liveRandomCityNoRepeat': 2 }
+  const at = (n: number) => ({ ...CTX, eventId: `e${n}`, startedAt: new Date(START.getTime() + n * 86_400_000) })
+
+  it('adds one pooled city to the queued post and stores it on the row', async () => {
+    const h = harness(POOL)
+    await runLiveAnnounce({ mode: 'auto', ctx: CTX }, h.deps)
+    const key = h.rows.get('777:2026-11-15')!.randomCityKey
+    expect(['paris', 'rome', 'oslo']).toContain(key)
+    expect((h.enqueue.mock.calls[0] as unknown as [object])[0]).toMatchObject({ kind: 'live', extraCityKeys: [key] })
+  })
+  it('excludes the cities of the last N calls', async () => {
+    const h = harness(POOL)
+    const picks: string[] = []
+    for (let n = 0; n < 3; n++) {
+      await runLiveAnnounce({ mode: 'auto', ctx: at(n) }, h.deps)
+      picks.push([...h.rows.values()].find((r) => r.eventId === `e${n}`)!.randomCityKey!)
+    }
+    expect(new Set(picks).size).toBe(3)
+  })
+  it('never picks a city that is already in the fixed groups', async () => {
+    const h = harness({ ...POOL, 'calls.liveTelegramCityKeys': ['paris', 'rome'] })
+    await runLiveAnnounce({ mode: 'auto', ctx: CTX }, h.deps)
+    expect(h.rows.get('777:2026-11-15')!.randomCityKey).toBe('oslo')
+  })
+  it('is stable: a second run neither re-picks nor re-queues', async () => {
+    const h = harness(POOL)
+    await runLiveAnnounce({ mode: 'auto', ctx: CTX }, h.deps)
+    const first = h.rows.get('777:2026-11-15')!.randomCityKey
+    await runLiveAnnounce({ mode: 'command', ctx: CTX, streamLink: 'https://x.com/i/broadcasts/abc' }, h.deps)
+    expect(h.rows.get('777:2026-11-15')!.randomCityKey).toBe(first)
+    expect(h.enqueue).toHaveBeenCalledTimes(1)
+  })
+  it("keeps today's behaviour with an empty pool", async () => {
+    const h = harness()
+    await runLiveAnnounce({ mode: 'auto', ctx: CTX }, h.deps)
+    expect(h.rows.get('777:2026-11-15')!.randomCityKey).toBeNull()
+    expect((h.enqueue.mock.calls[0] as unknown as [object])[0]).not.toHaveProperty('extraCityKeys')
+  })
+})
+
+describe('stream link ask', () => {
+  const ASK = { 'calls.liveStreamAskChannelId': '111', 'calls.liveStreamAskTemplate': 'Run /live please' }
+  const asks = (h: ReturnType<typeof harness>) => h.postDiscord.mock.calls.filter((c) => (c as unknown as [{ channelId: string }])[0].channelId === '111')
+
+  it('posts once on an auto announcement', async () => {
+    const h = harness(ASK)
+    await runLiveAnnounce({ mode: 'auto', ctx: CTX }, h.deps)
+    await runLiveAnnounce({ mode: 'auto', ctx: CTX }, h.deps)
+    expect(asks(h)).toHaveLength(1)
+    expect((asks(h)[0] as unknown as [unknown, { content: string }])[1].content).toBe('Run /live please')
+  })
+  it('does not post for /live, with no channel, or on a preview', async () => {
+    const a = harness(ASK)
+    await runLiveAnnounce({ mode: 'command', ctx: CTX }, a.deps)
+    expect(asks(a)).toHaveLength(0)
+    const b = harness()
+    await runLiveAnnounce({ mode: 'auto', ctx: CTX }, b.deps)
+    expect(asks(b)).toHaveLength(0)
+    const c = harness(ASK, { ...PROD, VERCEL_ENV: 'preview' })
+    await runLiveAnnounce({ mode: 'auto', ctx: CTX }, c.deps)
+    expect(c.postDiscord).not.toHaveBeenCalled()
   })
 })
