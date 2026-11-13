@@ -7,8 +7,6 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 
 | ID | Task | Stage | Priority | Due | Lead | Tags | Plan | PR | Notes |
 |----|------|-------|----------|-----|------|------|------|----|-------|
-| tax-form-native | Host the Rare Pizzas tax-form page natively at app.pizzadao.org/tax-form?payee=<token> (replaces the rsv.pizza redirect; calls api.rsv.pizza tax-form-request API) | review | P1 |  | Snax | tax | plans/tax-form-native.md | #330 |  |
-| tax-form-redirect | Redirect app.pizzadao.org/tax-form to rsv.pizza/tax-form (keeps ?payee= token) for Rare Pizzas W-9/W-8 requests | review | P2 |  | Snax | tax |  | #165 |  |
 | parmesan-10386 | Deliver POAPs automatically to people on the discord channel attendance | doing | P3 |  |  |  | plans/parmesan-10386.md |  |  |
 | jalapeno-34126 | Add animation/pop up to signal your profile has been completed | todo | P2 |  | Pizza Lord |  |  |  |  |
 | pizzaiolo-13628 | update timezone for crewsheet | todo | P2 |  |  |  |  |  | when someone selects their city, the timezone should auto format to their local pov |
@@ -25,6 +23,8 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 
 | ID | Task | Priority | Done | PR | Notes |
 |----|------|----------|------|----|-------|
+| tax-form-native | Host the Rare Pizzas tax-form page natively at app.pizzadao.org/tax-form (replaces the rsv.pizza redirect) | P1 | 2026-11-13 | #330 | backend CORS in rsv-pizza #1222; e2e passed on preview (W-8BEN) |
+| tax-form-redirect | Redirect app.pizzadao.org/tax-form to rsv.pizza/tax-form | P2 | 2026-10-18 | #165 | superseded by tax-form-native (#330) |
 | calzone-30418 | Recorder bot joins community calls, records, transcribes, summarizes, and posts them on the website | P2 | 2026-10-30 | #175,#176,#178 | Phase 0+1 (#174) and Phase 2 (#175) merged; recorder live on Railway. 10-20: no crew calls recorded (only started on Discord ACTIVE); trigger fix #176 merged and deployed to Railway 10-20 21:45 UTC. Next: verify first real call (Education Crew 10-21 15:00 UTC), add DEEPGRAM_API_KEY on Railway |
 | oregano-41907 | Welcome new Pizza Trainees by DM + welcome channel: "Welcome to PizzaDAO! Grab a name at https://app.pizzadao.org" | P2 | 2026-10-18 | #173 | Gated by TRAINEE_NICK_ENABLED; optional TRAINEE_WELCOME_CHANNEL_ID |
 | blackolive-55617 | Mafia Spotlight Submission form | P2 | 2026-10-18 | #169 | Needs a "Mafia Spotlight" row in the webhooks sheet |
