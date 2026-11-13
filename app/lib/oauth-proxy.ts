@@ -9,14 +9,12 @@ const PRODUCTION_ORIGIN = SITE_URL;
 // Where the production callback may send a transfer token / redirect:
 // only this app's own preview deployments (Vercel project `onboarding` on the
 // `pizza-dao` team, e.g. onboarding-abc123xyz-pizza-dao.vercel.app or
-// onboarding-git-my-branch-pizza-dao.vercel.app) and production itself, under
-// both its old host (app.) and the apex, so either can be the production origin
-// during and after the move.
+// onboarding-git-my-branch-pizza-dao.vercel.app). Production is deliberately NOT
+// listed: it never proxies a login to itself (only previews hop through it), and
+// allowing it would let anyone mint a plain transfer token aimed at production.
 // The preview host must be a single DNS label under vercel.app.
 const ALLOWED_RETURN_PATTERNS = [
   /^https:\/\/onboarding-[a-z0-9-]+-pizza-dao\.vercel\.app$/,
-  /^https:\/\/app\.pizzadao\.org$/,
-  /^https:\/\/pizzadao\.org$/,
 ];
 
 // Local development only (never accepted in production builds).

@@ -113,6 +113,23 @@ describe("session-transfer: preview proxy tokens (unchanged)", () => {
     expect(res.headers.getSetCookie().some((c) => c.startsWith(`${sess.COOKIE_NAME}=`))).toBe(true);
     expect(create).not.toHaveBeenCalled();
   });
+  it("on production, refuses a plain token aimed at this deployment (login CSRF) for every production origin", async () => {
+    const { GET, proxyLib, sess } = await setup();
+    vi.stubEnv("VERCEL_ENV", "production");
+    for (const origin of ["https://app.pizzadao.org", "https://pizzadao.org"]) {
+      const token = proxyLib.createTransferToken({ discordId: "1", username: "u", nick: "n", origin });
+      const res = await call(GET, `${origin}/api/auth/session-transfer?token=${token}&next=/crew`);
+      expect(res.status).toBe(403);
+      expect(res.headers.getSetCookie().some((c) => c.startsWith(`${sess.COOKIE_NAME}=`))).toBe(false);
+    }
+  });
+  it("off production, ignores next for a plain token", async () => {
+    const { GET, proxyLib } = await setup();
+    const o = "https://onboarding-abc-pizza-dao.vercel.app";
+    const token = proxyLib.createTransferToken({ discordId: "1", username: "u", nick: "n", origin: o });
+    const res = await call(GET, `${o}/api/auth/session-transfer?token=${token}&next=/crew`);
+    expect(res.headers.get("location")).toBe(o + "/");
+  });
   it("still answers JSON errors when there is no next", async () => {
     const { GET } = await setup();
     expect((await call(GET, `${SITE}/api/auth/session-transfer`)).status).toBe(400);

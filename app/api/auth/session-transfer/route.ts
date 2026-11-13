@@ -26,7 +26,8 @@ export const runtime = "nodejs";
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const token = url.searchParams.get("token");
-  const next = loginReturnPath(url.searchParams.get("next"));
+  // `next` is only ever honoured for bridge tokens (those with a jti, checked below).
+  let next = loginReturnPath(url.searchParams.get("next"));
 
   // Where a failed bridge lands: the page they asked for, signed out (they sign in again).
   const fail = (body: { error: string }, status: number) =>
@@ -46,7 +47,14 @@ export async function GET(req: Request) {
     return fail({ error: "Token not valid for this origin" }, 403);
   }
 
-  if (transfer.jti) {
+  if (!transfer.jti) {
+    // Plain tokens are the preview OAuth proxy's. Production never proxies to itself, so a plain
+    // token aimed at it can only be a forged login-CSRF link: refuse it.
+    if (process.env.VERCEL_ENV === "production") {
+      return NextResponse.json({ error: "Token not valid here" }, { status: 403 });
+    }
+    next = undefined;
+  } else {
     // A bridge token: kill switch, bound to the browser that asked, and one use only.
     if (!(await toggleEnabled("site.sessionBridgeEnabled"))) {
       return fail({ error: "Session bridge is off" }, 403);

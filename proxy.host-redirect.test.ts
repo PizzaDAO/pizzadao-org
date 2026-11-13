@@ -49,12 +49,13 @@ afterEach(() => vi.unstubAllEnvs());
 describe("proxy matcher", () => {
   it("covers page paths and leaves api, _next, _vercel and .well-known out", async () => {
     const { config } = await load();
-    const m = config.matcher[0];
-    const re = new RegExp("^" + m.replace("/((?!", "/(?!").replace(/\)\.\*\)$/, ").*") + "$");
+    const rule = config.matcher[2] as { source: string; has: unknown[] };
+    expect(rule.has).toEqual([{ type: "host", value: "app.pizzadao.org" }]);
+    const re = new RegExp("^" + rule.source.replace("/((?!", "/(?!").replace(/\)\.\*\)$/, ").*") + "$");
     expect(re.test("/")).toBe(true);
     expect(re.test("/crew")).toBe(true);
     expect(re.test("/apiary")).toBe(true);
-    for (const p of ["/api/x", "/api", "/_next/static/a.js", "/_vercel/x", "/.well-known/x"]) expect(re.test(p)).toBe(false);
+    for (const p of ["/api/x", "/api", "/_next/static/a.js", "/_vercel/x", "/.well-known/x", "/brand-kit/a.png", "/robots.txt"]) expect(re.test(p)).toBe(false);
   });
 });
 
@@ -173,6 +174,14 @@ describe("session bridge", () => {
     expect(await plain("https://app.pizzadao.org/crew", { headers: { ...withCookie, "next-router-prefetch": "1" } })).toBe("https://pizzadao.org/crew");
     expect(await plain("https://app.pizzadao.org/crew", { headers: withCookie, method: "POST" })).toBe("https://pizzadao.org/crew");
     expect(await plain("https://app.pizzadao.org/login", { headers: withCookie })).toBe("https://pizzadao.org/login");
+  });
+  it("on: HEAD gets the plain redirect (no cookie overwrite)", async () => {
+    bridgeOn();
+    const { proxy, verifySession } = await load("https://pizzadao.org");
+    verifySession.mockReturnValue(signedIn);
+    const r = await proxy(req("https://app.pizzadao.org/crew", { headers: withCookie, method: "HEAD" }));
+    expect(redirectedTo(r)).toBe("https://pizzadao.org/crew");
+    expect(r.headers.get("set-cookie")).toBeNull();
   });
   it("on: nothing is minted when the redirect itself is off", async () => {
     loadSettings.mockResolvedValue(settingsWith({ "site.sessionBridgeEnabled": true }));

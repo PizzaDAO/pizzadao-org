@@ -54,7 +54,7 @@ async function hostRedirect(req: NextRequest): Promise<NextResponse | null> {
         if (!target) return null;
 
         if (
-            (req.method === "GET" || req.method === "HEAD") &&
+            req.method === "GET" &&
             !isPrefetchLike(req.headers) &&
             resolveToggle("site.sessionBridgeEnabled", settings)
         ) {
@@ -90,5 +90,15 @@ async function allowed(req: NextRequest): Promise<boolean> {
     }
 }
 
-// Every page path (for the old-host redirect); /api, /_next, /_vercel and /.well-known never reach this function.
-export const config = { matcher: ["/((?!api(?:/|$)|_next/|_vercel/|\\.well-known/).*)"] };
+// /disavow everywhere, plus (only on the old app host, for the redirect) every page path;
+// /api, /_next, /_vercel, /.well-known and dotted static files never reach this function.
+export const config = {
+    matcher: [
+        "/disavow",
+        "/disavow/:path*",
+        {
+            source: "/((?!api(?:/|$)|_next/|_vercel/|\\.well-known/|.*\\..*).*)",
+            has: [{ type: "host", value: "app.pizzadao.org" }],
+        },
+    ],
+};

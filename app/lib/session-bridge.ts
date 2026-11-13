@@ -16,7 +16,12 @@
  *   - The token is short-lived, signed and spent once (the jti is recorded in ConsumedToken).
  *   - It is bound to the browser that asked: the jti also travels in an httpOnly cookie scoped to
  *     the session-transfer path. An attacker who feeds a victim a link with the attacker's own
- *     token (login CSRF) cannot set that cookie in the victim's browser.
+ *     token (login CSRF) cannot set that cookie in the victim's browser. This assumes every
+ *     *.pizzadao.org subdomain is trusted, since any of them can set a Domain=pizzadao.org cookie
+ *     (notify. is delegated to a third party: keep it that way only while that holds).
+ *   - On production, session-transfer refuses tokens WITHOUT a jti (those are the preview OAuth
+ *     proxy's), and honours `next` only for bridge tokens, so a forged plain token cannot log a
+ *     victim in as someone else.
  *   - `next` is a local path only (loginReturnPath), never a URL, so it cannot redirect off-site.
  *   - Tokens are never logged; the redirects carry no-store and no-referrer.
  */
