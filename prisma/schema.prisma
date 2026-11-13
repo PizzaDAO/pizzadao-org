@@ -1403,6 +1403,10 @@ model TraineeWelcome {
   welcomedAt DateTime @default(now())
   dm         String?
   channel    String?
+  // The channel post (when one was sent): used to delete it if the member leaves.
+  channelId        String?
+  channelMessageId String?
+  channelDeletedAt DateTime?
 }
 
 // ===== CALL RECORDER (calzone-30418) =====

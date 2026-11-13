@@ -9,10 +9,10 @@ describe('sendWelcome', () => {
     const calls: Array<{ url: string; body: any }> = []
     const fetchImpl = vi.fn(async (url: string, init: RequestInit) => {
       calls.push({ url, body: JSON.parse(String(init.body)) })
-      return url.endsWith('/users/@me/channels') ? json(200, { id: 'dm1' }) : json(200, {})
+      return url.endsWith('/users/@me/channels') ? json(200, { id: 'dm1' }) : json(200, { id: 'msg1' })
     }) as unknown as typeof fetch
     const r = await sendWelcome('u1', 'hi', 'chan1', { fetchImpl })
-    expect(r).toEqual({ dm: 'sent', channel: 'sent', transient: false, rateLimited: false })
+    expect(r).toEqual({ dm: 'sent', channel: 'sent', transient: false, rateLimited: false, channelId: 'chan1', channelMessageId: 'msg1' })
     expect(calls[2].url).toContain('/channels/chan1/messages')
     expect(calls[2].body).toEqual({ content: '<@u1> hi', allowed_mentions: { parse: [], users: ['u1'] } })
   })
@@ -70,5 +70,19 @@ describe('sendWelcome', () => {
     ) as unknown as typeof fetch
     await sendWelcome('u1', 'hi', 'chan1', { fetchImpl })
     for (const c of (fetchImpl as any).mock.calls) expect(c[1].signal).toBeInstanceOf(AbortSignal)
+  })
+})
+
+describe('deleteChannelMessage', () => {
+  it('maps 204 to deleted, 404 to gone, 429 to rateLimited, 500 to failed', async () => {
+    vi.stubEnv('DISCORD_BOT_TOKEN', 'tok')
+    const { deleteChannelMessage } = await import('./discord')
+    const run = (status: number) =>
+      deleteChannelMessage('c', 'm', { fetchImpl: (async () => new Response(null, { status })) as unknown as typeof fetch })
+    expect(await run(204)).toBe('deleted')
+    expect(await run(404)).toBe('gone')
+    expect(await run(403)).toBe('gone')
+    expect(await run(429)).toBe('rateLimited')
+    expect(await run(500)).toBe('failed')
   })
 })

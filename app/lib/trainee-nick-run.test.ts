@@ -62,6 +62,10 @@ function setup(over: Partial<TraineeNickDeps> = {}, env: Record<string, string> 
     }),
     recordWelcome: vi.fn(async () => {}),
     reclaimStaleWelcomes: vi.fn(async () => 0),
+    welcomeDeleteEnabled: vi.fn(async () => false),
+    undeletedWelcomePosts: vi.fn(async () => []),
+    deleteWelcomePost: vi.fn(async () => 'deleted' as const),
+    markWelcomePostDeleted: vi.fn(async () => {}),
     ...over,
   }
   return { deps, writes, order, signed }
@@ -567,5 +571,83 @@ describe('oregano-41907 welcome', () => {
     expect(writes).toEqual([])
     expect(log).toHaveBeenCalledWith('[trainee-nicks] would welcome u1')
     log.mockRestore()
+  })
+})
+
+describe('welcome cleanup when a member leaves', () => {
+  // u1 and u2 are in the guild (see setup); gone1 / gone2 left.
+  const posts = [
+    { discordId: 'u1', channelId: 'c', messageId: 'm-u1' },
+    { discordId: 'gone1', channelId: 'c', messageId: 'm-g1' },
+    { discordId: 'gone2', channelId: 'c', messageId: 'm-g2' },
+  ]
+  const base = (over: Partial<TraineeNickDeps> = {}) =>
+    setup({ welcomeDeleteEnabled: vi.fn(async () => true), undeletedWelcomePosts: vi.fn(async () => posts), ...over })
+
+  it('deletes the post of a member who left; leaves present members alone', async () => {
+    const { deps } = base()
+    const r = await runTraineeNicks({ dryRun: false, deps })
+    expect(deps.deleteWelcomePost).toHaveBeenCalledTimes(2)
+    expect(deps.deleteWelcomePost).toHaveBeenCalledWith('c', 'm-g1')
+    expect(deps.deleteWelcomePost).toHaveBeenCalledWith('c', 'm-g2')
+    expect(deps.deleteWelcomePost).not.toHaveBeenCalledWith('c', 'm-u1')
+    expect(deps.markWelcomePostDeleted).toHaveBeenCalledWith('gone1')
+    expect(deps.markWelcomePostDeleted).not.toHaveBeenCalledWith('u1')
+    expect(r).toMatchObject({ welcomeDeleted: 2, welcomeDeleteFailed: 0, welcomeDeletePending: 0 })
+  })
+
+  it('a 404 (already gone) is marked deleted', async () => {
+    const { deps } = base({ deleteWelcomePost: vi.fn(async () => 'gone' as const) })
+    const r = await runTraineeNicks({ dryRun: false, deps })
+    expect(deps.markWelcomePostDeleted).toHaveBeenCalledTimes(2)
+    expect(r).toMatchObject({ welcomeDeleted: 2, welcomeDeleteFailed: 0 })
+  })
+
+  it('a failure is counted, not marked, and stays pending', async () => {
+    const { deps } = base({ deleteWelcomePost: vi.fn(async () => 'failed' as const) })
+    const r = await runTraineeNicks({ dryRun: false, deps })
+    expect(deps.markWelcomePostDeleted).not.toHaveBeenCalled()
+    expect(r).toMatchObject({ welcomeDeleted: 0, welcomeDeleteFailed: 2, welcomeDeletePending: 2 })
+  })
+
+  it('toggle off: no delete, but the would-delete count is reported', async () => {
+    const { deps } = base({ welcomeDeleteEnabled: vi.fn(async () => false) })
+    const r = await runTraineeNicks({ dryRun: false, deps })
+    expect(deps.deleteWelcomePost).not.toHaveBeenCalled()
+    expect(r).toMatchObject({ welcomeDeleted: 0, welcomeDeletePending: 2 })
+  })
+
+  it('dry run: no delete even with the toggle on, count reported', async () => {
+    const { deps } = base()
+    const r = await runTraineeNicks({ dryRun: true, deps })
+    expect(deps.deleteWelcomePost).not.toHaveBeenCalled()
+    expect(r).toMatchObject({ welcomeDeletePending: 2 })
+  })
+
+  it('incomplete member list (listing throws): nothing is deleted', async () => {
+    const { deps } = base({ listMembers: vi.fn(async () => { throw new Error('Discord member list failed (500)') }) })
+    await expect(runTraineeNicks({ dryRun: false, deps })).rejects.toThrow()
+    expect(deps.deleteWelcomePost).not.toHaveBeenCalled()
+  })
+
+  it('a possibly truncated list (page cap reached) deletes nothing', async () => {
+    const big = Array.from({ length: 200_000 }, (_, i) => member(`x${i}`))
+    const { deps } = base({ listMembers: vi.fn(async () => [member(BOT, { roles: ['100003'], joined_at: '2020-01-01T00:00:00Z' }), ...big.slice(1)]) })
+    await runTraineeNicks({ dryRun: false, deps })
+    expect(deps.deleteWelcomePost).not.toHaveBeenCalled()
+  })
+
+  it('caps deletions per run at 25', async () => {
+    const many = Array.from({ length: 40 }, (_, i) => ({ discordId: `g${i}`, channelId: 'c', messageId: `m${i}` }))
+    const { deps } = base({ undeletedWelcomePosts: vi.fn(async () => many) })
+    const r = await runTraineeNicks({ dryRun: false, deps })
+    expect(deps.deleteWelcomePost).toHaveBeenCalledTimes(25)
+    expect(r).toMatchObject({ welcomeDeleted: 25, welcomeDeletePending: 15 })
+  })
+
+  it('records the channel post ids from the welcome result', async () => {
+    const { deps } = setup({ welcome: vi.fn(async () => ({ ...W_OK, channelId: 'c', channelMessageId: 'm9' })) }, { TRAINEE_WELCOME_CHANNEL_ID: 'c' })
+    await runTraineeNicks({ dryRun: false, deps })
+    expect(deps.recordWelcome).toHaveBeenCalledWith('u1', 'sent', 'sent', { channelId: 'c', messageId: 'm9' })
   })
 })

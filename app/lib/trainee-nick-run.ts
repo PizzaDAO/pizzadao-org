@@ -5,9 +5,11 @@ import { SITE_URL } from './site-url'
 import {
   getBotUserId,
   getGuildInfo,
+  deleteChannelMessage,
   listAllGuildMembers,
   sendWelcome,
   writeGuildMember,
+  type DeleteMessageResult,
   type GuildInfo,
   type GuildMemberRow,
   type MemberWrite,
@@ -44,6 +46,10 @@ const SAMPLE_SIZE = 20
 const WELCOME_MAX_PER_RUN = 20
 /** Spacing between channel posts (Discord's per-channel message bucket). */
 const WELCOME_CHANNEL_GAP_MS = 1200
+/** At most this many welcome posts deleted per run for members who left. */
+const WELCOME_DELETE_MAX_PER_RUN = 25
+/** The member listing stops at 200 pages of 1000; a list this long may be truncated. */
+const MEMBER_LIST_MAY_BE_TRUNCATED = 200_000
 export const TRAINEE_WELCOME_TEXT = `Welcome to PizzaDAO! Grab a name at ${SITE_URL}`
 
 export type RoleStatus = 'ok' | 'role_unresolved' | 'role_not_assignable'
@@ -63,6 +69,11 @@ export interface TraineeNickResult {
   dmClosed?: number
   channelFailed?: number
   welcomeDeferred?: number
+  /** Welcome posts deleted because the member left. */
+  welcomeDeleted?: number
+  welcomeDeleteFailed?: number
+  /** Welcome posts of members who left and are still up (would be deleted, or deferred by the cap). */
+  welcomeDeletePending?: number
   roleStatus?: RoleStatus
   pizzaNoobRoleId?: string | null
   healed?: number
@@ -100,7 +111,13 @@ export interface TraineeNickDeps {
   claimWelcome: (id: string) => Promise<boolean>
   /** Delete the row so the next run retries (transient failure). */
   releaseWelcome: (id: string) => Promise<void>
-  recordWelcome: (id: string, dm: string, channel: string) => Promise<void>
+  recordWelcome: (id: string, dm: string, channel: string, post?: { channelId: string; messageId: string }) => Promise<void>
+  /** discord.welcomeDeleteOnLeaveEnabled (fail closed). */
+  welcomeDeleteEnabled: () => Promise<boolean>
+  /** Welcome rows with a channel post that is not deleted yet. */
+  undeletedWelcomePosts: () => Promise<Array<{ discordId: string; channelId: string; messageId: string }>>
+  deleteWelcomePost: (channelId: string, messageId: string) => Promise<DeleteMessageResult>
+  markWelcomePostDeleted: (id: string) => Promise<void>
   /** Delete claims with no outcome older than 15 min; returns how many. */
   reclaimStaleWelcomes: () => Promise<number>
 }
@@ -142,8 +159,24 @@ const defaultDeps = (): TraineeNickDeps => ({
   releaseWelcome: async (id) => {
     await prisma.traineeWelcome.deleteMany({ where: { discordId: id } })
   },
-  recordWelcome: async (id, dm, channel) => {
-    await prisma.traineeWelcome.updateMany({ where: { discordId: id }, data: { dm, channel } })
+  recordWelcome: async (id, dm, channel, post) => {
+    await prisma.traineeWelcome.updateMany({
+      where: { discordId: id },
+      data: { dm, channel, ...(post ? { channelId: post.channelId, channelMessageId: post.messageId } : {}) },
+    })
+  },
+  welcomeDeleteEnabled: () => toggleEnabled('discord.welcomeDeleteOnLeaveEnabled'),
+  undeletedWelcomePosts: async () => {
+    const rows = await prisma.traineeWelcome.findMany({
+      where: { channelId: { not: null }, channelMessageId: { not: null }, channelDeletedAt: null },
+      select: { discordId: true, channelId: true, channelMessageId: true },
+      orderBy: { welcomedAt: 'asc' },
+    })
+    return rows.map((r) => ({ discordId: r.discordId, channelId: r.channelId!, messageId: r.channelMessageId! }))
+  },
+  deleteWelcomePost: (channelId, messageId) => deleteChannelMessage(channelId, messageId),
+  markWelcomePostDeleted: async (id) => {
+    await prisma.traineeWelcome.updateMany({ where: { discordId: id }, data: { channelDeletedAt: new Date() } })
   },
   reclaimStaleWelcomes: async () =>
     (
@@ -278,6 +311,9 @@ export async function runTraineeNicks(opts: {
       dmClosed: 0,
       channelFailed: 0,
       welcomeDeferred: 0,
+      welcomeDeleted: 0,
+      welcomeDeleteFailed: 0,
+      welcomeDeletePending: 0,
       roleStatus,
       pizzaNoobRoleId,
       healed: 0,
@@ -306,6 +342,7 @@ export async function runTraineeNicks(opts: {
       } catch (err) {
         console.warn('[trainee-nicks] welcome dry-run lookup failed', (err as Error)?.message)
       }
+      await leaveCleanupStep()
       result.samples = {
         heal: plan.heal.slice(0, SAMPLE_SIZE).map((h) => h.id),
         sweep: plan.sweep.slice(0, SAMPLE_SIZE).map((h) => h.id),
@@ -418,11 +455,70 @@ export async function runTraineeNicks(opts: {
       console.warn('[trainee-nicks] welcome step failed', (err as Error)?.message)
     }
 
+    try {
+      if (!stop || stop === 'time_budget') await leaveCleanupStep()
+    } catch (err) {
+      console.warn('[trainee-nicks] welcome cleanup failed', (err as Error)?.message)
+    }
+
     if (stop) {
       result.stoppedReason = stop
       if (stop === 'permission_error') result.status = 'aborted'
     }
     return result
+
+    /**
+     * Members who left: delete the bot's welcome channel post (DMs are left
+     * alone). Only runs off a listing that succeeded (a failed listing throws
+     * before here) and is not suspiciously long. Toggle off: counts only.
+     */
+    async function leaveCleanupStep() {
+      if (rawMembers.length >= MEMBER_LIST_MAY_BE_TRUNCATED) {
+        console.warn('[trainee-nicks] member list may be truncated; skipping welcome cleanup')
+        return
+      }
+      const present = new Set(members.map((m) => m.id))
+      let left: Array<{ discordId: string; channelId: string; messageId: string }>
+      try {
+        left = (await deps.undeletedWelcomePosts()).filter((r) => !present.has(r.discordId))
+      } catch (err) {
+        console.warn('[trainee-nicks] welcome cleanup lookup failed', (err as Error)?.message)
+        return
+      }
+      result.welcomeDeletePending = left.length
+      if (left.length === 0) return
+      let enabled = false
+      try {
+        enabled = await deps.welcomeDeleteEnabled()
+      } catch (err) {
+        console.warn('[trainee-nicks] welcome delete toggle read failed', (err as Error)?.message)
+      }
+      if (!enabled || dryRun) {
+        console.log(`[trainee-nicks] would delete ${left.length} welcome post(s) for members who left`)
+        return
+      }
+      let tried = 0
+      for (const row of left) {
+        if (tried >= WELCOME_DELETE_MAX_PER_RUN) break
+        if (deps.now() - writeStart >= WELCOME_DEADLINE_MS) break
+        tried++
+        let outcome: DeleteMessageResult
+        try {
+          outcome = await deps.deleteWelcomePost(row.channelId, row.messageId)
+        } catch (err) {
+          console.warn('[trainee-nicks] welcome delete failed', (err as Error)?.message)
+          outcome = 'failed'
+        }
+        if (outcome === 'deleted' || outcome === 'gone') {
+          await deps.markWelcomePostDeleted(row.discordId).catch(() => {})
+          result.welcomeDeleted!++
+          result.welcomeDeletePending!--
+        } else {
+          result.welcomeDeleteFailed!++
+          if (outcome === 'rateLimited') break
+        }
+      }
+    }
 
     async function welcomeStep() {
       if (!dryRun) {
@@ -474,7 +570,9 @@ export async function runTraineeNicks(opts: {
             await deps.releaseWelcome(id)
           } else {
             // Always non-null, so a finished row is never reclaimed as stale.
-            await deps.recordWelcome(id, w.dm || 'none', w.channel || 'none').catch(() => {})
+            await deps
+              .recordWelcome(id, w.dm || 'none', w.channel || 'none', w.channelId && w.channelMessageId ? { channelId: w.channelId, messageId: w.channelMessageId } : undefined)
+              .catch(() => {})
           }
           if (w.rateLimited) {
             // A 429 we could not ride out: back off for the rest of this run.
