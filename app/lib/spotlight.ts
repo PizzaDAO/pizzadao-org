@@ -6,6 +6,7 @@
 import type { SpotlightSubmission, SpotlightStatus } from "@prisma/client";
 import { postToPurpose } from "./discord-webhook";
 import { isOwnBlobUrl } from "./blob-url";
+import { SITE_URL } from "@/app/lib/site-url";
 import {
     ADMIN_NOTES_MAX_LEN,
     CITY_MAX_LEN,
@@ -204,7 +205,7 @@ export async function notifyNewSubmission(
     s: Pick<SpotlightSubmission, "id" | "nomineeName" | "pitch" | "submitterDiscordId" | "submitterName">,
 ): Promise<boolean> {
     try {
-        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://app.pizzadao.org";
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || SITE_URL;
         const who = s.submitterName ? `${s.submitterName} (<@${s.submitterDiscordId}>)` : `<@${s.submitterDiscordId}>`;
         const pitch = s.pitch.length > 300 ? `${s.pitch.slice(0, 300)}…` : s.pitch;
         const content = [

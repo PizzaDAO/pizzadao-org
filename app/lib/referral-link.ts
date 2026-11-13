@@ -6,6 +6,7 @@
  * POST /api/referrals/ref before the Discord login), and the onboarding
  * completion (POST /api/profile) reads it to record the Referral.
  */
+import { SITE_URL } from '@/app/lib/site-url'
 
 export const REF_COOKIE = 'pd_ref'
 /** How long an invite link click is remembered (the friend may join days later). */
@@ -18,7 +19,7 @@ export function normalizeRef(raw: unknown): string | null {
 }
 
 export function appBaseUrl(): string {
-  return (process.env.NEXT_PUBLIC_APP_URL?.trim() || 'https://app.pizzadao.org').replace(/\/$/, '')
+  return (process.env.NEXT_PUBLIC_APP_URL?.trim() || SITE_URL).replace(/\/$/, '')
 }
 
 export function inviteUrl(memberId: string, base: string = appBaseUrl()): string {

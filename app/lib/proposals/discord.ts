@@ -10,6 +10,7 @@ import { prisma } from '@/app/lib/db'
 import { DiscordPostError, editDiscordMessage, postDiscordMessage, type DiscordMessageBody } from '@/app/lib/discord-rest'
 import { getSetting } from '@/app/lib/settings'
 import { resolveConfiguredChannel, savedChannelId } from '@/app/lib/settings/channels'
+import { SITE_URL } from '@/app/lib/site-url'
 
 export interface PostDeps {
   channelId(): Promise<string | null>
@@ -34,7 +35,7 @@ export const defaultPostDeps: PostDeps = {
   post: (channelId, body) => postDiscordMessage({ kind: 'bot', channelId, botToken: process.env.DISCORD_BOT_TOKEN?.trim() ?? '' }, body),
   edit: (channelId, messageId, body) => editDiscordMessage({ channelId, messageId, botToken: process.env.DISCORD_BOT_TOKEN?.trim() ?? '' }, body),
   opsChannelId: async () => (await savedChannelId('discord.proposalsOpsChannelId')) || null,
-  appUrl: () => (process.env.NEXT_PUBLIC_APP_URL?.trim() || 'https://app.pizzadao.org').replace(/\/$/, ''),
+  appUrl: () => (process.env.NEXT_PUBLIC_APP_URL?.trim() || SITE_URL).replace(/\/$/, ''),
 }
 
 const usd = (cents: number) => `$${(cents / 100).toLocaleString('en-US', { maximumFractionDigits: 2 })}`

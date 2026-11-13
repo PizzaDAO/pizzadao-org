@@ -6,6 +6,7 @@
  */
 import { loadSettings } from '@/app/lib/settings'
 import { resolveToggle } from '@/app/lib/settings/toggles'
+import { SITE_URL } from '@/app/lib/site-url'
 
 export interface FollowUpConfig {
   sendEnabled: boolean
@@ -79,5 +80,5 @@ export async function loadFollowUpConfig(env: Record<string, string | undefined>
 }
 
 export function appUrl(env: Record<string, string | undefined> = process.env): string {
-  return (env.NEXT_PUBLIC_APP_URL?.trim() || 'https://app.pizzadao.org').replace(/\/$/, '')
+  return (env.NEXT_PUBLIC_APP_URL?.trim() || SITE_URL).replace(/\/$/, '')
 }

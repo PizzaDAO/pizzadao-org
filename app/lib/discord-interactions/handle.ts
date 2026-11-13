@@ -23,6 +23,7 @@ import { handleReviewButton, handleReviewModal, type MissionReviewDeps } from '.
 import type { MemberCommandJob, MemberCommandName } from './member-commands'
 import { handleFollowUpInteraction, isFollowUpInteraction, type FollowUpInteractionDeps } from './followups'
 import { handleReminderInteraction, isReminderInteraction, type ReminderInteractionDeps } from './reminders'
+import { SITE_HOST, SITE_URL } from '@/app/lib/site-url'
 
 type Option = { name: string; type: number; value?: unknown; focused?: boolean; options?: Option[] }
 type DiscordUser = { id: string; username?: string; global_name?: string | null; avatar?: string | null; bot?: boolean }
@@ -433,7 +434,7 @@ async function command(i: Interaction, userId: string, deps: HandlerDeps, cur: s
       const lines = items.map(
         (it) => `**${escapeMd(it.name)}** ${amt(it.price)}${it.quantity === -1 ? '' : it.quantity > 0 ? ` (${n(it.quantity)} left)` : ' (sold out)'}`,
       )
-      return out.ok('$PEP shop', `${numbered(lines)}\n\nBuy with /buy, or at [app.pizzadao.org/pep](<https://app.pizzadao.org/pep>)`, { ephemeral: true })
+      return out.ok('$PEP shop', `${numbered(lines)}\n\nBuy with /buy, or at [${SITE_HOST}/pep](<${SITE_URL}/pep>)`, { ephemeral: true })
     }
 
     case 'buy': {

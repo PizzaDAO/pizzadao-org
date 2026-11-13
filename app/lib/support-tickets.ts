@@ -5,6 +5,7 @@
 
 import type { SupportTicket, SupportTicketStatus } from "@prisma/client";
 import { postToPurpose } from "./discord-webhook";
+import { SITE_URL } from "@/app/lib/site-url";
 
 import {
     ADMIN_NOTES_MAX_LEN,
@@ -112,7 +113,7 @@ export async function notifyNewTicket(
     ticket: Pick<SupportTicket, "id" | "subject" | "discordId" | "displayName">,
 ): Promise<boolean> {
     try {
-        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://app.pizzadao.org";
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || SITE_URL;
         const who = ticket.displayName ? `${ticket.displayName} (<@${ticket.discordId}>)` : `<@${ticket.discordId}>`;
         const content = [
             `**🎫 New support ticket #${ticket.id}**`,

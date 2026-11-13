@@ -4,6 +4,7 @@ import { useState } from "react";
 import { AddVouchButton } from "./AddVouchButton";
 import Link from "next/link";
 import { btn, loadingSpinner } from "../shared-styles";
+import { SITE_HOST } from "@/app/lib/site-url";
 
 type PizzaDAOMember = {
   fid: number;
@@ -103,7 +104,7 @@ export function FarcasterDiscovery({
 
   const openInvite = () => {
     const usernames = Array.from(selected);
-    const baseText = "Join the party on PizzaDAO! 🍕 app.pizzadao.org";
+    const baseText = `Join the party on PizzaDAO! 🍕 ${SITE_HOST}`;
 
     // Batch into casts that fit within ~900 chars
     const batches: string[][] = [];

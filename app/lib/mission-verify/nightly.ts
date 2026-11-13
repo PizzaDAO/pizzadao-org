@@ -42,6 +42,7 @@ import { emptyStats, driveRun, prismaRunStore, type RunRow, type RunStats, type 
 import { refreshSignals } from './signals'
 import { defaultSources } from './sources'
 import { discordRole } from './verifiers'
+import { SITE_URL } from '@/app/lib/site-url'
 
 const HOUR = 3_600_000
 export const RUN_WINDOW_MS = 20 * HOUR
@@ -195,7 +196,7 @@ export async function announceRun({ runId, dryRun, stats }: NightlySummary): Pro
   if (!botToken) return
   const signals = stats.signals as { created?: number } | undefined
   const newSignals = signals?.created ?? 0
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL?.trim() || 'https://app.pizzadao.org').replace(/\/$/, '')
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL?.trim() || SITE_URL).replace(/\/$/, '')
   const alertAt = effectiveInt('missions.runPepAlert', await loadSettings(), envNumber(process.env.MISSIONS_RUN_PEP_ALERT))
 
   if (stats.flagged || stats.held || stats.reopened || newSignals) {

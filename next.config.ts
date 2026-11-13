@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
 import { REMOTE_IMAGE_PATTERNS } from "./app/lib/image-hosts";
+import { hstsHeaderValue } from "./app/lib/hsts";
+import { SITE_URL } from "./app/lib/site-url";
 
 // Points next-intl at the request-config module that resolves locale + loads
 // the messages catalog on every request.
@@ -73,7 +75,8 @@ const SECURITY_HEADERS = [
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   // Nothing in the app uses the camera, microphone or geolocation.
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), browsing-topics=()" },
-  { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
+  // No includeSubDomains when this build is the apex (see app/lib/hsts.ts).
+  { key: "Strict-Transport-Security", value: hstsHeaderValue(SITE_URL) },
 ];
 
 const nextConfig: NextConfig = {

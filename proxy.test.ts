@@ -29,8 +29,20 @@ beforeEach(() => {
 afterEach(() => { delete process.env.DISAVOW_ENABLED; });
 
 describe("proxy for /disavow", () => {
-    it("covers the page tree only", () => {
-        expect(config.matcher).toEqual(["/disavow", "/disavow/:path*"]);
+    it("covers /disavow everywhere and other pages only on the old app host, never api, _next or dotted files", () => {
+        expect(config.matcher).toEqual([
+            "/disavow",
+            "/disavow/:path*",
+            {
+                source: "/((?!api(?:/|$)|_next/|_vercel/|\\.well-known/|.*\\..*).*)",
+                has: [{ type: "host", value: "app.pizzadao.org" }],
+            },
+        ]);
+    });
+    it("lets every other page through untouched", async () => {
+        delete process.env.DISAVOW_ENABLED;
+        expect(passed(await proxy(req("/crew")))).toBe(true);
+        expect(verifySession).not.toHaveBeenCalled();
     });
     it("flag off: rewritten to a path that does not exist, and nothing is looked up", async () => {
         delete process.env.DISAVOW_ENABLED;
