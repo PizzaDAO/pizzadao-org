@@ -3,6 +3,7 @@ import { SITE_URL } from "@/app/lib/site-url";
 import { prisma } from "@/app/lib/db";
 import { getCrewMappings } from "@/app/lib/crew-mappings";
 import { HANDBOOK_PAGES } from "@/content/handbook";
+import { MARKETING_SITEMAP_PATHS, marketingIndexable } from "@/app/lib/marketing-site";
 
 // Regenerate at most hourly; dynamic sections are best-effort so a DB or
 // sheet outage still yields the static routes.
@@ -44,6 +45,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     changeFrequency: r.changeFrequency,
     priority: r.priority,
   }));
+
+  // The marketing pages join the sitemap only once they are indexable (the cutover switch).
+  if (marketingIndexable()) {
+    for (const path of MARKETING_SITEMAP_PATHS) {
+      entries.push({ url: `${SITE_URL}${path}`, lastModified: now, changeFrequency: "monthly", priority: 0.8 });
+    }
+  }
 
   const [articles, crews] = await Promise.allSettled([
     withTimeout(

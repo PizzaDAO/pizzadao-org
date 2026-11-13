@@ -255,6 +255,11 @@ describe('settings registry', () => {
       ['announce.roleIds', []],
       ['articles.authorRoleIds', []],
       ['calls.eventLocalTimes', []],
+      ['marketing.newsletterEnabled', false],
+      ['marketing.contactEnabled', false],
+      ['marketing.calendarEnabled', false],
+      ['marketing.contactNotifyEmail', ''],
+      ['marketing.calendarIcsUrl', ''],
     ])
   })
 

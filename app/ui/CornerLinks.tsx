@@ -1,11 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { Pencil } from "lucide-react";
 import SuggestionModal from "@/app/ui/SuggestionModal";
+import { isMarketingPath } from "@/app/lib/marketing-site";
 
 export default function CornerLinks() {
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  // The marketing pages are a separate surface: no suggestion box or GitHub link there.
+  if (isMarketingPath(pathname)) return null;
 
   return (
     <>

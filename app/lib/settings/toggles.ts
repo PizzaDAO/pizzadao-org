@@ -120,6 +120,10 @@ export const TOGGLES = {
   'crews.taskUpdatePostsEnabled': { env: 'CREWS_TASK_UPDATE_POSTS_ENABLED', legacy: ON_WORDS },
   // Off unless turned on: past attendees as Cold bench rows on the crew page.
   'crews.rosterBenchEnabled': { env: 'CREWS_ROSTER_BENCH_ENABLED', legacy: ON_WORDS },
+  // Off unless turned on: the marketing pages' forms and calendar (plans/pizzadao-org-to-vercel.md, Phase 2).
+  'marketing.newsletterEnabled': { env: 'MARKETING_NEWSLETTER_ENABLED', legacy: ON_WORDS },
+  'marketing.contactEnabled': { env: 'MARKETING_CONTACT_ENABLED', legacy: ON_WORDS },
+  'marketing.calendarEnabled': { env: 'MARKETING_CALENDAR_ENABLED', legacy: ON_WORDS },
 } as const satisfies Partial<Record<SettingKey, ToggleDef>>
 
 export type ToggleKey = keyof typeof TOGGLES

@@ -7,6 +7,7 @@ import { ChevronDown, Menu, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useSession } from "@/app/lib/hooks/use-session";
 import { PizzaDAOLogo } from "./PizzaDAOLogo";
+import { isMarketingPath } from "@/app/lib/marketing-site";
 
 type NavItem = { href: string; label: string; proposalsOnly?: boolean; disavowOnly?: boolean; membersOnly?: boolean; adminOnly?: boolean; analyticsOnly?: boolean; match?: (path: string) => boolean };
 const GROUPS: { key: string; items: NavItem[] }[] = [
@@ -77,7 +78,8 @@ export default function SiteHeader() {
     };
   }, [openGroup, mobileOpen]);
 
-  if (HIDDEN_ON.has(pathname)) return null;
+  // The marketing pages render their own nav (app/(marketing)).
+  if (HIDDEN_ON.has(pathname) || isMarketingPath(pathname)) return null;
   const loggedIn = !!session?.authenticated;
   const dashboardHref = session?.memberId ? `/dashboard/${session.memberId}` : "/";
   const groups = GROUPS.map(group => ({ ...group, items: group.items.filter(item => (!item.membersOnly || loggedIn) && (!item.adminOnly || session?.canManageShop) && (!item.analyticsOnly || session?.isAdmin) && (!item.disavowOnly || session?.canViewDisavow === true) && (!item.proposalsOnly || session?.showProposals === true)) }));
