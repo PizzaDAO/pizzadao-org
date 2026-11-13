@@ -30,7 +30,7 @@ vi.mock('@/app/lib/settings/channels', () => ({ savedChannelId: vi.fn(async () =
 vi.mock('@/app/lib/call-agenda/run', () => ({ DEFAULT_CALL_VOICE_CHANNEL_ID: '1' }))
 vi.mock('./progress-command', () => ({ currentCallEvent: vi.fn(), editOriginalUrl: () => 'u' }))
 
-const PROD = { VERCEL_ENV: 'production', DISCORD_GUILD_ID: '555', DISCORD_BOT_TOKEN: 'tok', ANNOUNCE_TIMEZONE: 'UTC' }
+const PROD = { VERCEL_ENV: 'production', DISCORD_GUILD_ID: '555', DISCORD_BOT_TOKEN: 'tok', ANNOUNCE_TIMEZONE: 'UTC', RSV_PIZZA_TELEGRAM_KEY: 'k' }
 const START = new Date('2026-11-15T20:00:00Z')
 const NOW = new Date('2026-11-15T20:01:00Z')
 const CTX = { eventId: '777', voiceChannelId: '888', sessionId: 's1', startedAt: START }
@@ -413,7 +413,7 @@ describe('pickRandomCity', () => {
 })
 
 describe('random city group', () => {
-  const POOL = { 'calls.liveRandomCityKeys': ['paris', 'rome', 'oslo'], 'calls.liveRandomCityNoRepeat': 2 }
+  const POOL = { 'calls.liveRandomCityKeys': ['paris', 'rome', 'oslo'], 'calls.liveRandomCityNoRepeat': 2, 'telegram.cityPostsEnabled': true }
   const at = (n: number) => ({ ...CTX, eventId: `e${n}`, startedAt: new Date(START.getTime() + n * 86_400_000) })
 
   it('adds one pooled city to the queued post and stores it on the row', async () => {
@@ -451,6 +451,11 @@ describe('random city group', () => {
     expect(h.rows.get('777:2026-11-15')!.randomCityKey).toBeNull()
     expect((h.enqueue.mock.calls[0] as unknown as [object])[0]).not.toHaveProperty('extraCityKeys')
   })
+  it('picks nothing while Telegram group posts are off, so the rotation does not skip that city', async () => {
+    const h = harness({ ...POOL, 'telegram.cityPostsEnabled': false })
+    await runLiveAnnounce({ mode: 'auto', ctx: CTX }, h.deps)
+    expect(h.rows.get('777:2026-11-15')!.randomCityKey).toBeNull()
+  })
 })
 
 describe('stream link ask', () => {
@@ -474,5 +479,10 @@ describe('stream link ask', () => {
     const c = harness(ASK, { ...PROD, VERCEL_ENV: 'preview' })
     await runLiveAnnounce({ mode: 'auto', ctx: CTX }, c.deps)
     expect(c.postDiscord).not.toHaveBeenCalled()
+  })
+  it('does not ask when the auto announcement already has the link', async () => {
+    const h = harness(ASK)
+    await runLiveAnnounce({ mode: 'auto', ctx: CTX, streamLink: 'https://x.com/i/broadcasts/abc' }, h.deps)
+    expect(asks(h)).toHaveLength(0)
   })
 })

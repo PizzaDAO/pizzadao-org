@@ -20,6 +20,7 @@ import { loadSettings, type Settings } from '@/app/lib/settings'
 import { resolveToggle } from '@/app/lib/settings/toggles'
 import { editDiscordMessage, postDiscordMessage } from '@/app/lib/discord-rest'
 import { enqueueMirror, targetCityKeys, type EnqueueInput, type EnqueueResult } from '@/app/lib/telegram/city-posts'
+import { telegramSendAllowed } from '@/app/lib/telegram/rsv-client'
 import { normalizeStreamLink } from './live-state'
 import { parseRoleLines } from './live-access'
 
@@ -230,9 +231,9 @@ export interface LiveDeps {
   kick?: () => Promise<void>
   /** How long to wait (ms) for a concurrent winner to record its Discord message id. */
   sleep?: (ms: number) => Promise<void>
-  /** The Discord event of the call channel, for a session whose recorder did not report an event id. */
   /** Random source for the random city pick (tests). */
   random?: () => number
+  /** The Discord event of the call channel, for a session whose recorder did not report an event id. */
   resolveEvent?: (channelId: string) => Promise<{ id: string; startsAt: Date } | null>
 }
 
@@ -338,8 +339,13 @@ export async function runLiveAnnounce(
   if (!may) return { status: 'preview', xText: xFor(row), streamLink: stream, discord: 'skipped', telegram: 'skipped' }
 
   // The random group is picked once, here, and stored on the claim row: a retry or a second /live reuses it.
+  // Only when a Telegram post can go out, so the rotation never skips past a city that got nothing.
   const pool = (settings.get('calls.liveRandomCityKeys') as string[] | undefined) ?? []
-  if (pool.length) {
+  const telegramOn =
+    telegramSendAllowed(env) &&
+    resolveToggle('telegram.cityPostsEnabled', settings, env) &&
+    !!renderTemplate(settings.get('calls.liveAnnounceTelegramTemplate'), buildVars(row, 'plain', env))
+  if (pool.length && telegramOn) {
     try {
       const noRepeat = (settings.get('calls.liveRandomCityNoRepeat') as number | undefined) ?? 0
       const recent = await store.recentRandomCities(noRepeat)
@@ -411,7 +417,7 @@ export async function runLiveAnnounce(
 
   // Automatic announcement only: ask the hosts (once, with the claim) to run /live with the X stream link.
   const askChannel = ((settings.get('calls.liveStreamAskChannelId') as string | undefined) ?? '').trim()
-  if (input.mode === 'auto' && askChannel) {
+  if (input.mode === 'auto' && askChannel && !row.streamLink) {
     const t = discordTarget(askChannel, env)
     const text = ((settings.get('calls.liveStreamAskTemplate') as string | undefined) ?? '').trim()
     if (t && text) {
