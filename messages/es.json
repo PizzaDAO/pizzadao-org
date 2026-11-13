@@ -2579,5 +2579,33 @@
     "poaps": "{count, plural, one {# POAP} other {# POAPs}}",
     "nfts": "{count, plural, one {# NFT} other {# NFTs}} en {collections, plural, one {# colección} other {# colecciones}}",
     "tickets": "{count, plural, one {# boleto} other {# boletos}}"
+  },
+  "taxForm": {
+    "meta": "Formulario fiscal",
+    "title": "Formulario fiscal",
+    "intro": "{requester} solicita un formulario fiscal para los pagos que se te hacen.",
+    "payee": "Beneficiario: {payee}",
+    "loading": "Cargando...",
+    "invalidTitle": "Este enlace no es válido",
+    "invalidBody": "Puede que se haya revocado o escrito mal. Ponte en contacto con quien te lo envió.",
+    "loadError": "Algo salió mal. Inténtalo de nuevo.",
+    "thanks": "Gracias, {requester} tiene tu formulario.",
+    "lockedTitle": "Formulario ya enviado",
+    "lockedBody": "{requester} tiene tu formulario {form}. Si algo debe cambiar, ponte en contacto con ellos.",
+    "lockedBodyGeneric": "{requester} tiene tu formulario fiscal. Si algo debe cambiar, ponte en contacto con ellos.",
+    "rejected": "Tu formulario anterior fue rechazado. Vuelve a rellenarlo.",
+    "rejectedReason": "Tu formulario anterior fue rechazado: {reason} Vuelve a rellenarlo.",
+    "tinOnFile": "NIF / datos sensibles guardados. Vuelve a introducirlos solo para cambiarlos. Vuelve a escribir tu firma antes de enviar.",
+    "pickerHeading": "¿Qué formulario te corresponde?",
+    "suggested": "Sugerido para ti: {form}",
+    "formHeading": "Formulario {form}",
+    "changeForm": "Cambiar tipo de formulario",
+    "saveDraft": "Guardar borrador",
+    "submit": "Firmar y enviar",
+    "draftSaved": "Borrador guardado.",
+    "saveFailed": "No se pudo guardar el borrador",
+    "submitFailed": "No se pudo enviar el formulario fiscal",
+    "rateLimited": "Demasiadas solicitudes. Espera unos minutos e inténtalo de nuevo.",
+    "networkError": "No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo."
   }
 }

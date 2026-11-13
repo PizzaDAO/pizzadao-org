@@ -56,6 +56,8 @@ const CSP_REPORT_ONLY = [
     // Vercel Blob, Vercel toolbar on previews
     "https://*.public.blob.vercel-storage.com",
     "https://vercel.live wss://ws-us3.pusher.com",
+    // rsv-pizza API (payee tax-form page /tax-form)
+    "https://api.rsv.pizza",
   ].join(" "),
   "frame-src 'self' https://verify.walletconnect.com https://verify.walletconnect.org https://vercel.live",
   "worker-src 'self' blob:",
@@ -82,12 +84,19 @@ const nextConfig: NextConfig = {
     remotePatterns: REMOTE_IMAGE_PATTERNS,
   },
   async headers() {
-    return [{ source: "/:path*", headers: SECURITY_HEADERS }];
-  },
-  async redirects() {
-    // Tax-form requests (W-9 / W-8) live on rsv.pizza; the ?payee=<token>
-    // query string is carried over by Next.js. Temporary so it can move later.
-    return [{ source: "/tax-form", destination: "https://rsv.pizza/tax-form", permanent: false }];
+    return [
+      { source: "/:path*", headers: SECURITY_HEADERS },
+      // Payee tax-form links carry a secret token in the query string: keep it out of
+      // referrers, search indexes and caches. Listed after the global rule so these win.
+      {
+        source: "/tax-form",
+        headers: [
+          { key: "Referrer-Policy", value: "no-referrer" },
+          { key: "X-Robots-Tag", value: "noindex, nofollow" },
+          { key: "Cache-Control", value: "private, no-store" },
+        ],
+      },
+    ];
   },
 };
 

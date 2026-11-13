@@ -116,7 +116,8 @@ export default function SuggestionModal({ open, onClose }: SuggestionModalProps)
           name: name.trim() || undefined,
           email: email.trim() || undefined,
           imageUrl,
-          pageUrl: window.location.href,
+          // Path only: query strings can carry secrets (e.g. /tax-form?payee=<token>).
+          pageUrl: window.location.origin + window.location.pathname,
         }),
       });
       if (!res.ok) {

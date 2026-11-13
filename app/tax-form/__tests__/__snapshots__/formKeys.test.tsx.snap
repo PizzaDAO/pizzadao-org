@@ -1,0 +1,60 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`form emitted keys > W8BEN 1`] = `
+[
+  "articleParagraph",
+  "date",
+  "dateOfBirth",
+  "foreignTin",
+  "incomeType",
+  "name",
+  "permanentAddress",
+  "permanentCity",
+  "permanentCountry",
+  "permanentPostalCode",
+  "permanentStateProvince",
+  "referenceNumbers",
+  "signature",
+  "treatyAutoFilledFor",
+  "treatyCountry",
+  "treatyExplanation",
+  "usTin",
+  "withholdingRate",
+]
+`;
+
+exports[`form emitted keys > W8BEN-E 1`] = `
+[
+  "articleParagraph",
+  "date",
+  "entityName",
+  "foreignTin",
+  "incomeType",
+  "permanentAddress",
+  "permanentCity",
+  "permanentCountry",
+  "permanentPostalCode",
+  "permanentStateProvince",
+  "signature",
+  "signerCapacity",
+  "treatyAutoFilledFor",
+  "treatyCountry",
+  "treatyExplanation",
+  "withholdingRate",
+]
+`;
+
+exports[`form emitted keys > W9 1`] = `
+[
+  "address",
+  "businessName",
+  "city",
+  "date",
+  "name",
+  "signature",
+  "ssn",
+  "state",
+  "taxClassification",
+  "zipCode",
+]
+`;
