@@ -35,7 +35,7 @@ describe('sendDm', () => {
     const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit]
     expect(url).toBe('https://api.example.test/api/service/telegram/dm')
     expect((init.headers as Record<string, string>)['x-pizzadao-telegram-key']).toBe('secret-key')
-    expect(JSON.parse(String(init.body))).toEqual({ ...dm, buttons })
+    expect(JSON.parse(String(init.body))).toEqual({ ...dm, buttons, format: 'auto' })
   })
 
   it('passes a replayed result through', async () => {
@@ -123,7 +123,7 @@ describe('cityPost', () => {
     const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit]
     expect(url).toBe('https://api.example.test/api/service/telegram/city-post')
     expect((init.headers as Record<string, string>)['x-pizzadao-telegram-key']).toBe('secret-key')
-    expect(JSON.parse(String(init.body))).toEqual(cp)
+    expect(JSON.parse(String(init.body))).toEqual({ ...cp, format: 'auto' })
   })
 
   it('reads Telegram outcomes (HTTP 200)', async () => {

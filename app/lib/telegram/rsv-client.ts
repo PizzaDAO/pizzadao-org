@@ -2,10 +2,10 @@
  * The only module that talks to the rsv.pizza Telegram send proxy (plans/telegram-shared-bot.md).
  * The app never holds the shared bot's token and never calls Telegram for sends: it asks the proxy.
  *
- *   POST {base}/api/service/telegram/dm     send a private message (plain text, optional URL buttons)
+ *   POST {base}/api/service/telegram/dm     send a private message (light Markdown, optional URL buttons)
  *   POST {base}/api/service/telegram/probe  can the bot DM this user?
  *   GET  {base}/api/service/telegram/city-groups  the city group directory (no chat ids)
- *   POST {base}/api/service/telegram/city-post    post plain text to a city's group
+ *   POST {base}/api/service/telegram/city-post    post a message to a city's group
  *   POST {base}/api/service/telegram/host-match   email hashes -> Telegram ids of hosts (a suggestion only)
  *
  * Auth is the `x-pizzadao-telegram-key` header (RSV_PIZZA_TELEGRAM_KEY, Production only). Every
@@ -101,7 +101,7 @@ export async function sendDm(
   if (!telegramSendAllowed(opts.env ?? process.env)) return { ok: false, code: 'not_configured' }
   const raw = await post(
     '/dm',
-    { telegramUserId: a.telegramUserId, text: a.text.slice(0, DM_TEXT_LIMIT), ...(a.buttons?.length ? { buttons: a.buttons } : {}), idempotencyKey: a.idempotencyKey },
+    { telegramUserId: a.telegramUserId, text: a.text.slice(0, DM_TEXT_LIMIT), format: 'auto', ...(a.buttons?.length ? { buttons: a.buttons } : {}), idempotencyKey: a.idempotencyKey },
     opts,
   )
   if (raw.kind === 'network') return { ok: false, code: 'uncertain' }
@@ -191,7 +191,7 @@ export async function cityGroups(opts: CallOpts = {}): Promise<CityGroupsResult>
  */
 export async function cityPost(a: { cityKey: string; text: string; idempotencyKey: string }, opts: CallOpts = {}): Promise<CityPostResult> {
   if (!telegramSendAllowed(opts.env ?? process.env)) return { ok: false, code: 'not_configured' }
-  const raw = await post('/city-post', { cityKey: a.cityKey, text: a.text.slice(0, DM_TEXT_LIMIT), idempotencyKey: a.idempotencyKey }, opts)
+  const raw = await post('/city-post', { cityKey: a.cityKey, text: a.text.slice(0, DM_TEXT_LIMIT), format: 'auto', idempotencyKey: a.idempotencyKey }, opts)
   if (raw.kind === 'network') return { ok: false, code: 'uncertain' }
   const { status, body } = raw
   if (status === 503 && body?.reason === 'disabled') return { ok: false, code: 'disabled' }
