@@ -14,6 +14,7 @@
 import { base, baseSepolia } from "viem/chains";
 import type { Settings } from "@/app/lib/settings";
 import { effectiveInt, storedOverride } from "@/app/lib/settings/numbers";
+import { SITE_URL } from "@/app/lib/site-url";
 
 export const SLICES_BATCH_SIZE = 50;
 export const SLICES_MAX_ATTEMPTS = 5;
@@ -103,5 +104,5 @@ export const txUrl = (hash: string, env: NodeJS.ProcessEnv = process.env) => `${
 export const addressUrl = (addr: string, env: NodeJS.ProcessEnv = process.env) => `${explorerBase(env)}/address/${addr}`;
 
 export function appBaseUrl(env: NodeJS.ProcessEnv = process.env): string {
-  return (env.NEXT_PUBLIC_APP_URL?.trim() || "https://app.pizzadao.org").replace(/\/+$/, "");
+  return (env.NEXT_PUBLIC_APP_URL?.trim() || SITE_URL).replace(/\/+$/, "");
 }

@@ -121,7 +121,7 @@ function deferMissions(job: Parameters<NonNullable<HandlerDeps["missions"]>["def
       announce: (view, id) =>
         announceMissionResults({ discordId: id, trigger: "discord", approvedTitles: view.approvedTitles, levelsPaid: view.levelsPaid }),
       currency,
-      appUrl: (process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://app.pizzadao.org").replace(/\/$/, ""),
+      appUrl: (process.env.NEXT_PUBLIC_APP_URL?.trim() || SITE_URL).replace(/\/$/, ""),
     });
   });
 }
@@ -195,7 +195,7 @@ async function progressCrewChoices(query: string): Promise<Array<{ name: string;
     .map((c) => ({ name: c.label.slice(0, 100), value: c.id }));
 }
 
-const appUrl = () => (process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://app.pizzadao.org").replace(/\/$/, "");
+const appUrl = () => (process.env.NEXT_PUBLIC_APP_URL?.trim() || SITE_URL).replace(/\/$/, "");
 
 /**
  * The decision behind a review-card button / the Reject modal, after the

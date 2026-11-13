@@ -21,6 +21,7 @@ import { postDiscordMessage } from '../discord-rest'
 import { makeEmbed, type Embed } from '../discord-interactions/embeds'
 import { missionVerifiersEnabled } from './policy'
 import type { Trigger } from './types'
+import { SITE_URL } from '@/app/lib/site-url'
 
 export interface LevelInfo {
   level: number
@@ -60,7 +61,7 @@ export const defaultNotifyDeps: NotifyDeps = {
     await postDiscordMessage({ kind: 'bot', channelId, botToken }, body)
   },
   currency: () => process.env.PEP_EMOJI?.trim() || '$PEP',
-  appUrl: () => (process.env.NEXT_PUBLIC_APP_URL?.trim() || 'https://app.pizzadao.org').replace(/\/$/, ''),
+  appUrl: () => (process.env.NEXT_PUBLIC_APP_URL?.trim() || SITE_URL).replace(/\/$/, ''),
 }
 
 export interface AnnounceInput {

@@ -1,18 +1,22 @@
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
+import { SITE_URL } from "@/app/lib/site-url";
 
 // The canonical production app. Preview deployments bounce Discord OAuth
-// through here (Discord only allows fixed redirect URIs). Note: the bare
-// pizzadao.org apex is the separate marketing site, not this app.
-const PRODUCTION_ORIGIN = "https://app.pizzadao.org";
+// through here (Discord only allows fixed redirect URIs). It follows SITE_URL
+// (app.pizzadao.org today, the pizzadao.org apex after the move).
+const PRODUCTION_ORIGIN = SITE_URL;
 
 // Where the production callback may send a transfer token / redirect:
 // only this app's own preview deployments (Vercel project `onboarding` on the
 // `pizza-dao` team, e.g. onboarding-abc123xyz-pizza-dao.vercel.app or
-// onboarding-git-my-branch-pizza-dao.vercel.app) and production itself.
+// onboarding-git-my-branch-pizza-dao.vercel.app) and production itself, under
+// both its old host (app.) and the apex, so either can be the production origin
+// during and after the move.
 // The preview host must be a single DNS label under vercel.app.
 const ALLOWED_RETURN_PATTERNS = [
   /^https:\/\/onboarding-[a-z0-9-]+-pizza-dao\.vercel\.app$/,
   /^https:\/\/app\.pizzadao\.org$/,
+  /^https:\/\/pizzadao\.org$/,
 ];
 
 // Local development only (never accepted in production builds).
@@ -26,6 +30,8 @@ export interface TransferPayload {
   nick: string;
   exp: number;
   origin: string;
+  /** Session bridge tokens only: a random id, also kept in a cookie and spent once (see session-bridge.ts). */
+  jti?: string;
 }
 
 export function isPreviewEnvironment(): boolean {

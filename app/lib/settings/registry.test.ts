@@ -255,6 +255,9 @@ describe('settings registry', () => {
       ['announce.roleIds', []],
       ['articles.authorRoleIds', []],
       ['calls.eventLocalTimes', []],
+      ['site.hostRedirectEnabled', false],
+      ['site.hostRedirectPermanent', false],
+      ['site.sessionBridgeEnabled', false],
     ])
   })
 

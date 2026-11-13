@@ -16,6 +16,7 @@ import { lookup as dnsLookup } from 'node:dns/promises'
 import { isIP } from 'node:net'
 import { fetchCapped } from './net'
 import { parseHttpsUrl } from './proof-links'
+import { SITE_URL } from '@/app/lib/site-url'
 
 export interface ProofPreview {
   url: string
@@ -138,7 +139,7 @@ export async function unfurlProof(raw: string | null | undefined, deps: UnfurlDe
       const res = await fetchCapped(
         fetchImpl,
         url,
-        { redirect: 'manual', headers: { 'User-Agent': 'PizzaDAO-ProofPreview/1.0 (+https://app.pizzadao.org)', Accept: 'text/html,image/*;q=0.9,*/*;q=0.1' } },
+        { redirect: 'manual', headers: { 'User-Agent': `PizzaDAO-ProofPreview/1.0 (+${SITE_URL})`, Accept: 'text/html,image/*;q=0.9,*/*;q=0.1' } },
         { timeoutMs: deps.timeoutMs, maxBytes: deps.maxBytes },
       )
       if (!res) return null

@@ -1,6 +1,7 @@
 import { prisma } from './db'
 import { toggleEnabled } from './settings/toggles'
 import { savedChannelId } from './settings/channels'
+import { SITE_URL } from './site-url'
 import {
   getBotUserId,
   getGuildInfo,
@@ -43,7 +44,7 @@ const SAMPLE_SIZE = 20
 const WELCOME_MAX_PER_RUN = 20
 /** Spacing between channel posts (Discord's per-channel message bucket). */
 const WELCOME_CHANNEL_GAP_MS = 1200
-export const TRAINEE_WELCOME_TEXT = 'Welcome to PizzaDAO! Grab a name at https://app.pizzadao.org'
+export const TRAINEE_WELCOME_TEXT = `Welcome to PizzaDAO! Grab a name at ${SITE_URL}`
 
 export type RoleStatus = 'ok' | 'role_unresolved' | 'role_not_assignable'
 

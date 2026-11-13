@@ -4,8 +4,9 @@
  */
 import { z } from 'zod'
 import type { SettingDef } from './registry'
+import { SITE_URL } from '@/app/lib/site-url'
 
-export const DEFAULT_NAME_REMINDER_TEXT = "You haven't claimed your pizza mafia name yet! Claim it at https://app.pizzadao.org"
+export const DEFAULT_NAME_REMINDER_TEXT = `You haven't claimed your pizza mafia name yet! Claim it at ${SITE_URL}`
 
 const nameReminderText: SettingDef<string> = {
   key: 'members.nameReminderText',
