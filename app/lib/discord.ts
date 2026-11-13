@@ -473,6 +473,9 @@ export interface WelcomeResult {
   transient: boolean
   /** True when a leg got a 429 that was not retried (wait over the cap) or was still 429 after the retry. */
   rateLimited: boolean
+  /** Set when the channel post was sent: where it landed, so it can be deleted later. */
+  channelId?: string
+  channelMessageId?: string
 }
 
 /**
@@ -545,8 +548,18 @@ export async function sendWelcome(
         content: `<@${userId}> ${text}`,
         allowed_mentions: { parse: [], users: [userId] },
       })
-      if (m.ok) out.channel = "sent"
-      else note(m, "channel post")
+      if (m.ok) {
+        out.channel = "sent"
+        try {
+          const id = ((await m.json()) as { id?: string })?.id
+          if (id) {
+            out.channelId = channelId
+            out.channelMessageId = String(id)
+          }
+        } catch {
+          // No message id: the post just cannot be cleaned up later.
+        }
+      } else note(m, "channel post")
     } catch (e) {
       transient = true
       console.warn("[welcome] channel post failed", (e as Error)?.message)
@@ -555,6 +568,38 @@ export async function sendWelcome(
   out.transient = transient
   out.rateLimited = rateLimited
   return out
+}
+
+export type DeleteMessageResult = "deleted" | "gone" | "rateLimited" | "failed"
+
+/**
+ * Delete one channel message as the bot. 404 (Unknown Message 10008 / Unknown
+ * Channel 10003) means it is already gone. Never throws on HTTP errors.
+ */
+export async function deleteChannelMessage(
+  channelId: string,
+  messageId: string,
+  opts: { fetchImpl?: typeof fetch } = {},
+): Promise<DeleteMessageResult> {
+  const botToken = botTokenOnly()
+  if (!botToken) throw new Error("Discord is not configured")
+  const doFetch = opts.fetchImpl ?? fetch
+  try {
+    const r = await doFetch(`https://discord.com/api/v10/channels/${channelId}/messages/${messageId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bot ${botToken}` },
+      cache: "no-store",
+      signal: AbortSignal.timeout(WELCOME_TIMEOUT_MS),
+    })
+    if (r.ok) return "deleted"
+    if (r.status === 404) return "gone"
+    if (r.status === 429) return "rateLimited"
+    console.warn(`[welcome] delete failed: HTTP ${r.status}`)
+    return "failed"
+  } catch (e) {
+    console.warn("[welcome] delete failed", (e as Error)?.message)
+    return "failed"
+  }
 }
 
 async function isDmClosed(r: Response): Promise<boolean> {

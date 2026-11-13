@@ -210,6 +210,7 @@ describe('settings registry', () => {
       ['calls.bulkActionMax', 50],
       ['disavow.enabled', false],
       ['reengage.enabled', false],
+      ['discord.welcomeDeleteOnLeaveEnabled', false],
       ['onboarding.traineeNickEnabled', false],
       ['onboarding.traineeNickHealEnabled', false],
       ['names.requireThemed', false],

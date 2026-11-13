@@ -1845,6 +1845,12 @@ export const SETTINGS = {
     help: 'Send the weekly re-engagement email. Off: dry run. The REENGAGE_EMAIL_ENABLED env var set to off always wins.',
     confirmOn: 'Members will be emailed on the next run.',
   }),
+  'discord.welcomeDeleteOnLeaveEnabled': boolSetting({
+    key: 'discord.welcomeDeleteOnLeaveEnabled',
+    area: 'features',
+    label: 'Delete the welcome post when a member leaves',
+    help: 'When someone leaves the server, delete the bot\'s welcome post for them in the channel (DMs are untouched). Off: the run only counts how many would be deleted. The WELCOME_DELETE_ON_LEAVE_ENABLED env var set to off always wins.',
+  }),
   'onboarding.traineeNickEnabled': boolSetting({
     key: 'onboarding.traineeNickEnabled',
     area: 'features',
