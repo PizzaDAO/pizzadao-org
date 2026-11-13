@@ -32,3 +32,20 @@ export function legacyDashboardRedirects(): LegacyRedirect[] {
     { source: `/dashboard/${section}/:path*`, destination: "/", permanent: true },
   ]);
 }
+
+/**
+ * Old public asset URLs whose files now live only under /marketing (same bytes, or a compressed
+ * copy). Redirected instead of duplicated in public/.
+ */
+export const LEGACY_ASSET_PATHS = [
+  "/brand-kit/stickers/molto-benny-sticker.ai",
+  "/brand-kit/stickers/molto-benny-sticker.pdf",
+  "/media/community-japan.jpg",
+  "/media/nyc-rp-teaser-poster.jpg",
+  "/media/wen-pizza-nyc-poster.jpg",
+] as const;
+
+/** next.config redirect rules: each old asset URL goes to its /marketing copy with a 308. */
+export function legacyAssetRedirects(): LegacyRedirect[] {
+  return LEGACY_ASSET_PATHS.map((path) => ({ source: path, destination: `/marketing${path}`, permanent: true }));
+}

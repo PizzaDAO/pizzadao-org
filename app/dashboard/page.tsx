@@ -17,7 +17,8 @@ export default async function DashboardIndexPage() {
     try {
         memberId = (await fetchMemberIdByDiscordId(session.discordId)) ?? null;
     } catch {
-        memberId = null;
+        // Lookup failed: don't send a member to onboarding; the home page has the nav's Dashboard link.
+        redirect("/");
     }
     // Signed in but not a member yet: the onboarding wizard.
     redirect(memberId ? `/dashboard/${encodeURIComponent(String(memberId))}` : "/start");

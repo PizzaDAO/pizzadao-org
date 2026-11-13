@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LEGACY_DASHBOARD_SECTIONS, legacyDashboardRedirects } from "./legacy-paths";
+import { LEGACY_ASSET_PATHS, LEGACY_DASHBOARD_SECTIONS, legacyAssetRedirects, legacyDashboardRedirects } from "./legacy-paths";
 
 describe("legacy dashboard prototype redirects", () => {
   const rules = legacyDashboardRedirects();
@@ -27,5 +27,20 @@ describe("legacy dashboard prototype redirects", () => {
     expect(matches("/dashboard")).toBe(false);
     expect(matches("/dashboard/12345")).toBe(false);
     expect(matches("/dashboard/family/7")).toBe(true);
+  });
+});
+
+describe("legacy asset redirects", () => {
+  it("sends each old asset URL to an existing /marketing copy", () => {
+    const fs = require("node:fs") as typeof import("node:fs");
+    const path = require("node:path") as typeof import("node:path");
+    const rules = legacyAssetRedirects();
+    expect(rules).toHaveLength(LEGACY_ASSET_PATHS.length);
+    for (const r of rules) {
+      expect(r.permanent).toBe(true);
+      expect(r.destination).toBe(`/marketing${r.source}`);
+      expect(fs.existsSync(path.join(process.cwd(), "public", r.destination))).toBe(true);
+      expect(fs.existsSync(path.join(process.cwd(), "public", r.source))).toBe(false);
+    }
   });
 });
