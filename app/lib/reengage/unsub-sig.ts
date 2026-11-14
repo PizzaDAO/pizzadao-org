@@ -11,6 +11,19 @@ import { SITE_URL } from "@/app/lib/site-url";
 
 export const CONFIRM_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
+/**
+ * Generic building blocks, shared with the newsletter links (app/lib/newsletter/sig.ts). A payload
+ * is "<domain>\n<part>\n<part>...", so a signature made for one domain never verifies in another.
+ * The reengage payloads below are unchanged byte for byte (old emailed links must keep working).
+ */
+export function signParts(domain: string, ...parts: Array<string | number>): string | null {
+  return mac([domain, ...parts].join("\n"));
+}
+
+export function sameSig(a: string, b: string): boolean {
+  return same(a, b);
+}
+
 function secret(): string | null {
   return process.env.UNSUBSCRIBE_SECRET?.trim() || process.env.SESSION_SECRET?.trim() || null;
 }
@@ -27,7 +40,7 @@ function same(a: string, b: string): boolean {
 }
 
 function sign(memberId: string): string | null {
-  return memberId ? mac(`reengage-unsub-v1\n${memberId}`) : null;
+  return memberId ? signParts("reengage-unsub-v1", memberId) : null;
 }
 
 export const signUnsubscribe = sign;
@@ -53,7 +66,7 @@ export function unsubscribePostUrl(memberId: string, base = SITE_URL): string | 
 // ----- address confirmation -----
 
 function confirmPayload(memberId: string, email: string, exp: number): string {
-  return `reengage-confirm-v1\n${memberId}\n${email.trim().toLowerCase()}\n${exp}`;
+  return ["reengage-confirm-v1", memberId, email.trim().toLowerCase(), exp].join("\n");
 }
 
 /** Token "<exp>.<sig>" binding the member, the address and an expiry. */

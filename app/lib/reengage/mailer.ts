@@ -16,6 +16,9 @@ export interface OutgoingEmail {
   text: string;
   headers?: Record<string, string>;
   idempotencyKey?: string;
+  /** Overrides the default sender (REENGAGE_EMAIL_FROM); the newsletter sets its own from admin settings. */
+  from?: string;
+  replyTo?: string;
 }
 
 /** `retryable`: the provider was rate limiting / failing / unreachable, so a later run may succeed. */
@@ -72,7 +75,8 @@ export async function sendEmail(
         ...(msg.idempotencyKey ? { "Idempotency-Key": msg.idempotencyKey } : {}),
       },
       body: JSON.stringify({
-        from: fromAddress(env),
+        from: msg.from ? oneLine(msg.from) : fromAddress(env),
+        ...(msg.replyTo ? { reply_to: oneLine(msg.replyTo) } : {}),
         to: [msg.to],
         subject: oneLine(msg.subject),
         html: msg.html,

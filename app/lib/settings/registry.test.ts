@@ -262,6 +262,11 @@ describe('settings registry', () => {
       ['marketing.newsletterEnabled', false],
       ['marketing.contactEnabled', false],
       ['marketing.contactNotifyEmail', ''],
+      ['newsletter.confirmEmailsEnabled', false],
+      ['newsletter.memberOptInEnabled', false],
+      ['newsletter.fromName', ''],
+      ['newsletter.fromAddress', ''],
+      ['newsletter.replyTo', ''],
     ])
   })
 

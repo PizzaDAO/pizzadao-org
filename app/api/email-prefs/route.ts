@@ -26,6 +26,9 @@ import { renderConfirmEmail } from "@/app/lib/reengage/render";
 import { confirmPageUrl, signConfirm } from "@/app/lib/reengage/unsub-sig";
 import { isSupportedLocale, DEFAULT_LOCALE } from "@/app/lib/i18n/locales";
 import { getClientIp, rateLimitIp } from "@/app/lib/rate-limit";
+import { loadSettings } from "@/app/lib/settings";
+import { resolveToggle } from "@/app/lib/settings/toggles";
+import { memberNewsletterState, setMemberNewsletter } from "@/app/lib/newsletter/member";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -52,6 +55,12 @@ function state(row: { email: string | null; emailVerifiedAt: Date | null; reenga
   return { email: row?.email ?? null, verified: !!row?.emailVerifiedAt, optIn: !!row?.reengageEmailOptIn };
 }
 
+/** The newsletter checkbox state, only present while newsletter.memberOptInEnabled is on. */
+async function newsletterPart(email: string | null): Promise<{ newsletter?: { subscribed: boolean; pending: boolean } }> {
+  if (!resolveToggle("newsletter.memberOptInEnabled", await loadSettings())) return {};
+  return { newsletter: await memberNewsletterState(email) };
+}
+
 function sha(s: string): string {
   return createHash("sha256").update(s).digest("hex");
 }
@@ -63,7 +72,7 @@ export async function GET() {
     const memberId = await memberFor(auth.session.discordId);
     if (!memberId) return NextResponse.json({ error: "Member not found" }, { status: 404 });
     const row = await prisma.memberProfileExtras.findUnique({ where: { memberId }, select: SELECT });
-    return NextResponse.json(state(row));
+    return NextResponse.json({ ...state(row), ...(await newsletterPart(row?.email ?? null)) });
   } catch (err) {
     return internalError(err, "email-prefs GET", "Couldn't load email preference");
   }
@@ -120,7 +129,7 @@ export async function POST(req: NextRequest) {
   if (!(req.headers.get("content-type") ?? "").toLowerCase().startsWith("application/json")) {
     return NextResponse.json({ error: "Content-Type must be application/json" }, { status: 415 });
   }
-  let body: { email?: unknown; optIn?: unknown; resend?: unknown } = {};
+  let body: { email?: unknown; optIn?: unknown; resend?: unknown; newsletter?: unknown } = {};
   try {
     body = await req.json();
   } catch {
@@ -134,7 +143,10 @@ export async function POST(req: NextRequest) {
   if (body.optIn !== undefined && typeof body.optIn !== "boolean") {
     return NextResponse.json({ error: "optIn must be a boolean" }, { status: 400 });
   }
-  if (!hasEmail && body.optIn === undefined && body.resend !== true) {
+  if (body.newsletter !== undefined && typeof body.newsletter !== "boolean") {
+    return NextResponse.json({ error: "newsletter must be a boolean" }, { status: 400 });
+  }
+  if (!hasEmail && body.optIn === undefined && body.resend !== true && body.newsletter === undefined) {
     return NextResponse.json({ error: "nothing to update" }, { status: 400 });
   }
 
@@ -171,7 +183,15 @@ export async function POST(req: NextRequest) {
     if (wantsConfirm && saved.email && !saved.emailVerifiedAt && saved.reengageEmailOptIn) {
       confirmation = await sendConfirmation(memberId, saved.email, saved.locale, getClientIp(req.headers));
     }
-    return NextResponse.json({ ...state(saved), confirmation });
+    // The monthly newsletter is its own consent (never implied by the digest opt-in).
+    let newsletter = {};
+    if (resolveToggle("newsletter.memberOptInEnabled", await loadSettings())) {
+      if (typeof body.newsletter === "boolean" && !remove && saved.email) {
+        await setMemberNewsletter(memberId, saved.email, !!saved.emailVerifiedAt, body.newsletter);
+      }
+      newsletter = await newsletterPart(saved.email);
+    }
+    return NextResponse.json({ ...state(saved), confirmation, ...newsletter });
   } catch (err) {
     return internalError(err, "email-prefs POST", "Couldn't save email preference");
   }

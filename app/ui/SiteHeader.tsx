@@ -38,6 +38,7 @@ const GROUPS: { key: string; items: NavItem[] }[] = [
     { href: "/admin/activation", label: "activation", analyticsOnly: true },
     { href: "/admin/shop", label: "shopAdmin", adminOnly: true },
     { href: "/admin/spotlight", label: "spotlightAdmin", analyticsOnly: true },
+    { href: "/admin/newsletter", label: "newsletterAdmin", adminOnly: true },
   ] },
 ];
 const HIDDEN_ON = new Set(["/join", "/login"]);

@@ -58,6 +58,7 @@ export const TABLES: TableSpec[] = [
   { kind: 'relabel', model: 'PaymentRequest', field: 'requesterMemberId' },
   { kind: 'relabel', model: 'PfpRestyle', field: 'memberId' },
   { kind: 'relabel', model: 'EmailConfirmSend', field: 'memberId' },
+  { kind: 'relabel', model: 'NewsletterSubscriber', field: 'memberId' },
   { kind: 'relabel', model: 'CrewTaskProposal', field: 'leadMemberId' },
   { kind: 'relabel', model: 'CrewTask', field: 'leadMemberId' },
   { kind: 'relabel', model: 'CrewRole', field: 'memberId' },

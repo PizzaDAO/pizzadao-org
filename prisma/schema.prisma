@@ -3028,6 +3028,16 @@ model NewsletterSubscriber {
   source    String   @default("journal")
   status    String   @default("subscribed")
   createdAt DateTime @default(now())
+  // Double opt-in: only rows with confirmedAt set and status "subscribed" may be mailed.
+  confirmedAt      DateTime?
+  confirmSentAt    DateTime?
+  confirmSends     Int       @default(0)
+  unsubscribedAt   DateTime?
+  memberId         String?
+  locale           String    @default("en")
+  lastStatusReason String?
+
+  @@index([memberId])
 }
 
 // A message sent through the marketing contact and partners forms. `emailed` records whether the
