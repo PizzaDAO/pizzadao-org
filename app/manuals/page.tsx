@@ -6,6 +6,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
+import { displayOrder } from "@/app/lib/manuals-freshness";
 import {
   EditorialMasthead,
   EditorialPage,
@@ -24,7 +25,22 @@ type Manual = {
   author: string;
   lastUpdated: string;
   notes: string;
+  // Present only when the review markers are switched on.
+  reviewedAt?: string | null;
+  supersededBy?: string | null;
+  stale?: boolean;
+  neverReviewed?: boolean;
+  draft?: boolean;
+  replaced?: boolean;
+  hidden?: boolean;
 };
+
+function reviewedLabel(iso: string): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  return d.toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
+}
+
+const chipClass = "overline px-2 py-1 rounded-md";
 
 function statusBadgeClass(status: string): string {
   const s = status.toLowerCase();
@@ -53,7 +69,7 @@ const CARET_BG = {
   backgroundPosition: "right 12px center",
 };
 
-function ManualCard({ manual, index }: { manual: Manual; index: number }) {
+function ManualCard({ manual, index, markers }: { manual: Manual; index: number; markers: boolean }) {
   return (
     <Link
       href={`/manuals/${index}`}
@@ -95,6 +111,27 @@ function ManualCard({ manual, index }: { manual: Manual; index: number }) {
               Updated {manual.lastUpdated}
             </p>
           )}
+          {markers && (
+            <div className="mt-2 flex flex-wrap items-center gap-2" data-testid="manual-markers">
+              <span className="overline text-foreground/45" style={{ fontSize: 10 }}>
+                {manual.reviewedAt ? `Reviewed ${reviewedLabel(manual.reviewedAt)}` : "Not yet reviewed"}
+              </span>
+              {manual.stale && (
+                <span className={`${chipClass} bg-[hsl(var(--tomato)/0.15)] text-tomato`} style={{ fontSize: 10 }}>
+                  Stale
+                </span>
+              )}
+              {manual.replaced && manual.supersededBy && (
+                <Link
+                  href={manual.supersededBy}
+                  className="text-[13px] text-tomato no-underline hover:underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Replaced by {manual.supersededBy} →
+                </Link>
+              )}
+            </div>
+          )}
         </div>
         {manual.status && (
           <span
@@ -111,6 +148,7 @@ function ManualCard({ manual, index }: { manual: Manual; index: number }) {
 
 export default function ManualsPage() {
   const [manuals, setManuals] = useState<Manual[]>([]);
+  const [markers, setMarkers] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -137,6 +175,7 @@ export default function ManualsPage() {
         if (!res.ok) throw new Error("Failed to fetch manuals");
         const data = await res.json();
         setManuals(data.manuals || []);
+        setMarkers(data.freshness?.enabled === true);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unknown error");
       } finally {
@@ -171,8 +210,10 @@ export default function ManualsPage() {
     const matchesStatus =
       statusFilters.length === 0 ||
       statusFilters.some((s) => manual.status.toLowerCase() === s.toLowerCase());
-    return matchesSearch && matchesCrew && matchesStatus;
+    return matchesSearch && matchesCrew && matchesStatus && !(markers && manual.hidden);
   });
+  // Replaced manuals sort last (markers on only).
+  const shownManuals = markers ? displayOrder(filteredManuals).map((i) => filteredManuals[i]) : filteredManuals;
 
   return (
     <EditorialPage width="max-w-[860px]">
@@ -314,7 +355,7 @@ export default function ManualsPage() {
             />
           ) : (
             <div className="grid gap-3">
-              {filteredManuals.map((manual) => {
+              {shownManuals.map((manual) => {
                 // Find original index for the link
                 const originalIndex = manuals.findIndex(
                   (m) => m.title === manual.title && m.crew === manual.crew
@@ -324,6 +365,7 @@ export default function ManualsPage() {
                     key={`${manual.title}-${manual.crew}`}
                     manual={manual}
                     index={originalIndex}
+                    markers={markers}
                   />
                 );
               })}

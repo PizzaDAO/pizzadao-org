@@ -10,6 +10,7 @@ import { EVT } from "@/app/(marketing)/_site/lib/analytics/events";
 
 const cols = [
   { title: "More", items: ["About", "Global Pizza Party", { label: "Partners", href: "/partners" }, "Journal", "Join"] as Array<string | { label: string; href: string }> },
+  { title: "Resources", items: [{ label: "Handbook", href: "/handbook" }, { label: "Manuals", href: "/manuals" }] as Array<string | { label: string; href: string }> },
   { title: "Press", items: [{ label: "Brand System", href: "https://pizzadao.xyz/brand" }, { label: "Contact", href: "/contact" }, "Inquiries"] as Array<string | { label: string; href: string }> },
   { title: "Elsewhere", items: [{ label: "Instagram", href: "https://www.instagram.com/Pizza_DAO/" }, { label: "X / Twitter", href: "https://x.com/Pizza_DAO" }, { label: "YouTube", href: "https://www.youtube.com/@PizzaDAO" }] as Array<string | { label: string; href: string }> },
 ];

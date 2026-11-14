@@ -267,6 +267,10 @@ describe('settings registry', () => {
       ['newsletter.fromName', ''],
       ['newsletter.fromAddress', ''],
       ['newsletter.replyTo', ''],
+      ['manuals.freshnessEnabled', false],
+      ['manuals.staleAfterDays', 365],
+      ['manuals.hideDrafts', false],
+      ['manuals.hideReplaced', false],
     ])
   })
 
