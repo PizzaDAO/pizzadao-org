@@ -2967,7 +2967,6 @@ model CrewSession {
   status            String    @default("SCHEDULED") // PROPOSED | SCHEDULED | CANCELED
   canceledAt        DateTime?
   public            Boolean   @default(true) // shown on the public listing
-  presenterMemberId String?
   recordingId       String?
   recordingUrl      String?
   updatedBy         String? // discordId of the last editor
