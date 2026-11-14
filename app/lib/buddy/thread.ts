@@ -14,6 +14,8 @@ export interface ThreadInput {
   content: string
   /** The two people: added to the thread and the only ones pinged. */
   userIds: string[]
+  /** Retry of a half-made intro: reuse this thread (add the members, post) instead of creating a new one. */
+  existingThreadId?: string
 }
 
 export async function createPrivateThread(input: ThreadInput, opts: { fetchImpl?: typeof fetch; botToken?: string } = {}): Promise<ThreadResult> {
@@ -29,16 +31,19 @@ export async function createPrivateThread(input: ThreadInput, opts: { fetchImpl?
       signal: AbortSignal.timeout(TIMEOUT_MS),
     })
   try {
-    // 12 = private thread; invitable false so only moderators can add more people.
-    const created = await call(`/channels/${input.channelId}/threads`, 'POST', {
-      name: input.name,
-      type: 12,
-      auto_archive_duration: 10080,
-      invitable: false,
-    })
-    if (!created.ok) return { ok: false, reason: created.status === 429 ? 'rate_limited' : `thread_create_http_${created.status}` }
-    const threadId = String(((await created.json()) as { id?: string }).id ?? '')
-    if (!/^\d{5,25}$/.test(threadId)) return { ok: false, reason: 'thread_create_bad_response' }
+    let threadId = input.existingThreadId ?? ''
+    if (!/^\d{5,25}$/.test(threadId)) {
+      // 12 = private thread; invitable false so only moderators can add more people.
+      const created = await call(`/channels/${input.channelId}/threads`, 'POST', {
+        name: input.name,
+        type: 12,
+        auto_archive_duration: 10080,
+        invitable: false,
+      })
+      if (!created.ok) return { ok: false, reason: created.status === 429 ? 'rate_limited' : `thread_create_http_${created.status}` }
+      threadId = String(((await created.json()) as { id?: string }).id ?? '')
+      if (!/^\d{5,25}$/.test(threadId)) return { ok: false, reason: 'thread_create_bad_response' }
+    }
     for (const userId of input.userIds) {
       const added = await call(`/channels/${threadId}/thread-members/${userId}`, 'PUT')
       if (!added.ok) return { ok: false, reason: `add_member_http_${added.status}`, threadId }

@@ -348,6 +348,10 @@ describe('settings registry', () => {
     }
   })
 
+  it('the session-crews gate fails closed (an unreadable setting means no crews)', () => {
+    expect(SETTINGS['education.sessionCrewIds'].onReadFailure).toBe('throw')
+  })
+
   it('money-hold and approval settings fail to their strictest value', () => {
     expect(SETTINGS['missions.humanReleaseMinLevel'].onReadFailure).toEqual({ value: 1 })
     expect(SETTINGS['missions.newAccountDays'].onReadFailure).toEqual({ value: 365 })

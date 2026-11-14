@@ -2963,6 +2963,9 @@ model CrewSession {
   eventId           String? // Discord scheduled event
   announceMessageId String? // post in the crew channel
   generalMessageId  String? // post in the general announcements channel
+  announceChannelId String? // channel the announcement was posted to (edit/cancel use it; old rows fall back to the setting)
+  generalChannelId  String? // same for the general post
+  noteKey           String? // "update note" claim: hash of the title/time it announced (PENDING while posting)
   telegramQueued    Boolean  @default(false)
   lastError         String?
   // Manage page, public listing and edit-in-place (plans/education-sessions-on-site.md).
@@ -3149,6 +3152,7 @@ model BuddyProfile {
   maxActive     Int       @default(2)
   lastMatchedAt DateTime?
   addedBy       String? // Discord id of the admin who added them by hand, if any
+  removedAt     DateTime? // set when an admin removed them; blocks self opt-in until an admin re-adds
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -3165,6 +3169,7 @@ model BuddyPair {
   score            Float?
   threadId         String?
   createdBy        String? // Discord id of the admin who made the pair
+  introStartedAt   DateTime? // claim while an intro is being sent (concurrent intros)
   introducedAt     DateTime?
   firstHelloAt     DateTime?
   vouchedAt        DateTime?

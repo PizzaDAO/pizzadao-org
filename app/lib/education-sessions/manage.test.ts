@@ -3,8 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 type Row = Record<string, unknown>
 const { rows, prismaMock, eventReq, postFile, editFile, editMsg, postMsg, enqueue } = vi.hoisted(() => {
   const rows: Row[] = []
-  const match = (r: Row, where: Row) =>
-    Object.entries(where).every(([k, v]) => (v && typeof v === 'object' && 'not' in (v as object) ? r[k] !== (v as { not: unknown }).not : r[k] === v))
+  const match = (r: Row, where: Row): boolean =>
+    Object.entries(where).every(([k, v]) => {
+      if (k === 'OR') return (v as Row[]).some((w) => match(r, w))
+      if (v && typeof v === 'object' && 'not' in (v as object)) return r[k] !== (v as { not: unknown }).not
+      if (v && typeof v === 'object' && 'notIn' in (v as object)) return !(v as { notIn: unknown[] }).notIn.includes(r[k])
+      return r[k] === v
+    })
   const prismaMock = {
     crewSession: {
       findUnique: vi.fn(async ({ where }: { where: Row }) => {
@@ -12,7 +17,7 @@ const { rows, prismaMock, eventReq, postFile, editFile, editMsg, postMsg, enqueu
         return rows.find((r) => (k ? r.crewId === k.crewId && r.dedupeKey === k.dedupeKey : r.id === where.id)) ?? null
       }),
       create: vi.fn(async ({ data }: { data: Row }) => {
-        const r = { id: `s${rows.length + 1}`, eventId: null, announceMessageId: null, generalMessageId: null, telegramQueued: false, status: 'SCHEDULED', canceledAt: null, public: true, recordingUrl: null, ...data }
+        const r = { id: `s${rows.length + 1}`, eventId: null, announceMessageId: null, generalMessageId: null, announceChannelId: null, generalChannelId: null, noteKey: null, lastError: null, telegramQueued: false, status: 'SCHEDULED', canceledAt: null, public: true, recordingUrl: null, ...data }
         rows.push(r)
         return r
       }),
@@ -145,6 +150,90 @@ describe('editSession: edit in place', () => {
     expect(body.content).toContain('Updated')
   })
 
+  it('a Discord 404 on edit clears the stored id so the step shows as missing and Retry re-posts it', async () => {
+    await scheduleEducationSession('education', session, 'u1', deps(), extras)
+    editFile.mockRejectedValueOnce(new DiscordPostError('Discord API error 404: {"message": "Unknown Message", "code": 10008}', 404))
+    eventReq.mockRejectedValueOnce(new DiscordPostError('Discord API error 404: Unknown Guild Scheduled Event (code 10070)', 404))
+    const r = await editSession(rows[0].id as string, session, extras, 'u1', {}, deps())
+    expect(r).toMatchObject({ event: 'failed', announcement: 'failed' })
+    expect(rows[0]).toMatchObject({ announceMessageId: null, announceChannelId: null, eventId: null })
+    const retried = await retrySession(rows[0].id as string, deps())
+    expect(retried).toMatchObject({ event: 'done', announcement: 'done' })
+    expect(rows[0].announceMessageId).toBe('m-222222')
+  })
+
+  it('a 404 that is not Unknown Message / Event (or other errors) keeps the stored id', async () => {
+    await scheduleEducationSession('education', session, 'u1', deps(), extras)
+    editFile.mockRejectedValueOnce(new DiscordPostError('Discord API error 500', 500))
+    await editSession(rows[0].id as string, session, extras, 'u1', {}, deps())
+    editFile.mockRejectedValueOnce(new DiscordPostError('Missing Access', 404))
+    await editSession(rows[0].id as string, session, extras, 'u1', {}, deps())
+    expect(rows[0].announceMessageId).toBe('m-222222')
+  })
+
+  it('a 404 on cancel clears the stored id too', async () => {
+    await scheduleEducationSession('education', session, 'u1', deps(), extras)
+    editMsg.mockRejectedValueOnce(new DiscordPostError('Unknown Message (code 10008)', 404))
+    const r = await cancelSession(rows[0].id as string, 'u1', deps())
+    expect(r.announcement).toBe('failed')
+    expect(rows[0].announceMessageId).toBeNull()
+  })
+
+  it('edit and cancel use the channel stored with the message, not the current setting', async () => {
+    await scheduleEducationSession('education', session, 'u1', deps(), extras)
+    expect(rows[0].announceChannelId).toBe('222222')
+    channels['discord.educationChannelId'] = '888888'
+    await editSession(rows[0].id as string, session, extras, 'u1', {}, deps())
+    expect((editFile.mock.calls[0][0] as { channelId: string }).channelId).toBe('222222')
+    await cancelSession(rows[0].id as string, 'u1', deps())
+    expect((editMsg.mock.calls[0][0] as { channelId: string }).channelId).toBe('222222')
+    channels['discord.educationChannelId'] = '222222'
+  })
+
+  it('an old row without a stored channel falls back to the current setting', async () => {
+    await scheduleEducationSession('education', session, 'u1', deps(), extras)
+    rows[0].announceChannelId = null
+    await editSession(rows[0].id as string, session, extras, 'u1', {}, deps())
+    expect((editFile.mock.calls[0][0] as { channelId: string }).channelId).toBe('222222')
+  })
+
+  it('the update note is posted once per title/time: a re-submit does not post it again', async () => {
+    await scheduleEducationSession('education', session, 'u1', deps(), extras)
+    const fixed = parseSessionInput({ ...input, title: 'Intro to Dough' }, NOW)
+    expect((await editSession(rows[0].id as string, fixed, extras, 'u1', { notify: true }, deps())).note).toBe('done')
+    expect((await editSession(rows[0].id as string, fixed, extras, 'u1', { notify: true }, deps())).note).toBe('already')
+    expect(postMsg).toHaveBeenCalledTimes(1)
+    const later = parseSessionInput({ ...input, title: 'Intro to Dough', time: '19:00' }, NOW)
+    expect((await editSession(rows[0].id as string, later, extras, 'u1', { notify: true }, deps())).note).toBe('done')
+    expect(postMsg).toHaveBeenCalledTimes(2)
+  })
+
+  it('an unclear note failure stays claimed (no double note); a definitive one releases the claim', async () => {
+    await scheduleEducationSession('education', session, 'u1', deps(), extras)
+    postMsg.mockRejectedValueOnce(new DiscordPostError('boom', 500))
+    expect((await editSession(rows[0].id as string, session, extras, 'u1', { notify: true }, deps())).note).toBe('failed')
+    expect(rows[0].noteKey).toBe('PENDING')
+    expect((await editSession(rows[0].id as string, session, extras, 'u1', { notify: true }, deps())).note).toBe('already')
+    rows[0].noteKey = null
+    postMsg.mockRejectedValueOnce(new DiscordPostError('Missing Access', 403))
+    await editSession(rows[0].id as string, session, extras, 'u1', { notify: true }, deps())
+    expect(rows[0].noteKey).toBeNull()
+    expect((await editSession(rows[0].id as string, session, extras, 'u1', { notify: true }, deps())).note).toBe('done')
+  })
+
+  it('keeps lastError when a step is still missing, clears it when everything is posted', async () => {
+    postFile.mockRejectedValueOnce(new DiscordPostError('Missing Access', 403))
+    await scheduleEducationSession('education', session, 'u1', deps(), extras)
+    expect(rows[0].announceMessageId).toBeNull()
+    expect(rows[0].lastError).toContain('announcement')
+    await editSession(rows[0].id as string, session, extras, 'u1', {}, deps())
+    expect(rows[0].lastError).toContain('announcement') // the announcement is still missing
+    await retrySession(rows[0].id as string, deps())
+    expect(rows[0].lastError).toBeNull()
+    await editSession(rows[0].id as string, session, extras, 'u1', {}, deps())
+    expect(rows[0].lastError).toBeNull()
+  })
+
   it('does nothing while editing or posting is switched off', async () => {
     await scheduleEducationSession('education', session, 'u1', deps(), extras)
     expect((await editSession(rows[0].id as string, session, extras, 'u1', {}, deps({ editEnabled: async () => false }))).status).toBe('disabled')
@@ -199,13 +288,27 @@ describe('cancelSession', () => {
     expect(rows[0].updatedBy).toBe('u1')
   })
 
-  it('a canceled session cannot be scheduled again by the same form values', async () => {
+  it('the same title and time can be scheduled again after a cancel, as a new session', async () => {
     await scheduleEducationSession('education', session, 'u1', deps(), extras)
     await cancelSession(rows[0].id as string, 'u1', deps())
     const posts = postFile.mock.calls.length
     const r = await scheduleEducationSession('education', session, 'u1', deps(), extras)
-    expect(r.status).toBe('canceled')
-    expect(postFile).toHaveBeenCalledTimes(posts)
+    expect(r.status).toBe('scheduled')
+    expect(rows).toHaveLength(2)
+    expect(rows[0].status).toBe('CANCELED')
+    expect(rows[1].status).toBe('SCHEDULED')
+    expect(rows[0].dedupeKey).not.toBe(rows[1].dedupeKey)
+    expect(postFile).toHaveBeenCalledTimes(posts + 1)
+    // ...and a repeat of that is still deduped.
+    expect((await scheduleEducationSession('education', session, 'u1', deps(), extras)).status).toBe('already')
+  })
+
+  it('frees the key of a row canceled before keys were freed (legacy)', async () => {
+    await scheduleEducationSession('education', session, 'u1', deps(), extras)
+    rows[0].status = 'CANCELED'
+    const r = await scheduleEducationSession('education', session, 'u1', deps(), extras)
+    expect(r.status).toBe('scheduled')
+    expect(rows).toHaveLength(2)
   })
 
   it('switched off, unknown or ended', async () => {

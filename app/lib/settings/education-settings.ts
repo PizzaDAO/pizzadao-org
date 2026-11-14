@@ -84,7 +84,7 @@ export const EDUCATION_SETTINGS = {
     help: 'Crew ids (one per line) whose leads can schedule sessions from the website. Posts go to the education channels above. Empty: nobody can schedule (admins included).',
     schema: z.array(z.string().trim().toLowerCase().regex(/^[a-z0-9]+(?:_[a-z0-9]+)*$/, 'Not a valid crew id')).max(20),
     default: SESSION_CREW_IDS_DEFAULT,
-    onReadFailure: { value: SESSION_CREW_IDS_DEFAULT },
+    onReadFailure: 'throw', // fail closed: access.ts treats an unreadable setting as "no crews"
     input: { type: 'stringList', maxItems: 20, maxLength: 40 },
     confirm: (from, to) => (to.some((c) => !from.includes(c)) ? 'Leads of the added crews will be able to post session announcements.' : null),
   } as SettingDef<string[]>,

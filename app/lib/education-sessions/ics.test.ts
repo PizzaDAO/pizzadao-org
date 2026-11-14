@@ -33,6 +33,21 @@ describe('buildIcs', () => {
   })
 })
 
+describe('control characters and bare CR', () => {
+  it('turns CRLF, CR and LF into \\n and drops other control chars', () => {
+    expect(icsEscape('a\r\nb\rc\nd')).toBe('a\\nb\\nc\\nd')
+    expect(icsEscape('x\u0000y\u0007z\u001Fw\u007F')).toBe('xyzw')
+  })
+  it('cannot inject a property through any text field', () => {
+    const evil = 'Hi\r\nBEGIN:VEVENT\rATTENDEE:x\u0000'
+    const ics = buildIcs({ ...base, id: 'a\r\nb', title: evil, presenter: evil, description: evil, url: 'https://x.test/\r\nATTENDEE:y' }, { host: 'h\nost' })
+    const lines = ics.split('\r\n')
+    expect(lines.filter((l) => l === 'BEGIN:VEVENT')).toHaveLength(1)
+    expect(lines.some((l) => l.startsWith('ATTENDEE'))).toBe(false)
+    expect(ics.replace(/\r\n/g, '')).not.toMatch(/[\r\n\u0000]/)
+  })
+})
+
 describe('icsEscape / icsFold', () => {
   it('escapes backslashes first', () => {
     expect(icsEscape('a\\b;c,d\ne')).toBe('a\\\\b\\;c\\,d\\ne')

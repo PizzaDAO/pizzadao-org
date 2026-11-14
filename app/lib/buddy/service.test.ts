@@ -22,7 +22,7 @@ vi.mock('@/app/lib/missions', () => ({ getCurrentLevel: m.level }))
 vi.mock('@/app/lib/sheets/member-repository', () => ({ fetchMemberIdByDiscordId: m.memberId }))
 vi.mock('./reward', () => ({ rewardBuddy: m.reward }))
 
-import { adminAddBuddy, completeDuePairs, completeIfDue, createPair, endPair, saveOwnProfile } from './service'
+import { adminAddBuddy, adminRemoveBuddy, completeDuePairs, completeIfDue, createPair, endPair, retryPendingRewards, saveOwnProfile } from './service'
 
 const TRAINEE = '111111'
 const BUDDY = '222222'
@@ -69,6 +69,67 @@ describe('saveOwnProfile (opt-in eligibility)', () => {
     m.level.mockResolvedValue(1)
     expect((await saveOwnProfile(BUDDY, { paused: true })).ok).toBe(true)
     expect((await saveOwnProfile(BUDDY, { active: false })).ok).toBe(true)
+  })
+})
+
+describe('saveOwnProfile (no stray rows, removal, default load)', () => {
+  beforeEach(() => {
+    p.buddyProfile.findUnique.mockResolvedValue(null)
+    p.buddyProfile.upsert.mockImplementation(async ({ create }: { create: object }) => ({ active: true, paused: false, maxActive: 2, languages: [], ...create }))
+  })
+  it('does not create a row for a pause, leave or empty save', async () => {
+    expect((await saveOwnProfile(BUDDY, { paused: true })).ok).toBe(false)
+    expect((await saveOwnProfile(BUDDY, { active: false })).ok).toBe(false)
+    expect((await saveOwnProfile(BUDDY, {})).ok).toBe(false)
+    expect(p.buddyProfile.upsert).not.toHaveBeenCalled()
+  })
+  it('defaults the self opt-in load to the buddy.maxActivePerBuddy setting', async () => {
+    m.level.mockResolvedValue(4)
+    await saveOwnProfile(BUDDY, { active: true })
+    expect(p.buddyProfile.upsert.mock.calls[0][0].create).toMatchObject({ maxActive: 2 })
+  })
+  it('refuses a removed buddy any change, even one with a high level', async () => {
+    m.level.mockResolvedValue(9)
+    p.buddyProfile.findUnique.mockResolvedValue({ discordId: BUDDY, active: false, removedAt: new Date(), addedBy: null, maxActive: 2, languages: [] })
+    expect(await saveOwnProfile(BUDDY, { active: true })).toEqual({ ok: false, reason: 'not_eligible' })
+    expect(p.buddyProfile.upsert).not.toHaveBeenCalled()
+  })
+})
+
+describe('admin remove and re-add', () => {
+  it('remove clears addedBy and records the removal marker', async () => {
+    p.buddyProfile.updateMany.mockResolvedValue({ count: 1 })
+    expect(await adminRemoveBuddy(BUDDY)).toEqual({ ok: true })
+    expect(p.buddyProfile.updateMany.mock.calls[0][0]).toMatchObject({ where: { discordId: BUDDY }, data: { active: false, addedBy: null, removedAt: expect.any(Date) } })
+  })
+  it('re-adding clears the marker', async () => {
+    await adminAddBuddy(BUDDY, 'adm')
+    expect(p.buddyProfile.upsert.mock.calls[0][0].update).toMatchObject({ active: true, removedAt: null })
+  })
+})
+
+describe('reward retry', () => {
+  it('records reward_pending when the reward throws at completion', async () => {
+    m.reward.mockRejectedValue(new Error('boom'))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    p.buddyEvent.create.mockResolvedValue({})
+    await completeIfDue({ id: 'pair1', traineeDiscordId: TRAINEE, buddyDiscordId: BUDDY }, 3, 2)
+    expect(p.buddyEvent.create.mock.calls.map((c) => c[0].data.kind)).toEqual(['completed', 'reward_pending'])
+  })
+  it('retries unrewarded completed pairs only while rewardEnabled is on', async () => {
+    p.buddyPair.findMany.mockResolvedValue([{ id: 'pair1', buddyDiscordId: BUDDY }])
+    m.reward.mockResolvedValue('granted')
+    m.toggle.mockImplementation(async (k: string) => k !== 'buddy.rewardEnabled')
+    expect(await retryPendingRewards()).toBe(0)
+    expect(m.reward).not.toHaveBeenCalled()
+    m.toggle.mockResolvedValue(true)
+    expect(await retryPendingRewards()).toBe(1)
+    expect(m.reward).toHaveBeenCalledWith({ pairId: 'pair1', buddyDiscordId: BUDDY })
+    expect(p.buddyPair.findMany.mock.calls[0][0].where).toMatchObject({ status: 'COMPLETED', events: { some: { kind: 'reward_pending' }, none: { kind: { in: ['reward_granted', 'reward_skipped'] } } } })
+  })
+  it('the daily run includes the retry count', async () => {
+    p.buddyPair.findMany.mockResolvedValue([])
+    expect(await completeDuePairs()).toEqual({ checked: 0, completed: 0, rewardsRetried: 0 })
   })
 })
 
@@ -155,8 +216,8 @@ describe('completion', () => {
   it('the run completes only the pairs whose trainee is done, and is a no-op while off', async () => {
     p.buddyPair.findMany.mockResolvedValue([pair, { id: 'pair2', traineeDiscordId: '333333', buddyDiscordId: BUDDY }])
     m.level.mockImplementation(async (id: string) => (id === TRAINEE ? 3 : 1))
-    expect(await completeDuePairs()).toEqual({ checked: 2, completed: 1 })
+    expect(await completeDuePairs()).toMatchObject({ checked: 2, completed: 1 })
     m.toggle.mockResolvedValue(false)
-    expect(await completeDuePairs()).toEqual({ checked: 0, completed: 0 })
+    expect(await completeDuePairs()).toMatchObject({ checked: 0, completed: 0 })
   })
 })
