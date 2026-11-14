@@ -1,7 +1,7 @@
 import { fetchGviz, type GvizCacheOptions } from "@/app/lib/sheets/gviz";
 import { SHEET_IDS } from "@/app/lib/sheets/config";
 import { isTablesModeDetected } from "@/app/lib/table-parser";
-import { listManualsFromDb, manualsFromDb, parseManualsTable, type Manual } from "@/app/lib/manuals";
+import { decorateManuals, listManualsFromDb, manualsFromDb, parseManualsTable, type Manual } from "@/app/lib/manuals";
 import { NextResponse } from 'next/server'
 import { getManualLinks, getManualLinksDebug, ManualLinksDebugResult } from '@/app/api/lib/google-sheets'
 import { cacheDel } from '@/app/api/lib/cache'
@@ -25,8 +25,9 @@ export async function GET(req: Request) {
     // Once the index lives in the database (sheets.source.manuals = db), the sheet is not read.
     if (await manualsFromDb()) {
       const allManuals = await listManualsFromDb()
-      const manuals = crewFilter ? allManuals.filter(m => m.crew.toLowerCase() === crewFilter) : allManuals
-      return NextResponse.json({ manuals }, {
+      const decorated = await decorateManuals(allManuals)
+      const manuals = crewFilter ? decorated.manuals.filter(m => m.crew.toLowerCase() === crewFilter) : decorated.manuals
+      return NextResponse.json({ manuals, freshness: decorated.freshness }, {
         headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=3600' }
       })
     }

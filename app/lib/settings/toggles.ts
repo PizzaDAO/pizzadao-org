@@ -127,6 +127,10 @@ export const TOGGLES = {
   // Off unless turned on: newsletter consent (double opt-in emails, member checkbox).
   'newsletter.confirmEmailsEnabled': { env: 'NEWSLETTER_CONFIRM_EMAILS_ENABLED', legacy: ON_WORDS },
   'newsletter.memberOptInEnabled': { env: 'NEWSLETTER_MEMBER_OPT_IN_ENABLED', legacy: ON_WORDS },
+  // Off unless turned on: review markers on the manuals page, and hiding drafts / replaced manuals.
+  'manuals.freshnessEnabled': { env: 'MANUALS_FRESHNESS_ENABLED', legacy: ON_WORDS },
+  'manuals.hideDrafts': { env: 'MANUALS_HIDE_DRAFTS', legacy: ON_WORDS },
+  'manuals.hideReplaced': { env: 'MANUALS_HIDE_REPLACED', legacy: ON_WORDS },
   // Off unless turned on: redirect page requests on the old app host to the main site, and carry the login across.
   'site.hostRedirectEnabled': { env: 'SITE_HOST_REDIRECT_ENABLED', legacy: ON_WORDS },
   'site.sessionBridgeEnabled': { env: 'SITE_SESSION_BRIDGE_ENABLED', legacy: ON_WORDS },
