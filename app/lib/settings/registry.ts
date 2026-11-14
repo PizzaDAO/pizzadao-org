@@ -25,6 +25,7 @@ import { SITE_SETTINGS } from './site-settings'
 import { CALL_UPDATES_SETTINGS } from './call-updates-settings'
 import { MEMBERS_SETTINGS } from './members-settings'
 import { MARKETING_SETTINGS } from './marketing-settings'
+import { EDUCATION_SETTINGS } from './education-settings'
 import { NEWSLETTER_SETTINGS } from './newsletter-settings'
 import { BUDDY_SETTINGS } from './buddy-settings'
 import { MANUALS_SETTINGS } from './manuals-settings'
@@ -2396,6 +2397,7 @@ export const SETTINGS = {
   ...MEMBERS_SETTINGS,
   ...MARKETING_SETTINGS,
   ...NEWSLETTER_SETTINGS,
+  ...EDUCATION_SETTINGS,
   ...BUDDY_SETTINGS,
   ...MANUALS_SETTINGS,
   // The Work Payment responses sheet. Empty = form ingest does nothing. Never committed to the repo, and

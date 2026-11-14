@@ -2965,11 +2965,20 @@ model CrewSession {
   generalMessageId  String? // post in the general announcements channel
   telegramQueued    Boolean  @default(false)
   lastError         String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  // Manage page, public listing and edit-in-place (plans/education-sessions-on-site.md).
+  status            String    @default("SCHEDULED") // PROPOSED | SCHEDULED | CANCELED
+  canceledAt        DateTime?
+  public            Boolean   @default(true) // shown on the public listing
+  recordingId       String?
+  recordingUrl      String?
+  updatedBy         String? // discordId of the last editor
+  proposedBy        String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   @@unique([crewId, dedupeKey])
   @@index([crewId, startsAt])
+  @@index([startsAt])
 }
 
 // One spoken call-updates run (plans/metalhead-reads-updates.md): the claim, what was said (hash and

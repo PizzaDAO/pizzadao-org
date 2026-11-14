@@ -120,12 +120,13 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
   const [elapsedTime, setElapsedTime] = useState(0)
   const [user, setUser] = useState<UserData | null>(null)
   const [userFetched, setUserFetched] = useState(false)
-  // Education only: leads and admins get a "Schedule a session" link (the API answers per signed-in user).
+  // Leads and admins of a crew that may host sessions (education.sessionCrewIds) get a "Sessions" link
+  // (the API answers per signed-in user and crew).
   const [canScheduleSession, setCanScheduleSession] = useState(false)
   useEffect(() => {
-    if (crewId.toLowerCase() !== 'education' || !user) return
+    if (!user) return
     let off = false
-    fetch(`/api/crew/education/sessions`, { cache: 'no-store' })
+    fetch(`/api/crew/${encodeURIComponent(crewId)}/sessions`, { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : { canManage: false }))
       .then((j) => { if (!off) setCanScheduleSession(!!j.canManage) })
       .catch(() => {})
@@ -970,8 +971,8 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
               </Link>
             )}
             {canScheduleSession && (
-              <Link href={`/crew/${crew.id}/sessions/new`} style={{ ...badge(), textDecoration: 'none' }}>
-                🎓 Schedule a session
+              <Link href={`/crew/${crew.id}/sessions`} style={{ ...badge(), textDecoration: 'none' }}>
+                🎓 Sessions
               </Link>
             )}
           </div>

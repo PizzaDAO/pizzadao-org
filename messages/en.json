@@ -614,6 +614,7 @@
     "pep": "Earn & spend PEP",
     "articles": "Stories",
     "calls": "Call history",
+    "sessions": "Sessions",
     "proposals": "Proposals",
     "chats": "Chats",
     "manuals": "Crew manuals",
@@ -890,6 +891,14 @@
     "howToAttend": "How to attend a call",
     "gettingStarted": "Getting started",
     "handbook": "Handbook",
+    "sessionsCard": {
+      "overline": "Next session",
+      "none": "No session is scheduled yet.",
+      "by": "by {presenter}",
+      "viewAll": "All sessions",
+      "schedule": "Schedule a session",
+      "manage": "Manage sessions"
+    },
     "levelCard": {
       "overline": "Your level",
       "level": "Level {level}",
