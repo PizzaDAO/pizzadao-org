@@ -103,7 +103,10 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     // The old site's /dashboard/<section> prototype pages go to "/" before /dashboard/[id] can read them as a member id.
-    const legacy = [...legacyDashboardRedirects(), ...legacyAssetRedirects()];
+    // /app and bare /api (people typing the old app.pizzadao.org address as a path) go to the wizard,
+    // which is what the old app host's "/" showed. Exact paths only: /api/* routes are untouched.
+    const appEntry = ["/app", "/api"].map((source) => ({ source, destination: "/start", permanent: false }));
+    const legacy = [...appEntry, ...legacyDashboardRedirects(), ...legacyAssetRedirects()];
     return marketingHomeAtRoot() ? [...legacy, { source: "/home", destination: "/", permanent: false }] : legacy;
   },
   async headers() {
