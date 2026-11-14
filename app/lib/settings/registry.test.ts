@@ -302,6 +302,13 @@ describe('settings registry', () => {
       ['manuals.staleAfterDays', 365],
       ['manuals.hideDrafts', false],
       ['manuals.hideReplaced', false],
+      ['features.publicEnabled', false],
+      ['features.exportEnabled', false],
+      ['features.navLinkEnabled', false],
+      ['features.showOps', false],
+      ['features.introText', ''],
+      ['features.contributeUrl', ''],
+      ['features.githubCacheMinutes', 60],
     ])
   })
 
