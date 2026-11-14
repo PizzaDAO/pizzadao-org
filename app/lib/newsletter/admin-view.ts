@@ -7,6 +7,7 @@ import { prisma } from "@/app/lib/db";
 import { NextResponse } from "next/server";
 import { loadSettings, type Settings } from "@/app/lib/settings";
 import { resolveToggle } from "@/app/lib/settings/toggles";
+import { isAdminDiscordId } from "@/app/lib/auth-guards";
 import { approvalBlockers, isApprover, IssueError } from "./issue";
 import { renderNewsletter } from "./render";
 import { newsletterSender } from "./sender";
@@ -25,6 +26,7 @@ export const patchSchema = z
     sections: sectionsSchema.optional(),
     sponsorNotified: z.boolean().optional(),
     pickMember: z.number().int().positive().optional(),
+    updatedAt: z.string().min(1).max(40),
     pickCity: z.object({ key: z.string().min(1).max(120), notes: z.string().max(2000) }).optional(),
   })
   .strict();
@@ -41,9 +43,11 @@ export async function issueView(id: string, discordId: string, settings?: Settin
   if (!row) throw new IssueError(404, "Issue not found");
   const parsed = sectionsSchema.safeParse(row.sections);
   const sections = parsed.success ? parsed.data : emptySections();
+  // Approvers who are not app admins get a read-only view without pick lists or actor ids.
+  const admin = await isAdminDiscordId(discordId);
   const [events, members, canApprove] = await Promise.all([
     prisma.newsletterIssueEvent.findMany({ where: { issueId: id }, orderBy: { createdAt: "desc" }, take: 20, select: { action: true, actor: true, createdAt: true } }),
-    loadMemberCandidates().then((m) => m.candidates).catch(() => []),
+    admin ? loadMemberCandidates().then((m) => m.candidates).catch(() => []) : Promise.resolve([]),
     isApprover(discordId, s),
   ]);
   const preview = renderNewsletter({ subject: row.subject, preheader: row.preheader, sections });
@@ -61,20 +65,21 @@ export async function issueView(id: string, discordId: string, settings?: Settin
       sponsorNotified: row.sponsorNotified,
       sections,
       model: row.model,
-      approvedBy: row.approvedBy,
+      approvedBy: admin ? row.approvedBy : null,
       approvedAt: row.approvedAt?.toISOString() ?? null,
       updatedAt: row.updatedAt.toISOString(),
     },
     preview,
     blockers: approvalBlockers({ ...row }),
     canApprove,
-    candidates: { members, cities: cityOptions() },
+    readOnly: !admin,
+    candidates: { members, cities: admin ? cityOptions() : [] },
     flags: {
       draftEnabled: resolveToggle("newsletter.draftEnabled", s) === true,
       senderConfigured: newsletterSender(s) !== null,
       emailEnabled: resolveToggle("newsletter.confirmEmailsEnabled", s) === true,
     },
-    audit: events.map((e) => ({ action: e.action, actor: e.actor, at: e.createdAt.toISOString() })),
+    audit: events.map((e) => ({ action: e.action, actor: admin ? e.actor : null, at: e.createdAt.toISOString() })),
   };
 }
 

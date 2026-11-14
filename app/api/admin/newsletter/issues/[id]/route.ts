@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/app/lib/auth-guards";
 import { internalError } from "@/app/lib/errors/error-response";
+import { requireViewer } from "@/app/lib/newsletter/access";
 import { updateIssue } from "@/app/lib/newsletter/issue";
 import { dateAtNoonUtc, errorResponse, issueView, patchSchema } from "@/app/lib/newsletter/admin-view";
 
@@ -13,11 +14,11 @@ type Ctx = { params: Promise<{ id: string }> };
 const NO_STORE = { "Cache-Control": "private, no-store" };
 
 export async function GET(_req: Request, ctx: Ctx) {
-  const admin = await requireAdmin();
-  if (!admin.ok) return admin.response;
+  const viewer = await requireViewer(); // admins and approvers (read-only for approvers)
+  if (!viewer.ok) return viewer.response;
   try {
     const { id } = await ctx.params;
-    return NextResponse.json(await issueView(id, admin.session.discordId), { headers: NO_STORE });
+    return NextResponse.json(await issueView(id, viewer.discordId), { headers: NO_STORE });
   } catch (err) {
     return errorResponse(err) ?? internalError(err, "admin/newsletter/issue", "Couldn't load the issue");
   }
@@ -46,6 +47,8 @@ export async function PATCH(req: Request, ctx: Ctx) {
         pickCity: b.pickCity,
       },
       admin.session.discordId,
+      "edit",
+      new Date(b.updatedAt),
     );
     return NextResponse.json(await issueView(id, admin.session.discordId), { headers: NO_STORE });
   } catch (err) {

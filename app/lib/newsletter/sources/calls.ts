@@ -56,6 +56,9 @@ export function plainLine(s: string): string {
 /** Why a call is not used, or null when it may be. */
 export function skipReason(row: CallRow, opts: Pick<CallSelectOptions, "filter" | "importedOk">): string | null {
   if (recapCrewExcluded(row, opts.filter)) return "excluded";
+  // A crew label derived from the event name goes through the same exclusion and term checks.
+  if (!row.crewLabel && row.eventName && (recapCrewExcluded({ crewId: row.crewId, crewLabel: row.eventName }, opts.filter) || mentionsBlockedTerm(row.eventName, opts.filter))) return "excluded";
+  if (row.crewLabel && mentionsBlockedTerm(row.crewLabel, opts.filter)) return "excluded";
   if (isImportedSource(row.source) && !opts.importedOk) return "imported";
   if (redactionsNewerThanSummary(row)) return "stale-redactions";
   return null;

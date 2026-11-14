@@ -18,7 +18,9 @@ type View = {
     model: string | null;
     approvedBy: string | null;
     approvedAt: string | null;
+    updatedAt: string;
   };
+  readOnly: boolean;
   preview: { subject: string; html: string; text: string };
   blockers: string[];
   canApprove: boolean;
@@ -107,7 +109,7 @@ export function IssueEditor({ id }: { id: string }) {
   }, [id, call, apply]);
 
   const dirty = useMemo(() => !!form && JSON.stringify(form) !== saved, [form, saved]);
-  const editable = view ? view.issue.status === "draft" || view.issue.status === "approved" : false;
+  const editable = view ? !view.readOnly && (view.issue.status === "draft" || view.issue.status === "approved") : false;
 
   if (!view || !form) {
     return (
@@ -127,6 +129,7 @@ export function IssueEditor({ id }: { id: string }) {
     xSpaceUrl: form.xSpaceUrl.trim() || null,
     sections: s,
     sponsorNotified: form.sponsorNotified,
+    updatedAt: view.issue.updatedAt,
     ...extra,
   });
 
@@ -143,7 +146,11 @@ export function IssueEditor({ id }: { id: string }) {
   };
 
   const post = async (label: string, path: string, okText: string) => {
-    const v = await call(label, `/api/admin/newsletter/issues/${id}/${path}`, { method: "POST" });
+    const v = await call(label, `/api/admin/newsletter/issues/${id}/${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ updatedAt: view.issue.updatedAt }),
+    });
     if (v) {
       if (path === "test-send") setMsg({ kind: "ok", text: okText });
       else {
@@ -347,10 +354,13 @@ export function IssueEditor({ id }: { id: string }) {
           </fieldset>
 
           <div className="flex flex-wrap gap-2">
-            <button type="button" className={btn} disabled={!editable || !dirty || !!busy} onClick={() => save()}>
-              {busy === "save" ? "Saving…" : "Save changes"}
-            </button>
-            {view.flags.draftEnabled ? (
+            {view.readOnly ? <p className="m-0 text-sm text-foreground/60">Read-only view: you can approve or unapprove, not edit.</p> : null}
+            {!view.readOnly ? (
+              <button type="button" className={btn} disabled={!editable || !dirty || !!busy} onClick={() => save()}>
+                {busy === "save" ? "Saving…" : "Save changes"}
+              </button>
+            ) : null}
+            {view.flags.draftEnabled && !view.readOnly ? (
               <button
                 type="button"
                 className={btn}
@@ -365,7 +375,7 @@ export function IssueEditor({ id }: { id: string }) {
             ) : null}
             <button
               type="button"
-              className={btn}
+              className={`${btn} ${view.readOnly ? "hidden" : ""}`}
               disabled={dirty || !!busy || !view.flags.senderConfigured || !view.flags.emailEnabled}
               title={view.flags.senderConfigured && view.flags.emailEnabled ? "Email this saved version to your own verified address" : "Needs a sender address and the newsletter email switch on"}
               onClick={() => void post("test", "test-send", "Test sent to your own verified address.")}

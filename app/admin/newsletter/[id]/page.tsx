@@ -4,7 +4,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getSession } from "@/app/lib/session";
-import { isAdminDiscordId } from "@/app/lib/auth-guards";
+import { viewerAccess } from "@/app/lib/newsletter/access";
 import { IssueEditor } from "./IssueEditor";
 
 export const runtime = "nodejs";
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 
 export default async function AdminNewsletterIssuePage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
-  const isAdmin = session?.discordId ? await isAdminDiscordId(session.discordId) : false;
+  const isAdmin = session?.discordId ? (await viewerAccess(session.discordId)) !== null : false; // admins and approvers
   if (!isAdmin) {
     return (
       <main className="min-h-screen bg-background text-foreground flex items-center justify-center p-5">

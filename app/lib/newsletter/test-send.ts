@@ -37,9 +37,14 @@ export async function sendTestIssue(issueId: string, adminDiscordId: string): Pr
     return { ok: false, status: 400, error: "Verify your own email address in your email preferences first; test sends go only there." };
   }
 
-  const since = new Date(Date.now() - 3_600_000);
-  const recent = await prisma.newsletterIssueEvent.count({ where: { issueId, action: "test-send", createdAt: { gte: since } } });
-  if (recent >= TEST_SENDS_PER_HOUR) return { ok: false, status: 429, error: "Too many test sends this hour." };
+  // Claim a slot first, then count, so parallel requests can't both pass under the cap.
+  // The cap is per admin, across issues.
+  const claim = await prisma.newsletterIssueEvent.create({ data: { issueId, action: "test-send", actor: adminDiscordId, data: { claim: true } }, select: { id: true } });
+  const used = await prisma.newsletterIssueEvent.count({ where: { actor: adminDiscordId, action: "test-send", createdAt: { gte: new Date(Date.now() - 3_600_000) } } });
+  if (used > TEST_SENDS_PER_HOUR) {
+    await prisma.newsletterIssueEvent.delete({ where: { id: claim.id } });
+    return { ok: false, status: 429, error: "Too many test sends this hour." };
+  }
 
   const mail = renderNewsletter(
     { subject: issue.subject, preheader: issue.preheader, sections: parsed.data },
@@ -54,6 +59,6 @@ export async function sendTestIssue(issueId: string, adminDiscordId: string): Pr
     replyTo: sender.replyTo,
   });
   // The audit row has no address and no content.
-  await prisma.newsletterIssueEvent.create({ data: { issueId, action: "test-send", actor: adminDiscordId, data: { ok: res.ok, ...(res.ok ? {} : { reason: res.reason }) } } });
+  await prisma.newsletterIssueEvent.update({ where: { id: claim.id }, data: { data: { ok: res.ok, ...(res.ok ? {} : { reason: res.reason }) } } });
   return res.ok ? { ok: true } : { ok: false, status: 502, error: "The email provider didn't accept the test message." };
 }

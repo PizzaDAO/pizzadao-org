@@ -12,6 +12,7 @@ import { loadSettings, type Settings } from "@/app/lib/settings";
 import { settingInt } from "@/app/lib/settings/numbers";
 import { contentHash, partnerNeedsNotice, sectionsSchema, type NewsletterSections } from "./sections";
 import { draftWithModelEnabled, fallbackSubject, gatherSections, writeDraftText } from "./draft";
+import { recheckIssueContent } from "./recheck";
 import { citySection, loadMemberSpotlight, memberSection } from "./sources/spotlight";
 import { buildXSpace, xSpaceConfig } from "./xspace";
 
@@ -105,6 +106,7 @@ export interface EditData {
   issueDate?: Date;
   xSpaceUrl?: string | null;
   sections?: NewsletterSections;
+  sources?: object;
   sponsorNotified?: boolean;
   status?: string;
   approvedBy?: null;
@@ -245,20 +247,29 @@ export async function createDraft(o: { actor: string; issueDate: Date; now?: Dat
 }
 
 /** Re-run the model over the current sections (selections and edited fields it does not overwrite stay). */
-export async function redraftText(id: string, actor: string): Promise<IssueState> {
+export async function redraftText(id: string, actor: string, expectedUpdatedAt: Date): Promise<IssueState> {
   const settings = await loadSettings();
   if (!draftWithModelEnabled(settings)) throw new IssueError(409, "AI drafting is switched off (Settings, Newsletter).");
   const row = await prisma.newsletterIssue.findUnique({ where: { id } });
   if (!row) throw new IssueError(404, "Issue not found");
+  assertFresh(row.updatedAt, expectedUpdatedAt);
   const parsed = sectionsSchema.safeParse(row.sections);
   if (!parsed.success) throw new IssueError(409, "The content is not valid.");
   const text = await writeDraftText(parsed.data, monthLabel(row.issueDate), { settings });
-  return updateIssue(id, { subject: text.subject, preheader: text.preheader, sections: text.sections }, actor, "redraft");
+  // The model call can take a while: the save only applies if nobody edited the issue meanwhile.
+  return updateIssue(id, { subject: text.subject, preheader: text.preheader, sections: text.sections }, actor, "redraft", expectedUpdatedAt);
 }
 
-export async function updateIssue(id: string, patch: IssuePatch, actor: string, action = "edit"): Promise<IssueState> {
+/** Optimistic lock: the version the editor rendered must still be the stored one. */
+export function assertFresh(stored: Date, expected: Date | undefined): void {
+  if (!expected || Number.isNaN(expected.getTime())) throw new IssueError(400, "Missing the version of the issue you are looking at. Reload the page.");
+  if (stored.getTime() !== expected.getTime()) throw new IssueError(409, "The issue changed since you loaded it. Reload and review it again.");
+}
+
+export async function updateIssue(id: string, patch: IssuePatch, actor: string, action = "edit", expectedUpdatedAt?: Date): Promise<IssueState> {
   const row = await prisma.newsletterIssue.findUnique({ where: { id } });
   if (!row) throw new IssueError(404, "Issue not found");
+  assertFresh(row.updatedAt, expectedUpdatedAt);
   if (row.status === "sent" || row.status === "cancelled") throw new IssueError(409, `A ${row.status} issue can't be edited.`);
   const settings = await loadSettings();
   const picked: { member?: NewsletterSections["member"]; city?: NewsletterSections["city"] } = {};
@@ -274,6 +285,16 @@ export async function updateIssue(id: string, patch: IssuePatch, actor: string, 
     picked.city = { ...c, blurb: keepBlurb.success && keepBlurb.data.city.cityKey === c.cityKey ? keepBlurb.data.city.blurb : "" };
   }
   const { data, invalidated } = editData(toState(row), patch, { actor, now: new Date(), xSpace: xSpaceConfig(settings), picked });
+  if (data.sections) {
+    // The Member Spotlight must always be a consented, eligible submission, however it got into the sections.
+    const m = data.sections.member;
+    if (m.enabled && m.submissionId === null && m.name.trim()) throw new IssueError(400, "Pick a consented submission for the Member Spotlight (no free-form entries).");
+    if (m.enabled && m.submissionId !== null && picked.member?.submissionId !== m.submissionId && !(await loadMemberSpotlight(m.submissionId))) {
+      throw new IssueError(400, "That submission can't be featured (not consented, not shortlisted, or already used).");
+    }
+    const old = (row.sources && typeof row.sources === "object" ? row.sources : {}) as Record<string, unknown>;
+    data.sources = { ...old, spotlightIds: m.enabled && m.submissionId !== null ? [m.submissionId] : [] };
+  }
   const res = await prisma.newsletterIssue.updateMany({
     where: { id, updatedAt: row.updatedAt, status: { in: ["draft", "approved"] } },
     data: data as object,
@@ -284,12 +305,22 @@ export async function updateIssue(id: string, patch: IssuePatch, actor: string, 
   return toState(fresh);
 }
 
-export async function approveIssue(id: string, actor: string, settings: Settings): Promise<IssueState> {
+export async function approveIssue(id: string, actor: string, settings: Settings, expectedUpdatedAt?: Date): Promise<IssueState> {
   if (!(await isApprover(actor, settings))) throw new IssueError(403, "You are not allowed to approve newsletters.");
   const row = await prisma.newsletterIssue.findUnique({ where: { id } });
   if (!row) throw new IssueError(404, "Issue not found");
+  // Approval is of the version the approver looked at.
+  assertFresh(row.updatedAt, expectedUpdatedAt);
   const blockers = approvalBlockers(toState(row));
   if (blockers.length) throw new IssueError(409, blockers.join(" "));
+  // The privacy rules as they are now (calls unpublished, redactions, exclusions, blocked terms).
+  let problems: string[];
+  try {
+    problems = await recheckIssueContent(row);
+  } catch {
+    throw new IssueError(503, "Couldn't re-check the content against the post filter right now. Try again shortly.");
+  }
+  if (problems.length) throw new IssueError(409, `Content changed since drafting: ${problems.join(" ")}`);
   const now = new Date();
   const hash = hashOf(row);
   // Bound to the version just read: an edit in between changes updatedAt and the approval does not apply.

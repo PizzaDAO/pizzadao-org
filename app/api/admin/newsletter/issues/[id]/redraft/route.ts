@@ -10,12 +10,13 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-export async function POST(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const admin = await requireAdmin();
   if (!admin.ok) return admin.response;
   try {
     const { id } = await ctx.params;
-    await redraftText(id, admin.session.discordId);
+    const body = (await req.json().catch(() => null)) as { updatedAt?: unknown } | null;
+    await redraftText(id, admin.session.discordId, new Date(typeof body?.updatedAt === "string" ? body.updatedAt : NaN));
     return NextResponse.json(await issueView(id, admin.session.discordId), { headers: { "Cache-Control": "private, no-store" } });
   } catch (err) {
     return errorResponse(err) ?? internalError(err, "admin/newsletter/redraft", "Couldn't redraft the issue");

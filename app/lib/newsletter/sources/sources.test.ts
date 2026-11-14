@@ -72,6 +72,14 @@ describe("call updates selection", () => {
     expect(shippedItems(items, filter, false)).toEqual(["Ship the guide"]);
   });
 
+  it("applies exclusions and blocked terms to a crew label derived from the event name", () => {
+    const filter: PostFilter = { excludedCrewIds: [], excludedCrewLabelTerms: ["hush"], blockedTerms: ["codename"] };
+    expect(skipReason(call({ crewId: null, crewLabel: null, eventName: "Hush weekly" }), opts({ filter }))).toBe("excluded");
+    expect(skipReason(call({ crewId: null, crewLabel: null, eventName: "Project codename sync" }), opts({ filter }))).toBe("excluded");
+    expect(skipReason(call({ crewLabel: "Codename Crew" }), opts({ filter }))).toBe("excluded");
+    expect(skipReason(call({ crewId: null, crewLabel: null, eventName: "Open sync" }), opts({ filter }))).toBeNull();
+  });
+
   it("neutralises Discord mentions and markup", () => {
     expect(plainLine("**Thanks** <@123456789012345678> and <@&987654321098765432> `code`")).toBe("Thanks @user and @user code");
   });
