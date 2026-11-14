@@ -14,7 +14,7 @@
     {
       "slug": "outfit-level-2",
       "kind": "outfit",
-      "prompt": "A plain white dress shirt with an open collar and a loose, slightly undone dark red tie hanging a little below the collar. Front-facing view of ONLY the upper-body clothing (shoulders, chest and torso: no head, no neck, no hands, no person inside), sitting at the bottom of the square canvas: the garment spans most of the canvas width and is cut off by the bottom edge, with the collar opening near the horizontal center and the shoulders in the lower half of the canvas. Mafia-boss style, same cartoon look as the fedora. Isolated clothing, nothing else: fully transparent everywhere outside the clothing, no background, no shadow, no floor, no decorations in the corners."
+      "prompt": "A plain white dress shirt with an open collar and the top button undone, NO tie, no necktie, no bow tie, no accessories. Front-facing view of ONLY the upper-body clothing (shoulders, chest and torso: no head, no neck, no hands, no person inside), sitting at the bottom of the square canvas: the garment spans most of the canvas width and is cut off by the bottom edge, with the collar opening near the horizontal center and the shoulders in the lower half of the canvas. Mafia-boss style, same cartoon look as the fedora. Isolated clothing, nothing else: fully transparent everywhere outside the clothing, no background, no shadow, no floor, no decorations in the corners."
     },
     {
       "slug": "outfit-level-3",
