@@ -56,8 +56,9 @@ export default function BuddiesPage() {
   }, [data, filter]);
 
   const introNote = (res: Record<string, unknown>) => {
-    const intro = res.intro as { mode?: string; ok?: boolean; reason?: string } | undefined;
+    const intro = res.intro as { mode?: string; ok?: boolean; reason?: string; waiting?: boolean } | undefined;
     if (!intro) return "Paired.";
+    if (!intro.ok && intro.waiting) return "Paired. Waiting for channel access: the intro opens once both people can see the buddy channel.";
     if (!intro.ok) return `Paired. The intro thread failed (${intro.reason}); use Retry intro.`;
     return intro.mode === "dry-run" ? "Paired. Intro threads are off, so nothing was posted (recorded as a dry run)." : "Paired and the intro thread is open.";
   };
@@ -123,9 +124,9 @@ export default function BuddiesPage() {
                   <tr key={p.id} className="border-t border-foreground/20">
                     <td className="py-2">{p.trainee.name}</td>
                     <td>{p.buddy.name}</td>
-                    <td>{p.status}{p.endedReason ? ` (${p.endedReason})` : ""}{p.lastEvent === "intro_failed" ? " - intro failed" : ""}</td>
+                    <td>{p.status}{p.endedReason ? ` (${p.endedReason})` : ""}{p.lastEvent === "intro_failed" ? " - intro failed" : ""}{p.lastEvent === "intro_deferred" ? " - Waiting for channel access" : ""}{p.lastEvent === "intro_uncertain" ? " - intro post unclear: check the thread, then Retry intro" : ""}</td>
                     <td className="whitespace-nowrap">
-                      {ACTIVE.includes(p.status) && !p.threadId && <button type="button" disabled={busy} onClick={() => act({ action: "introduce", pairId: p.id }, (r) => (r.ok ? (r.mode === "dry-run" ? "Dry run recorded; nothing was posted." : "Intro thread opened.") : `Intro failed: ${String(r.reason)}`))}>Retry intro</button>}
+                      {ACTIVE.includes(p.status) && !p.threadId && <button type="button" disabled={busy} onClick={() => act({ action: "introduce", pairId: p.id }, (r) => (r.ok ? (r.mode === "dry-run" ? "Dry run recorded; nothing was posted." : "Intro thread opened.") : r.waiting ? "Waiting for channel access: the member cannot see the buddy channel yet." : r.cancelled ? "Cancelled: still no channel access after the wait. The trainee is unmatched again." : `Intro failed: ${String(r.reason)}`))}>Retry intro</button>}
                       {ACTIVE.includes(p.status) && <button type="button" className="ml-2" disabled={busy} onClick={() => { if (confirm(`End the pairing of ${p.trainee.name} and ${p.buddy.name}?`)) void act({ action: "end", pairId: p.id }, () => "Pair ended."); }}>End</button>}
                     </td>
                   </tr>

@@ -3153,6 +3153,7 @@ model BuddyProfile {
   lastMatchedAt DateTime?
   addedBy       String? // Discord id of the admin who added them by hand, if any
   removedAt     DateTime? // set when an admin removed them; blocks self opt-in until an admin re-adds
+  hideRecognition Boolean @default(false) // opt-out of public recognition (profile line, Top buddies)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -3170,6 +3171,7 @@ model BuddyPair {
   threadId         String?
   createdBy        String? // Discord id of the admin who made the pair
   introStartedAt   DateTime? // claim while an intro is being sent (concurrent intros)
+  traineeHideRecognition Boolean @default(false) // the trainee opted out of "Onboarded with help from ..." on their profile
   introducedAt     DateTime?
   firstHelloAt     DateTime?
   vouchedAt        DateTime?

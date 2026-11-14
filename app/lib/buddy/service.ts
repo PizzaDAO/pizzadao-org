@@ -10,6 +10,7 @@ import { getCurrentLevel } from '@/app/lib/missions'
 import { fetchMemberIdByDiscordId } from '@/app/lib/sheets/member-repository'
 import { ACTIVE_PAIR_STATUSES, buddyCapacity, checkPairing, hasTraineeFinished, isBuddyEligible, type PairRefusal } from './rules'
 import { rewardBuddy } from './reward'
+import { introducePair } from './intro'
 
 const SNOWFLAKE = /^\d{5,25}$/
 export const isSnowflake = (v: unknown): v is string => typeof v === 'string' && SNOWFLAKE.test(v)
@@ -25,6 +26,7 @@ export async function buddySettings() {
     completionLevel: s.get('buddy.completionLevel'),
     rewardMissionId: s.get('buddy.rewardMissionId'),
     introText: s.get('buddy.introText'),
+    introRecheckHours: s.get('buddy.introRecheckHours'),
   }
 }
 
@@ -206,8 +208,34 @@ export async function retryPendingRewards(limit = 50): Promise<number> {
   return rewarded
 }
 
+/**
+ * Retry intros that are waiting for channel access (an intro_deferred event, still MATCHED, no thread yet).
+ * Only while buddy.introThreadsEnabled is on. introducePair decides: still inside the wait it does nothing,
+ * past it a second failed check cancels the pair, a pass opens the thread.
+ */
+export async function retryDeferredIntros(limit = 50): Promise<{ opened: number; waiting: number; cancelled: number }> {
+  const out = { opened: 0, waiting: 0, cancelled: 0 }
+  if (!(await toggleEnabled('buddy.introThreadsEnabled'))) return out
+  const pairs = await prisma.buddyPair.findMany({
+    where: { status: 'MATCHED', introducedAt: null, threadId: null, events: { some: { kind: 'intro_deferred' } } },
+    select: { id: true },
+    take: limit,
+  })
+  for (const pair of pairs) {
+    try {
+      const r = await introducePair(pair.id, 'system')
+      if (r.ok) out.opened++
+      else if ('cancelled' in r && r.cancelled) out.cancelled++
+      else out.waiting++
+    } catch (e) {
+      console.error('[buddy] deferred intro failed', pair.id, e)
+    }
+  }
+  return out
+}
+
 /** Check every active pair and complete the ones whose trainee is done. Used by the daily run and the admin page. */
-export async function completeDuePairs(): Promise<{ checked: number; completed: number; rewardsRetried: number }> {
+export async function completeDuePairs(): Promise<{ checked: number; completed: number; rewardsRetried: number; intros?: { opened: number; waiting: number; cancelled: number } }> {
   if (!(await toggleEnabled('buddy.enabled'))) return { checked: 0, completed: 0, rewardsRetried: 0 }
   const cfg = await buddySettings()
   const pairs = await prisma.buddyPair.findMany({
@@ -220,5 +248,9 @@ export async function completeDuePairs(): Promise<{ checked: number; completed: 
     if (await completeIfDue(pair, level, cfg.completionLevel)) completed++
   }
   const rewardsRetried = await retryPendingRewards()
-  return { checked: pairs.length, completed, rewardsRetried }
+  const intros = await retryDeferredIntros().catch((e) => {
+    console.error('[buddy] deferred intros failed', e)
+    return undefined
+  })
+  return { checked: pairs.length, completed, rewardsRetried, ...(intros ? { intros } : {}) }
 }

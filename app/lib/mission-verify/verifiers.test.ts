@@ -51,7 +51,7 @@ describe('registry', () => {
       [
         'attendance_count', 'discord_message', 'discord_role', 'manual', 'referral', 'vouch_given', 'vouch_received', 'rare_pizza_box', 'wallet_connected', 'x_linked',
         'social_post', 'poap_drop', 'media_proof', 'gpp_host',
-        'pizzeria_checkin', 'passport_stamps', 'spotlight', 'shop_purchase', 'bounty_or_job', 'article_published', 'social_linked',
+        'pizzeria_checkin', 'passport_stamps', 'spotlight', 'shop_purchase', 'bounty_or_job', 'article_published', 'buddy_completed', 'social_linked',
       ].sort(),
     )
     expect(Object.values(VERIFIERS).filter((v) => v.mode === 'manual').map((v) => v.key)).toEqual(['manual'])

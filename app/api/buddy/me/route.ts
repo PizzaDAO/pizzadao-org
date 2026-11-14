@@ -3,6 +3,8 @@ import { json, rejectUnsafeWrite } from '@/app/lib/admin-guard'
 import { internalError } from '@/app/lib/errors/error-response'
 import { getMyBuddyState } from '@/app/lib/buddy/view'
 import { saveOwnProfile } from '@/app/lib/buddy/service'
+import { setRecognitionHidden } from '@/app/lib/buddy/recognition'
+import { toggleEnabled } from '@/app/lib/settings/toggles'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -34,6 +36,13 @@ export async function POST(request: Request) {
   const languages = Array.isArray(body.languages) && body.languages.every((l) => typeof l === 'string') ? (body.languages as string[]) : undefined
   const maxActive = typeof body.maxActive === 'number' && Number.isFinite(body.maxActive) ? body.maxActive : undefined
   try {
+    // Public recognition opt-out: { hideRecognition: boolean, pairId? } (pairId = the trainee's own pair).
+    if (typeof body.hideRecognition === 'boolean') {
+      if (!(await toggleEnabled('buddy.enabled'))) return json({ error: 'disabled' }, 404)
+      const pairId = typeof body.pairId === 'string' && body.pairId ? body.pairId : undefined
+      const ok = await setRecognitionHidden(auth.session.discordId, body.hideRecognition, pairId)
+      return ok ? json({ ok: true }) : json({ error: 'not_found' }, 404)
+    }
     const result = await saveOwnProfile(auth.session.discordId, { active: bool(body.active), paused: bool(body.paused), maxActive, languages })
     if (!result.ok) {
       const status = result.reason === 'not_eligible' ? 403 : result.reason === 'disabled' ? 404 : 400

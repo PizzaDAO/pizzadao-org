@@ -7,6 +7,7 @@ const m = vi.hoisted(() => ({
     vouch: { count: vi.fn() },
     buddyPair: { findMany: vi.fn(), groupBy: vi.fn(), updateMany: vi.fn() },
     buddyProfile: { findMany: vi.fn(), updateMany: vi.fn() },
+    buddyEvent: { findFirst: vi.fn(), create: vi.fn() },
   },
   memberId: vi.fn(),
 }))
@@ -24,6 +25,8 @@ import { getAdminOverview, loadChecklist } from './view'
 
 beforeEach(() => {
   vi.clearAllMocks()
+  m.prisma.buddyEvent.findFirst.mockResolvedValue(null)
+  m.prisma.buddyEvent.create.mockResolvedValue({})
   m.prisma.attendanceSummary.findUnique.mockResolvedValue(null)
   m.prisma.vouch.count.mockResolvedValue(0)
   m.prisma.buddyPair.updateMany.mockResolvedValue({ count: 1 })
@@ -59,5 +62,21 @@ describe('loadChecklist backfill', () => {
     m.memberId.mockRejectedValue(new Error('sheet down'))
     await expect(loadChecklist(pair, 1, 2, null)).resolves.toBeTruthy()
     expect(m.prisma.buddyPair.updateMany).not.toHaveBeenCalled()
+  })
+  it('remembers a member who is not in the sheet for a day, per pair and role', async () => {
+    m.memberId.mockResolvedValue(null)
+    m.prisma.buddyEvent.findFirst.mockResolvedValue(null)
+    await loadChecklist(pair, 1, 2, null)
+    expect(m.prisma.buddyEvent.create.mock.calls.map((c) => c[0].data.kind)).toEqual(['member_lookup_missed_trainee', 'member_lookup_missed_buddy'])
+    m.memberId.mockClear()
+    m.prisma.buddyEvent.findFirst.mockResolvedValue({ id: 'e1' }) // a miss from the last day
+    await loadChecklist(pair, 1, 2, null)
+    expect(m.memberId).not.toHaveBeenCalled()
+  })
+  it('does not cache a failed sheet read as "not found"', async () => {
+    m.prisma.buddyEvent.findFirst.mockResolvedValue(null)
+    m.memberId.mockRejectedValue(new Error('sheet down'))
+    await loadChecklist(pair, 1, 2, null)
+    expect(m.prisma.buddyEvent.create).not.toHaveBeenCalled()
   })
 })

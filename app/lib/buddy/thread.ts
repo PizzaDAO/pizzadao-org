@@ -6,7 +6,10 @@
 const API = 'https://discord.com/api/v10'
 const TIMEOUT_MS = 8000
 
-export type ThreadResult = { ok: true; threadId: string } | { ok: false; reason: string; threadId?: string }
+export type ThreadResult =
+  | { ok: true; threadId: string }
+  /** uncertain: the final post may or may not have gone out (timeout, network error, 5xx): never repost blindly. */
+  | { ok: false; reason: string; threadId?: string; uncertain?: boolean }
 
 export interface ThreadInput {
   channelId: string
@@ -30,8 +33,10 @@ export async function createPrivateThread(input: ThreadInput, opts: { fetchImpl?
       cache: 'no-store',
       signal: AbortSignal.timeout(TIMEOUT_MS),
     })
+  const bareId = (v: string) => (/^\d{5,25}$/.test(v) ? v : undefined)
+  let threadId = input.existingThreadId ?? ''
+  let posting = false
   try {
-    let threadId = input.existingThreadId ?? ''
     if (!/^\d{5,25}$/.test(threadId)) {
       // 12 = private thread; invitable false so only moderators can add more people.
       const created = await call(`/channels/${input.channelId}/threads`, 'POST', {
@@ -48,13 +53,44 @@ export async function createPrivateThread(input: ThreadInput, opts: { fetchImpl?
       const added = await call(`/channels/${threadId}/thread-members/${userId}`, 'PUT')
       if (!added.ok) return { ok: false, reason: `add_member_http_${added.status}`, threadId }
     }
-    const posted = await call(`/channels/${threadId}/messages`, 'POST', {
-      content: input.content.slice(0, 2000),
-      allowed_mentions: { users: input.userIds },
-    })
-    if (!posted.ok) return { ok: false, reason: `post_http_${posted.status}`, threadId }
+    const content = input.content.slice(0, 2000)
+    if (input.existingThreadId) {
+      // A reused thread may already hold the intro (an earlier post whose answer was lost): look before posting.
+      const found = await introAlreadyPosted(call, threadId, content)
+      if (found === 'unknown') return { ok: false, reason: 'verify_failed', threadId, uncertain: true }
+      if (found) return { ok: true, threadId }
+    }
+    posting = true
+    const posted = await call(`/channels/${threadId}/messages`, 'POST', { content, allowed_mentions: { users: input.userIds } })
+    if (!posted.ok) return { ok: false, reason: `post_http_${posted.status}`, threadId, ...(posted.status >= 500 ? { uncertain: true } : {}) }
     return { ok: true, threadId }
   } catch (e) {
-    return { ok: false, reason: (e as Error)?.name === 'TimeoutError' ? 'timeout' : 'network_error' }
+    const reason = (e as Error)?.name === 'TimeoutError' ? 'timeout' : 'network_error'
+    const id = bareId(threadId)
+    return { ok: false, reason, ...(id ? { threadId: id } : {}), ...(posting ? { uncertain: true } : {}) }
   }
+}
+
+let botIdCache: string | null = null
+
+/** Is the bot's intro already in the thread? Reads the latest messages and the bot's own id. 'unknown' when Discord cannot say. */
+async function introAlreadyPosted(call: (path: string, method: string, body?: unknown) => Promise<Response>, threadId: string, content: string): Promise<boolean | 'unknown'> {
+  try {
+    if (!botIdCache) {
+      const me = await call('/users/@me', 'GET')
+      if (!me.ok) return 'unknown'
+      botIdCache = String(((await me.json()) as { id?: string }).id ?? '') || null
+      if (!botIdCache) return 'unknown'
+    }
+    const list = await call(`/channels/${threadId}/messages?limit=50`, 'GET')
+    if (!list.ok) return 'unknown'
+    const msgs = (await list.json()) as Array<{ author?: { id?: string }; content?: string }>
+    return msgs.some((m) => m.author?.id === botIdCache && (m.content ?? '').slice(0, 80) === content.slice(0, 80))
+  } catch {
+    return 'unknown'
+  }
+}
+
+export function clearBotIdCache() {
+  botIdCache = null
 }

@@ -58,7 +58,7 @@ vi.mock('@/app/lib/telegram/city-posts', () => ({ enqueueMirror: enqueue }))
 
 import { DiscordPostError } from '@/app/lib/discord-rest'
 import { parseSessionInput } from './build'
-import { cancelSession, editSession, retrySession, scheduleEducationSession } from './run'
+import { cancelSession, editSession, resetPendingSteps, retrySession, scheduleEducationSession } from './run'
 
 const NOW = new Date('2026-11-11T00:00:00Z')
 const input = { title: 'Intro', presenter: 'P', description: 'D', date: '2026-11-20', time: '18:30', timeZone: 'UTC', lengthMinutes: 60 }
@@ -213,12 +213,31 @@ describe('editSession: edit in place', () => {
     postMsg.mockRejectedValueOnce(new DiscordPostError('boom', 500))
     expect((await editSession(rows[0].id as string, session, extras, 'u1', { notify: true }, deps())).note).toBe('failed')
     expect(rows[0].noteKey).toBe('PENDING')
-    expect((await editSession(rows[0].id as string, session, extras, 'u1', { notify: true }, deps())).note).toBe('already')
+    expect((await editSession(rows[0].id as string, session, extras, 'u1', { notify: true }, deps())).note).toBe('uncertain')
     rows[0].noteKey = null
     postMsg.mockRejectedValueOnce(new DiscordPostError('Missing Access', 403))
     await editSession(rows[0].id as string, session, extras, 'u1', { notify: true }, deps())
     expect(rows[0].noteKey).toBeNull()
     expect((await editSession(rows[0].id as string, session, extras, 'u1', { notify: true }, deps())).note).toBe('done')
+  })
+
+  it('resetPendingSteps also clears a PENDING note; a PENDING step keeps lastError', async () => {
+    await scheduleEducationSession('education', session, 'u1', deps(), extras)
+    rows[0].noteKey = 'PENDING'
+    rows[0].generalMessageId = null
+    rows[0].lastError = 'earlier'
+    await editSession(rows[0].id as string, session, extras, 'u1', {}, deps())
+    expect(rows[0].lastError).toBe('earlier') // a PENDING note is still unclear
+    expect(await resetPendingSteps(rows[0].id as string)).toEqual({ cleared: 1 })
+    expect(rows[0].noteKey).toBeNull()
+  })
+
+  it('treats a PENDING step id as missing in recordOutcome (lastError is not cleared)', async () => {
+    await scheduleEducationSession('education', session, 'u1', deps(), extras)
+    rows[0].announceMessageId = 'PENDING'
+    rows[0].lastError = 'earlier'
+    await editSession(rows[0].id as string, session, extras, 'u1', {}, deps())
+    expect(rows[0].lastError).toBe('earlier')
   })
 
   it('keeps lastError when a step is still missing, clears it when everything is posted', async () => {

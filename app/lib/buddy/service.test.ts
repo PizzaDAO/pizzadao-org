@@ -10,7 +10,7 @@ const m = vi.hoisted(() => {
     $executeRaw: vi.fn(),
     $transaction: vi.fn(),
   }
-  return { prisma, toggle: vi.fn(), level: vi.fn(), memberId: vi.fn(), reward: vi.fn() }
+  return { prisma, toggle: vi.fn(), level: vi.fn(), memberId: vi.fn(), reward: vi.fn(), intro: vi.fn() }
 })
 
 vi.mock('@/app/lib/db', () => ({ prisma: m.prisma }))
@@ -21,8 +21,9 @@ vi.mock('@/app/lib/settings', () => ({
 vi.mock('@/app/lib/missions', () => ({ getCurrentLevel: m.level }))
 vi.mock('@/app/lib/sheets/member-repository', () => ({ fetchMemberIdByDiscordId: m.memberId }))
 vi.mock('./reward', () => ({ rewardBuddy: m.reward }))
+vi.mock('./intro', () => ({ introducePair: m.intro }))
 
-import { adminAddBuddy, adminRemoveBuddy, completeDuePairs, completeIfDue, createPair, endPair, retryPendingRewards, saveOwnProfile } from './service'
+import { adminAddBuddy, adminRemoveBuddy, completeDuePairs, completeIfDue, createPair, endPair, retryDeferredIntros, retryPendingRewards, saveOwnProfile } from './service'
 
 const TRAINEE = '111111'
 const BUDDY = '222222'
@@ -129,9 +130,29 @@ describe('reward retry', () => {
   })
   it('the daily run includes the retry count', async () => {
     p.buddyPair.findMany.mockResolvedValue([])
-    expect(await completeDuePairs()).toEqual({ checked: 0, completed: 0, rewardsRetried: 0 })
+    expect(await completeDuePairs()).toEqual({ checked: 0, completed: 0, rewardsRetried: 0, intros: { opened: 0, waiting: 0, cancelled: 0 } })
   })
 })
+
+describe('deferred intro retry', () => {
+  it('does nothing while intro threads are off', async () => {
+    m.toggle.mockImplementation(async (k: string) => k !== 'buddy.introThreadsEnabled')
+    expect(await retryDeferredIntros()).toEqual({ opened: 0, waiting: 0, cancelled: 0 })
+    expect(p.buddyPair.findMany).not.toHaveBeenCalled()
+  })
+  it('retries only MATCHED pairs with a deferral and no thread, and tallies the outcomes', async () => {
+    m.toggle.mockResolvedValue(true)
+    p.buddyPair.findMany.mockResolvedValue([{ id: 'a' }, { id: 'b' }, { id: 'c' }])
+    m.intro
+      .mockResolvedValueOnce({ mode: 'live', ok: true, threadId: '1' })
+      .mockResolvedValueOnce({ mode: 'live', ok: false, reason: 'waiting_for_access', waiting: true })
+      .mockResolvedValueOnce({ mode: 'live', ok: false, reason: 'no_channel_access', cancelled: true })
+    expect(await retryDeferredIntros()).toEqual({ opened: 1, waiting: 1, cancelled: 1 })
+    expect(p.buddyPair.findMany.mock.calls[0][0].where).toMatchObject({ status: 'MATCHED', introducedAt: null, threadId: null, events: { some: { kind: 'intro_deferred' } } })
+    expect(m.intro).toHaveBeenCalledWith('a', 'system')
+  })
+})
+
 
 describe('createPair', () => {
   it('creates a MATCHED pair, writes the audit row and takes the per-buddy lock', async () => {

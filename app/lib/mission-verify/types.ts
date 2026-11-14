@@ -147,6 +147,7 @@ export type ActivityKind =
   | 'bounty_completed'
   | 'job_completed'
   | 'article_published'
+  | 'buddy_completed'
 
 export interface ReferralRow {
   inviteeDiscordId: string

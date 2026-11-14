@@ -76,6 +76,12 @@ export const BUDDY_SETTINGS = {
     'When a pair completes, the buddy is given the bonus mission set below (so its normal bonus PEP pays out). Off, completion only records that the reward would have been given.',
     'Buddies will start receiving the bonus mission when their trainee finishes.',
   ),
+  'buddy.publicRecognitionEnabled': toggle(
+    'buddy.publicRecognitionEnabled',
+    'Show buddies on public profiles and /buddies',
+    'Buddies get a "helped N trainees" line and badge on their profile, finished trainees get "Onboarded with help from ...", and /buddies lists the top buddies. Only completed pairs show, and members can opt out on their buddy card. Needs the buddy system on too. Off, none of it shows.',
+    'Completed buddy pairs will be shown on public profiles and on the /buddies page (members can opt out).',
+  ),
   'buddy.minLevel': int(
     'buddy.minLevel',
     'Minimum level to be a buddy',
@@ -99,6 +105,14 @@ export const BUDDY_SETTINGS = {
     1,
     9,
     2,
+  ),
+  'buddy.introRecheckHours': int(
+    'buddy.introRecheckHours',
+    'Hours to wait before the second channel-access check',
+    'If a trainee or buddy cannot see the buddy channel, the intro waits this long and checks once more. Still no access: the pair is cancelled (reason no_channel_access) and the trainee goes back to the unmatched list.',
+    1,
+    168,
+    24,
   ),
   'buddy.rewardMissionId': int(
     'buddy.rewardMissionId',

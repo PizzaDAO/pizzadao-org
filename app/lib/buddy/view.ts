@@ -9,6 +9,7 @@ import { readSignedUpMembers } from '@/app/lib/member-registration'
 import { fetchMemberByDiscordId, fetchMemberIdByDiscordId } from '@/app/lib/sheets/member-repository'
 import { ACTIVE_PAIR_STATUSES, buildChecklist, isBuddyEligible, isActiveStatus, type ChecklistItem } from './rules'
 import { buddySettings, completeIfDue } from './service'
+import { recognitionEnabled } from './recognition'
 
 const ACTIVE = [...ACTIVE_PAIR_STATUSES]
 const RECENT_DONE_MS = 14 * 24 * 60 * 60 * 1000
@@ -19,6 +20,10 @@ export interface PairCard {
   status: string
   partner: { discordId: string; name: string }
   threadUrl: string | null
+  /** The intro is waiting until the member can see the buddy channel. */
+  waitingForAccess: boolean
+  /** Trainee side only: the trainee hides "Onboarded with help from ..." on their public profile. */
+  hideRecognition?: boolean
   checklist: ChecklistItem[]
 }
 
@@ -26,7 +31,9 @@ export interface MyBuddyState {
   enabled: boolean
   eligible?: boolean
   minLevel?: number
-  profile?: { active: boolean; paused: boolean; maxActive: number; languages: string[] } | null
+  profile?: { active: boolean; paused: boolean; maxActive: number; languages: string[]; hideRecognition: boolean } | null
+  /** buddy.publicRecognitionEnabled is on: the card shows the opt-out. */
+  recognitionEnabled?: boolean
   maxActiveCap?: number
   pairs?: PairCard[]
 }
@@ -34,6 +41,27 @@ export interface MyBuddyState {
 function threadUrl(threadId: string | null): string | null {
   const guild = process.env.DISCORD_GUILD_ID
   return threadId && guild ? `https://discord.com/channels/${guild}/${threadId}` : null
+}
+
+const LOOKUP_RETRY_MS = 24 * 60 * 60 * 1000
+
+/** The sheet member id, or null. A definite "not a member" is cached per pair and role for a day; a failed read is not. */
+async function lookupMemberId(pairId: string | undefined, role: 'trainee' | 'buddy', discordId: string): Promise<string | null> {
+  const kind = `member_lookup_missed_${role}`
+  if (pairId) {
+    const recent = await prisma.buddyEvent
+      .findFirst({ where: { pairId, kind, at: { gte: new Date(Date.now() - LOOKUP_RETRY_MS) } }, select: { id: true } })
+      .catch(() => null)
+    if (recent) return null
+  }
+  let id: string | null
+  try {
+    id = await fetchMemberIdByDiscordId(discordId)
+  } catch {
+    return null
+  }
+  if (!id && pairId) await prisma.buddyEvent.create({ data: { pairId, kind, actor: 'system' } }).catch(() => {})
+  return id
 }
 
 /** The facts the checklist ticks from: existing mission, attendance and vouch data. */
@@ -44,15 +72,16 @@ export async function loadChecklist(pair: {
   traineeMemberId: string | null
   buddyDiscordId: string
 }, traineeLevel: number, completionLevel: number, buddyMemberIdIn: string | null): Promise<ChecklistItem[]> {
-  // Lazily backfill ids that were null when the pair / profile was made (the sheet lookup can fail then).
+  // Lazily backfill ids that were null when the pair / profile was made. A member who is simply not in the sheet
+  // is remembered for a day (an event on the pair), so the sheet is not read on every card load for them.
   let { traineeMemberId } = pair
   let buddyMemberId = buddyMemberIdIn
   if (!traineeMemberId) {
-    traineeMemberId = await fetchMemberIdByDiscordId(pair.traineeDiscordId).catch(() => null)
+    traineeMemberId = await lookupMemberId(pair.id, 'trainee', pair.traineeDiscordId)
     if (traineeMemberId && pair.id) await prisma.buddyPair.updateMany({ where: { id: pair.id, traineeMemberId: null }, data: { traineeMemberId } }).catch(() => {})
   }
   if (!buddyMemberId) {
-    buddyMemberId = await fetchMemberIdByDiscordId(pair.buddyDiscordId).catch(() => null)
+    buddyMemberId = await lookupMemberId(pair.id, 'buddy', pair.buddyDiscordId)
     if (buddyMemberId) await prisma.buddyProfile.updateMany({ where: { discordId: pair.buddyDiscordId, memberId: null }, data: { memberId: buddyMemberId } }).catch(() => {})
   }
   const [attendance, vouches] = await Promise.all([
@@ -83,6 +112,7 @@ export async function getMyBuddyState(discordId: string): Promise<MyBuddyState> 
       },
       orderBy: { createdAt: 'desc' },
       take: 10,
+      include: { events: { where: { kind: { in: ['intro_deferred', 'introduced'] } }, orderBy: { at: 'desc' }, take: 1 } },
     }),
   ])
   const pairs: PairCard[] = []
@@ -102,6 +132,8 @@ export async function getMyBuddyState(discordId: string): Promise<MyBuddyState> 
       status,
       partner: { discordId: partnerId, name: partner?.name || 'A member' },
       threadUrl: row.introducedAt ? threadUrl(row.threadId) : null,
+      ...(role === 'trainee' ? { hideRecognition: row.traineeHideRecognition } : {}),
+      waitingForAccess: status === 'MATCHED' && !row.introducedAt && row.events[0]?.kind === 'intro_deferred',
       checklist: await loadChecklist(row, traineeLevel, cfg.completionLevel, buddyProfile?.memberId ?? null),
     })
   }
@@ -110,7 +142,8 @@ export async function getMyBuddyState(discordId: string): Promise<MyBuddyState> 
     eligible: !profile?.removedAt && (isBuddyEligible(level, cfg.minLevel) || !!profile?.addedBy),
     minLevel: cfg.minLevel,
     maxActiveCap: cfg.cap,
-    profile: profile ? { active: profile.active, paused: profile.paused, maxActive: profile.maxActive, languages: profile.languages } : null,
+    recognitionEnabled: await recognitionEnabled().catch(() => false),
+    profile: profile ? { active: profile.active, paused: profile.paused, maxActive: profile.maxActive, languages: profile.languages, hideRecognition: profile.hideRecognition } : null,
     pairs,
   }
 }

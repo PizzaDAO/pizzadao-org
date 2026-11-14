@@ -14,6 +14,7 @@ describe.each([
   ['spotlight', 'spotlight_featured', 1],
   ['shop_purchase', 'shop_purchase', 1],
   ['article_published', 'article_published', 1],
+  ['buddy_completed', 'buddy_completed', 1],
 ])('%s', (key, kind, defMin) => {
   const v = VERIFIERS[key]
   it('parses params with a default min and rejects bad ones', () => {
