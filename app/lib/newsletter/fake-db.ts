@@ -1,3 +1,5 @@
+import { NEWSLETTER_SETTINGS } from "@/app/lib/settings/newsletter-settings";
+
 // Test helper: a tiny in-memory stand-in for prisma.newsletterSubscriber (fake data only).
 export interface FakeSub {
   id: string;
@@ -95,7 +97,8 @@ export function fakeSettings(values: Record<string, unknown> = {}) {
     "newsletter.fromAddress": "",
     "newsletter.replyTo": "",
   };
-  const all = { ...defaults, ...values };
+  const registry = Object.fromEntries(Object.values(NEWSLETTER_SETTINGS).map((d) => [d.key, d.default]));
+  const all = { ...registry, ...defaults, ...values };
   return {
     readFailed: false,
     invalidKeys: [] as string[],

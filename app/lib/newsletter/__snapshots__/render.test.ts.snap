@@ -1,0 +1,69 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`newsletter rendering > renders email-safe HTML and plain text (snapshot) > html 1`] = `
+"<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>December news</title></head>
+<body style="margin:0;padding:24px 12px;background:#f6f1e7;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#1d1a16">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0">What happened this month</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden">
+<tr><td style="padding:24px 28px 8px"><p style="margin:0;font-size:22px;font-weight:800;color:#1d1a16">December news</p></td></tr>
+<tr><td style="padding:20px 28px 4px"><p style="margin:0 0 12px;font-size:15px;line-height:1.55;color:#1d1a16;">Welcome &lt;b&gt;friends&lt;/b&gt;.</p><p style="margin:0 0 12px;font-size:15px;line-height:1.55;color:#1d1a16;">Second paragraph.</p></td></tr>
+<tr><td style="padding:20px 28px;border-top:1px solid #eadfcb"><h2 style="margin:0 0 10px;font-size:18px;line-height:1.3;color:#1d1a16">Join our X Space today at 4:20pm ET</h2><p style="margin:0 0 12px;font-size:15px;line-height:1.55;color:#1d1a16;color:#6b6358">4:20pm ET is 21:20 UTC.</p><p style="margin:0"><a href="https://x.com/i/spaces/abc" style="color:#c0392b;font-weight:700;text-decoration:underline">Open the X Space</a></p></td></tr>
+<tr><td style="padding:20px 28px;border-top:1px solid #eadfcb"><h2 style="margin:0 0 10px;font-size:18px;line-height:1.3;color:#1d1a16">Member Spotlight: Nominee</h2><img src="https://blob.example/a.jpg" alt="Nominee" width="504" style="display:block;width:100%;max-width:504px;height:auto;border-radius:12px;margin:0 0 12px"><p style="margin:0 0 12px;font-size:15px;line-height:1.55;color:#1d1a16;color:#6b6358">Town</p><p style="margin:0 0 12px;font-size:15px;line-height:1.55;color:#1d1a16;">Did good things.</p><p style="margin:0"><a href="https://example.org/a" style="color:#c0392b;font-weight:700;text-decoration:underline">example.org/a</a></p></td></tr>
+<tr><td style="padding:20px 28px;border-top:1px solid #eadfcb"><h2 style="margin:0 0 10px;font-size:18px;line-height:1.3;color:#1d1a16">City Spotlight: Alpha</h2><p style="margin:0 0 12px;font-size:15px;line-height:1.55;color:#1d1a16;">City text.</p></td></tr>
+<tr><td style="padding:20px 28px;border-top:1px solid #eadfcb"><h2 style="margin:0 0 10px;font-size:18px;line-height:1.3;color:#1d1a16">Partner Spotlight: Sponsor</h2><p style="margin:0 0 12px;font-size:15px;line-height:1.55;color:#1d1a16;">Partner text.</p><p style="margin:0"><a href="https://sponsor.example" style="color:#c0392b;font-weight:700;text-decoration:underline">sponsor.example</a></p></td></tr>
+<tr><td style="padding:20px 28px;border-top:1px solid #eadfcb"><h2 style="margin:0 0 10px;font-size:18px;line-height:1.3;color:#1d1a16">Upcoming events</h2><ul style="margin:0;padding-left:20px"><li style="margin:0 0 6px;font-size:15px;line-height:1.5;color:#1d1a16"><a href="https://discord.com/events/1/2" style="color:#c0392b;font-weight:700;text-decoration:underline">Community call</a> <span style="color:#6b6358">(Sat, Dec 12, 18:00 UTC)</span></li></ul></td></tr>
+<tr><td style="padding:20px 28px;border-top:1px solid #eadfcb"><h2 style="margin:0 0 10px;font-size:18px;line-height:1.3;color:#1d1a16">What the crews have been up to</h2><h3 style="margin:14px 0 6px;font-size:16px;color:#1d1a16">Ops Crew</h3><p style="margin:0 0 12px;font-size:15px;line-height:1.55;color:#1d1a16;">Reviewed the backlog.</p><p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#6b6358">Finished</p><ul style="margin:0 0 12px;padding-left:20px"><li style="margin:0 0 6px;font-size:15px;line-height:1.5;color:#1d1a16">Shipped the guide</li></ul><p style="margin:0 0 8px;font-size:14px"><a href="https://app.example.org/calls/c1" style="color:#c0392b;font-weight:700;text-decoration:underline">Read the call recap</a></p></td></tr>
+<tr><td style="padding:20px 28px;border-top:1px solid #eadfcb"><h2 style="margin:0 0 10px;font-size:18px;line-height:1.3;color:#1d1a16">New articles</h2><p style="margin:0 0 12px;font-size:15px;line-height:1.55;color:#1d1a16;">Fresh reads.</p><p style="margin:0 0 4px;font-size:16px;font-weight:700"><a href="https://app.example.org/articles/hello" style="color:#c0392b;font-weight:700;text-decoration:underline">Hello &lt;script&gt;</a></p><p style="margin:0 0 4px;font-size:13px;color:#6b6358">by Writer</p><p style="margin:0 0 12px;font-size:15px;line-height:1.55;color:#1d1a16;">An excerpt.</p></td></tr>
+<tr><td style="padding:18px 28px;border-top:1px solid #eadfcb;font-size:12px;line-height:1.5;color:#6b6358"><p style="margin:0 0 6px"><a href="https://app.example.org/newsletter/2026-12" style="color:#c0392b;font-weight:700;text-decoration:underline">View in browser</a> &middot; <a href="https://app.example.org/newsletter/unsubscribe?s=1&amp;sig=2" style="color:#c0392b;font-weight:700;text-decoration:underline">Unsubscribe</a></p><p style="margin:0">You get this because you asked for the PizzaDAO newsletter.</p><p style="margin:6px 0 0">1 Example Street, Town</p></td></tr>
+</table>
+</body></html>"
+`;
+
+exports[`newsletter rendering > renders email-safe HTML and plain text (snapshot) > text 1`] = `
+"December news
+
+Welcome <b>friends</b>.
+
+Second paragraph.
+
+Join our X Space today at 4:20pm ET
+4:20pm ET is 21:20 UTC.
+Open the X Space: https://x.com/i/spaces/abc
+
+MEMBER SPOTLIGHT: Nominee
+Town
+Did good things.
+https://example.org/a
+
+CITY SPOTLIGHT: Alpha
+City text.
+
+PARTNER SPOTLIGHT: Sponsor
+Partner text.
+https://sponsor.example
+
+UPCOMING EVENTS
+- Community call (Sat, Dec 12, 18:00 UTC) https://discord.com/events/1/2
+
+WHAT THE CREWS HAVE BEEN UP TO
+
+OPS CREW
+Reviewed the backlog.
+- Shipped the guide
+Recap: https://app.example.org/calls/c1
+
+NEW ARTICLES
+
+Fresh reads.
+
+Hello <script>
+by Writer
+An excerpt.
+https://app.example.org/articles/hello
+
+View in browser: https://app.example.org/newsletter/2026-12
+Unsubscribe: https://app.example.org/newsletter/unsubscribe?s=1&sig=2
+You get this because you asked for the PizzaDAO newsletter.
+1 Example Street, Town"
+`;

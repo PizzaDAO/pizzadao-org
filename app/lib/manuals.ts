@@ -17,6 +17,14 @@ export type Manual = {
   author: string
   lastUpdated: string
   notes: string
+  /** Review markers (DB source only; added by the API when the freshness switch is on). */
+  reviewedAt?: string | null
+  supersededBy?: string | null
+  stale?: boolean
+  neverReviewed?: boolean
+  draft?: boolean
+  replaced?: boolean
+  hidden?: boolean
 }
 
 /**
@@ -100,7 +108,37 @@ export async function listManualsFromDb(): Promise<Manual[]> {
     author: r.author,
     lastUpdated: r.lastUpdated,
     notes: r.notes,
+    reviewedAt: r.reviewedAt ? r.reviewedAt.toISOString().slice(0, 10) : null,
+    supersededBy: r.supersededBy ?? null,
   }))
+}
+
+/** The index with review markers applied, or untouched when the switch is off. */
+export async function decorateManuals(manuals: Manual[], now = new Date()): Promise<{ manuals: Manual[]; freshness: { enabled: boolean; staleAfterDays: number } }> {
+  const [{ getSetting }, { toggleEnabled }] = await Promise.all([import('@/app/lib/settings'), import('@/app/lib/settings/toggles')])
+  const [enabled, staleAfterDays, hideDrafts, hideReplaced] = await Promise.all([
+    toggleEnabled('manuals.freshnessEnabled'),
+    getSetting('manuals.staleAfterDays'),
+    toggleEnabled('manuals.hideDrafts'),
+    toggleEnabled('manuals.hideReplaced'),
+  ])
+  if (!enabled) {
+    // Off: the page is exactly as before (no marker fields leave the server).
+    return {
+      manuals: manuals.map((m) => {
+        const rest: Manual = { ...m }
+        delete rest.reviewedAt
+        delete rest.supersededBy
+        return rest
+      }),
+      freshness: { enabled: false, staleAfterDays },
+    }
+  }
+  const { manualFreshness } = await import('@/app/lib/manuals-freshness')
+  return {
+    manuals: manuals.map((m) => ({ ...m, ...manualFreshness(m, { now, staleAfterDays, hideDrafts, hideReplaced }) })),
+    freshness: { enabled: true, staleAfterDays },
+  }
 }
 
 export async function manualsFromDb(): Promise<boolean> {
