@@ -61,7 +61,7 @@ export const UB_STORE_ITEMS = [
 export const UB_COLLECTIBLES = {
   "Molto Benny Pin": {
     description: "📌 Retired UnbelievaBoat collectible: the Molto Benny pin. Not for sale.",
-    image: "https://app.pizzadao.org/brand-kit/molto-benny/molto-benny-color.png",
+    image: "https://pizzadao.org/brand-kit/molto-benny/molto-benny-color.png",
   },
 };
 
