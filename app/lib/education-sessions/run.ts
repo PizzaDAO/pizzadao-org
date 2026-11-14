@@ -269,7 +269,7 @@ async function runSteps(row: CrewSession, s: SessionTimes, cfg: Config, deps: Sc
  */
 export async function resetPendingSteps(sessionId: string): Promise<{ cleared: number }> {
   let cleared = 0
-  for (const field of ['eventId', 'announceMessageId', 'generalMessageId'] as const) {
+  for (const field of ['eventId', 'announceMessageId', 'generalMessageId', 'noteKey'] as const) {
     cleared += (await prisma.crewSession.updateMany({ where: { id: sessionId, [field]: PENDING }, data: { [field]: null } })).count
   }
   return { cleared }
@@ -319,9 +319,10 @@ async function recordOutcome(sessionId: string, cfg: Config, errors: string[]) {
     const fresh = await prisma.crewSession.findUnique({ where: { id: sessionId } })
     if (!fresh) return
     const missing =
-      (!!cfg.eventChannelId && !fresh.eventId) ||
-      (!!cfg.announceChannelId && !fresh.announceMessageId) ||
-      (!!cfg.generalChannelId && cfg.generalChannelId !== cfg.announceChannelId && !fresh.generalMessageId)
+      (!!cfg.eventChannelId && !real(fresh.eventId)) ||
+      (!!cfg.announceChannelId && !real(fresh.announceMessageId)) ||
+      (!!cfg.generalChannelId && cfg.generalChannelId !== cfg.announceChannelId && !real(fresh.generalMessageId)) ||
+      fresh.noteKey === PENDING // an unclear update note is still unresolved
     if (!missing) await prisma.crewSession.update({ where: { id: sessionId }, data: { lastError: null } })
   } catch {
     /* best effort */
@@ -337,7 +338,7 @@ export interface ChangeResult {
   event?: EditStep
   announcement?: EditStep
   general?: EditStep
-  note?: EditStep | 'already'
+  note?: EditStep | 'already' | 'uncertain'
   errors?: string[]
 }
 
@@ -444,8 +445,11 @@ export async function editSession(
     // Claim the note (same pattern as the steps): only one caller flips noteKey to PENDING, and a note for this
     // title/time that already went out (noteKey === key) is not posted again.
     const claimed = await prisma.crewSession.updateMany({ where: { id: sessionId, OR: [{ noteKey: null }, { noteKey: { notIn: [key, PENDING] } }] }, data: { noteKey: PENDING } })
-    if (claimed.count !== 1) out.note = 'already'
-    else {
+    if (claimed.count !== 1) {
+      // PENDING means a note went out unclearly (or is being sent): not "already posted".
+      const now = await prisma.crewSession.findUnique({ where: { id: sessionId }, select: { noteKey: true } })
+      out.note = now?.noteKey === PENDING ? 'uncertain' : 'already'
+    } else {
       out.note = await attempt('update note', async () => {
         try {
           await postDiscordMessage(

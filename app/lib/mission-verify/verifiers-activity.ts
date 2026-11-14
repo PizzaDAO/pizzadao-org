@@ -8,6 +8,7 @@
  *   shop_purchase     bought a shop item (SHOP_PURCHASE in the PEP ledger)
  *   bounty_or_job     completed a bounty, or was paid for a job
  *   article_published a published Article
+ *   buddy_completed   a COMPLETED buddy pairing, as the buddy
  *   social_linked     a Telegram or Farcaster account linked (not X: that is level 1)
  *
  * Call streaks use attendance_count with { min, windowDays, crewId } (verifiers.ts); a post with
@@ -119,6 +120,15 @@ export const articlePublished = counting({
   hint: 'Write an article and publish it.',
 })
 
+/** Buddy pairs the member has seen through to completion as the buddy (BuddyPair COMPLETED). */
+export const buddyCompleted = counting({
+  key: 'buddy_completed',
+  kind: 'buddy_completed',
+  defaultMin: 1,
+  noun: 'completed buddy pairings',
+  hint: 'Be a buddy: get paired with a trainee and help them reach the finishing level.',
+})
+
 const SOCIAL_PLATFORMS = ['telegram', 'farcaster'] as const
 
 export const socialLinked: Verifier<{ platforms: string[] }> = {
@@ -142,6 +152,7 @@ export const socialLinked: Verifier<{ platforms: string[] }> = {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const ACTIVITY_VERIFIERS: Array<Verifier<any>> = [
+  buddyCompleted,
   pizzeriaCheckin,
   passportStamps,
   spotlightFeatured,

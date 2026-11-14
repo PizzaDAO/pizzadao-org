@@ -15,6 +15,7 @@ interface PairCard {
     status: string;
     partner: { discordId: string; name: string };
     threadUrl: string | null;
+    waitingForAccess?: boolean;
     checklist: ChecklistItem[];
 }
 interface BuddyState {
@@ -22,7 +23,9 @@ interface BuddyState {
     eligible?: boolean;
     minLevel?: number;
     maxActiveCap?: number;
-    profile?: { active: boolean; paused: boolean; maxActive: number } | null;
+    profile?: { active: boolean; paused: boolean; maxActive: number; hideRecognition?: boolean } | null;
+    recognitionEnabled?: boolean;
+    traineeRecognition?: { pairId: string; buddyName: string; hidden: boolean } | null;
     pairs?: PairCard[];
 }
 
@@ -61,7 +64,8 @@ export function BuddyCard({ initial }: { initial?: BuddyState | null }) {
     const pairs = state.pairs ?? [];
     const profile = state.profile;
     const showOptIn = (state.eligible && !profile?.active) || profile?.active;
-    if (!showOptIn && pairs.length === 0) return null;
+    const tr = state.recognitionEnabled ? state.traineeRecognition : null;
+    if (!showOptIn && pairs.length === 0 && !tr) return null;
 
     return (
         <section data-testid="buddy-card" className="my-5 rounded-2xl border border-[hsl(var(--rule-warm)/0.55)] p-5" aria-label="Buddy">
@@ -72,6 +76,7 @@ export function BuddyCard({ initial }: { initial?: BuddyState | null }) {
                         {p.role === "trainee" ? `Your buddy: ${p.partner.name}` : `You are buddying ${p.partner.name}`}
                     </h2>
                     {p.status === "COMPLETED" ? <p className="mt-1 text-sm text-foreground/80">All done. Thank you!</p> : null}
+                    {p.waitingForAccess ? <p className="mt-1 text-sm text-foreground/80">Waiting for channel access. Your intro opens once you can both see the buddy channel.</p> : null}
                     {p.threadUrl ? (
                         <a href={p.threadUrl} target="_blank" rel="noreferrer" className="text-sm font-semibold underline-offset-4 hover:underline">
                             Open your thread on Discord
@@ -96,6 +101,18 @@ export function BuddyCard({ initial }: { initial?: BuddyState | null }) {
                         Be a buddy
                     </button>
                 </div>
+            ) : null}
+            {tr ? (
+                <label className="mt-4 flex items-center gap-2 text-sm">
+                    <input type="checkbox" disabled={busy} checked={!tr.hidden} onChange={(e) => save({ hideRecognition: !e.target.checked, pairId: tr.pairId })} />
+                    Show &ldquo;Onboarded with help from {tr.buddyName}&rdquo; on my public profile
+                </label>
+            ) : null}
+            {state.recognitionEnabled && profile ? (
+                <label className="mt-4 flex items-center gap-2 text-sm">
+                    <input type="checkbox" disabled={busy} checked={!profile.hideRecognition} onChange={(e) => save({ hideRecognition: !e.target.checked })} />
+                    Show me as a buddy on my public profile and on the Top buddies page
+                </label>
             ) : null}
             {profile?.active ? (
                 <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">

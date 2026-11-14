@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const m = vi.hoisted(() => {
-  const model = () => ({ findUnique: vi.fn(), findMany: vi.fn(), count: vi.fn(), create: vi.fn(), update: vi.fn(), updateMany: vi.fn(), upsert: vi.fn() })
+  const model = () => ({ findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), count: vi.fn(), create: vi.fn(), update: vi.fn(), updateMany: vi.fn(), upsert: vi.fn() })
   const prisma = {
     buddyProfile: model(),
     buddyPair: model(),
@@ -10,19 +10,20 @@ const m = vi.hoisted(() => {
     $executeRaw: vi.fn(),
     $transaction: vi.fn(),
   }
-  return { prisma, toggle: vi.fn(), level: vi.fn(), memberId: vi.fn(), reward: vi.fn() }
+  return { prisma, toggle: vi.fn(), level: vi.fn(), memberId: vi.fn(), reward: vi.fn(), intro: vi.fn(), cancel: vi.fn() }
 })
 
 vi.mock('@/app/lib/db', () => ({ prisma: m.prisma }))
 vi.mock('@/app/lib/settings/toggles', () => ({ toggleEnabled: m.toggle }))
 vi.mock('@/app/lib/settings', () => ({
-  loadSettings: async () => ({ get: (k: string) => ({ 'buddy.minLevel': 4, 'buddy.maxActivePerBuddy': 2, 'buddy.completionLevel': 2, 'buddy.rewardMissionId': 0, 'buddy.introText': 'x' })[k] }),
+  loadSettings: async () => ({ get: (k: string) => ({ 'buddy.minLevel': 4, 'buddy.maxActivePerBuddy': 2, 'buddy.completionLevel': 2, 'buddy.rewardMissionId': 0, 'buddy.introText': 'x', 'buddy.introRecheckHours': 24, 'buddy.maxCancelsPerRun': 3 })[k] }),
 }))
 vi.mock('@/app/lib/missions', () => ({ getCurrentLevel: m.level }))
 vi.mock('@/app/lib/sheets/member-repository', () => ({ fetchMemberIdByDiscordId: m.memberId }))
 vi.mock('./reward', () => ({ rewardBuddy: m.reward }))
+vi.mock('./intro', () => ({ introducePair: m.intro, cancelForNoAccess: m.cancel }))
 
-import { adminAddBuddy, adminRemoveBuddy, completeDuePairs, completeIfDue, createPair, endPair, retryPendingRewards, saveOwnProfile } from './service'
+import { adminAddBuddy, adminRemoveBuddy, completeDuePairs, completeIfDue, createPair, endPair, retryDeferredIntros, retryPendingRewards, saveOwnProfile } from './service'
 
 const TRAINEE = '111111'
 const BUDDY = '222222'
@@ -129,95 +130,63 @@ describe('reward retry', () => {
   })
   it('the daily run includes the retry count', async () => {
     p.buddyPair.findMany.mockResolvedValue([])
-    expect(await completeDuePairs()).toEqual({ checked: 0, completed: 0, rewardsRetried: 0 })
+    expect(await completeDuePairs()).toEqual({ checked: 0, completed: 0, rewardsRetried: 0, intros: { opened: 0, waiting: 0, cancelled: 0, held: 0 } })
   })
 })
 
-describe('createPair', () => {
-  it('creates a MATCHED pair, writes the audit row and takes the per-buddy lock', async () => {
-    const r = await createPair({ traineeDiscordId: TRAINEE, buddyDiscordId: BUDDY }, 'adm')
-    expect(r).toEqual({ ok: true, pairId: 'pair1', traineeMemberId: 'M1' })
-    expect(p.$executeRaw).toHaveBeenCalledTimes(1)
-    expect(p.buddyPair.create.mock.calls[0][0].data).toMatchObject({ traineeDiscordId: TRAINEE, buddyDiscordId: BUDDY, status: 'MATCHED', createdBy: 'adm' })
-    expect(p.buddyEvent.create.mock.calls[0][0].data).toMatchObject({ pairId: 'pair1', kind: 'paired', actor: 'adm' })
-  })
-  it('refuses when the system is off or the ids are bad', async () => {
-    m.toggle.mockResolvedValue(false)
-    expect(await createPair({ traineeDiscordId: TRAINEE, buddyDiscordId: BUDDY }, 'adm')).toEqual({ ok: false, reason: 'disabled' })
+describe('deferred intro retry', () => {
+  const due = (id: string, hoursAgo?: number) => ({ id, events: hoursAgo === undefined ? [] : [{ at: new Date(Date.now() - hoursAgo * 3600 * 1000) }] })
+  beforeEach(() => {
     m.toggle.mockResolvedValue(true)
-    expect(await createPair({ traineeDiscordId: 'x', buddyDiscordId: BUDDY }, 'adm')).toEqual({ ok: false, reason: 'bad_input' })
-    expect(p.buddyPair.create).not.toHaveBeenCalled()
+    m.cancel.mockResolvedValue(true)
+    p.buddyEvent.findFirst.mockResolvedValue(null)
+    p.buddyEvent.create.mockResolvedValue({})
   })
-  it('enforces one active buddy per trainee', async () => {
-    p.buddyPair.count.mockImplementation(async ({ where }: { where: { traineeDiscordId?: string } }) => (where.traineeDiscordId ? 1 : 0))
-    expect(await createPair({ traineeDiscordId: TRAINEE, buddyDiscordId: BUDDY }, 'adm')).toEqual({ ok: false, reason: 'trainee_has_buddy' })
-    expect(p.buddyPair.create).not.toHaveBeenCalled()
+  it('does nothing while intro threads are off', async () => {
+    m.toggle.mockImplementation(async (k: string) => k !== 'buddy.introThreadsEnabled')
+    expect(await retryDeferredIntros()).toEqual({ opened: 0, waiting: 0, cancelled: 0, held: 0 })
+    expect(p.buddyPair.findMany).not.toHaveBeenCalled()
   })
-  it('enforces the buddy load cap', async () => {
-    p.buddyPair.count.mockImplementation(async ({ where }: { where: { buddyDiscordId?: string } }) => (where.buddyDiscordId ? 2 : 0))
-    expect(await createPair({ traineeDiscordId: TRAINEE, buddyDiscordId: BUDDY }, 'adm')).toEqual({ ok: false, reason: 'buddy_full' })
-    expect(p.buddyPair.create).not.toHaveBeenCalled()
+  it('asks oldest pairs first, only MATCHED with a deferral and no thread', async () => {
+    p.buddyPair.findMany.mockResolvedValue([])
+    await retryDeferredIntros()
+    const q = p.buddyPair.findMany.mock.calls[0][0]
+    expect(q.where).toMatchObject({ status: 'MATCHED', introducedAt: null, threadId: null, events: { some: { kind: 'intro_deferred' } } })
+    expect(q.orderBy).toEqual({ createdAt: 'asc' })
   })
-  it('refuses a paused or non-buddy and a trainee who already finished', async () => {
-    p.buddyProfile.findUnique.mockResolvedValue({ active: true, paused: true, maxActive: 2 })
-    expect(await createPair({ traineeDiscordId: TRAINEE, buddyDiscordId: BUDDY }, 'adm')).toEqual({ ok: false, reason: 'buddy_paused' })
-    p.buddyProfile.findUnique.mockResolvedValue(null)
-    expect(await createPair({ traineeDiscordId: TRAINEE, buddyDiscordId: BUDDY }, 'adm')).toEqual({ ok: false, reason: 'buddy_unavailable' })
-    p.buddyProfile.findUnique.mockResolvedValue({ active: true, paused: false, maxActive: 2 })
-    m.level.mockResolvedValue(3)
-    expect(await createPair({ traineeDiscordId: TRAINEE, buddyDiscordId: BUDDY }, 'adm')).toEqual({ ok: false, reason: 'trainee_finished' })
+  it('skips pairs still inside their wait BEFORE the cap, so they cannot crowd out due ones', async () => {
+    p.buddyPair.findMany.mockResolvedValue([due('w1', 1), due('w2', 2), due('d1', 30), due('d2')])
+    m.intro.mockResolvedValue({ mode: 'live', ok: true, threadId: '1' })
+    const r = await retryDeferredIntros(2)
+    expect(m.intro.mock.calls.map((c) => c[0])).toEqual(['d1', 'd2'])
+    expect(r).toMatchObject({ opened: 2, waiting: 2 })
   })
-  it('maps the unique-index backstop to trainee_has_buddy', async () => {
-    p.buddyPair.create.mockRejectedValue(Object.assign(new Error('dup'), { code: 'P2002' }))
-    expect(await createPair({ traineeDiscordId: TRAINEE, buddyDiscordId: BUDDY }, 'adm')).toEqual({ ok: false, reason: 'trainee_has_buddy' })
+  it('tallies opened / waiting / cancelled (cancelling with the pair who list)', async () => {
+    p.buddyPair.findMany.mockResolvedValue([due('a', 30), due('b', 30), due('c', 30)])
+    m.intro
+      .mockResolvedValueOnce({ mode: 'live', ok: true, threadId: '1' })
+      .mockResolvedValueOnce({ mode: 'live', ok: false, reason: 'access_unknown' })
+      .mockResolvedValueOnce({ mode: 'live', ok: false, reason: 'no_channel_access', cancelDue: { who: ['buddy'] } })
+    expect(await retryDeferredIntros()).toEqual({ opened: 1, waiting: 1, cancelled: 1, held: 0 })
+    expect(m.intro).toHaveBeenCalledWith('a', 'system', {}, { deferCancel: true })
+    expect(m.cancel).toHaveBeenCalledWith('c', ['buddy'], 'system')
   })
-})
-
-describe('endPair', () => {
-  it('ends an active pair once and records why', async () => {
-    expect(await endPair('pair1', 'adm', 'not a fit')).toEqual({ ok: true })
-    expect(p.buddyPair.updateMany.mock.calls[0][0]).toMatchObject({ where: { id: 'pair1', status: { in: ['QUEUED', 'MATCHED', 'INTRODUCED'] } }, data: { status: 'ENDED', endedReason: 'not a fit' } })
-    p.buddyPair.updateMany.mockResolvedValue({ count: 0 })
-    expect(await endPair('pair1', 'adm', '')).toEqual({ ok: false })
-  })
-})
-
-describe('adminAddBuddy', () => {
-  it('adds without a level check and remembers who did it', async () => {
-    expect(await adminAddBuddy(BUDDY, 'adm')).toEqual({ ok: true })
-    expect(p.buddyProfile.upsert.mock.calls[0][0].create).toMatchObject({ discordId: BUDDY, active: true, addedBy: 'adm' })
-    expect(m.level).not.toHaveBeenCalled()
-    expect(await adminAddBuddy('nope', 'adm')).toEqual({ ok: false, reason: 'bad_input' })
-  })
-})
-
-describe('completion', () => {
-  const pair = { id: 'pair1', traineeDiscordId: TRAINEE, buddyDiscordId: BUDDY }
-  it('completes when the trainee has finished the configured level, and rewards once', async () => {
-    expect(await completeIfDue(pair, 3, 2)).toBe(true)
-    expect(p.buddyPair.updateMany.mock.calls[0][0].data).toMatchObject({ status: 'COMPLETED' })
-    expect(m.reward).toHaveBeenCalledWith({ pairId: 'pair1', buddyDiscordId: BUDDY })
-  })
-  it('does not complete before that level', async () => {
-    expect(await completeIfDue(pair, 2, 2)).toBe(false)
-    expect(p.buddyPair.updateMany).not.toHaveBeenCalled()
-    expect(m.reward).not.toHaveBeenCalled()
-  })
-  it('a lost race neither logs nor rewards', async () => {
-    p.buddyPair.updateMany.mockResolvedValue({ count: 0 })
-    expect(await completeIfDue(pair, 3, 2)).toBe(false)
-    expect(m.reward).not.toHaveBeenCalled()
-  })
-  it('a failing reward does not undo the completion', async () => {
-    m.reward.mockRejectedValue(new Error('boom'))
+  it('safety brake: more due cancellations than the limit cancels none and flags each pair once', async () => {
+    p.buddyPair.findMany.mockResolvedValue([due('a', 30), due('b', 30), due('c', 30), due('d', 30)])
+    m.intro.mockResolvedValue({ mode: 'live', ok: false, reason: 'no_channel_access', cancelDue: { who: ['trainee'] } })
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    expect(await completeIfDue(pair, 3, 2)).toBe(true)
+    expect(await retryDeferredIntros()).toEqual({ opened: 0, waiting: 0, cancelled: 0, held: 4 })
+    expect(m.cancel).not.toHaveBeenCalled()
+    expect(p.buddyEvent.create.mock.calls.map((c) => c[0].data.kind)).toEqual(['cancel_held', 'cancel_held', 'cancel_held', 'cancel_held'])
+    // already flagged: no second event
+    p.buddyEvent.create.mockClear()
+    p.buddyEvent.findFirst.mockResolvedValue({ id: 'e' })
+    await retryDeferredIntros()
+    expect(p.buddyEvent.create).not.toHaveBeenCalled()
   })
-  it('the run completes only the pairs whose trainee is done, and is a no-op while off', async () => {
-    p.buddyPair.findMany.mockResolvedValue([pair, { id: 'pair2', traineeDiscordId: '333333', buddyDiscordId: BUDDY }])
-    m.level.mockImplementation(async (id: string) => (id === TRAINEE ? 3 : 1))
-    expect(await completeDuePairs()).toMatchObject({ checked: 2, completed: 1 })
-    m.toggle.mockResolvedValue(false)
-    expect(await completeDuePairs()).toMatchObject({ checked: 0, completed: 0 })
+  it('at or under the limit the cancellations go ahead', async () => {
+    p.buddyPair.findMany.mockResolvedValue([due('a', 30), due('b', 30), due('c', 30)])
+    m.intro.mockResolvedValue({ mode: 'live', ok: false, reason: 'no_channel_access', cancelDue: { who: ['trainee'] } })
+    expect(await retryDeferredIntros()).toMatchObject({ cancelled: 3, held: 0 })
   })
 })

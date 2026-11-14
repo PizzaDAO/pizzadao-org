@@ -29,6 +29,8 @@ import { AttendanceCard } from "../../ui/attendance-card";
 import { useProfileSummary } from "../../lib/hooks/use-api";
 import { norm } from "../../lib/strings";
 import { DisavowChip } from "../../disavow/_components/DisavowChip";
+import { BuddyRecognitionBlock } from "../../ui/profile/BuddyRecognitionBlock";
+import type { BuddyRecognition } from "../../lib/buddy/recognition";
 
 
 interface ProfileClientProps {
@@ -39,9 +41,11 @@ interface ProfileClientProps {
      * everyone else sees exactly the page they always did.
      */
     disavowWarning?: { id: string; label: string } | null;
+    /** Loaded server-side, public fields only; null while buddy.publicRecognitionEnabled is off or there is nothing to show. */
+    buddyRecognition?: BuddyRecognition | null;
 }
 
-export function ProfileClient({ id, disavowWarning = null }: ProfileClientProps) {
+export function ProfileClient({ id, disavowWarning = null, buddyRecognition = null }: ProfileClientProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const asVisitor = searchParams?.get("as") === "visitor";
@@ -159,6 +163,8 @@ export function ProfileClient({ id, disavowWarning = null }: ProfileClientProps)
                 />
 
                 <CrewChipRow crewIds={data.crewIds} crewOptions={crewOptions} />
+
+                {buddyRecognition && <BuddyRecognitionBlock recognition={buddyRecognition} />}
 
                 <ContributionsBlock memberId={id} />
 

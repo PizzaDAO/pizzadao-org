@@ -54,6 +54,15 @@ describe('rewardBuddy', () => {
     m.prisma.missionCompletion.findUnique.mockResolvedValue({ status: 'APPROVED' })
     expect(await rewardBuddy(pair)).toBe('already_done')
     expect(m.prisma.missionCompletion.upsert).not.toHaveBeenCalled()
-    expect(m.pay).not.toHaveBeenCalled()
+  })
+  it('an already APPROVED completion still runs the (idempotent) payout, and a failing payout is not logged as done', async () => {
+    m.prisma.missionCompletion.findUnique.mockResolvedValue({ status: 'APPROVED' })
+    expect(await rewardBuddy(pair)).toBe('already_done')
+    expect(m.pay).toHaveBeenCalledWith('222222')
+    expect(kinds()).toEqual(['reward_skipped'])
+    m.prisma.buddyEvent.create.mockClear()
+    m.pay.mockRejectedValueOnce(new Error('sheet down'))
+    await expect(rewardBuddy(pair)).rejects.toThrow('sheet down')
+    expect(kinds()).toEqual([]) // stays retryable
   })
 })

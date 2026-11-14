@@ -15,6 +15,7 @@ import { disavowEnabled } from "@/app/lib/disavow/constants";
 import { canViewDisavowList } from "@/app/lib/disavow/access";
 import { findActiveListingFor } from "@/app/lib/disavow/match";
 import { getDisavowTranslator } from "@/app/lib/disavow/messages";
+import { getBuddyRecognition } from "@/app/lib/buddy/recognition";
 
 export const runtime = "nodejs";
 
@@ -85,7 +86,8 @@ export default async function ProfilePage({
     params: Promise<{ id: string }>;
 }) {
     const { id } = await params;
-    return <ProfileClient id={id} disavowWarning={await loadDisavowWarning(id)} />;
+    const buddyRecognition = await getBuddyRecognition(id).catch(() => null);
+    return <ProfileClient id={id} disavowWarning={await loadDisavowWarning(id)} buddyRecognition={buddyRecognition} />;
 }
 
 /**

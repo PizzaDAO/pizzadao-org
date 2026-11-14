@@ -76,6 +76,12 @@ export const BUDDY_SETTINGS = {
     'When a pair completes, the buddy is given the bonus mission set below (so its normal bonus PEP pays out). Off, completion only records that the reward would have been given.',
     'Buddies will start receiving the bonus mission when their trainee finishes.',
   ),
+  'buddy.publicRecognitionEnabled': toggle(
+    'buddy.publicRecognitionEnabled',
+    'Show buddies on public profiles and /buddies',
+    'Buddies get a "helped N trainees" line and badge on their profile, finished trainees get "Onboarded with help from ...", and /buddies lists the top buddies. Only completed pairs show, and members can opt out on their buddy card. Needs the buddy system on too. Off, none of it shows.',
+    'Completed buddy pairs will be shown on public profiles and on the /buddies page (members can opt out).',
+  ),
   'buddy.minLevel': int(
     'buddy.minLevel',
     'Minimum level to be a buddy',
@@ -99,6 +105,22 @@ export const BUDDY_SETTINGS = {
     1,
     9,
     2,
+  ),
+  'buddy.introRecheckHours': int(
+    'buddy.introRecheckHours',
+    'Hours to wait before cancelling a pair that cannot see the buddy channel',
+    'If the trainee or buddy cannot see the buddy channel, the intro waits. It is re-checked every hour and opens as soon as both can view it. The first failed check after this many hours cancels the pair (reason no_channel_access) and the trainee goes back to the unmatched list.',
+    1,
+    168,
+    24,
+  ),
+  'buddy.maxCancelsPerRun': int(
+    'buddy.maxCancelsPerRun',
+    'Most no-access cancellations in one run',
+    'Safety brake: if one hourly or daily run would cancel more pairs than this (for example a channel permission change made everyone lose access), it cancels none and flags the pairs on /admin/buddies.',
+    1,
+    50,
+    3,
   ),
   'buddy.rewardMissionId': int(
     'buddy.rewardMissionId',

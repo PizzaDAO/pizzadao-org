@@ -135,6 +135,7 @@ export const TOGGLES = {
   'buddy.enabled': { env: 'BUDDY_ENABLED', legacy: ON_WORDS },
   'buddy.introThreadsEnabled': { env: 'BUDDY_INTRO_THREADS_ENABLED', legacy: ON_WORDS },
   'buddy.rewardEnabled': { env: 'BUDDY_REWARD_ENABLED', legacy: ON_WORDS },
+  'buddy.publicRecognitionEnabled': { env: 'BUDDY_PUBLIC_RECOGNITION_ENABLED', legacy: ON_WORDS },
   'newsletter.draftEnabled': { env: 'NEWSLETTER_DRAFT_ENABLED', legacy: ON_WORDS },
   // On unless the env var is an explicit off: the X Space invite block and naming people on finished call items in new drafts.
   'newsletter.xSpaceEnabled': { env: 'NEWSLETTER_XSPACE_ENABLED', legacy: (raw) => !envKillsToggle(raw) },

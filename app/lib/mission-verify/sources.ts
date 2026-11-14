@@ -55,6 +55,8 @@ export const defaultSources: VerifierSources = {
         return prisma.transaction.count({ where: { userId: discordId, type: 'JOB_REWARD' } })
       case 'article_published':
         return prisma.article.count({ where: { authorId: discordId, status: 'PUBLISHED' } })
+      case 'buddy_completed':
+        return prisma.buddyPair.count({ where: { buddyDiscordId: discordId, status: 'COMPLETED' } })
     }
   },
 

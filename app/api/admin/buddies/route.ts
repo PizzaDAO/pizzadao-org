@@ -4,7 +4,7 @@ import { internalError } from '@/app/lib/errors/error-response'
 import { toggleEnabled } from '@/app/lib/settings/toggles'
 import { getAdminOverview } from '@/app/lib/buddy/view'
 import { adminAddBuddy, adminRemoveBuddy, completeDuePairs, createPair, endPair, isSnowflake } from '@/app/lib/buddy/service'
-import { introducePair } from '@/app/lib/buddy/intro'
+import { introducePair, resolveUncertainIntro } from '@/app/lib/buddy/intro'
 import { REFUSAL_TEXT, type PairRefusal } from '@/app/lib/buddy/rules'
 
 export const runtime = 'nodejs'
@@ -28,6 +28,7 @@ export async function GET() {
  *   { action: 'pair', traineeDiscordId, buddyDiscordId }   (also opens the intro thread, or records a dry run)
  *   { action: 'end', pairId, reason? }
  *   { action: 'introduce', pairId }                         (retry an intro that failed)
+ *   { action: 'resolveUncertain', pairId, threadId? }       (after checking Discord for an intro whose answer was lost)
  *   { action: 'completeDue' }
  */
 export async function POST(request: Request) {
@@ -73,6 +74,12 @@ export async function POST(request: Request) {
       case 'introduce': {
         if (typeof body.pairId !== 'string' || !body.pairId) return json({ error: 'pairId is required' }, 400)
         return json(await introducePair(body.pairId, actor))
+      }
+      case 'resolveUncertain': {
+        if (typeof body.pairId !== 'string' || !body.pairId) return json({ error: 'pairId is required' }, 400)
+        const threadId = typeof body.threadId === 'string' && body.threadId ? body.threadId : undefined
+        if (threadId && !isSnowflake(threadId)) return json({ error: 'That is not a Discord thread id' }, 400)
+        return (await resolveUncertainIntro(body.pairId, actor, threadId)) ? json({ ok: true }) : json({ error: 'Nothing to resolve' }, 409)
       }
       case 'completeDue':
         return json(await completeDuePairs())

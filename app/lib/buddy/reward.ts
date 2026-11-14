@@ -33,6 +33,8 @@ export async function rewardBuddy(pair: { pairId: string; buddyDiscordId: string
     select: { status: true },
   })
   if (existing?.status === 'APPROVED') {
+    // Already approved (a crash after the approval, before the payout): pay out too. payBonusRewards is idempotent per member and mission.
+    await payBonusRewards(pair.buddyDiscordId)
     await log('reward_skipped', { reason: 'already_done', missionId })
     return 'already_done'
   }
