@@ -45,7 +45,9 @@ describe("email prefs: Monthly newsletter checkbox", () => {
   });
 
   it("toggle on: GET reports the state, POST applies it with the verified flag", async () => {
-    expect((await (await GET()).json()).newsletter).toEqual({ subscribed: true, pending: false });
+    const got = (await (await GET()).json()).newsletter;
+    expect(got).toMatchObject({ subscribed: true, pending: false });
+    expect(h.memberNewsletterState).toHaveBeenCalledWith("a@example.org", true);
     const res = await POST(post({ email: "a@example.org", optIn: false, newsletter: true }));
     expect(res.status).toBe(200);
     expect(h.setMemberNewsletter).toHaveBeenCalledWith("42", "a@example.org", true, true);
@@ -56,6 +58,26 @@ describe("email prefs: Monthly newsletter checkbox", () => {
     expect(h.setMemberNewsletter).toHaveBeenCalledWith("42", "a@example.org", true, false);
     expect(h.upsert).toHaveBeenCalledWith(expect.objectContaining({ update: {} }));
     expect((await POST(post({ newsletter: "yes" }))).status).toBe(400);
+  });
+
+  it("H1: the lookup is told when the saved address is unverified", async () => {
+    h.findUnique.mockResolvedValue({ ...verified, emailVerifiedAt: null });
+    await GET();
+    expect(h.memberNewsletterState).toHaveBeenCalledWith("a@example.org", false);
+  });
+
+  it("L4: canSendConfirm is true only with the confirmation switch on and a sender set", async () => {
+    expect((await (await GET()).json()).newsletter.canSendConfirm).toBe(false);
+    h.settings = fakeSettings({ "newsletter.memberOptInEnabled": true, "newsletter.confirmEmailsEnabled": true });
+    expect((await (await GET()).json()).newsletter.canSendConfirm).toBe(false);
+    h.settings = fakeSettings({ "newsletter.memberOptInEnabled": true, "newsletter.confirmEmailsEnabled": true, "newsletter.fromAddress": "news@example.org" });
+    expect((await (await GET()).json()).newsletter.canSendConfirm).toBe(true);
+  });
+
+  it("L3: an unrelated prefs save never touches the newsletter", async () => {
+    await POST(post({ email: "a@example.org", optIn: true }));
+    await POST(post({ resend: true }));
+    expect(h.setMemberNewsletter).not.toHaveBeenCalled();
   });
 
   it("the env kill switch hides it", async () => {

@@ -40,7 +40,7 @@ const fromName: SettingDef<string> = {
   area: 'newsletter',
   label: 'Newsletter sender name',
   help: 'The display name on newsletter emails (confirmation and, later, issues).',
-  schema: z.string().trim().max(80).regex(/^[^<>"\r\n]*$/, 'No angle brackets, quotes or line breaks'),
+  schema: z.string().trim().max(80).regex(/^[^<>"\\,;:\r\n]*$/, 'No angle brackets, quotes, backslashes, commas, semicolons, colons or line breaks'),
   default: '',
   onReadFailure: { value: '' },
   input: { type: 'text', maxLength: 80 },

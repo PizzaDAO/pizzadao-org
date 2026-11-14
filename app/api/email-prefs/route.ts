@@ -28,6 +28,7 @@ import { isSupportedLocale, DEFAULT_LOCALE } from "@/app/lib/i18n/locales";
 import { getClientIp, rateLimitIp } from "@/app/lib/rate-limit";
 import { loadSettings } from "@/app/lib/settings";
 import { resolveToggle } from "@/app/lib/settings/toggles";
+import { newsletterSender } from "@/app/lib/newsletter/sender";
 import { memberNewsletterState, setMemberNewsletter } from "@/app/lib/newsletter/member";
 
 export const runtime = "nodejs";
@@ -56,9 +57,14 @@ function state(row: { email: string | null; emailVerifiedAt: Date | null; reenga
 }
 
 /** The newsletter checkbox state, only present while newsletter.memberOptInEnabled is on. */
-async function newsletterPart(email: string | null): Promise<{ newsletter?: { subscribed: boolean; pending: boolean } }> {
-  if (!resolveToggle("newsletter.memberOptInEnabled", await loadSettings())) return {};
-  return { newsletter: await memberNewsletterState(email) };
+async function newsletterPart(
+  email: string | null,
+  verified: boolean,
+): Promise<{ newsletter?: { subscribed: boolean; pending: boolean; canSendConfirm: boolean } }> {
+  const settings = await loadSettings();
+  if (!resolveToggle("newsletter.memberOptInEnabled", settings)) return {};
+  const canSendConfirm = resolveToggle("newsletter.confirmEmailsEnabled", settings) && newsletterSender(settings) !== null;
+  return { newsletter: { ...(await memberNewsletterState(email, verified)), canSendConfirm } };
 }
 
 function sha(s: string): string {
@@ -72,7 +78,7 @@ export async function GET() {
     const memberId = await memberFor(auth.session.discordId);
     if (!memberId) return NextResponse.json({ error: "Member not found" }, { status: 404 });
     const row = await prisma.memberProfileExtras.findUnique({ where: { memberId }, select: SELECT });
-    return NextResponse.json({ ...state(row), ...(await newsletterPart(row?.email ?? null)) });
+    return NextResponse.json({ ...state(row), ...(await newsletterPart(row?.email ?? null, !!row?.emailVerifiedAt)) });
   } catch (err) {
     return internalError(err, "email-prefs GET", "Couldn't load email preference");
   }
@@ -189,7 +195,7 @@ export async function POST(req: NextRequest) {
       if (typeof body.newsletter === "boolean" && !remove && saved.email) {
         await setMemberNewsletter(memberId, saved.email, !!saved.emailVerifiedAt, body.newsletter);
       }
-      newsletter = await newsletterPart(saved.email);
+      newsletter = await newsletterPart(saved.email, !!saved.emailVerifiedAt);
     }
     return NextResponse.json({ ...state(saved), confirmation, ...newsletter });
   } catch (err) {

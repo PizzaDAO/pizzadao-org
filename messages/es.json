@@ -1705,7 +1705,8 @@
       "loadError": "No pudimos cargar tus ajustes de correo. Recarga la página para intentarlo de nuevo.",
       "tooMany": "Demasiados correos de confirmación. Inténtalo de nuevo mañana.",
       "newsletterOptIn": "Recibir el boletín mensual de PizzaDAO",
-      "newsletterPending": "La suscripción al boletín está pendiente. Revisa tu correo para confirmar esta dirección."
+      "newsletterPending": "La suscripción al boletín está pendiente. Revisa tu correo para confirmar esta dirección.",
+      "newsletterPendingNoMail": "La suscripción al boletín está pendiente."
     },
     "confirm": {
       "subject": "Confirma tu correo para el resumen semanal de PizzaDAO",

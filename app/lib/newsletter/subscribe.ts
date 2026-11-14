@@ -22,6 +22,14 @@ const SELECT = {
 
 type Row = ConsentRow & { id: string; email: string };
 
+/** Case-insensitive, so a mixed-case legacy row is found and never duplicated by a lower-cased signup. */
+export function findByEmail(email: string) {
+  return prisma.newsletterSubscriber.findFirst({
+    where: { email: { equals: email.trim().toLowerCase(), mode: "insensitive" } },
+    select: SELECT,
+  });
+}
+
 export type SignupOutcome = "created" | "reconfirm" | "none";
 
 export interface SignupInput {
@@ -33,7 +41,7 @@ export interface SignupInput {
 /** Store the signup (pending) and, when allowed and not throttled, send the confirmation email. */
 export async function requestSubscription(input: SignupInput, now = Date.now()): Promise<SignupOutcome> {
   const settings = await loadSettings();
-  let row = (await prisma.newsletterSubscriber.findUnique({ where: { email: input.email }, select: SELECT })) as Row | null;
+  let row = (await findByEmail(input.email)) as Row | null;
   let outcome: SignupOutcome = "none";
 
   if (signupAction(row) === "create") {
@@ -45,7 +53,7 @@ export async function requestSubscription(input: SignupInput, now = Date.now()):
       outcome = "created";
     } catch (e) {
       if ((e as { code?: string })?.code !== "P2002") throw e;
-      row = (await prisma.newsletterSubscriber.findUnique({ where: { email: input.email }, select: SELECT })) as Row | null;
+      row = (await findByEmail(input.email)) as Row | null;
     }
   }
   if (!row) return outcome;
@@ -57,7 +65,8 @@ export async function requestSubscription(input: SignupInput, now = Date.now()):
     if (row.status !== "pending") {
       await prisma.newsletterSubscriber.update({
         where: { id: row.id },
-        data: { status: "pending", confirmedAt: null, ...(input.memberId ? { memberId: input.memberId } : {}) },
+        // memberId is deliberately not written here: this address may belong to someone else.
+        data: { status: "pending", confirmedAt: null },
       });
     }
   }
@@ -87,11 +96,13 @@ export async function confirmSubscriber(id: string, issuedAt: number, now = new 
   });
   if (!row || !canConfirm(row, issuedAt)) return "invalid";
   if (row.status === "subscribed" && row.confirmedAt) return "already";
-  await prisma.newsletterSubscriber.update({
-    where: { id },
+  // Conditional write: an unsubscribe that lands after the check above (and after the link was
+  // issued) wins, so a confirm can never undo it.
+  const res = await prisma.newsletterSubscriber.updateMany({
+    where: { id, OR: [{ unsubscribedAt: null }, { unsubscribedAt: { lte: new Date(issuedAt) } }] },
     data: { status: "subscribed", confirmedAt: now, unsubscribedAt: null, lastStatusReason: null },
   });
-  return "confirmed";
+  return res.count === 1 ? "confirmed" : "invalid";
 }
 
 /** Idempotent: an already unsubscribed row is left as it is (keeps the first unsubscribedAt). */

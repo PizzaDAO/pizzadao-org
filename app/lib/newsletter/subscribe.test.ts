@@ -150,7 +150,7 @@ describe("member checkbox", () => {
     await setMemberNewsletter("m1", "A@Example.org", true, true, new Date(NOW));
     expect(fake.rows[0]).toMatchObject({ email: "a@example.org", status: "subscribed", confirmedAt: new Date(NOW), source: "member", memberId: "m1" });
     expect(h.sendEmail).not.toHaveBeenCalled();
-    expect(await memberNewsletterState("a@example.org")).toEqual({ subscribed: true, pending: false });
+    expect(await memberNewsletterState("a@example.org", true)).toEqual({ subscribed: true, pending: false });
   });
 
   it("ticking with an unverified address goes through the double opt-in", async () => {
@@ -158,7 +158,7 @@ describe("member checkbox", () => {
     await setMemberNewsletter("m1", "a@example.org", false, true, new Date(NOW));
     expect(fake.rows[0]).toMatchObject({ status: "pending", confirmedAt: null, memberId: "m1" });
     expect(h.sendEmail).toHaveBeenCalledTimes(1);
-    expect(await memberNewsletterState("a@example.org")).toEqual({ subscribed: false, pending: true });
+    expect(await memberNewsletterState("a@example.org", true)).toEqual({ subscribed: false, pending: true });
   });
 
   it("ticking re-subscribes a verified member who had unsubscribed, unticking unsubscribes", async () => {
@@ -167,5 +167,66 @@ describe("member checkbox", () => {
     expect(fake.rows[0]).toMatchObject({ status: "subscribed", confirmedAt: new Date(NOW), unsubscribedAt: null });
     await setMemberNewsletter("m1", "a@example.org", true, false, new Date(NOW + 1));
     expect(fake.rows[0]).toMatchObject({ status: "unsubscribed", lastStatusReason: "user" });
+  });
+});
+
+describe("review fixes", () => {
+  const OTHER = { email: "victim@example.org", status: "subscribed", confirmedAt: new Date(NOW - 5000), memberId: "owner" };
+
+  it("H1: an unverified address never reveals subscription state", async () => {
+    use({}, [OTHER]);
+    expect(await memberNewsletterState("victim@example.org", false)).toEqual({ subscribed: false, pending: false });
+    expect(await memberNewsletterState("victim@example.org", true)).toEqual({ subscribed: true, pending: false });
+  });
+
+  it("M1: a pending or legacy row is not reported as subscribed", async () => {
+    use({}, [{ email: "p@example.org", status: "pending" }, { email: "l@example.org", status: "subscribed" }]);
+    expect((await memberNewsletterState("p@example.org", true)).subscribed).toBe(false);
+    expect((await memberNewsletterState("l@example.org", true)).subscribed).toBe(false);
+  });
+
+  it("H2: unticking with an unverified address cannot unsubscribe someone else's address", async () => {
+    use({}, [OTHER]);
+    await setMemberNewsletter("attacker", "victim@example.org", false, false, new Date(NOW));
+    expect(fake.rows[0].status).toBe("subscribed");
+  });
+
+  it("H2: unticking works for a verified address and for a row this member created", async () => {
+    use({}, [OTHER]);
+    await setMemberNewsletter("anyone", "victim@example.org", true, false, new Date(NOW));
+    expect(fake.rows[0].status).toBe("unsubscribed");
+    use(ON);
+    await setMemberNewsletter("m1", "a@example.org", false, true, new Date(NOW));
+    await setMemberNewsletter("m1", "a@example.org", false, false, new Date(NOW + 1));
+    expect(fake.rows[0].status).toBe("unsubscribed");
+  });
+
+  it("L1: an unverified tick on an existing row does not claim its memberId", async () => {
+    use(ON, [{ email: "victim@example.org", status: "unsubscribed", memberId: "owner", unsubscribedAt: new Date(NOW - 10) }]);
+    await setMemberNewsletter("attacker", "victim@example.org", false, true, new Date(NOW));
+    expect(fake.rows[0].memberId).toBe("owner");
+    await requestSubscription({ email: "victim@example.org", source: "member", memberId: "attacker" }, NOW);
+    expect(fake.rows[0].memberId).toBe("owner");
+  });
+
+  it("L2: an unsubscribe that lands between the check and the write wins over the confirm", async () => {
+    use({}, [{ email: "a@example.org", status: "pending" }]);
+    const original = fake.prisma.newsletterSubscriber.findUnique;
+    fake.prisma.newsletterSubscriber.findUnique = async (a: Parameters<typeof original>[0]) => {
+      const r = await original(a);
+      Object.assign(fake.rows[0], { status: "unsubscribed", unsubscribedAt: new Date(NOW + 5) });
+      return r;
+    };
+    expect(await confirmSubscriber("sub1", NOW - 1000, new Date(NOW + 10))).toBe("invalid");
+    expect(fake.rows[0].status).toBe("unsubscribed");
+    expect(fake.rows[0].confirmedAt).toBeNull();
+  });
+
+  it("L5: a mixed-case legacy row is found, not duplicated", async () => {
+    use(ON, [{ email: "Old@Example.org", status: "subscribed" }]);
+    await requestSubscription({ email: "old@example.org", source: "footer" }, NOW);
+    expect(fake.rows).toHaveLength(1);
+    expect(fake.rows[0]).toMatchObject({ status: "pending", confirmedAt: null });
+    expect(await memberNewsletterState("OLD@example.org", true)).toEqual({ subscribed: false, pending: true });
   });
 });

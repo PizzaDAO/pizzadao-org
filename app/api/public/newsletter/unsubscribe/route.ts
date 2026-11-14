@@ -2,9 +2,9 @@
 // The target of the List-Unsubscribe header (RFC 8058 one-click: the mail client POSTs the body
 // "List-Unsubscribe=One-Click" and expects a 2xx) and of the button on /newsletter/unsubscribe.
 // The HMAC proves the link came from us for this subscriber. Idempotent. GET is deliberately not
-// supported (link scanners prefetch GETs). Re-subscribing needs a new confirmation.
+// supported (link scanners prefetch GETs). No per-IP rate limit: RFC 8058 posts come from shared
+// provider addresses, and the HMAC is the gate (same as the weekly digest unsubscribe). Re-subscribing needs a new confirmation.
 import { NextRequest, NextResponse } from "next/server";
-import { enforceRateLimit } from "@/app/lib/rate-limit";
 import { verifyNewsletterUnsub } from "@/app/lib/newsletter/sig";
 import { unsubscribeSubscriber } from "@/app/lib/newsletter/subscribe";
 
@@ -12,8 +12,6 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  const limited = await enforceRateLimit(req, "newsletter-unsubscribe");
-  if (limited) return limited;
   const url = new URL(req.url);
   const id = url.searchParams.get("s");
   const sig = url.searchParams.get("sig");

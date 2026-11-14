@@ -7,7 +7,7 @@
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 
-type Prefs = { email: string | null; verified: boolean; optIn: boolean; newsletter?: { subscribed: boolean; pending: boolean } };
+type Prefs = { email: string | null; verified: boolean; optIn: boolean; newsletter?: { subscribed: boolean; pending: boolean; canSendConfirm?: boolean } };
 
 export function EmailPrefsEditor() {
     const t = useTranslations("reengage.prefs");
@@ -24,7 +24,8 @@ export function EmailPrefsEditor() {
         setPrefs(p);
         setEmail(p.email ?? "");
         setOptIn(p.optIn);
-        setNewsletter(!!(p.newsletter?.subscribed || p.newsletter?.pending));
+        // Ticked only for a real (confirmed) subscription, never for a pending or legacy row.
+        setNewsletter(!!p.newsletter?.subscribed);
     }
 
     useEffect(() => {
@@ -65,7 +66,7 @@ export function EmailPrefsEditor() {
             else if (j.confirmation === "too_soon") setNote(t("tooSoon"));
             else if (j.confirmation === "too_many") setNote(t("tooMany"));
             else if (j.confirmation === "failed") setError(t("sendFailed"));
-            else if (j.newsletter?.pending) setNote(t("newsletterPending"));
+            else if (j.newsletter?.pending) setNote(t(j.newsletter.canSendConfirm ? "newsletterPending" : "newsletterPendingNoMail"));
             else if (j.optIn && j.email && !j.verified) setNote(t("pending"));
             else setNote(t("saved"));
         } catch {
@@ -83,7 +84,7 @@ export function EmailPrefsEditor() {
                 e.preventDefault();
                 const addr = email.trim();
                 // An empty field removes the address (and opts out).
-                void submit(addr ? { email: addr, optIn, ...(prefs?.newsletter ? { newsletter } : {}) } : { email: null });
+                void submit(addr ? { email: addr, optIn, ...(prefs?.newsletter && newsletter !== prefs.newsletter.subscribed ? { newsletter } : {}) } : { email: null });
             }}
         >
             <label style={{ display: "grid", gap: 4, fontSize: 14 }}>

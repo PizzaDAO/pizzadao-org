@@ -4,19 +4,21 @@
 // weekly digest opt-in (reengageEmailOptIn is never read or written here).
 import { prisma } from "@/app/lib/db";
 import { isMailable } from "./consent";
-import { requestSubscription, unsubscribeSubscriber } from "./subscribe";
+import { findByEmail, requestSubscription, unsubscribeSubscriber } from "./subscribe";
 
 export interface MemberNewsletterState {
   subscribed: boolean;
   pending: boolean;
 }
 
-export async function memberNewsletterState(email: string | null): Promise<MemberNewsletterState> {
-  if (!email) return { subscribed: false, pending: false };
-  const row = await prisma.newsletterSubscriber.findUnique({
-    where: { email: email.trim().toLowerCase() },
-    select: { status: true, confirmedAt: true },
-  });
+/**
+ * The checkbox state for the member's saved address. Only a VERIFIED address is looked up: anyone can
+ * type any address into their prefs, so an unverified one must never reveal who is subscribed.
+ * "subscribed" means mailable (confirmed), so the box is only ticked for a real subscription.
+ */
+export async function memberNewsletterState(email: string | null, verified: boolean): Promise<MemberNewsletterState> {
+  if (!email || !verified) return { subscribed: false, pending: false };
+  const row = await findByEmail(email);
   if (!row) return { subscribed: false, pending: false };
   return { subscribed: isMailable(row), pending: !isMailable(row) && row.status !== "unsubscribed" };
 }
@@ -34,12 +36,15 @@ export async function setMemberNewsletter(
   now = new Date(),
 ): Promise<void> {
   const addr = email.trim().toLowerCase();
-  const existing = await prisma.newsletterSubscriber.findUnique({
-    where: { email: addr },
-    select: { id: true, status: true, confirmedAt: true },
-  });
+  const found = await findByEmail(addr);
+  const existing = found ? { id: found.id, status: found.status, confirmedAt: found.confirmedAt } : null;
+  const ownerId = found
+    ? (await prisma.newsletterSubscriber.findUnique({ where: { id: found.id }, select: { memberId: true } }))?.memberId ?? null
+    : null;
   if (!wanted) {
-    if (existing && existing.status !== "unsubscribed") await unsubscribeSubscriber(existing.id, "user", now);
+    // Unticking acts only on an address the member proved (verified) or a row this member created.
+    const mayAct = verified || ownerId === memberId;
+    if (existing && mayAct && existing.status !== "unsubscribed") await unsubscribeSubscriber(existing.id, "user", now);
     return;
   }
   if (!verified) {

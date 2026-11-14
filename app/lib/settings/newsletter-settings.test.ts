@@ -4,7 +4,7 @@ import { SETTINGS, parseSetting } from './registry'
 import { TOGGLES, resolveToggle, type ToggleKey } from './toggles'
 import type { Settings } from './index'
 import { NEWSLETTER_SETTINGS } from './newsletter-settings'
-import { newsletterSender } from '@/app/lib/newsletter/sender'
+import { displayName, newsletterSender } from '@/app/lib/newsletter/sender'
 
 const KEYS = ['newsletter.confirmEmailsEnabled', 'newsletter.memberOptInEnabled'] as const
 const snapshot = (values: Record<string, unknown> = {}, over: Partial<Settings> = {}): Settings =>
@@ -51,6 +51,15 @@ describe('newsletter settings', () => {
     expect(parseSetting('newsletter.fromAddress', 'not an address').ok).toBe(false)
     expect(parseSetting('newsletter.replyTo', 'x').ok).toBe(false)
     expect(parseSetting('newsletter.fromName', 'Bad <name>').ok).toBe(false)
+    for (const bad of ['A, B', 'A; B', 'A: B', 'A\\B', 'A"B']) expect(parseSetting('newsletter.fromName', bad).ok).toBe(false)
+    expect(parseSetting('newsletter.fromName', 'Example News-1.0').ok).toBe(true)
+  })
+
+  it('quotes a display name that has specials (RFC 5322) and leaves plain names bare', () => {
+    expect(displayName('Example News')).toBe('Example News')
+    expect(displayName('Doe, Jane')).toBe('"Doe, Jane"')
+    expect(displayName('A\\B')).toBe('"A\\\\B"')
+    expect(newsletterSender(snapshot({ 'newsletter.fromAddress': 'news@example.org', 'newsletter.fromName': 'News; Team' }))?.from).toBe('"News; Team" <news@example.org>')
   })
 
   it('no sender address: no sender at all; otherwise name and reply-to are applied', () => {

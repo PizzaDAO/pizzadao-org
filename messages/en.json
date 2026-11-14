@@ -1705,7 +1705,8 @@
       "loadError": "Couldn't load your email settings. Reload the page to try again.",
       "tooMany": "Too many confirmation emails. Try again tomorrow.",
       "newsletterOptIn": "Get the monthly PizzaDAO newsletter",
-      "newsletterPending": "Newsletter signup is pending. Check your inbox to confirm this address."
+      "newsletterPending": "Newsletter signup is pending. Check your inbox to confirm this address.",
+      "newsletterPendingNoMail": "Newsletter signup is pending."
     },
     "confirm": {
       "subject": "Confirm your email for the PizzaDAO weekly digest",

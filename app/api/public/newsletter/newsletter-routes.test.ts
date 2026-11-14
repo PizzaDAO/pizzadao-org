@@ -146,6 +146,13 @@ describe("POST /api/public/newsletter/unsubscribe", () => {
     expect(fake.rows[0].unsubscribedAt).toEqual(first);
   });
 
+  it("has no per-IP rate limit (RFC 8058 posts come from shared provider addresses)", async () => {
+    use({}, [{ email: "a@example.org", status: "subscribed", confirmedAt: new Date(NOW - 5000) }]);
+    h.limited = new Response("slow", { status: 429 });
+    expect((await unsub.POST(nreq(link("sub1"), { body: "List-Unsubscribe=One-Click" }))).status).toBe(200);
+    expect(fake.rows[0].status).toBe("unsubscribed");
+  });
+
   it("rejects a forged or missing signature and changes nothing", async () => {
     use({}, [{ email: "a@example.org", status: "subscribed", confirmedAt: new Date(NOW - 5000) }]);
     expect((await unsub.POST(nreq("https://x/api/public/newsletter/unsubscribe?s=sub1&sig=forged"))).status).toBe(400);

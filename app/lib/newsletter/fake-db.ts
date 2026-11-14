@@ -21,7 +21,9 @@ function matches(row: Record<string, unknown>, where: Where): boolean {
     if (k === "OR") return (cond as Where[]).some((w) => matches(row, w));
     const v = row[k];
     if (cond && typeof cond === "object" && !(cond instanceof Date)) {
-      const c = cond as { not?: unknown; lt?: Date };
+      const c = cond as { not?: unknown; lt?: Date; lte?: Date; equals?: string; mode?: string };
+      if ("equals" in c) return c.mode === "insensitive" ? String(v).toLowerCase() === String(c.equals).toLowerCase() : v === c.equals;
+      if ("lte" in c) return v instanceof Date && v.getTime() <= (c.lte as Date).getTime();
       if ("not" in c) return v !== c.not;
       if ("lt" in c) return v instanceof Date && v.getTime() < (c.lt as Date).getTime();
     }
@@ -55,6 +57,8 @@ export function makeFakeDb(seed: Array<Partial<FakeSub> & { email: string }> = [
     row ? (select ? Object.fromEntries(Object.keys(select).map((k) => [k, (row as never)[k]])) : { ...row }) : null;
   const newsletterSubscriber = {
     findUnique: async ({ where, select }: { where: Where; select?: object }) =>
+      pick(rows.find((r) => matches(r as never, where)), select),
+    findFirst: async ({ where, select }: { where: Where; select?: object }) =>
       pick(rows.find((r) => matches(r as never, where)), select),
     create: async ({ data, select }: { data: Partial<FakeSub> & { email: string }; select?: object }) => {
       if (rows.some((r) => r.email === data.email)) throw Object.assign(new Error("dup"), { code: "P2002" });
