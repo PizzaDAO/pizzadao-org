@@ -10,7 +10,7 @@
 // configured login bot, so the shared rsv.pizza bot can never be pointed at this app.
 
 // Origin of the app: NEXT_PUBLIC_APP_URL, else NEXT_PUBLIC_SITE_URL (same order as app/lib/site-url.ts), else the legacy host.
-const APP_ORIGIN = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://app.pizzadao.org").replace(/\/$/, "");
+const APP_ORIGIN = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://pizzadao.org").replace(/\/$/, "");
 const WEBHOOK_URL = `${APP_ORIGIN}/api/telegram/login-bot/webhook`;
 
 const token = process.env.TELEGRAM_LOGIN_BOT_TOKEN?.trim();
