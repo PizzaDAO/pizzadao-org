@@ -3055,3 +3055,58 @@ model ContactSubmission {
 
   @@index([createdAt])
 }
+
+// ===== BUDDY SYSTEM (plans/buddy-system.md, phase 1: manual matching) =====
+
+// A member who offered to buddy a new member. `active` = opted in, `paused` = temporarily off.
+model BuddyProfile {
+  discordId     String    @id
+  memberId      String?
+  active        Boolean   @default(false)
+  paused        Boolean   @default(false)
+  languages     String[]  @default([])
+  maxActive     Int       @default(2)
+  lastMatchedAt DateTime?
+  addedBy       String? // Discord id of the admin who added them by hand, if any
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+// One trainee with one buddy. status: QUEUED | MATCHED | INTRODUCED | COMPLETED | EXPIRED | DECLINED | ENDED.
+// At most one active (QUEUED, MATCHED or INTRODUCED) pair per trainee: a partial unique index in the
+// migration (Prisma cannot express it).
+model BuddyPair {
+  id               String       @id @default(cuid())
+  traineeDiscordId String
+  traineeMemberId  String?
+  buddyDiscordId   String
+  status           String
+  score            Float?
+  threadId         String?
+  createdBy        String? // Discord id of the admin who made the pair
+  introducedAt     DateTime?
+  firstHelloAt     DateTime?
+  vouchedAt        DateTime?
+  completedAt      DateTime?
+  endedReason      String?
+  lastNudgeAt      DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  events           BuddyEvent[]
+
+  @@index([buddyDiscordId, status])
+  @@index([traineeDiscordId])
+}
+
+// Audit trail and dedupe rows for a pair (paired, introduced, intro_dry_run, ended, completed, reward_*).
+model BuddyEvent {
+  id     String    @id @default(cuid())
+  pairId String
+  kind   String
+  actor  String
+  at     DateTime  @default(now())
+  data   Json?
+  pair   BuddyPair @relation(fields: [pairId], references: [id], onDelete: Cascade)
+
+  @@index([pairId, kind])
+}

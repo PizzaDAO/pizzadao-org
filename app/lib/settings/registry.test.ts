@@ -6,6 +6,7 @@ vi.mock('@/app/lib/db', () => ({ prisma: {} }))
 import { SETTINGS, SETTING_KEYS, TRANSCRIPTION_KEYTERMS_DEFAULT, isSettingKey, parseSetting } from './registry'
 import { ECONOMY_SETTINGS } from './economy-settings'
 import { CONTENT_SETTINGS } from './content-settings'
+import { DEFAULT_BUDDY_INTRO_TEXT } from './buddy-settings'
 
 const ECONOMY_KEYS = new Set<string>([...Object.keys(ECONOMY_SETTINGS), ...Object.keys(CONTENT_SETTINGS)])
 import { CALL_TRANSCRIPT_MIN_LEVEL, CALL_SUMMARY_MIN_LEVEL, CALL_ACTION_ITEMS_MIN_LEVEL, CALL_CHAPTERS_MIN_LEVEL } from '@/app/lib/calls/transcript-access'
@@ -267,6 +268,15 @@ describe('settings registry', () => {
       ['newsletter.fromName', ''],
       ['newsletter.fromAddress', ''],
       ['newsletter.replyTo', ''],
+      ['buddy.enabled', false],
+      ['buddy.introThreadsEnabled', false],
+      ['buddy.rewardEnabled', false],
+      ['buddy.minLevel', 4],
+      ['buddy.maxActivePerBuddy', 2],
+      ['buddy.completionLevel', 2],
+      ['buddy.rewardMissionId', 0],
+      ['discord.buddyChannelId', ''],
+      ['buddy.introText', DEFAULT_BUDDY_INTRO_TEXT],
     ])
   })
 
