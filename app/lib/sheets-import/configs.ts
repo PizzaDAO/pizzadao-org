@@ -8,6 +8,7 @@ import { fetchGviz } from '@/app/lib/sheets/gviz'
 import { getManualLinks } from '@/app/api/lib/google-sheets'
 import { fetchAllowedPOAPIdsFromDb, fetchAllowedPOAPIdsFromSheet } from '@/app/lib/poap'
 import { getNFTContractsFromDb, getNFTContractsFromSheet, isContractAddress } from '@/app/lib/nft-config'
+import { isInternalPath, parseReviewedDate } from '@/app/lib/manuals-freshness'
 import { listManualsFromDb, parseManualsTable, type Manual } from '@/app/lib/manuals'
 import type { NFTContract } from '@/app/lib/nft-types'
 import { compareKeyed, type Importer, type ParityReport, type ParseIssue } from './framework'
@@ -319,6 +320,16 @@ export function manualRowKeys(rows: readonly EditorRow[]): string[] {
   })
 }
 
+/** Row checks for the manuals editor: link, reviewed date (YYYY-MM-DD) and an in-app replacement path. */
+export function manualRowProblem(row: EditorRow): string | null {
+  if (!isHttpUrlOrEmpty(row.url)) return 'link must be a full http(s) address'
+  const reviewed = String(row.reviewedAt ?? '')
+  if (reviewed && !parseReviewedDate(reviewed)) return 'last reviewed must be a date like 2026-11-14'
+  const by = String(row.supersededBy ?? '')
+  if (by && !isInternalPath(by)) return 'replaced by must be a page on this site, like /handbook/host-a-party'
+  return null
+}
+
 export const manualsEditor: EditorSpec = {
   dataset: 'manuals',
   label: 'Manuals index',
@@ -333,24 +344,26 @@ export const manualsEditor: EditorSpec = {
     { key: 'author', label: 'Author', kind: 'text', maxLength: 120 },
     { key: 'lastUpdated', label: 'Last updated', kind: 'text', maxLength: 40 },
     { key: 'notes', label: 'Notes', kind: 'text', maxLength: 1000 },
+    { key: 'reviewedAt', label: 'Last reviewed', kind: 'text', maxLength: 10, placeholder: 'YYYY-MM-DD' },
+    { key: 'supersededBy', label: 'Replaced by (page)', kind: 'text', maxLength: 200, placeholder: '/handbook/...' },
   ],
   maxRows: 500,
-  validate: (row) => (isHttpUrlOrEmpty(row.url) ? null : 'link must be a full http(s) address'),
+  validate: manualRowProblem,
   // Listed rows carry their stored key; new rows get one on save (see manualRowKeys).
   keyOf: (row, index) => (typeof row.key === 'string' && row.key ? `key:${row.key}` : `new:${index}`),
   async list() {
     const rows = await prisma.manual.findMany({ where: { active: true }, orderBy: { position: 'asc' } })
-    return rows.map((r) => ({ key: r.titleKey, title: r.title, url: r.url ?? '', crew: r.crew, status: r.status, authorId: r.authorId, author: r.author, lastUpdated: r.lastUpdated, notes: r.notes }))
+    return rows.map((r) => ({ key: r.titleKey, title: r.title, url: r.url ?? '', crew: r.crew, status: r.status, authorId: r.authorId, author: r.author, lastUpdated: r.lastUpdated, notes: r.notes, reviewedAt: r.reviewedAt ? r.reviewedAt.toISOString().slice(0, 10) : '', supersededBy: r.supersededBy ?? '' }))
   },
   async save(rows, actor) {
-    const fields = ['title', 'url', 'crew', 'status', 'authorId', 'author', 'lastUpdated', 'notes'] as const
+    const fields = ['title', 'url', 'crew', 'status', 'authorId', 'author', 'lastUpdated', 'notes', 'reviewedAt', 'supersededBy'] as const
     const keyList = manualRowKeys(rows)
     const keys = new Map(rows.map((r, i) => [r, keyList[i]]))
     return saveByKey({
       rows,
       keyOf: (r) => keys.get(r)!,
       existing: async () =>
-        (await prisma.manual.findMany()).map((r) => ({ key: r.titleKey, active: r.active, value: { ...r, url: r.url ?? '' } as Record<string, unknown> })),
+        (await prisma.manual.findMany()).map((r) => ({ key: r.titleKey, active: r.active, value: { ...r, url: r.url ?? '', reviewedAt: r.reviewedAt ? r.reviewedAt.toISOString().slice(0, 10) : '', supersededBy: r.supersededBy ?? '' } as Record<string, unknown> })),
       same: (prev, row, position) => prev.active && prev.value.position === position && fields.every((f) => prev.value[f] === row[f]),
       upsert: (row, position) => {
         const data = {
@@ -362,6 +375,8 @@ export const manualsEditor: EditorSpec = {
           author: String(row.author ?? ''),
           lastUpdated: String(row.lastUpdated ?? ''),
           notes: String(row.notes ?? ''),
+          reviewedAt: row.reviewedAt ? parseReviewedDate(String(row.reviewedAt)) : null,
+          supersededBy: row.supersededBy ? String(row.supersededBy) : null,
           position,
           active: true,
           updatedBy: actor,

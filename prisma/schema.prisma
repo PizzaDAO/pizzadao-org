@@ -2545,6 +2545,8 @@ model Manual {
   author      String   @default("")
   lastUpdated String   @default("")
   notes       String   @default("")
+  reviewedAt   DateTime? // when the manual was last checked against the current app
+  supersededBy String? // an in-app path (e.g. /handbook/host-a-party) that replaces this manual
   position    Int
   active      Boolean  @default(true)
   createdAt   DateTime @default(now())

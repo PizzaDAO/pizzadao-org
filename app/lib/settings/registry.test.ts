@@ -281,6 +281,10 @@ describe('settings registry', () => {
       ['newsletter.eventsWindowDays', 45],
       ['newsletter.maxCallCrews', 8],
       ['newsletter.callOwnerNames', true],
+      ['manuals.freshnessEnabled', false],
+      ['manuals.staleAfterDays', 365],
+      ['manuals.hideDrafts', false],
+      ['manuals.hideReplaced', false],
     ])
   })
 
