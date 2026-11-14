@@ -65,7 +65,8 @@ export function buildPublicCatalog(input: BuildInput): PublicCatalog {
   const repoIsPublic = (repo: string): boolean => {
     const owner = appByRepo.get(repoName(repo))
     if (owner?.repoPrivate) return false
-    if (!githubOk) return true
+    // GitHub unreachable: only a repo with a catalog row that is not flagged private is trusted.
+    if (!githubOk) return !!owner
     const f = factsFor(repo)
     return !!f && !f.private
   }
@@ -82,7 +83,8 @@ export function buildPublicCatalog(input: BuildInput): PublicCatalog {
         continue
       }
       const f = factsFor(ref.repo)
-      const branch = f?.defaultBranch ?? appByRepo.get(repoName(ref.repo))?.defaultBranch ?? 'main'
+      // HEAD is GitHub's alias for the default branch, used when neither GitHub nor the catalog knows it.
+      const branch = f?.defaultBranch ?? appByRepo.get(repoName(ref.repo))?.defaultBranch ?? 'HEAD'
       const item: PublicCodeRef = {
         repo: ref.repo,
         ...(ref.path ? { path: ref.path } : {}),
@@ -104,11 +106,12 @@ export function buildPublicCatalog(input: BuildInput): PublicCatalog {
     const status = publicStatus(e, input.isOn)
     if (!status) continue
     const audiences = e.audiences.filter((a): a is Audience => (AUDIENCES as readonly string[]).includes(a))
-    const opsOnly = audiences.length > 0 && audiences.every((a) => a === 'ops')
+    // Any ops audience marks the row as an ops tool: hidden unless features.showOps.
+    const opsOnly = audiences.includes('ops')
     if (opsOnly && !input.showOps) continue
 
     const priv = e.status === 'private'
-    const base = app.url ?? input.siteUrl
+    const base = safeHttpUrl(app.url) ?? input.siteUrl
     const showUrl = !priv && e.access !== 'admin'
     entries.push({
       slug: e.slug,
@@ -137,7 +140,7 @@ export function buildPublicCatalog(input: BuildInput): PublicCatalog {
         name: a.name,
         tagline: a.tagline,
         kind: a.kind,
-        url: a.url ?? (a.slug === 'pizzadao-org' ? input.siteUrl : null),
+        url: safeHttpUrl(a.url) ?? (a.slug === 'pizzadao-org' ? input.siteUrl : null),
         repo: repoOk ? fullRepo(a.repo as string) : null,
         defaultBranch: repoOk ? (f?.defaultBranch ?? a.defaultBranch ?? null) : null,
         commit: repoOk ? (f?.commit ?? null) : null,

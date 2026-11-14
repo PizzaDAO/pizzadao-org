@@ -4,7 +4,7 @@ import { SITE_URL } from '@/app/lib/site-url'
 import { getPublicCatalog, loadSwitches } from './service'
 import type { PublicCatalog } from './types'
 
-const CACHE = 'public, s-maxage=300, stale-while-revalidate=600'
+const CACHE = 'public, s-maxage=60, stale-while-revalidate=60'
 
 export async function exportResponse(
   format: (catalog: PublicCatalog, o: { siteUrl: string }) => string,

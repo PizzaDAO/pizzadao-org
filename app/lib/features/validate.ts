@@ -1,6 +1,7 @@
 /** Input validation for the /admin/features editor. */
 import { z } from 'zod'
 import { isSettingKey } from '@/app/lib/settings/registry'
+import { isSafePath, isSafeRepo } from './links'
 import { APP_KINDS, AUDIENCES, ENTRY_STATUSES } from './types'
 
 const slug = z.string().trim().min(1).max(80).regex(/^[a-z0-9][a-z0-9-]*$/, 'Lowercase letters, digits and dashes')
@@ -15,14 +16,19 @@ const httpUrl = z
   .string()
   .trim()
   .max(500)
-  .refine((v) => /^https?:\/\/\S+$/i.test(v), 'Must start with http:// or https://')
+  .refine((v) => /^https:\/\/\S+$/i.test(v), 'Must start with https://')
 const optUrl = z.union([z.literal('').transform(() => null), z.null(), httpUrl])
 /** A live link: a path on the app's own site ("/start") or an http(s) URL. */
 const optLiveUrl = z.union([z.literal('').transform(() => null), z.null(), httpUrl, z.string().trim().max(300).regex(/^\/[^\s]*$/, 'A path starting with /')])
 
 export const codeRefSchema = z.object({
-  repo: z.string().trim().min(1).max(120).regex(/^[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)?$/, 'Repo name'),
-  path: z.string().trim().max(300).optional(),
+  repo: z.string().trim().min(1).max(120).refine(isSafeRepo, 'A repo name: letters, digits, dot, dash and underscore'),
+  path: z
+    .string()
+    .trim()
+    .max(300)
+    .refine((v) => v === '' || isSafePath(v), 'A repo-relative path: no leading slash, no . or .. segments, letters digits . _ - @ + ~ ( ) [ ] only')
+    .optional(),
   description: z.string().trim().max(200).optional(),
   private: z.boolean().optional(),
 })

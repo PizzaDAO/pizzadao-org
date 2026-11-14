@@ -8,6 +8,7 @@ vi.mock("@/app/lib/db", () => ({ prisma: {} }));
 import seedJson from "@/data/features-seed.json";
 import { isSettingKey } from "@/app/lib/settings/registry";
 import { buildPublicCatalog } from "./catalog";
+import { isSafePath, isSafeRepo } from "./links";
 import { ENTRY_STATUSES, AUDIENCES, type Seed } from "./types";
 
 const seed = seedJson as unknown as Seed;
@@ -34,6 +35,46 @@ describe("data/features-seed.json", () => {
       expect(e.access, e.slug).toMatch(/^(public|members|admin|level:\w+)$/);
     }
     for (const a of seed.apps) expect(a.tagline.length).toBeLessThanOrEqual(140);
+  });
+
+  it("every code path and repo is safe to link", () => {
+    for (const e of seed.entries)
+      for (const c of e.code) {
+        expect(isSafeRepo(c.repo), `${e.slug}: ${c.repo}`).toBe(true);
+        if (c.path) expect(isSafePath(c.path), `${e.slug}: ${c.path}`).toBe(true);
+      }
+  });
+
+  it("wording is public-safe: no backticks, settings-derived numbers or internal status notes", () => {
+    for (const e of seed.entries) {
+      const t = `${e.title} ${e.summary} ${e.body ?? ""}`;
+      expect(t, e.slug).not.toMatch(/`|\d+-month|\bforms Off\b|behind a flag|\.\.\.$/);
+    }
+    const modules = seed.entries.find((e) => e.slug === "open-pizza-modules")!;
+    expect(modules.summary.endsWith("...")).toBe(false);
+  });
+
+  it("the languages row points at the message file and i18n code", () => {
+    const paths = seed.entries.find((e) => e.slug === "languages")!.code.map((c) => c.path);
+    expect(paths).toEqual(["messages/en.json", "app/lib/i18n"]);
+  });
+
+  it("the member app's URL comes from SITE_URL, not the seed", () => {
+    expect(seed.apps.find((a) => a.slug === "pizzadao-org")!.url).toBeNull();
+    expect(seed.apps.find((a) => a.slug === "metalhead")!.url).toBeNull();
+  });
+
+  it("rows governed by a single switch follow it", () => {
+    const keys = Object.fromEntries(seed.entries.map((e) => [e.slug, e.toggleKey]));
+    expect(keys).toMatchObject({
+      "live-call-view": "calls.liveViewEnabled",
+      vouches: "vouches.requestsEnabled",
+      followups: "followups.sendEnabled",
+      "crew-tasks": "crews.taskUpdatePostsEnabled",
+      telegram: "telegram.dmEnabled",
+      "reach-map": "map.levelsEnabled",
+      "pfp-builder": "pfp.restyleEnabled",
+    });
   });
 
   it("every switch key is a real setting", () => {

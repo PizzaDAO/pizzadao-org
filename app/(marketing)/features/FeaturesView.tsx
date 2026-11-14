@@ -9,6 +9,8 @@ type Props = {
   catalog: PublicCatalog;
   intro: string;
   contributeUrl: string;
+  /** Whether the machine-readable exports are live (their links are hidden otherwise). */
+  exportEnabled: boolean;
 };
 
 const TABS: Audience[] = ["members", "hosts", "partners", "builders", "crews"];
@@ -98,7 +100,7 @@ function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; chi
   );
 }
 
-export default function FeaturesView({ catalog, intro, contributeUrl }: Props) {
+export default function FeaturesView({ catalog, intro, contributeUrl, exportEnabled }: Props) {
   const [audience, setAudience] = useState<Audience | "all">("all");
   const [appFilter, setAppFilter] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<Set<PublicStatus>>(new Set(["live", "beta", "soon"]));
@@ -152,10 +154,12 @@ export default function FeaturesView({ catalog, intro, contributeUrl }: Props) {
           <p className="mk-overline text-tomato">§ What we have built</p>
           <h1 className="font-serif mt-3 text-4xl font-bold leading-tight md:text-6xl">What we have built</h1>
           <p className="font-serif mt-4 max-w-[62ch] text-[16px] leading-relaxed text-ink/70 md:text-lg">{intro || DEFAULT_INTRO}</p>
-          <p className="mt-3 text-[13px] text-ink/60">
-            For AI agents: <a className="underline" href="/llms.txt">llms.txt</a>, <a className="underline" href="/features.md">features.md</a>,{" "}
-            <a className="underline" href="/features.json">features.json</a>.
-          </p>
+          {exportEnabled && (
+            <p className="mt-3 text-[13px] text-ink/60">
+              For AI agents: <a className="underline" href="/llms.txt">llms.txt</a>, <a className="underline" href="/features.md">features.md</a>,{" "}
+              <a className="underline" href="/features.json">features.json</a>.
+            </p>
+          )}
 
           <div className="mt-8 flex gap-2 overflow-x-auto pb-1" role="group" aria-label="Audience">
             <Chip on={audience === "all"} onClick={() => setAudience("all")}>Everyone</Chip>

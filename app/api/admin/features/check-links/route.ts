@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   if (unsafe) return unsafe
   try {
     const { githubCacheMinutes } = await loadSwitches()
-    return json(await runLinkChecks(prisma, sharedGithubClient(githubCacheMinutes), { budgetMs: 240_000 }))
+    return json(await runLinkChecks(prisma, sharedGithubClient(githubCacheMinutes), { budgetMs: 240_000, force: true }))
   } catch (e) {
     console.error('[features] link check failed', e instanceof Error ? e.message : e)
     return json({ error: 'Link check failed' }, 500)

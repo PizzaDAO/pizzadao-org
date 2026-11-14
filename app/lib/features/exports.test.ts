@@ -71,6 +71,25 @@ describe("exports", () => {
     expect(md).toContain("License: No license file yet: ask before reusing code.");
   });
 
+  it("escapes Markdown and collapses newlines in titles, summaries and names", () => {
+    const evil = buildPublicCatalog({
+      apps: [{ ...apps[0], name: "Al*pha [x](http://evil)", tagline: "line1\n# heading", url: "http://insecure.example" }],
+      entries: [{ ...entries[0], title: "T_i`tle", summary: "a\n\n- [click](javascript:alert(1)) <b>x</b>" }],
+      facts, githubOk: true, isOn: () => true, showOps: false, siteUrl: "https://site.example",
+    });
+    for (const out of [toMarkdown(evil, o), toLlmsTxt(evil, o)]) {
+      expect(out).not.toMatch(/\[x\]\(http/);
+      expect(out).not.toContain("\n# heading");
+      expect(out).not.toContain("<b>");
+      expect(out).not.toContain("http://insecure");
+    }
+    const md = toMarkdown(evil, o);
+    expect(md).toContain("Al\\*pha \\[x\\]\\(http://evil\\)");
+    expect(md).toContain("T\\_i\\`tle");
+    expect(md).toContain("a - \\[click\\]\\(javascript:alert\\(1\\)\\) \\<b\\>x\\</b\\>");
+    expect(JSON.stringify(toJson(evil, o))).not.toContain("http://insecure");
+  });
+
   it("/llms.txt follows the convention: title, summary, then link lists", () => {
     const t = toLlmsTxt(catalog, o);
     expect(t.startsWith("# PizzaDAO\n\n> ")).toBe(true);

@@ -19,5 +19,5 @@ export default async function Page() {
   if (!switches?.publicEnabled) notFound();
   const loaded = await getPublicCatalog().catch(() => null);
   if (!loaded) notFound();
-  return <FeaturesView catalog={loaded.catalog} intro={switches.introText} contributeUrl={switches.contributeUrl} />;
+  return <FeaturesView catalog={loaded.catalog} intro={switches.introText} contributeUrl={switches.contributeUrl} exportEnabled={switches.exportEnabled} />;
 }

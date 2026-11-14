@@ -12,11 +12,27 @@ export function fullRepo(repo: string): string {
   return `${GITHUB_ORG}/${repoName(repo)}`
 }
 
-/** URL-encode each path segment (keeps the slashes). */
+const REPO_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/
+const SEGMENT_RE = /^[A-Za-z0-9._@+~()[\]-]{1,120}$/
+
+/** A repo name (optionally "PizzaDAO/name"): letters, digits, dot, dash and underscore only. */
+export function isSafeRepo(repo: string): boolean {
+  const name = repoName(repo)
+  return REPO_RE.test(name) && /[^.]/.test(name) && (!repo.includes('/') || /^PizzaDAO\/[^/]+$/i.test(repo.trim()))
+}
+
+/** A repo-relative path: no leading slash, no "." or ".." segments, a restricted character set. */
+export function isSafePath(path: string): boolean {
+  if (path.startsWith('/') || path.length > 300) return false
+  const segs = path.split('/')
+  return segs.every((s) => SEGMENT_RE.test(s) && /[^.]/.test(s))
+}
+
+/** URL-encode each path segment (keeps the slashes). Empty and dot-only segments are dropped, so it never emits "..". */
 export function encodePath(path: string): string {
   return path
     .split('/')
-    .filter((s) => s.length > 0)
+    .filter((s) => s.length > 0 && /[^.]/.test(s))
     .map((s) => encodeURIComponent(s))
     .join('/')
 }
@@ -42,9 +58,13 @@ export function parseCodeRefs(raw: unknown): CodeRef[] {
   for (const item of raw) {
     if (!item || typeof item !== 'object') continue
     const o = item as Record<string, unknown>
-    if (typeof o.repo !== 'string' || !o.repo.trim()) continue
+    if (typeof o.repo !== 'string' || !isSafeRepo(o.repo.trim())) continue
     const ref: CodeRef = { repo: fullRepo(o.repo) }
-    if (typeof o.path === 'string' && o.path.trim()) ref.path = o.path.trim().replace(/^\/+/, '')
+    if (typeof o.path === 'string' && o.path.trim()) {
+      // An unsafe stored path is dropped as a whole reference, never "repaired" into a different link.
+      if (!isSafePath(o.path.trim())) continue
+      ref.path = o.path.trim()
+    }
     if (typeof o.description === 'string' && o.description.trim()) ref.description = o.description.trim()
     if (o.private === true) ref.private = true
     out.push(ref)
@@ -52,12 +72,14 @@ export function parseCodeRefs(raw: unknown): CodeRef[] {
   return out
 }
 
-/** Only http(s) URLs are ever rendered as links. */
+/** Only https URLs are ever rendered as links. */
 export function safeHttpUrl(raw: string | null | undefined): string | null {
   if (!raw) return null
   try {
     const u = new URL(raw)
-    return u.protocol === 'https:' || u.protocol === 'http:' ? u.toString() : null
+    if (u.protocol !== 'https:') return null
+    const out = u.toString()
+    return u.pathname === '/' && !u.search && !u.hash ? out.replace(/\/$/, '') : out
   } catch {
     return null
   }

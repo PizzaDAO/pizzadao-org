@@ -60,16 +60,16 @@ export function createGithubClient(opts: GithubClientOptions = {}) {
   }
   const isLimited = () => now() < limitedUntil
 
-  const cached = async <T>(key: string, load: () => Promise<T>): Promise<T> => {
+  const cached = async <T>(key: string, load: () => Promise<T>, force = false): Promise<T> => {
     const hit = cache.get(key)
-    if (hit && now() < hit.until) return hit.value as T
+    if (!force && hit && now() < hit.until) return hit.value as T
     const value = await load()
     cache.set(key, { until: now() + ttl, value })
     return value
   }
 
   /** Every repo in the org the token (or anonymous access) can see. Null when GitHub did not answer. */
-  async function listRepos(): Promise<RepoFactsMap | null> {
+  async function listRepos(opts: { force?: boolean } = {}): Promise<RepoFactsMap | null> {
     if (isLimited()) return (cache.get('repos')?.value as RepoFactsMap | null | undefined) ?? null
     try {
       return await cached('repos', async () => {
@@ -95,7 +95,7 @@ export function createGithubClient(opts: GithubClientOptions = {}) {
           if (rows.length < 100) break
         }
         return map
-      })
+      }, opts.force)
     } catch {
       cache.set('repos', { until: now() + Math.min(ttl, FAILURE_RETRY_MS), value: null })
       return null
@@ -125,7 +125,7 @@ export function createGithubClient(opts: GithubClientOptions = {}) {
   }
 
   /** Whether `path` still exists on `branch`. */
-  async function checkPath(repo: string, branch: string, path: string): Promise<PathStatus> {
+  async function checkPath(repo: string, branch: string, path: string, opts: { force?: boolean } = {}): Promise<PathStatus> {
     if (isLimited()) return 'rate_limited'
     try {
       return await cached(`path:${repo}:${branch}:${path}`, async () => {
@@ -139,7 +139,7 @@ export function createGithubClient(opts: GithubClientOptions = {}) {
         }
         if (res.status === 404) return 'missing' as PathStatus
         return (res.ok ? 'ok' : 'error') as PathStatus
-      })
+      }, opts.force)
     } catch (e) {
       return e instanceof RateLimitedError ? 'rate_limited' : 'error'
     }

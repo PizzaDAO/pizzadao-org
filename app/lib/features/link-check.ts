@@ -34,14 +34,14 @@ export interface LinkCheckSummary {
 export async function runLinkChecks(
   db: LinkDb,
   client: GithubClient,
-  opts: { now?: () => Date; budgetMs?: number; concurrency?: number } = {},
+  opts: { now?: () => Date; budgetMs?: number; concurrency?: number; force?: boolean } = {},
 ): Promise<LinkCheckSummary> {
   const now = opts.now ?? (() => new Date())
   const started = Date.now()
   const budget = opts.budgetMs ?? 240_000
   const summary: LinkCheckSummary = { checked: 0, broken: 0, skipped: 0, rateLimited: false, githubUnavailable: false }
 
-  const repos = await client.listRepos()
+  const repos = await client.listRepos({ force: opts.force })
   if (!repos) {
     summary.githubUnavailable = true
     return summary
@@ -73,7 +73,7 @@ export async function runLinkChecks(
           results.push({ repo: ref.repo, path, status: 'ok' })
         } else {
           const branch = facts.defaultBranch ?? appByRepo.get(name)?.defaultBranch ?? 'main'
-          const st = await client.checkPath(name, branch, path)
+          const st = await client.checkPath(name, branch, path, { force: opts.force })
           if (st === 'rate_limited') limited = true
           results.push({ repo: ref.repo, path, status: st })
         }

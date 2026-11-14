@@ -1,9 +1,10 @@
 /**
  * Idempotent import of data/features-seed.json (plans/features-catalog.md, 4.3). Rules:
  *  - a new slug is created UNPUBLISHED, so nothing is public until an admin reviews and publishes it;
- *  - an existing row that was imported and never edited since (updatedAt <= importedAt) is refreshed
- *    from the seed, keeping its published / showWhenOff / reviewedAt choices;
- *  - an existing row that an admin edited, or created by hand, is never overwritten.
+ *  - an existing row that was imported and never had its content edited (editedAt is empty) is refreshed
+ *    from the seed, keeping its published / showWhenOff / reviewedAt choices. Publishing, marking reviewed and
+ *    link checks do not set editedAt;
+ *  - an existing row whose content an admin edited, or one created by hand, is never overwritten.
  */
 import type { Prisma, PrismaClient } from '@prisma/client'
 import type { Seed, SeedApp, SeedEntry } from './types'
@@ -20,7 +21,16 @@ export interface ImportSummary {
 type Counts = ImportSummary['apps']
 const zero = (): Counts => ({ created: 0, refreshed: 0, unchanged: 0, keptEdited: 0 })
 
-const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
+/** JSON with object keys sorted, so equal data compares equal whatever its key order (Postgres JSONB reorders keys). */
+export function stableStringify(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(stableStringify).join(',')}]`
+  if (v && typeof v === 'object') {
+    const o = v as Record<string, unknown>
+    return `{${Object.keys(o).sort().map((k) => `${JSON.stringify(k)}:${stableStringify(o[k])}`).join(',')}}`
+  }
+  return JSON.stringify(v) ?? 'null'
+}
+const same = (a: unknown, b: unknown) => stableStringify(a) === stableStringify(b)
 
 function appData(a: SeedApp) {
   return {
@@ -55,8 +65,7 @@ function entryData(e: SeedEntry) {
   }
 }
 
-const unedited = (row: { importedAt: Date | null; updatedAt: Date }) =>
-  !!row.importedAt && row.updatedAt.getTime() <= row.importedAt.getTime()
+const unedited = (row: { importedAt: Date | null; editedAt: Date | null }) => !!row.importedAt && !row.editedAt
 
 export async function importSeed(db: SeedDb, seed: Seed, opts: { now?: Date } = {}): Promise<ImportSummary> {
   const now = opts.now ?? new Date()
@@ -67,7 +76,7 @@ export async function importSeed(db: SeedDb, seed: Seed, opts: { now?: Date } = 
     const row = existingApps.get(a.slug)
     const data = appData(a)
     if (!row) {
-      await db.featureApp.create({ data: { slug: a.slug, ...data, published: false, importedAt: now, updatedAt: now, updatedBy: null } })
+      await db.featureApp.create({ data: { slug: a.slug, ...data, published: false, importedAt: now, updatedBy: null } })
       summary.apps.created++
     } else if (!unedited(row)) {
       summary.apps.keptEdited++
@@ -75,7 +84,7 @@ export async function importSeed(db: SeedDb, seed: Seed, opts: { now?: Date } = 
     } else if (same(pick(row, data), data)) {
       summary.apps.unchanged++
     } else {
-      await db.featureApp.update({ where: { slug: a.slug }, data: { ...data, importedAt: now, updatedAt: now } })
+      await db.featureApp.update({ where: { slug: a.slug }, data: { ...data, importedAt: now } })
       summary.apps.refreshed++
     }
   }
@@ -85,7 +94,7 @@ export async function importSeed(db: SeedDb, seed: Seed, opts: { now?: Date } = 
     const row = existing.get(e.slug)
     const data = entryData(e)
     if (!row) {
-      await db.featureEntry.create({ data: { slug: e.slug, ...data, published: false, showWhenOff: false, importedAt: now, updatedAt: now } })
+      await db.featureEntry.create({ data: { slug: e.slug, ...data, published: false, showWhenOff: false, importedAt: now } })
       summary.entries.created++
     } else if (!unedited(row)) {
       summary.entries.keptEdited++
@@ -93,7 +102,7 @@ export async function importSeed(db: SeedDb, seed: Seed, opts: { now?: Date } = 
     } else if (same(pick(row, data), data)) {
       summary.entries.unchanged++
     } else {
-      await db.featureEntry.update({ where: { slug: e.slug }, data: { ...data, importedAt: now, updatedAt: now } })
+      await db.featureEntry.update({ where: { slug: e.slug }, data: { ...data, importedAt: now } })
       summary.entries.refreshed++
     }
   }

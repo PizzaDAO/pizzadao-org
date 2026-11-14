@@ -98,6 +98,36 @@ describe("admin routes require an admin", () => {
   });
 });
 
+describe("content edits vs publishing (seed refresh bookkeeping)", () => {
+  it("publish / reviewed / coming-soon edits do not set editedAt; content edits do", async () => {
+    mocks.prisma.featureEntry.update.mockResolvedValue({ slug: "e" } as never);
+    await entriesPATCH(post({ slug: "e", patch: { published: true, showWhenOff: true, markReviewed: true } }));
+    expect(mocks.prisma.featureEntry.update.mock.calls[0][0].data).not.toHaveProperty("editedAt");
+    await entriesPATCH(post({ slug: "e", patch: { title: "New" } }));
+    expect(mocks.prisma.featureEntry.update.mock.calls[1][0].data.editedAt).toBeInstanceOf(Date);
+    mocks.prisma.featureApp.update.mockResolvedValue({ slug: "a" } as never);
+    await appsPATCH(post({ slug: "a", patch: { published: true } }));
+    expect(mocks.prisma.featureApp.update.mock.calls[0][0].data).not.toHaveProperty("editedAt");
+    await appsPATCH(post({ slug: "a", patch: { name: "N" } }));
+    expect(mocks.prisma.featureApp.update.mock.calls[1][0].data.editedAt).toBeInstanceOf(Date);
+  });
+
+  it("rejects code paths with traversal, leading slashes or odd characters", async () => {
+    for (const path of ["../x", "/abs", "a/./b", "a b", "a?x"]) {
+      const res = await entriesPATCH(post({ slug: "e", patch: { code: [{ repo: "pizzadao-org", path }] } }));
+      expect(res.status, path).toBe(400);
+    }
+    expect((await entriesPATCH(post({ slug: "e", patch: { code: [{ repo: "../evil" }] } }))).status).toBe(400);
+    mocks.prisma.featureEntry.update.mockResolvedValue({ slug: "e" } as never);
+    expect((await entriesPATCH(post({ slug: "e", patch: { code: [{ repo: "pizzadao-org", path: "app/(marketing)/[id]/page.tsx" }] } }))).status).toBe(200);
+  });
+
+  it("Check links forces a refresh past the cache", async () => {
+    await checkPOST(post());
+    expect((mocks.runLinkChecks.mock.calls[0] as unknown[])[2]).toMatchObject({ force: true });
+  });
+});
+
 describe("cron", () => {
   it("rejects a call without the cron secret", async () => {
     const res = await cronGET(new NextRequest("https://app.example/api/cron/feature-links"));

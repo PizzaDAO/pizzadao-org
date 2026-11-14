@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import { buildPublicCatalog, publicStatus } from "./catalog";
-import { codeUrl } from "./links";
+import { codeUrl, encodePath, isSafePath, isSafeRepo } from "./links";
 import type { AppRow, EntryRow, RepoFactsMap } from "./types";
 
 const app = (over: Partial<AppRow> = {}): AppRow => ({
@@ -56,7 +56,9 @@ describe("buildPublicCatalog", () => {
     expect(build({ entries: [ops] }).entries).toHaveLength(0);
     const shown = build({ entries: [ops], showOps: true }).entries[0];
     expect(shown.ops).toBe(true);
-    expect(build({ entries: [entry({ audiences: ["ops", "crews"] })] }).entries).toHaveLength(1);
+    // Any ops audience makes it an ops tool.
+    expect(build({ entries: [entry({ audiences: ["ops", "crews"] })] }).entries).toHaveLength(0);
+    expect(build({ entries: [entry({ audiences: ["ops", "crews"] })], showOps: true }).entries[0].ops).toBe(true);
   });
 
   it("builds default-branch links from GitHub's branch and pins the commit when known", () => {
@@ -68,6 +70,27 @@ describe("buildPublicCatalog", () => {
     expect(ref.license).toBe("MIT");
     expect(c.apps[0].license).toBe("MIT");
     expect(c.apps[0].commit).toBe(sha);
+  });
+
+  it("without GitHub, links only repos that have a catalog row, using its stored branch (HEAD when unknown)", () => {
+    const refs = [{ repo: "PizzaDAO/demo-repo", path: "a.ts" }, { repo: "PizzaDAO/unknown", path: "b.ts" }];
+    const c = build({ entries: [entry({ code: refs })], facts: new Map(), githubOk: false, apps: [app({ defaultBranch: "dev" })] });
+    expect(c.entries[0].code[0].url).toBe("https://github.com/PizzaDAO/demo-repo/blob/dev/a.ts");
+    expect(c.entries[0].code[1]).toEqual({ repo: "PizzaDAO/unknown", private: true });
+    const noBranch = build({ facts: new Map(), githubOk: false, apps: [app({ defaultBranch: null })] });
+    expect(noBranch.entries[0].code[0].url).toBe("https://github.com/PizzaDAO/demo-repo/blob/HEAD/src/lib/thing.ts");
+  });
+
+  it("drops stored code refs with unsafe paths or repos", () => {
+    const bad = [
+      { repo: "PizzaDAO/demo-repo", path: "../etc/passwd" },
+      { repo: "PizzaDAO/demo-repo", path: "/abs" },
+      { repo: "PizzaDAO/demo-repo", path: "a/./b" },
+      { repo: "PizzaDAO/demo-repo", path: "a b?x=1" },
+      { repo: "../x", path: "a" },
+      { repo: "evil/x", path: "a" },
+    ];
+    expect(build({ entries: [entry({ code: bad })] }).entries[0].code).toEqual([]);
   });
 
   it("falls back to the stored branch and omits permalinks when GitHub is unavailable", () => {
@@ -113,6 +136,20 @@ describe("private rows never expose code links", () => {
     const priv = build({ apps: [app({ repoPrivate: true })] });
     expect(priv.entries[0].code[0]).toEqual({ repo: "PizzaDAO/demo-repo", private: true });
     expect(priv.apps[0].repo).toBeNull();
+  });
+});
+
+describe("path safety", () => {
+  it("isSafePath/isSafeRepo accept real paths and refuse traversal", () => {
+    expect(isSafePath("app/(marketing)/[id]/page.tsx")).toBe(true);
+    expect(isSafePath("src/lib/a-b_c.ts")).toBe(true);
+    for (const p of ["..", "a/../b", "./a", "/a", "a//b", "a\\b", "a%2e%2e/b", "a b", "a?b", "a#b"]) expect(isSafePath(p), p).toBe(false);
+    expect(isSafeRepo("PizzaDAO/rsv-pizza")).toBe(true);
+    expect(isSafeRepo("Bitcoin-Pizza_Blastoff")).toBe(true);
+    for (const r of ["..", "a/b", "evil/x", "a b", ""]) expect(isSafeRepo(r), r).toBe(false);
+  });
+  it("encodePath never emits a dot segment", () => {
+    expect(encodePath("a/../b/./c/..")).toBe("a/b/c");
   });
 });
 

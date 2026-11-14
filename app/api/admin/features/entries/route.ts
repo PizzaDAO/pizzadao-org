@@ -54,6 +54,8 @@ export async function PATCH(request: Request) {
         ...rest,
         ...(code !== undefined ? { code: code as unknown as Prisma.InputJsonValue } : {}),
         ...(markReviewed ? { reviewedAt: new Date() } : {}),
+        // Publishing, the coming-soon choice and marking reviewed are not content edits.
+        ...(Object.keys(parsed.data.patch).some((k) => !['published', 'showWhenOff', 'markReviewed'].includes(k)) ? { editedAt: new Date() } : {}),
         updatedBy: auth.session.discordId,
       },
     })

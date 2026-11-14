@@ -58,7 +58,7 @@ describe("importSeed", () => {
   it("never overwrites a row an admin edited", async () => {
     const f = fakeDb();
     await importSeed(f.db, seed(), { now: f.clock() });
-    await f.featureEntry.update({ where: { slug: "e1" }, data: { title: "Edited by admin", published: true } });
+    await f.featureEntry.update({ where: { slug: "e1" }, data: { title: "Edited by admin", published: true, editedAt: f.clock() } });
     const changed = seed();
     changed.entries[0].title = "Seed changed";
     changed.entries[1].summary = "s2 changed";
@@ -70,6 +70,28 @@ describe("importSeed", () => {
     // The untouched row is refreshed from the seed.
     expect(s.entries.refreshed).toBe(1);
     expect(f.featureEntry.rows.get("e2")!.summary).toBe("s2 changed");
+  });
+
+  it("publishing or marking reviewed (no editedAt) does not freeze a row against refresh", async () => {
+    const f = fakeDb();
+    await importSeed(f.db, seed(), { now: f.clock() });
+    await f.featureEntry.update({ where: { slug: "e1" }, data: { published: true, reviewedAt: f.clock() } });
+    const changed = seed();
+    changed.entries[0].summary = "newer";
+    const s = await importSeed(f.db, changed, { now: f.clock() });
+    expect(s.entries.refreshed).toBe(1);
+    expect(f.featureEntry.rows.get("e1")!.summary).toBe("newer");
+    expect(f.featureEntry.rows.get("e1")!.published).toBe(true);
+  });
+
+  it("compares stored JSON regardless of key order", async () => {
+    const f = fakeDb();
+    await importSeed(f.db, seed(), { now: f.clock() });
+    // JSONB hands keys back in a different order.
+    f.featureEntry.rows.get("e1")!.code = [{ path: "x", repo: "PizzaDAO/a" }];
+    const s = await importSeed(f.db, seed(), { now: f.clock() });
+    expect(s.entries.unchanged).toBe(2);
+    expect(s.entries.refreshed).toBe(0);
   });
 
   it("refreshing keeps an unedited row's published choice and does not make it look edited", async () => {

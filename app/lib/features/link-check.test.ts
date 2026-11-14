@@ -68,6 +68,19 @@ describe("github client", () => {
     expect(c.isRateLimited()).toBe(true);
   });
 
+  it("force bypasses the cache for the repo list and for paths", async () => {
+    const { f, calls } = mockFetch({ "/orgs/PizzaDAO/repos": repoList([R("alpha")]), "contents/a.ts": () => new Response("{}", { status: 200 }) });
+    const c = createGithubClient({ fetchImpl: f, token: null });
+    await c.listRepos();
+    await c.checkPath("alpha", "main", "a.ts");
+    await c.listRepos();
+    await c.checkPath("alpha", "main", "a.ts");
+    expect(calls).toHaveLength(2);
+    await c.listRepos({ force: true });
+    await c.checkPath("alpha", "main", "a.ts", { force: true });
+    expect(calls).toHaveLength(4);
+  });
+
   it("sends the token and reads the head commit", async () => {
     let auth = "";
     const sha = "c".repeat(40);
