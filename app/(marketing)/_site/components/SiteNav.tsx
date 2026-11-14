@@ -21,6 +21,19 @@ type Props = { solid?: boolean };
 
 const SiteNav = ({ solid = false }: Props) => {
   const [open, setOpen] = useState(false);
+  // The features link is behind its own switch (features.navLinkEnabled); off, the header is unchanged.
+  const [featuresNav, setFeaturesNav] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/public/features-nav")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((b) => alive && setFeaturesNav(b?.enabled === true))
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const navItems = featuresNav ? [...NAV, { label: "What we've built", href: "/features" }] : NAV;
   const { data: session } = useSession();
   // A signed-in member sees their dashboard instead of "Member login" and "Join".
   const dashboardHref = session?.authenticated ? (session.memberId ? `/dashboard/${session.memberId}` : "/start") : null;
@@ -56,7 +69,7 @@ const SiteNav = ({ solid = false }: Props) => {
         </Link>
 
         <nav className="hidden items-center gap-5 md:flex lg:gap-7">
-          {NAV.map((n) => (
+          {navItems.map((n) => (
             <Link
               key={n.label}
               to={n.href}
@@ -144,7 +157,7 @@ const SiteNav = ({ solid = false }: Props) => {
         <div className="container flex h-full flex-col">
           <p className="mk-overline text-ink/45">Navigate</p>
           <nav className="mt-6 flex flex-col">
-            {NAV.map((n, i) => (
+            {navItems.map((n, i) => (
               <Link
                 key={n.label}
                 to={n.href}

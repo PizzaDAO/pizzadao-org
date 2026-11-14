@@ -3196,3 +3196,63 @@ model BuddyEvent {
 
   @@index([pairId, kind])
 }
+
+// Public features catalog (plans/features-catalog.md). Rows import unpublished and stay hidden until an
+// admin publishes them. FeatureApp is a product or repo; FeatureEntry is one feature of it.
+model FeatureApp {
+  slug          String    @id
+  name          String
+  tagline       String    @default("")
+  url           String?
+  repo          String?
+  repoPrivate   Boolean   @default(false)
+  defaultBranch String?
+  license       String?
+  licenseNote   String?
+  kind          String    @default("app")
+  position      Int       @default(0)
+  published     Boolean   @default(false)
+  importedAt    DateTime?
+  editedAt      DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  updatedBy     String?
+
+  entries FeatureEntry[]
+
+  @@index([position])
+}
+
+model FeatureEntry {
+  id            String    @id @default(cuid())
+  slug          String    @unique
+  appSlug       String
+  title         String
+  summary       String
+  body          String?
+  audiences     String[]  @default([])
+  tags          String[]  @default([])
+  status        String    @default("live")
+  access        String    @default("public")
+  toggleKey     String?
+  liveUrl       String?
+  docsUrl       String?
+  screenshotUrl String?
+  code          Json      @default("[]")
+  published     Boolean   @default(false)
+  showWhenOff   Boolean   @default(false)
+  position      Int       @default(0)
+  reviewedAt    DateTime?
+  importedAt    DateTime?
+  editedAt      DateTime?
+  linkCheck     Json?
+  linkCheckedAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  updatedBy     String?
+
+  app FeatureApp @relation(fields: [appSlug], references: [slug], onDelete: Cascade)
+
+  @@index([appSlug])
+  @@index([published, position])
+}
