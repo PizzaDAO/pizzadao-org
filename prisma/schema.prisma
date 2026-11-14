@@ -3040,6 +3040,76 @@ model NewsletterSubscriber {
   @@index([memberId])
 }
 
+// A monthly newsletter issue (plans/monthly-newsletter.md, phase 2). `sections` is the editable
+// structured content; `contentHash` is the sha256 of subject + preheader + sections + issue date +
+// Space URL at the moment of approval (null while a draft). Any edit after approval returns the issue
+// to "draft" and clears the approval. Status: draft | approved | sent | cancelled.
+model NewsletterIssue {
+  id              String    @id @default(cuid())
+  slug            String    @unique
+  status          String    @default("draft")
+  issueDate       DateTime // the day the issue goes out (the X Space invite wording follows it)
+  periodStart     DateTime
+  periodEnd       DateTime
+  subject         String    @default("")
+  preheader       String    @default("")
+  sections        Json
+  sources         Json? // ids of the calls, articles, spotlight rows, events used (no text)
+  xSpaceUrl       String?
+  model           String?
+  generatedAt     DateTime?
+  createdBy       String?
+  editedBy        String?
+  editedAt        DateTime?
+  approvedBy      String?
+  approvedAt      DateTime?
+  contentHash     String?
+  sponsorNotified Boolean   @default(false)
+  sendAfter       DateTime?
+  sentAt          DateTime?
+  publishedAt     DateTime?
+  recipientCount  Int       @default(0)
+  sentCount       Int       @default(0)
+  failedCount     Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  sends  NewsletterSend[]
+  events NewsletterIssueEvent[]
+
+  @@index([status, periodEnd])
+}
+
+// One row per (issue, subscriber): claimed before the send so a retry never double-sends. Created now,
+// used by the sender in phase 4.
+model NewsletterSend {
+  id           String          @id @default(cuid())
+  issueId      String
+  issue        NewsletterIssue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  subscriberId String
+  status       String          @default("SENDING") // SENDING | SENT | FAILED
+  resendId     String?
+  error        String? // short code, never an address
+  createdAt    DateTime        @default(now())
+  sentAt       DateTime?
+
+  @@unique([issueId, subscriberId])
+  @@index([issueId, status])
+}
+
+// Audit trail of an issue: generate, edit, approve, unapprove, test-send, cancel.
+model NewsletterIssueEvent {
+  id        String          @id @default(cuid())
+  issueId   String
+  issue     NewsletterIssue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  action    String
+  actor     String?
+  data      Json?
+  createdAt DateTime        @default(now())
+
+  @@index([issueId, createdAt])
+}
+
 // A message sent through the marketing contact and partners forms. `emailed` records whether the
 // notification to the team went out (the row is kept either way).
 model ContactSubmission {

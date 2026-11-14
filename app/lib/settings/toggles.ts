@@ -127,6 +127,10 @@ export const TOGGLES = {
   // Off unless turned on: newsletter consent (double opt-in emails, member checkbox).
   'newsletter.confirmEmailsEnabled': { env: 'NEWSLETTER_CONFIRM_EMAILS_ENABLED', legacy: ON_WORDS },
   'newsletter.memberOptInEnabled': { env: 'NEWSLETTER_MEMBER_OPT_IN_ENABLED', legacy: ON_WORDS },
+  'newsletter.draftEnabled': { env: 'NEWSLETTER_DRAFT_ENABLED', legacy: ON_WORDS },
+  // On unless the env var is an explicit off: the X Space invite block and naming people on finished call items in new drafts.
+  'newsletter.xSpaceEnabled': { env: 'NEWSLETTER_XSPACE_ENABLED', legacy: (raw) => !envKillsToggle(raw) },
+  'newsletter.callOwnerNames': { env: 'NEWSLETTER_CALL_OWNER_NAMES', legacy: (raw) => !envKillsToggle(raw) },
   // Off unless turned on: redirect page requests on the old app host to the main site, and carry the login across.
   'site.hostRedirectEnabled': { env: 'SITE_HOST_REDIRECT_ENABLED', legacy: ON_WORDS },
   'site.sessionBridgeEnabled': { env: 'SITE_SESSION_BRIDGE_ENABLED', legacy: ON_WORDS },
