@@ -638,6 +638,7 @@
     "activation": "Activation des membres",
     "spotlight": "Coup de projecteur Mafia",
     "spotlightAdmin": "File Spotlight",
+    "newsletterAdmin": "Newsletter",
     "handbook": "Guide PizzaDAO"
   },
   "dashboard": {
@@ -1702,7 +1703,10 @@
       "tooSoon": "Une confirmation vient d'être envoyée. Réessayez dans quelques minutes.",
       "sendFailed": "Enregistré, mais l'envoi de la confirmation a échoué. Réessayez plus tard.",
       "loadError": "Impossible de charger vos réglages e-mail. Rechargez la page pour réessayer.",
-      "tooMany": "Trop d'e-mails de confirmation. Réessayez demain."
+      "tooMany": "Trop d'e-mails de confirmation. Réessayez demain.",
+      "newsletterOptIn": "Recevoir la newsletter mensuelle de PizzaDAO",
+      "newsletterPending": "L'inscription à la newsletter est en attente. Consultez votre boîte mail pour confirmer cette adresse.",
+      "newsletterPendingNoMail": "L'inscription à la newsletter est en attente."
     },
     "confirm": {
       "subject": "Confirme ton e-mail pour le résumé hebdomadaire PizzaDAO",

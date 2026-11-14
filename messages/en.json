@@ -638,6 +638,7 @@
     "activation": "Member activation",
     "spotlight": "Mafia Spotlight",
     "spotlightAdmin": "Spotlight queue",
+    "newsletterAdmin": "Newsletter",
     "handbook": "Handbook"
   },
   "dashboard": {
@@ -1702,7 +1703,10 @@
       "tooSoon": "A confirmation was just sent. Try again in a few minutes.",
       "sendFailed": "Saved, but we couldn't send the confirmation. Try again later.",
       "loadError": "Couldn't load your email settings. Reload the page to try again.",
-      "tooMany": "Too many confirmation emails. Try again tomorrow."
+      "tooMany": "Too many confirmation emails. Try again tomorrow.",
+      "newsletterOptIn": "Get the monthly PizzaDAO newsletter",
+      "newsletterPending": "Newsletter signup is pending. Check your inbox to confirm this address.",
+      "newsletterPendingNoMail": "Newsletter signup is pending."
     },
     "confirm": {
       "subject": "Confirm your email for the PizzaDAO weekly digest",

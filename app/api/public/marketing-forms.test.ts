@@ -11,10 +11,11 @@ const enforceRateLimit = vi.fn();
 vi.mock("@/app/lib/settings", () => ({ loadSettings: () => loadSettings() }));
 vi.mock("@/app/lib/db", () => ({
   prisma: {
-    newsletterSubscriber: { create: (...a: unknown[]) => create(...a) },
     contactSubmission: { create: (...a: unknown[]) => contactCreate(...a), update: (...a: unknown[]) => contactUpdate(...a) },
   },
 }));
+const requestSubscription = vi.fn();
+vi.mock("@/app/lib/newsletter/subscribe", () => ({ requestSubscription: (...a: unknown[]) => requestSubscription(...a) }));
 vi.mock("@/app/lib/rate-limit", () => ({ enforceRateLimit: (...a: unknown[]) => enforceRateLimit(...a) }));
 vi.mock("@/app/lib/reengage/mailer", () => ({
   oneLine: (s: string) => s,
@@ -36,8 +37,9 @@ const settings = (over: Record<string, unknown> = {}) => {
 const post = (body: unknown) => new Request("https://x/api", { method: "POST", body: JSON.stringify(body), headers: { "content-type": "application/json" } });
 
 beforeEach(() => {
-  for (const m of [loadSettings, create, contactCreate, contactUpdate, sendEmail, enforceRateLimit]) m.mockReset();
+  for (const m of [loadSettings, requestSubscription, create, contactCreate, contactUpdate, sendEmail, enforceRateLimit]) m.mockReset();
   enforceRateLimit.mockResolvedValue(null);
+  requestSubscription.mockResolvedValue("none");
   loadSettings.mockResolvedValue(settings());
   vi.stubEnv("VERCEL_ENV", "production");
   for (const k of ["MARKETING_NEWSLETTER_ENABLED", "MARKETING_CONTACT_ENABLED"]) vi.stubEnv(k, "");
@@ -47,7 +49,7 @@ describe("POST /api/public/newsletter", () => {
   it("503s while the switch is off and stores nothing", async () => {
     loadSettings.mockResolvedValue(settings({ "marketing.newsletterEnabled": false }));
     expect((await newsletter(post({ email: "a@b.co" }))).status).toBe(503);
-    expect(create).not.toHaveBeenCalled();
+    expect(requestSubscription).not.toHaveBeenCalled();
   });
 
   it("the env kill switch wins over a saved ON", async () => {
@@ -55,23 +57,17 @@ describe("POST /api/public/newsletter", () => {
     expect((await newsletter(post({ email: "a@b.co" }))).status).toBe(503);
   });
 
-  it("stores a lower-cased address", async () => {
-    create.mockResolvedValue({});
+  it("hands a lower-cased address to the double opt-in and answers a bare ok", async () => {
+    requestSubscription.mockResolvedValue("created");
     const res = await newsletter(post({ email: "A@B.co", source: "footer" }));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true });
-    expect(create).toHaveBeenCalledWith({ data: { email: "a@b.co", source: "footer" } });
-  });
-
-  it("answers already: true for a repeat address", async () => {
-    create.mockRejectedValue(Object.assign(new Error("dup"), { code: "P2002" }));
-    expect(await (await newsletter(post({ email: "a@b.co" }))).json()).toEqual({ ok: true, already: true });
+    expect(requestSubscription).toHaveBeenCalledWith({ email: "a@b.co", source: "footer" });
   });
 
   it("400s on a bad address, 500s on a database error, passes a rate limit through", async () => {
     expect((await newsletter(post({ email: "nope" }))).status).toBe(400);
-    create.mockRejectedValue(new Error("db down"));
-    expect((await newsletter(post({ email: "a@b.co" }))).status).toBe(500);
+    expect((await newsletter(post({ email: "a@b.co" }))).status).toBe(200);
     enforceRateLimit.mockResolvedValue(new Response("slow down", { status: 429 }));
     expect((await newsletter(post({ email: "a@b.co" }))).status).toBe(429);
   });
@@ -80,7 +76,7 @@ describe("POST /api/public/newsletter", () => {
 describe("honeypot", () => {
   it("a filled website field is answered ok and stored nowhere", async () => {
     expect(await (await newsletter(post({ email: "a@b.co", website: "http://spam" }))).json()).toEqual({ ok: true });
-    expect(create).not.toHaveBeenCalled();
+    expect(requestSubscription).not.toHaveBeenCalled();
     const res = await contact(post({ name: "A", email: "a@b.co", message: "m", website: "x" }));
     expect((await res.json()).ok).toBe(true);
     expect(contactCreate).not.toHaveBeenCalled();

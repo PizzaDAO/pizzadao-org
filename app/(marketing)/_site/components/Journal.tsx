@@ -69,12 +69,8 @@ const Journal = () => {
       });
       if (error || !data?.ok) throw error ?? new Error("Subscribe failed");
       void identifyByEmail(trimmed, { newsletter_source: "journal" });
-      track(EVT.NEWSLETTER_SUBMITTED, { source: "journal", already: Boolean(data.already) });
-      if (data.already) {
-        toast({ title: "You're already on the list", description: "Thanks for being here." });
-      } else {
-        toast({ title: "You're in", description: "We'll be in touch when the next issue lands." });
-      }
+      track(EVT.NEWSLETTER_SUBMITTED, { source: "journal" });
+      toast({ title: "Check your inbox", description: "We sent a link to confirm your address. You're subscribed once you click it." });
       setStatus("success");
       setEmail("");
       setTimeout(() => setStatus("idle"), 4000);
@@ -253,7 +249,7 @@ const Journal = () => {
                   disabled={status === "loading"}
                   className="mk-btn-pill-lg bg-ink text-cream hover:bg-tomato disabled:opacity-60"
                 >
-                  {status === "loading" ? "Subscribing…" : status === "success" ? "Subscribed ✓" : "Subscribe →"}
+                  {status === "loading" ? "Subscribing…" : status === "success" ? "Check your inbox ✓" : "Subscribe →"}
                 </button>
               </div>
               <p className="ui mt-3 text-[10px] uppercase tracking-[0.18em] text-ink/50">

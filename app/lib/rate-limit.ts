@@ -111,6 +111,8 @@ export const RATE_LIMITS = {
   // The marketing pages' public forms (newsletter, contact/partners), per IP.
   "marketing-newsletter": { limit: 10, windowSec: 10 * 60 },
   "marketing-contact": { limit: 5, windowSec: 10 * 60 },
+  // Newsletter confirm (signed link), per IP. Unsubscribe has no IP limit: the HMAC is the gate.
+  "newsletter-confirm": { limit: 20, windowSec: 10 * 60 },
 } as const satisfies Record<string, RateLimitRule>;
 
 export type RateLimitName = keyof typeof RATE_LIMITS;

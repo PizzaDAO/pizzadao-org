@@ -7,13 +7,14 @@
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 
-type Prefs = { email: string | null; verified: boolean; optIn: boolean };
+type Prefs = { email: string | null; verified: boolean; optIn: boolean; newsletter?: { subscribed: boolean; pending: boolean; canSendConfirm?: boolean } };
 
 export function EmailPrefsEditor() {
     const t = useTranslations("reengage.prefs");
     const [prefs, setPrefs] = useState<Prefs | null>(null);
     const [email, setEmail] = useState("");
     const [optIn, setOptIn] = useState(false);
+    const [newsletter, setNewsletter] = useState(false);
     const [busy, setBusy] = useState(false);
     const [note, setNote] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -23,6 +24,8 @@ export function EmailPrefsEditor() {
         setPrefs(p);
         setEmail(p.email ?? "");
         setOptIn(p.optIn);
+        // Ticked only for a real (confirmed) subscription, never for a pending or legacy row.
+        setNewsletter(!!p.newsletter?.subscribed);
     }
 
     useEffect(() => {
@@ -63,6 +66,7 @@ export function EmailPrefsEditor() {
             else if (j.confirmation === "too_soon") setNote(t("tooSoon"));
             else if (j.confirmation === "too_many") setNote(t("tooMany"));
             else if (j.confirmation === "failed") setError(t("sendFailed"));
+            else if (j.newsletter?.pending) setNote(t(j.newsletter.canSendConfirm ? "newsletterPending" : "newsletterPendingNoMail"));
             else if (j.optIn && j.email && !j.verified) setNote(t("pending"));
             else setNote(t("saved"));
         } catch {
@@ -80,7 +84,7 @@ export function EmailPrefsEditor() {
                 e.preventDefault();
                 const addr = email.trim();
                 // An empty field removes the address (and opts out).
-                void submit(addr ? { email: addr, optIn } : { email: null });
+                void submit(addr ? { email: addr, optIn, ...(prefs?.newsletter && newsletter !== prefs.newsletter.subscribed ? { newsletter } : {}) } : { email: null });
             }}
         >
             <label style={{ display: "grid", gap: 4, fontSize: 14 }}>
@@ -104,6 +108,17 @@ export function EmailPrefsEditor() {
                 />
                 {t("optIn")}
             </label>
+            {prefs?.newsletter ? (
+                <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15 }}>
+                    <input
+                        type="checkbox"
+                        checked={newsletter}
+                        disabled={busy || !loaded}
+                        onChange={(e) => setNewsletter(e.target.checked)}
+                    />
+                    {t("newsletterOptIn")}
+                </label>
+            ) : null}
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
                 <button type="submit" disabled={busy || !loaded} className="btn-pill">
                     {t("save")}
