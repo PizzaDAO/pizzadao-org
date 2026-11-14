@@ -59,4 +59,15 @@ describe('createPrivateThread', () => {
     const f = vi.fn().mockResolvedValueOnce(res(200, { id: '555555' })).mockRejectedValueOnce(err)
     expect(await createPrivateThread(input, { fetchImpl: f as unknown as typeof fetch, botToken: 't' })).toEqual({ ok: false, reason: 'timeout', threadId: '555555' })
   })
+
+  it('a timeout or 5xx while creating the thread is uncertain (no thread id): no blind second thread', async () => {
+    const err = Object.assign(new Error('t'), { name: 'TimeoutError' })
+    const ft = vi.fn().mockRejectedValueOnce(err)
+    expect(await createPrivateThread(input, { fetchImpl: ft as unknown as typeof fetch, botToken: 't' })).toEqual({ ok: false, reason: 'timeout', uncertain: true })
+    const f5 = vi.fn().mockResolvedValueOnce(res(503))
+    expect(await createPrivateThread(input, { fetchImpl: f5 as unknown as typeof fetch, botToken: 't' })).toEqual({ ok: false, reason: 'thread_create_http_503', uncertain: true })
+    // a definite refusal stays retryable
+    const f4 = vi.fn().mockResolvedValueOnce(res(403))
+    expect(await createPrivateThread(input, { fetchImpl: f4 as unknown as typeof fetch, botToken: 't' })).toEqual({ ok: false, reason: 'thread_create_http_403' })
+  })
 })

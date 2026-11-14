@@ -297,6 +297,7 @@ describe('settings registry', () => {
       ['buddy.maxActivePerBuddy', 2],
       ['buddy.completionLevel', 2],
       ['buddy.introRecheckHours', 24],
+      ['buddy.maxCancelsPerRun', 3],
       ['buddy.rewardMissionId', 0],
       ['discord.buddyChannelId', ''],
       ['buddy.introText', DEFAULT_BUDDY_INTRO_TEXT],

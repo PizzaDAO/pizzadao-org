@@ -18,7 +18,7 @@ vi.mock('@/app/lib/settings/channels', () => ({ savedChannelId: m.channel }))
 vi.mock('@/app/lib/settings', () => ({ loadSettings: async () => ({ get: (k: string) => (k === 'buddy.introRecheckHours' ? m.hours.value : 'Hi {trainee}, meet {buddy}') }) }))
 vi.mock('@/app/lib/sheets/member-repository', () => ({ fetchMemberByDiscordId: async () => ({ memberId: 'M1', name: 'Mario' }) }))
 
-import { introducePair } from './intro'
+import { introducePair, resolveUncertainIntro } from './intro'
 
 const canView = (...a: [string, string]) => m.view(...a)
 
@@ -181,5 +181,58 @@ describe('introducePair', () => {
     await introducePair('p1', 'adm', { createThread, canView })
     const release = m.prisma.buddyPair.updateMany.mock.calls[1][0]
     expect(release.where.introStartedAt).toBeInstanceOf(Date)
+  })
+
+  it('unknown access on a fresh pair records intro_deferred(reason unknown) once, starts no clock and cancels nothing', async () => {
+    m.toggle.mockResolvedValue(true)
+    m.view.mockResolvedValue('unknown')
+    expect(await introducePair('p1', 'adm', { createThread: vi.fn(), canView })).toEqual({ mode: 'live', ok: false, reason: 'access_unknown' })
+    expect(m.prisma.buddyEvent.create.mock.calls[0][0].data).toMatchObject({ kind: 'intro_deferred', data: { reason: 'unknown' } })
+    // the recheck clock is read from cannot_view events only
+    m.prisma.buddyEvent.create.mockClear()
+    m.view.mockResolvedValue('no')
+    await introducePair('p1', 'adm', { createThread: vi.fn(), canView })
+    expect(m.prisma.buddyEvent.findFirst.mock.calls.some((c) => c[0].where?.data?.equals === 'cannot_view')).toBe(true)
+  })
+
+  it('cancel respects an active intro claim (null or stale introStartedAt only)', async () => {
+    m.toggle.mockResolvedValue(true)
+    m.view.mockResolvedValue('no')
+    m.prisma.buddyEvent.findFirst.mockResolvedValue({ at: new Date(Date.now() - 25 * 3600 * 1000) })
+    await introducePair('p1', 'system', { createThread: vi.fn(), canView })
+    const where = m.prisma.buddyPair.updateMany.mock.calls[0][0].where
+    expect(where.OR).toEqual([{ introStartedAt: null }, { introStartedAt: { lt: expect.any(Date) } }])
+    // a live claim means the cancel does not happen
+    m.prisma.buddyPair.updateMany.mockResolvedValue({ count: 0 })
+    m.prisma.buddyEvent.create.mockClear()
+    expect(await introducePair('p1', 'system', { createThread: vi.fn(), canView })).toMatchObject({ ok: false, reason: 'intro_in_progress' })
+    expect(m.prisma.buddyEvent.create).not.toHaveBeenCalled()
+  })
+
+  it('deferCancel reports the cancellation as due instead of doing it', async () => {
+    m.toggle.mockResolvedValue(true)
+    m.view.mockResolvedValue('no')
+    m.prisma.buddyEvent.findFirst.mockResolvedValue({ at: new Date(Date.now() - 25 * 3600 * 1000) })
+    expect(await introducePair('p1', 'system', { createThread: vi.fn(), canView }, { deferCancel: true })).toMatchObject({ ok: false, cancelDue: { who: ['trainee', 'buddy'] } })
+    expect(m.prisma.buddyPair.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('an uncertain thread-create (no thread id) blocks a new thread until an admin resolves it', async () => {
+    m.toggle.mockResolvedValue(true)
+    const createThread = vi.fn()
+    m.prisma.buddyEvent.findFirst.mockResolvedValue({ kind: 'intro_uncertain', at: new Date(), data: { reason: 'timeout' } })
+    expect(await introducePair('p1', 'adm', { createThread, canView })).toEqual({ mode: 'live', ok: false, reason: 'intro_uncertain', uncertain: true })
+    expect(createThread).not.toHaveBeenCalled()
+    // resolved: goes ahead
+    m.prisma.buddyEvent.findFirst.mockResolvedValue({ kind: 'intro_uncertain_resolved', at: new Date(), data: {} })
+    createThread.mockResolvedValue({ ok: true, threadId: '555555' })
+    expect(await introducePair('p1', 'adm', { createThread, canView })).toMatchObject({ ok: true })
+  })
+
+  it('resolveUncertainIntro clears the claim, optionally adopts the thread id, and records the resolution', async () => {
+    m.prisma.buddyPair.findUnique.mockResolvedValue(pair)
+    expect(await resolveUncertainIntro('p1', 'adm', '777777')).toBe(true)
+    expect(m.prisma.buddyPair.updateMany.mock.calls[0][0].data).toEqual({ introStartedAt: null, threadId: '777777' })
+    expect(m.prisma.buddyEvent.create.mock.calls[0][0].data).toMatchObject({ kind: 'intro_uncertain_resolved' })
   })
 })

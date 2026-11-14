@@ -36,8 +36,10 @@ export async function createPrivateThread(input: ThreadInput, opts: { fetchImpl?
   const bareId = (v: string) => (/^\d{5,25}$/.test(v) ? v : undefined)
   let threadId = input.existingThreadId ?? ''
   let posting = false
+  let creating = false
   try {
     if (!/^\d{5,25}$/.test(threadId)) {
+      creating = true
       // 12 = private thread; invitable false so only moderators can add more people.
       const created = await call(`/channels/${input.channelId}/threads`, 'POST', {
         name: input.name,
@@ -45,9 +47,13 @@ export async function createPrivateThread(input: ThreadInput, opts: { fetchImpl?
         auto_archive_duration: 10080,
         invitable: false,
       })
-      if (!created.ok) return { ok: false, reason: created.status === 429 ? 'rate_limited' : `thread_create_http_${created.status}` }
+      if (!created.ok) {
+        // A 5xx may still have made the thread: do not retry blind (an admin resolves it).
+        return { ok: false, reason: created.status === 429 ? 'rate_limited' : `thread_create_http_${created.status}`, ...(created.status >= 500 ? { uncertain: true } : {}) }
+      }
       threadId = String(((await created.json()) as { id?: string }).id ?? '')
-      if (!/^\d{5,25}$/.test(threadId)) return { ok: false, reason: 'thread_create_bad_response' }
+      creating = false
+      if (!/^\d{5,25}$/.test(threadId)) return { ok: false, reason: 'thread_create_bad_response', uncertain: true }
     }
     for (const userId of input.userIds) {
       const added = await call(`/channels/${threadId}/thread-members/${userId}`, 'PUT')
@@ -67,7 +73,7 @@ export async function createPrivateThread(input: ThreadInput, opts: { fetchImpl?
   } catch (e) {
     const reason = (e as Error)?.name === 'TimeoutError' ? 'timeout' : 'network_error'
     const id = bareId(threadId)
-    return { ok: false, reason, ...(id ? { threadId: id } : {}), ...(posting ? { uncertain: true } : {}) }
+    return { ok: false, reason, ...(id ? { threadId: id } : {}), ...(posting || creating ? { uncertain: true } : {}) }
   }
 }
 

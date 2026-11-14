@@ -10,7 +10,7 @@ import { getCurrentLevel } from '@/app/lib/missions'
 import { fetchMemberIdByDiscordId } from '@/app/lib/sheets/member-repository'
 import { ACTIVE_PAIR_STATUSES, buddyCapacity, checkPairing, hasTraineeFinished, isBuddyEligible, type PairRefusal } from './rules'
 import { rewardBuddy } from './reward'
-import { introducePair } from './intro'
+import { cancelForNoAccess, introducePair } from './intro'
 
 const SNOWFLAKE = /^\d{5,25}$/
 export const isSnowflake = (v: unknown): v is string => typeof v === 'string' && SNOWFLAKE.test(v)
@@ -208,34 +208,78 @@ export async function retryPendingRewards(limit = 50): Promise<number> {
   return rewarded
 }
 
+export interface DeferredIntroRun {
+  opened: number
+  waiting: number
+  cancelled: number
+  /** Cancellations the safety brake held back (more than buddy.maxCancelsPerRun in one run). */
+  held: number
+}
+
 /**
- * Retry intros that are waiting for channel access (an intro_deferred event, still MATCHED, no thread yet).
- * Only while buddy.introThreadsEnabled is on. introducePair decides: still inside the wait it does nothing,
- * past it a second failed check cancels the pair, a pass opens the thread.
+ * Retry intros that are waiting for channel access (an intro_deferred event, still MATCHED, no thread yet),
+ * oldest pair first. Only while buddy.introThreadsEnabled is on. Pairs still inside their recheck wait are
+ * skipped before the cap is applied. introducePair opens the thread when both can view; when the wait is over
+ * and someone still cannot, the pair is due for cancelling. Safety brake: if more than buddy.maxCancelsPerRun
+ * pairs are due in one run (a channel permission change would do that), none are cancelled; each gets a
+ * cancel_held event that /admin/buddies shows as a warning.
  */
-export async function retryDeferredIntros(limit = 50): Promise<{ opened: number; waiting: number; cancelled: number }> {
-  const out = { opened: 0, waiting: 0, cancelled: 0 }
+export async function retryDeferredIntros(limit = 50): Promise<DeferredIntroRun> {
+  const out: DeferredIntroRun = { opened: 0, waiting: 0, cancelled: 0, held: 0 }
   if (!(await toggleEnabled('buddy.introThreadsEnabled'))) return out
+  const settings = await loadSettings()
+  const waitMs = settings.get('buddy.introRecheckHours') * 3600 * 1000
+  const maxCancels = settings.get('buddy.maxCancelsPerRun')
   const pairs = await prisma.buddyPair.findMany({
     where: { status: 'MATCHED', introducedAt: null, threadId: null, events: { some: { kind: 'intro_deferred' } } },
-    select: { id: true },
-    take: limit,
+    orderBy: { createdAt: 'asc' },
+    take: 500,
+    select: { id: true, events: { where: { kind: 'intro_deferred', data: { path: ['reason'], equals: 'cannot_view' } }, orderBy: { at: 'desc' }, take: 1, select: { at: true } } },
   })
-  for (const pair of pairs) {
+  const now = Date.now()
+  const due = pairs
+    .filter((p) => {
+      const at = p.events[0]?.at
+      if (at && now - new Date(at).getTime() < waitMs) {
+        out.waiting++
+        return false
+      }
+      return true
+    })
+    .slice(0, limit)
+  const cancels: Array<{ id: string; who: string[] }> = []
+  for (const pair of due) {
     try {
-      const r = await introducePair(pair.id, 'system')
+      const r = await introducePair(pair.id, 'system', {}, { deferCancel: true })
       if (r.ok) out.opened++
-      else if ('cancelled' in r && r.cancelled) out.cancelled++
+      else if ('cancelDue' in r && r.cancelDue) cancels.push({ id: pair.id, who: r.cancelDue.who })
       else out.waiting++
     } catch (e) {
       console.error('[buddy] deferred intro failed', pair.id, e)
     }
   }
+  if (cancels.length > maxCancels) {
+    out.held = cancels.length
+    console.error(`[buddy] ${cancels.length} intros are due to be cancelled for no channel access (limit ${maxCancels}): cancelling none`)
+    for (const c of cancels) {
+      const flagged = await prisma.buddyEvent.findFirst({ where: { pairId: c.id, kind: 'cancel_held' }, select: { id: true } })
+      if (!flagged) {
+        await prisma.buddyEvent
+          .create({ data: { pairId: c.id, kind: 'cancel_held', actor: 'system', data: { reason: 'no_channel_access', who: c.who, due: cancels.length, limit: maxCancels } } })
+          .catch(() => {})
+      }
+    }
+    return out
+  }
+  for (const c of cancels) {
+    if (await cancelForNoAccess(c.id, c.who, 'system')) out.cancelled++
+    else out.waiting++
+  }
   return out
 }
 
 /** Check every active pair and complete the ones whose trainee is done. Used by the daily run and the admin page. */
-export async function completeDuePairs(): Promise<{ checked: number; completed: number; rewardsRetried: number; intros?: { opened: number; waiting: number; cancelled: number } }> {
+export async function completeDuePairs(): Promise<{ checked: number; completed: number; rewardsRetried: number; intros?: DeferredIntroRun }> {
   if (!(await toggleEnabled('buddy.enabled'))) return { checked: 0, completed: 0, rewardsRetried: 0 }
   const cfg = await buddySettings()
   const pairs = await prisma.buddyPair.findMany({

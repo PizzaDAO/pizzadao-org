@@ -108,11 +108,19 @@ export const BUDDY_SETTINGS = {
   ),
   'buddy.introRecheckHours': int(
     'buddy.introRecheckHours',
-    'Hours to wait before the second channel-access check',
-    'If a trainee or buddy cannot see the buddy channel, the intro waits this long and checks once more. Still no access: the pair is cancelled (reason no_channel_access) and the trainee goes back to the unmatched list.',
+    'Hours to wait before cancelling a pair that cannot see the buddy channel',
+    'If the trainee or buddy cannot see the buddy channel, the intro waits. It is re-checked every hour and opens as soon as both can view it. The first failed check after this many hours cancels the pair (reason no_channel_access) and the trainee goes back to the unmatched list.',
     1,
     168,
     24,
+  ),
+  'buddy.maxCancelsPerRun': int(
+    'buddy.maxCancelsPerRun',
+    'Most no-access cancellations in one run',
+    'Safety brake: if one hourly or daily run would cancel more pairs than this (for example a channel permission change made everyone lose access), it cancels none and flags the pairs on /admin/buddies.',
+    1,
+    50,
+    3,
   ),
   'buddy.rewardMissionId': int(
     'buddy.rewardMissionId',

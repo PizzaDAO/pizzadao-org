@@ -5,8 +5,8 @@ const m = vi.hoisted(() => ({
   prisma: {
     attendanceSummary: { findUnique: vi.fn() },
     vouch: { count: vi.fn() },
-    buddyPair: { findMany: vi.fn(), groupBy: vi.fn(), updateMany: vi.fn() },
-    buddyProfile: { findMany: vi.fn(), updateMany: vi.fn() },
+    buddyPair: { findMany: vi.fn(), findFirst: vi.fn(), groupBy: vi.fn(), updateMany: vi.fn() },
+    buddyProfile: { findMany: vi.fn(), findUnique: vi.fn(), updateMany: vi.fn() },
     buddyEvent: { findFirst: vi.fn(), create: vi.fn() },
   },
   memberId: vi.fn(),
@@ -21,7 +21,7 @@ vi.mock('./service', () => ({
   completeIfDue: vi.fn(async () => false),
 }))
 
-import { getAdminOverview, loadChecklist } from './view'
+import { getAdminOverview, getMyBuddyState, loadChecklist } from './view'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -78,5 +78,37 @@ describe('loadChecklist backfill', () => {
     m.memberId.mockRejectedValue(new Error('sheet down'))
     await loadChecklist(pair, 1, 2, null)
     expect(m.prisma.buddyEvent.create).not.toHaveBeenCalled()
+  })
+})
+describe('admin overview last event', () => {
+  it('ignores the member_lookup_missed bookkeeping events when picking a pair\'s last event, and counts held cancellations', async () => {
+    m.prisma.buddyPair.findMany
+      .mockResolvedValueOnce([{ id: 'p1', status: 'MATCHED', traineeDiscordId: '111111', buddyDiscordId: '222222', threadId: null, introducedAt: null, createdAt: new Date(), endedReason: null, events: [{ kind: 'cancel_held' }] }])
+      .mockResolvedValueOnce([])
+    m.prisma.buddyPair.groupBy.mockResolvedValue([])
+    m.prisma.buddyProfile.findMany.mockResolvedValue([])
+    const o = await getAdminOverview()
+    const include = m.prisma.buddyPair.findMany.mock.calls[0][0].include
+    expect(include.events.where).toEqual({ kind: { notIn: ['member_lookup_missed_trainee', 'member_lookup_missed_buddy'] } })
+    expect(o.pairs[0].lastEvent).toBe('cancel_held')
+    expect(o.heldCancels).toBe(1)
+  })
+})
+
+describe('trainee recognition opt-out on the card', () => {
+  it('is offered for the latest COMPLETED pair whatever its age (not tied to the 14-day card window)', async () => {
+    m.prisma.buddyProfile.findUnique.mockResolvedValue(null)
+    m.prisma.buddyPair.findMany.mockResolvedValue([]) // nothing recent: no pair cards
+    m.prisma.buddyPair.findFirst.mockResolvedValue({ id: 'old1', buddyDiscordId: '222222', traineeHideRecognition: true })
+    const state = await getMyBuddyState('111111')
+    expect(m.prisma.buddyPair.findFirst.mock.calls[0][0]).toMatchObject({ where: { traineeDiscordId: '111111', status: 'COMPLETED' }, orderBy: { completedAt: 'desc' } })
+    expect(state.pairs).toEqual([])
+    expect(state.traineeRecognition).toEqual({ pairId: 'old1', buddyName: 'your buddy', hidden: true })
+  })
+  it('is absent when there is no completed pair', async () => {
+    m.prisma.buddyProfile.findUnique.mockResolvedValue(null)
+    m.prisma.buddyPair.findMany.mockResolvedValue([])
+    m.prisma.buddyPair.findFirst.mockResolvedValue(null)
+    expect((await getMyBuddyState('111111')).traineeRecognition).toBeNull()
   })
 })

@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     // ?mode=intros (hourly): only the cheap deferred-intro retry, so the second access check lands close to
     // the configured wait. The daily run does everything.
     const introsOnly = new URL(request.url).searchParams.get('mode') === 'intros'
-    if (introsOnly && !(await toggleEnabled('buddy.enabled'))) return NextResponse.json({ opened: 0, waiting: 0, cancelled: 0 })
+    if (introsOnly && !(await toggleEnabled('buddy.enabled'))) return NextResponse.json({ opened: 0, waiting: 0, cancelled: 0, held: 0 })
     const result = introsOnly ? await retryDeferredIntros() : await completeDuePairs()
     console.log('[cron/buddies]', JSON.stringify(result))
     return NextResponse.json(result)

@@ -69,7 +69,10 @@ describe('userCanViewChannel', () => {
     expect(await userCanViewChannel('200000', '500000', o(route(res({ roles: [] }), hide)))).toBe('no')
   })
   it('not in the server is no; an API failure is unknown (never a refusal)', async () => {
-    expect(await userCanViewChannel('200000', '500000', o(route(res({}, 404))))).toBe('no')
+    expect(await userCanViewChannel('200000', '500000', o(route(res({ code: 10007, message: 'Unknown Member' }, 404))))).toBe('no')
+    // Unknown Guild (10004), or a 404 with no code, says nothing about the person
+    expect(await userCanViewChannel('200000', '500000', o(route(res({ code: 10004 }, 404))))).toBe('unknown')
+    expect(await userCanViewChannel('200000', '500000', o(route(res({}, 404))))).toBe('unknown')
     expect(await userCanViewChannel('200000', '500000', o(route(res({}, 500))))).toBe('unknown')
     expect(await userCanViewChannel('200000', '500000', o(route(new Error('x'))))).toBe('unknown')
   })

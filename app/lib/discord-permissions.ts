@@ -79,12 +79,15 @@ export function clearPermissionCaches() {
   channelCache.clear()
 }
 
-async function getJson(path: string, opts: PermOpts): Promise<{ ok: true; json: unknown } | { ok: false; status: number }> {
+async function getJson(path: string, opts: PermOpts): Promise<{ ok: true; json: unknown } | { ok: false; status: number; code?: number }> {
   const t = (opts.botToken ?? process.env.DISCORD_BOT_TOKEN ?? '').trim()
   if (!t) return { ok: false, status: 0 }
   try {
     const res = await (opts.fetchImpl ?? fetch)(`${API}${path}`, { headers: { Authorization: `Bot ${t}` }, cache: 'no-store', signal: AbortSignal.timeout(TIMEOUT_MS) })
-    if (!res.ok) return { ok: false, status: res.status }
+    if (!res.ok) {
+      const code = await res.json().then((b: { code?: number }) => (typeof b?.code === 'number' ? b.code : undefined)).catch(() => undefined)
+      return { ok: false, status: res.status, ...(code !== undefined ? { code } : {}) }
+    }
     return { ok: true, json: await res.json() }
   } catch {
     return { ok: false, status: 0 }
@@ -130,8 +133,10 @@ export async function userCanViewChannel(userId: string, channelId: string, opts
   if (!guildId || !SNOWFLAKE.test(userId) || !SNOWFLAKE.test(channelId)) return 'unknown'
   const now = opts.now ?? Date.now()
   const [guild, overwrites, member] = await Promise.all([loadGuild(guildId, opts, now), loadOverwrites(channelId, opts, now), getJson(`/guilds/${guildId}/members/${userId}`, opts)])
-  if (!member.ok) return member.status === 404 ? 'no' : 'unknown'
   if (!guild || !overwrites) return 'unknown'
+  // Only Unknown Member (10007) with the guild itself loaded means "not in the server"; Unknown Guild (10004)
+  // or any other 404/error says nothing about the person.
+  if (!member.ok) return member.status === 404 && member.code === 10007 ? 'no' : 'unknown'
   const memberRoleIds = ((member.json as { roles?: string[] }).roles ?? []).map(String)
   return canViewChannel({ guildId, ownerId: guild.ownerId, userId, memberRoleIds, rolePerms: guild.rolePerms, overwrites }) ? 'yes' : 'no'
 }

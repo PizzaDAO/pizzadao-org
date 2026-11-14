@@ -22,8 +22,6 @@ export interface PairCard {
   threadUrl: string | null
   /** The intro is waiting until the member can see the buddy channel. */
   waitingForAccess: boolean
-  /** Trainee side only: the trainee hides "Onboarded with help from ..." on their public profile. */
-  hideRecognition?: boolean
   checklist: ChecklistItem[]
 }
 
@@ -34,6 +32,8 @@ export interface MyBuddyState {
   profile?: { active: boolean; paused: boolean; maxActive: number; languages: string[]; hideRecognition: boolean } | null
   /** buddy.publicRecognitionEnabled is on: the card shows the opt-out. */
   recognitionEnabled?: boolean
+  /** The member's latest COMPLETED pair as a trainee, whatever its age, for the profile opt-out (only while recognition is on). */
+  traineeRecognition?: { pairId: string; buddyName: string; hidden: boolean } | null
   maxActiveCap?: number
   pairs?: PairCard[]
 }
@@ -115,6 +115,19 @@ export async function getMyBuddyState(discordId: string): Promise<MyBuddyState> 
       include: { events: { where: { kind: { in: ['intro_deferred', 'introduced'] } }, orderBy: { at: 'desc' }, take: 1 } },
     }),
   ])
+  const recognitionOn = await recognitionEnabled().catch(() => false)
+  let traineeRecognition: MyBuddyState['traineeRecognition'] = null
+  if (recognitionOn) {
+    const done = await prisma.buddyPair.findFirst({
+      where: { traineeDiscordId: discordId, status: 'COMPLETED' },
+      orderBy: { completedAt: 'desc' },
+      select: { id: true, buddyDiscordId: true, traineeHideRecognition: true },
+    })
+    if (done) {
+      const buddy = await fetchMemberByDiscordId(done.buddyDiscordId).catch(() => null)
+      traineeRecognition = { pairId: done.id, buddyName: buddy?.name || 'your buddy', hidden: done.traineeHideRecognition }
+    }
+  }
   const pairs: PairCard[] = []
   for (const row of rows) {
     const role = row.buddyDiscordId === discordId ? 'buddy' : 'trainee'
@@ -132,7 +145,6 @@ export async function getMyBuddyState(discordId: string): Promise<MyBuddyState> 
       status,
       partner: { discordId: partnerId, name: partner?.name || 'A member' },
       threadUrl: row.introducedAt ? threadUrl(row.threadId) : null,
-      ...(role === 'trainee' ? { hideRecognition: row.traineeHideRecognition } : {}),
       waitingForAccess: status === 'MATCHED' && !row.introducedAt && row.events[0]?.kind === 'intro_deferred',
       checklist: await loadChecklist(row, traineeLevel, cfg.completionLevel, buddyProfile?.memberId ?? null),
     })
@@ -142,7 +154,8 @@ export async function getMyBuddyState(discordId: string): Promise<MyBuddyState> 
     eligible: !profile?.removedAt && (isBuddyEligible(level, cfg.minLevel) || !!profile?.addedBy),
     minLevel: cfg.minLevel,
     maxActiveCap: cfg.cap,
-    recognitionEnabled: await recognitionEnabled().catch(() => false),
+    recognitionEnabled: recognitionOn,
+    traineeRecognition,
     profile: profile ? { active: profile.active, paused: profile.paused, maxActive: profile.maxActive, languages: profile.languages, hideRecognition: profile.hideRecognition } : null,
     pairs,
   }
@@ -154,11 +167,16 @@ export interface AdminBuddyOverview {
   rewardEnabled: boolean
   cap: number
   completionLevel: number
+  /** Pairs whose no-access cancellation the safety brake is holding back: an admin should look. */
+  heldCancels: number
   buddies: Array<{ discordId: string; name: string; active: boolean; paused: boolean; maxActive: number; activeCount: number; capacity: number; addedBy: string | null }>
   trainees: Array<{ discordId: string; name: string }>
   traineesTruncated: boolean
   pairs: Array<{ id: string; status: string; trainee: { discordId: string; name: string }; buddy: { discordId: string; name: string }; threadId: string | null; createdAt: string; endedReason: string | null; lastEvent: string | null }>
 }
+
+/** Bookkeeping events the admin page does not show as a pair's last event. */
+export const HIDDEN_EVENT_KINDS = ['member_lookup_missed_trainee', 'member_lookup_missed_buddy']
 
 const TRAINEE_LIMIT = 300
 const PAIR_LIMIT = 100
@@ -173,7 +191,7 @@ export async function getAdminOverview(): Promise<AdminBuddyOverview> {
   const [names, profiles, pairs, loadRows, traineeRows] = await Promise.all([
     readSignedUpMembers().catch(() => new Map<string, string>()),
     prisma.buddyProfile.findMany({ orderBy: { createdAt: 'asc' } }),
-    prisma.buddyPair.findMany({ orderBy: { createdAt: 'desc' }, take: PAIR_LIMIT, include: { events: { orderBy: { at: 'desc' }, take: 1 } } }),
+    prisma.buddyPair.findMany({ orderBy: { createdAt: 'desc' }, take: PAIR_LIMIT, include: { events: { where: { kind: { notIn: HIDDEN_EVENT_KINDS } }, orderBy: { at: 'desc' }, take: 1 } } }),
     // Dedicated counts over ALL active pairs: the list above is only the newest PAIR_LIMIT.
     prisma.buddyPair.groupBy({ by: ['buddyDiscordId'], where: { status: { in: ACTIVE } }, _count: { _all: true } }),
     prisma.buddyPair.findMany({ where: { status: { in: ACTIVE } }, select: { traineeDiscordId: true } }),
@@ -191,6 +209,7 @@ export async function getAdminOverview(): Promise<AdminBuddyOverview> {
     rewardEnabled,
     cap: cfg.cap,
     completionLevel: cfg.completionLevel,
+    heldCancels: pairs.filter((p) => p.status === 'MATCHED' && p.events[0]?.kind === 'cancel_held').length,
     buddies: profiles.map((p) => ({
       discordId: p.discordId,
       name: nameOf(p.discordId),
