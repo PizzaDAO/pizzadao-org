@@ -1,0 +1,4878 @@
+{
+  "version": 1,
+  "generatedFrom": "plans/features-catalog.md",
+  "apps": [
+    {
+      "slug": "pizzadao-org",
+      "name": "PizzaDAO member app",
+      "tagline": "Onboarding, profiles, missions, crews, calls, governance and the $PEP economy.",
+      "url": "https://app.pizzadao.org",
+      "repo": "pizzadao-org",
+      "repoPrivate": false,
+      "defaultBranch": "main",
+      "license": null,
+      "licenseNote": "No license yet, ask before reuse",
+      "kind": "app",
+      "position": 10
+    },
+    {
+      "slug": "metalhead",
+      "name": "Metalhead",
+      "tagline": "The call recorder and assistant for crew calls in Discord.",
+      "url": null,
+      "repo": "pizzadao-org",
+      "repoPrivate": false,
+      "defaultBranch": "main",
+      "license": null,
+      "licenseNote": "No license yet, ask before reuse",
+      "kind": "bot",
+      "position": 20
+    },
+    {
+      "slug": "rsvpizza",
+      "name": "RSVPizza",
+      "tagline": "Event pages, guest preferences, pizza ordering and host tools for pizza parties.",
+      "url": "https://www.rsv.pizza",
+      "repo": "rsv-pizza",
+      "repoPrivate": false,
+      "defaultBranch": "master",
+      "license": null,
+      "licenseNote": "No license yet, ask before reuse",
+      "kind": "app",
+      "position": 30
+    },
+    {
+      "slug": "rare-pizzas",
+      "name": "Rare Pizzas",
+      "tagline": "The Rare Pizzas NFT collection: mint, toppings, marketplace and leaderboard.",
+      "url": "https://rarepizzas.com",
+      "repo": "rare-pizzas",
+      "repoPrivate": false,
+      "defaultBranch": "main",
+      "license": null,
+      "licenseNote": "No license yet, ask before reuse",
+      "kind": "app",
+      "position": 40
+    },
+    {
+      "slug": "rare-pizzas-contracts",
+      "name": "Rare Pizzas contracts",
+      "tagline": "Smart contracts behind Rare Pizzas.",
+      "url": null,
+      "repo": "pizza-smartcontract",
+      "repoPrivate": false,
+      "defaultBranch": null,
+      "license": "GPL-3.0",
+      "licenseNote": null,
+      "kind": "library",
+      "position": 50
+    },
+    {
+      "slug": "mixtape",
+      "name": "Mixtape",
+      "tagline": "Mixtape NFTs you buy in USDC on Base and stream.",
+      "url": "https://pizzadao.github.io/mixtape/",
+      "repo": "mixtape",
+      "repoPrivate": false,
+      "defaultBranch": "master",
+      "license": null,
+      "licenseNote": "No license yet, ask before reuse",
+      "kind": "app",
+      "position": 60
+    },
+    {
+      "slug": "proof-of-pizza",
+      "name": "Proof of Pizza",
+      "tagline": "Submit a pizza receipt and get paid back in USDC on Base.",
+      "url": "https://proofof.pizza",
+      "repo": "proof-of-pizza",
+      "repoPrivate": false,
+      "defaultBranch": "master",
+      "license": null,
+      "licenseNote": "No license yet, ask before reuse",
+      "kind": "app",
+      "position": 70
+    },
+    {
+      "slug": "zaave",
+      "name": "Zaave",
+      "tagline": "Supply USDC to Aave on Base and see the interest as pizzas.",
+      "url": "https://zaave.vercel.app",
+      "repo": "zaave",
+      "repoPrivate": false,
+      "defaultBranch": "main",
+      "license": null,
+      "licenseNote": "No license yet, ask before reuse",
+      "kind": "app",
+      "position": 80
+    },
+    {
+      "slug": "open-pizza",
+      "name": "Open Pizza",
+      "tagline": "Open software for pizzerias: point of sale and a private stack of modules.",
+      "url": "https://pos-pizza-dao.vercel.app",
+      "repo": "pos",
+      "repoPrivate": false,
+      "defaultBranch": "main",
+      "license": null,
+      "licenseNote": "No license yet, ask before reuse",
+      "kind": "app",
+      "position": 90
+    },
+    {
+      "slug": "pizza-content",
+      "name": "Pizza Content",
+      "tagline": "A library of pizza GIFs, memes, videos, music and art.",
+      "url": "https://pizza-content.vercel.app",
+      "repo": "pizza-content",
+      "repoPrivate": false,
+      "defaultBranch": "main",
+      "license": null,
+      "licenseNote": "No license yet, ask before reuse",
+      "kind": "app",
+      "position": 100
+    },
+    {
+      "slug": "gpp-photo-archive",
+      "name": "GPP photo archive",
+      "tagline": "Photos from the Global Pizza Party.",
+      "url": "https://dow-pizza-party.vercel.app",
+      "repo": "gpp-pics",
+      "repoPrivate": false,
+      "defaultBranch": null,
+      "license": null,
+      "licenseNote": "No license yet, ask before reuse",
+      "kind": "app",
+      "position": 110
+    },
+    {
+      "slug": "pizza-personality",
+      "name": "Pizza Personality",
+      "tagline": "A quiz that finds your pizza personality.",
+      "url": "https://project-pizza-dao.vercel.app",
+      "repo": "pizza-personality",
+      "repoPrivate": false,
+      "defaultBranch": null,
+      "license": null,
+      "licenseNote": "No license yet, ask before reuse",
+      "kind": "app",
+      "position": 120
+    },
+    {
+      "slug": "proposal-guide",
+      "name": "Proposal guide",
+      "tagline": "An interactive guide to writing a PizzaDAO proposal.",
+      "url": "https://propose.pizzadao.xyz",
+      "repo": "proposalguide",
+      "repoPrivate": false,
+      "defaultBranch": null,
+      "license": null,
+      "licenseNote": "No license yet, ask before reuse",
+      "kind": "app",
+      "position": 130
+    },
+    {
+      "slug": "brand-kit",
+      "name": "Brand kit",
+      "tagline": "Logos, assets and the style guide.",
+      "url": "https://pizzadao.xyz/brand",
+      "repo": "pizzadao-brand-kit",
+      "repoPrivate": false,
+      "defaultBranch": null,
+      "license": null,
+      "licenseNote": "No license yet, ask before reuse",
+      "kind": "app",
+      "position": 140
+    },
+    {
+      "slug": "metalhead-qa",
+      "name": "Metalhead Q&A",
+      "tagline": "Ask questions about PizzaDAO, answered from crew documents.",
+      "url": "https://pizzadao-crew-qa.vercel.app",
+      "repo": "pizzadao-crew-qa",
+      "repoPrivate": false,
+      "defaultBranch": "master",
+      "license": null,
+      "licenseNote": "No license yet, ask before reuse",
+      "kind": "app",
+      "position": 150
+    },
+    {
+      "slug": "pizza-radio",
+      "name": "Pizza Radio",
+      "tagline": "A Discord music bot with an HTTP control API.",
+      "url": null,
+      "repo": "pizza-radio",
+      "repoPrivate": false,
+      "defaultBranch": "main",
+      "license": null,
+      "licenseNote": "Fork: terms follow upstream. No LICENSE file; package.json says ISC.",
+      "kind": "bot",
+      "position": 160
+    },
+    {
+      "slug": "google-apps-scripts",
+      "name": "Crew call announcer",
+      "tagline": "Apps Script that announces crew calls from Sheets.",
+      "url": null,
+      "repo": "google-apps-scripts",
+      "repoPrivate": false,
+      "defaultBranch": "main",
+      "license": null,
+      "licenseNote": "No LICENSE file; package.json says ISC. Ask before reuse.",
+      "kind": "library",
+      "position": 170
+    },
+    {
+      "slug": "pizza-generator",
+      "name": "Generative pizza art",
+      "tagline": "Generative pizza art and recipe tools.",
+      "url": null,
+      "repo": "pizza-oven-js",
+      "repoPrivate": false,
+      "defaultBranch": null,
+      "license": "GPL-3.0",
+      "licenseNote": null,
+      "kind": "library",
+      "position": 180
+    },
+    {
+      "slug": "games",
+      "name": "Games and experiments",
+      "tagline": "Small games and experiments from the community.",
+      "url": null,
+      "repo": null,
+      "repoPrivate": false,
+      "defaultBranch": null,
+      "license": null,
+      "licenseNote": null,
+      "kind": "game",
+      "position": 190
+    }
+  ],
+  "entries": [
+    {
+      "slug": "onboarding-wizard",
+      "appSlug": "pizzadao-org",
+      "title": "Onboarding wizard",
+      "summary": "Signup wizard: pick a topping and a mafia movie (or TV show) to generate a mafia name, choose city, crews and Turtle role, with a finale scene",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/start",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/ui/onboarding",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/onboarding",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/member-registration.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/namegen",
+          "description": ""
+        }
+      ],
+      "position": 10
+    },
+    {
+      "slug": "discord-login",
+      "appSlug": "pizzadao-org",
+      "title": "Discord login",
+      "summary": "Log in with Discord, or \"magic login\" by a Discord DM matched to your server nickname",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/login",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/discord/login",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/discord/callback",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/magic-login.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/session.ts",
+          "description": ""
+        }
+      ],
+      "position": 20
+    },
+    {
+      "slug": "trainee-welcome",
+      "appSlug": "pizzadao-org",
+      "title": "Trainee welcome",
+      "summary": "New Discord joiners get a \"Pizza Trainee\" nickname, a welcome DM and a welcome-channel post (removed when they leave)",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [
+        "discord"
+      ],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/trainee-nick.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/cron/trainee-nicks",
+          "description": ""
+        }
+      ],
+      "position": 30
+    },
+    {
+      "slug": "regional-roles",
+      "appSlug": "pizzadao-org",
+      "title": "Regional roles",
+      "summary": "Your city sets your regional Discord role and timezone",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/start",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/region-mapping.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/city-timezone.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/sync-roles-on-login.ts",
+          "description": ""
+        }
+      ],
+      "position": 40
+    },
+    {
+      "slug": "get-your-mafia-name",
+      "appSlug": "pizzadao-org",
+      "title": "Get your mafia name",
+      "summary": "Public mafia-name generator for non-members: claim a name and a shareable /made certificate, optional AI portrait, share on X",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/get-your-mafia-name",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/get-your-mafia-name",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/made/[id]",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/mafia-claim.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/mafia-portrait",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/ui/mafia-name",
+          "description": ""
+        }
+      ],
+      "position": 50
+    },
+    {
+      "slug": "languages",
+      "appSlug": "pizzadao-org",
+      "title": "English, Spanish and French",
+      "summary": "Dashboard, nav and onboarding in English, Spanish and French",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/dashboard",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "messages",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/i18n",
+          "description": ""
+        }
+      ],
+      "position": 60
+    },
+    {
+      "slug": "themed-names",
+      "appSlug": "pizzadao-org",
+      "title": "Themed names",
+      "summary": "Optional rule that display names follow the pizza/mafia theme, with reminder DMs",
+      "body": null,
+      "audiences": [
+        "crews",
+        "ops"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": "names.requireThemed",
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/themed-name.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/members/name-reminders.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/admin/members/names",
+          "description": ""
+        }
+      ],
+      "position": 70
+    },
+    {
+      "slug": "member-profile",
+      "appSlug": "pizzadao-org",
+      "title": "Member profile",
+      "summary": "Public member profile: tagline, links, crews, roles, call attendance, collections, mafia rank, hover card, share and social preview image",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/profile/[id]",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/ui/profile",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/profile",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/profile-summary",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/public/member-card/[id]",
+          "description": ""
+        }
+      ],
+      "position": 80
+    },
+    {
+      "slug": "member-dashboard",
+      "appSlug": "pizzadao-org",
+      "title": "Member dashboard",
+      "summary": "Personal dashboard: next action, recent activity, profile completion meter, celebrations",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "members",
+      "toggleKey": null,
+      "liveUrl": "/dashboard",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/dashboard",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/dashboard-summary",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/celebration.ts",
+          "description": ""
+        }
+      ],
+      "position": 90
+    },
+    {
+      "slug": "notifications",
+      "appSlug": "pizzadao-org",
+      "title": "Notifications",
+      "summary": "In-app notifications (bounties, vouches, missions)",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "members",
+      "toggleKey": null,
+      "liveUrl": "/dashboard",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/notifications.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/ui/notifications",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/notifications",
+          "description": ""
+        }
+      ],
+      "position": 100
+    },
+    {
+      "slug": "pfp-builder",
+      "appSlug": "pizzadao-org",
+      "title": "Profile picture builder",
+      "summary": "Profile-picture builder with backgrounds, frames, accessories and badges that unlock by level, plus AI restyle",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/profile/[id]/pfp",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/pfp.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/pfp-assets",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/admin/pfp-assets",
+          "description": ""
+        }
+      ],
+      "position": 110
+    },
+    {
+      "slug": "wallets",
+      "appSlug": "pizzadao-org",
+      "title": "Multiple wallets",
+      "summary": "Connect and manage several wallets on one profile",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "members",
+      "toggleKey": null,
+      "liveUrl": "/me/wallets",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/me/wallets",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/ui/wallet-manager",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/wagmi-config.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/wallet-lookup.ts",
+          "description": ""
+        }
+      ],
+      "position": 120
+    },
+    {
+      "slug": "social-connections",
+      "appSlug": "pizzadao-org",
+      "title": "Social connections",
+      "summary": "Connect X, find Farcaster friends in the DAO, link Telegram",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/x-oauth.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/x",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/farcaster.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/farcaster",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/social-accounts.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/ui/telegram",
+          "description": ""
+        }
+      ],
+      "position": 130
+    },
+    {
+      "slug": "collections",
+      "appSlug": "pizzadao-org",
+      "title": "Collections",
+      "summary": "POAPs, NFT collections (Rare Pizzas and more) and Unlock Pizza Party tickets across all linked wallets",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/poaps",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/poaps",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/nfts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/poap.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/nft.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/unlock",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/ui/unlock-ticket-card.tsx",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/collection-stats",
+          "description": ""
+        }
+      ],
+      "position": 140
+    },
+    {
+      "slug": "mafia-points",
+      "appSlug": "pizzadao-org",
+      "title": "Mafia points",
+      "summary": "Mafia points and rank, computed nightly",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/mafia-points",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/cron/mafia-ranks",
+          "description": ""
+        }
+      ],
+      "position": 150
+    },
+    {
+      "slug": "turtles",
+      "appSlug": "pizzadao-org",
+      "title": "Turtles",
+      "summary": "Pages listing members by Ninja Turtle role",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/turtles",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/turtles",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/turtles",
+          "description": ""
+        }
+      ],
+      "position": 160
+    },
+    {
+      "slug": "missions",
+      "appSlug": "pizzadao-org",
+      "title": "Missions",
+      "summary": "Level-up missions with rewards, bonus \"anytime\" missions, automatic and semi-automatic verifiers (including event-host lookup on RSVPizza and referrals)",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/missions",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/missions",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/missions.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/mission-verify",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/ui/missions",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/missions",
+          "description": ""
+        }
+      ],
+      "position": 170
+    },
+    {
+      "slug": "mission-review",
+      "appSlug": "pizzadao-org",
+      "title": "Mission review",
+      "summary": "Mission review queue for leads in Discord with a digest",
+      "body": null,
+      "audiences": [
+        "crews"
+      ],
+      "tags": [
+        "discord"
+      ],
+      "status": "live",
+      "access": "public",
+      "toggleKey": "missions.reviewCardsEnabled",
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/discord-interactions/mission-review.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/mission-review-access.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/cron/mission-sla",
+          "description": ""
+        }
+      ],
+      "position": 180
+    },
+    {
+      "slug": "vouches",
+      "appSlug": "pizzadao-org",
+      "title": "Vouches",
+      "summary": "Vouch for members, see who vouches for you, ask for vouches, in-app vouch requests",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/vouches",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/vouches",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/vouches.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/give-vouch.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/vouch-request.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/ui/vouches",
+          "description": ""
+        }
+      ],
+      "position": 190
+    },
+    {
+      "slug": "referrals",
+      "appSlug": "pizzadao-org",
+      "title": "Referrals",
+      "summary": "Personal referral links that count toward missions",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/missions",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/referral-link.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/referrals.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/referrals",
+          "description": ""
+        }
+      ],
+      "position": 200
+    },
+    {
+      "slug": "handbook",
+      "appSlug": "pizzadao-org",
+      "title": "Handbook",
+      "summary": "Member handbook with links into missions and editable facts",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/handbook",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/handbook",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/handbook.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/ui/handbook",
+          "description": ""
+        }
+      ],
+      "position": 210
+    },
+    {
+      "slug": "manuals",
+      "appSlug": "pizzadao-org",
+      "title": "Manuals",
+      "summary": "Crew manuals index",
+      "body": null,
+      "audiences": [
+        "members",
+        "crews"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/manuals",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/manuals",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/manuals.ts",
+          "description": ""
+        }
+      ],
+      "position": 220
+    },
+    {
+      "slug": "crews-directory",
+      "appSlug": "pizzadao-org",
+      "title": "Crews directory",
+      "summary": "All crews with their weekly call schedule and next call",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/crews",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/crews",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/crew-schedule.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/crew-next-call.ts",
+          "description": ""
+        }
+      ],
+      "position": 230
+    },
+    {
+      "slug": "crew-page",
+      "appSlug": "pizzadao-org",
+      "title": "Crew page",
+      "summary": "Crew page: goals, tasks, leads, roster, Discord link, join button, public visitor view",
+      "body": null,
+      "audiences": [
+        "members",
+        "crews"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/crew/[crewId]",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/crew-content.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/crew-roles.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/crew",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/join-crew",
+          "description": ""
+        }
+      ],
+      "position": 240
+    },
+    {
+      "slug": "crew-tasks",
+      "appSlug": "pizzadao-org",
+      "title": "Crew tasks",
+      "summary": "Claim crew tasks, \"my tasks\", and a digest of task changes in the crew's Discord channel",
+      "body": null,
+      "audiences": [
+        "members",
+        "crews"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/crew-tasks-write.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/my-tasks.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/claim-task",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/my-tasks",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/crews/task-update-posts.ts",
+          "description": ""
+        }
+      ],
+      "position": 250
+    },
+    {
+      "slug": "crew-rosters",
+      "appSlug": "pizzadao-org",
+      "title": "Crew rosters",
+      "summary": "Rosters follow call attendance (12-month regulars, past attendees on a cold bench)",
+      "body": null,
+      "audiences": [
+        "crews"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/crews/roster-auto-add.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/cron/crew-roster",
+          "description": ""
+        }
+      ],
+      "position": 260
+    },
+    {
+      "slug": "crew-bounties",
+      "appSlug": "pizzadao-org",
+      "title": "Crew bounties",
+      "summary": "Crews post and run their own bounties: submit, review, approve, comment",
+      "body": null,
+      "audiences": [
+        "members",
+        "crews"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/pep",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/bounties.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/ui/bounties",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/bounties",
+          "description": ""
+        }
+      ],
+      "position": 270
+    },
+    {
+      "slug": "comms-drafts",
+      "appSlug": "pizzadao-org",
+      "title": "Comms drafts",
+      "summary": "Comms crew drafts with one-click post to X or LinkedIn",
+      "body": null,
+      "audiences": [
+        "crews"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/crew-drafts.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/draft-text.ts",
+          "description": ""
+        }
+      ],
+      "position": 280
+    },
+    {
+      "slug": "education-sessions",
+      "appSlug": "pizzadao-org",
+      "title": "Education sessions",
+      "summary": "Schedule an education session: Discord event, generated flyer and announcement in one step",
+      "body": null,
+      "audiences": [
+        "crews"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": "education.sessionAnnounceEnabled",
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/crew/[crewId]/sessions/new",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/education-sessions",
+          "description": ""
+        }
+      ],
+      "position": 290
+    },
+    {
+      "slug": "community-call-announce",
+      "appSlug": "pizzadao-org",
+      "title": "Community call announce",
+      "summary": "Announce the Community Call (Discord event, X post, attendance), `/live` with stream link, auto-announce to a city group",
+      "body": null,
+      "audiences": [
+        "crews"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/announce",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/announce",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/announce",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/calls/live-announce.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/calls/live-announce-command.ts",
+          "description": ""
+        }
+      ],
+      "position": 300
+    },
+    {
+      "slug": "dst-sync",
+      "appSlug": "pizzadao-org",
+      "title": "Daylight-saving call sync",
+      "summary": "Keep crew call times right across daylight-saving changes",
+      "body": null,
+      "audiences": [
+        "crews"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": "calls.dstFixEnabled",
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/calls/event-time-sync.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/cron/event-time-sync",
+          "description": ""
+        }
+      ],
+      "position": 310
+    },
+    {
+      "slug": "print-materials",
+      "appSlug": "pizzadao-org",
+      "title": "Print materials",
+      "summary": "Printable PizzaDAO materials",
+      "body": null,
+      "audiences": [
+        "members",
+        "hosts"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/print",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/print",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/ui/print",
+          "description": ""
+        }
+      ],
+      "position": 320
+    },
+    {
+      "slug": "spotlight",
+      "appSlug": "pizzadao-org",
+      "title": "Spotlight",
+      "summary": "Submit a member for the Mafia Spotlight; admin queue",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/spotlight",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/spotlight",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/spotlight.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/admin/spotlight",
+          "description": ""
+        }
+      ],
+      "position": 330
+    },
+    {
+      "slug": "tech-projects",
+      "appSlug": "pizzadao-org",
+      "title": "Tech projects dashboard",
+      "summary": "Dashboard of public PizzaDAO repos with PRs, commits and contributors",
+      "body": null,
+      "audiences": [
+        "builders"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/tech/projects",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/tech/projects",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/projects",
+          "description": ""
+        }
+      ],
+      "position": 340
+    },
+    {
+      "slug": "call-recorder",
+      "appSlug": "metalhead",
+      "title": "Call recorder",
+      "summary": "Metalhead records scheduled crew calls in Discord voice (one track per speaker, private storage, voice-chat text captured, time limits)",
+      "body": null,
+      "audiences": [
+        "crews"
+      ],
+      "tags": [
+        "discord"
+      ],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "recorder/src",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "recorder/README.md",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/calls/ingest-schema.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/calls/r2.ts",
+          "description": ""
+        }
+      ],
+      "position": 350
+    },
+    {
+      "slug": "call-transcripts",
+      "appSlug": "metalhead",
+      "title": "Call transcripts",
+      "summary": "Transcripts with custom vocabulary and language hints; full transcript for higher levels",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "members",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/calls/transcribe.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/calls/speech.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/calls/keyterms.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "recorder/src/transcribe.ts",
+          "description": ""
+        }
+      ],
+      "position": 360
+    },
+    {
+      "slug": "call-summaries",
+      "appSlug": "metalhead",
+      "title": "Call summaries",
+      "summary": "AI summary, chapters and action items (with who suggested them); mark items done with evidence",
+      "body": null,
+      "audiences": [
+        "members",
+        "crews"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "members",
+      "toggleKey": null,
+      "liveUrl": "/calls",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/calls/summarize.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/calls/evidence.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/ui/calls",
+          "description": ""
+        }
+      ],
+      "position": 370
+    },
+    {
+      "slug": "call-archive",
+      "appSlug": "metalhead",
+      "title": "Call archive",
+      "summary": "Call history, recordings and published call pages with attendees",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "members",
+      "toggleKey": null,
+      "liveUrl": "/calls",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/calls",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/ui/calls",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/calls/recordings.ts",
+          "description": ""
+        }
+      ],
+      "position": 380
+    },
+    {
+      "slug": "call-recaps",
+      "appSlug": "metalhead",
+      "title": "Call recaps",
+      "summary": "Recap posted to Discord on publish, tagging the members it mentions",
+      "body": null,
+      "audiences": [
+        "members",
+        "crews"
+      ],
+      "tags": [
+        "discord"
+      ],
+      "status": "live",
+      "access": "public",
+      "toggleKey": "calls.recapPostEnabled",
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/calls/recap.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/calls/post-filters.ts",
+          "description": ""
+        }
+      ],
+      "position": 390
+    },
+    {
+      "slug": "live-call-view",
+      "appSlug": "metalhead",
+      "title": "Live call view",
+      "summary": "Live view of the running call: crew card, live action items, Q&A and polls",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/calls/live",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/calls/live",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/calls/live-view.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/calls/live-qa.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/polls",
+          "description": ""
+        }
+      ],
+      "position": 400
+    },
+    {
+      "slug": "live-action-items",
+      "appSlug": "metalhead",
+      "title": "Live action items",
+      "summary": "Action items captured during the call, spoken or typed (\"action: ...\")",
+      "body": null,
+      "audiences": [
+        "crews"
+      ],
+      "tags": [
+        "discord"
+      ],
+      "status": "live",
+      "access": "public",
+      "toggleKey": "calls.liveActionItemsEnabled",
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "recorder/src/live-items.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/calls/live-items.ts",
+          "description": ""
+        }
+      ],
+      "position": 410
+    },
+    {
+      "slug": "call-attendance",
+      "appSlug": "metalhead",
+      "title": "Call attendance",
+      "summary": "Attendance from recordings by minutes present, admin compare and fix-up, POAP claims, how-to-attend guide",
+      "body": null,
+      "audiences": [
+        "members",
+        "crews"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/calls/how-to-attend",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/attendance.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/calls/attendance-from-recordings.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/admin/calls/attendance",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/calls/how-to-attend",
+          "description": ""
+        }
+      ],
+      "position": 420
+    },
+    {
+      "slug": "pre-call-agenda",
+      "appSlug": "metalhead",
+      "title": "Pre call agenda",
+      "summary": "Metalhead posts each crew's agenda before its call",
+      "body": null,
+      "audiences": [
+        "crews"
+      ],
+      "tags": [
+        "discord"
+      ],
+      "status": "live",
+      "access": "public",
+      "toggleKey": "calls.agendaPostEnabled",
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/call-agenda",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/cron/call-agenda",
+          "description": ""
+        }
+      ],
+      "position": 430
+    },
+    {
+      "slug": "task-proposals",
+      "appSlug": "metalhead",
+      "title": "Task proposals",
+      "summary": "After a call, proposed crew task updates for leads to accept",
+      "body": null,
+      "audiences": [
+        "crews"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": "calls.taskProposalsEnabled",
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/call-tasks",
+          "description": ""
+        }
+      ],
+      "position": 440
+    },
+    {
+      "slug": "spoken-updates",
+      "appSlug": "metalhead",
+      "title": "Spoken updates",
+      "summary": "Metalhead reads crew updates aloud in the call; `/metalhead` controls (pause, skip, stop)",
+      "body": null,
+      "audiences": [
+        "crews"
+      ],
+      "tags": [
+        "discord"
+      ],
+      "status": "live",
+      "access": "public",
+      "toggleKey": "calls.updatesEnabled",
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/call-updates",
+          "description": ""
+        }
+      ],
+      "position": 450
+    },
+    {
+      "slug": "call-music",
+      "appSlug": "metalhead",
+      "title": "Call music",
+      "summary": "Welcome for late joiners, house band at call start, end-of-call song, \"play the song\" command (with Pizza Radio)",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [
+        "discord"
+      ],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "recorder/src/start-band.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "recorder/src/end-song.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "recorder/src/play-out.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/calls/play-out.ts",
+          "description": ""
+        }
+      ],
+      "position": 460
+    },
+    {
+      "slug": "progress-command",
+      "appSlug": "metalhead",
+      "title": "Progress command",
+      "summary": "`/progress`: a crew's progress report on demand",
+      "body": null,
+      "audiences": [
+        "crews"
+      ],
+      "tags": [
+        "discord"
+      ],
+      "status": "live",
+      "access": "public",
+      "toggleKey": "calls.progressReportEnabled",
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/calls/progress-report.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/calls/progress-command.ts",
+          "description": ""
+        }
+      ],
+      "position": 470
+    },
+    {
+      "slug": "followups",
+      "appSlug": "metalhead",
+      "title": "Follow-up DMs",
+      "summary": "Follow-up DMs drafted from calls, approval queue, sent via Discord or Telegram, replies inbox",
+      "body": null,
+      "audiences": [
+        "crews"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/followups/replies",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/followups",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/admin/followups",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/followups/replies",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/fu/[token]",
+          "description": ""
+        }
+      ],
+      "position": 480
+    },
+    {
+      "slug": "reminders",
+      "appSlug": "metalhead",
+      "title": "Reminders",
+      "summary": "Opt-in Discord DM reminders for calls and proposals",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": "reminders.callsEnabled",
+      "liveUrl": "/dashboard",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/reminders",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/reminder-prefs",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/cron/reminders",
+          "description": ""
+        }
+      ],
+      "position": 490
+    },
+    {
+      "slug": "x-call-import",
+      "appSlug": "metalhead",
+      "title": "Import past X broadcast calls",
+      "summary": "Import past X (Twitter) broadcast calls with speaker diarization",
+      "body": null,
+      "audiences": [
+        "ops"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "scripts/calls/x-import.mjs",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "scripts/calls/x-import",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/calls/import.ts",
+          "description": ""
+        }
+      ],
+      "position": 500
+    },
+    {
+      "slug": "call-slices",
+      "appSlug": "metalhead",
+      "title": "Call Slices",
+      "summary": "Non-transferable attendance NFTs on Base",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "off",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/slices",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/slices",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/slices",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/ui/slices",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "contracts/src/CallSlices.sol",
+          "description": ""
+        }
+      ],
+      "position": 510
+    },
+    {
+      "slug": "metalhead-qa",
+      "appSlug": "metalhead-qa",
+      "title": "Metalhead Q&A",
+      "summary": "Ask Metalhead questions about PizzaDAO and its crews (RAG over crew docs)",
+      "body": null,
+      "audiences": [
+        "members",
+        "builders"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "https://pizzadao-crew-qa.vercel.app",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-crew-qa",
+          "path": "src",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-crew-indexer",
+          "path": "src/indexer.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-crew-indexer",
+          "path": "src/chunk.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-crew-indexer",
+          "path": "src/embed.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-crew-indexer",
+          "path": "src/webcrawl.ts",
+          "description": ""
+        }
+      ],
+      "position": 520
+    },
+    {
+      "slug": "proposals-voting",
+      "appSlug": "pizzadao-org",
+      "title": "Proposals voting",
+      "summary": "Proposals with secret, changeable votes by Rare Pizzas Box holders; reminders; public history of past votes and payments",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "members",
+      "toggleKey": "proposals.enabled",
+      "liveUrl": "/proposals",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/proposals",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/vote/[pollId]",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/proposals",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/vote",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/voting-pubkey",
+          "description": ""
+        }
+      ],
+      "position": 530
+    },
+    {
+      "slug": "pep-economy",
+      "appSlug": "pizzadao-org",
+      "title": "$PEP economy",
+      "summary": "$PEP: balance, work, collect income (also on the website), pay, leaderboard, transaction history",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/pep",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/pep",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/economy.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/pep-earn",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/transactions.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/ui/economy",
+          "description": ""
+        }
+      ],
+      "position": 540
+    },
+    {
+      "slug": "jobs",
+      "appSlug": "pizzadao-org",
+      "title": "Jobs",
+      "summary": "Jobs board paid in $PEP, with post verification",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/pep",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/jobs.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/jobs-verify.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/ui/jobs",
+          "description": ""
+        }
+      ],
+      "position": 550
+    },
+    {
+      "slug": "shop",
+      "appSlug": "pizzadao-org",
+      "title": "Shop",
+      "summary": "Item shop and collectibles bought with $PEP",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/pep",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/shop.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/shop-grants.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/ui/shop",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/admin/shop",
+          "description": ""
+        }
+      ],
+      "position": 560
+    },
+    {
+      "slug": "pep-games",
+      "appSlug": "pizzadao-org",
+      "title": "$PEP casino games",
+      "summary": "Blackjack, roulette and slots in Discord",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [
+        "discord"
+      ],
+      "status": "live",
+      "access": "public",
+      "toggleKey": "games.enabled",
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/pep-games",
+          "description": ""
+        }
+      ],
+      "position": 570
+    },
+    {
+      "slug": "discord-commands",
+      "appSlug": "pizzadao-org",
+      "title": "Discord slash commands",
+      "summary": "Slash commands: /balance /work /pay /shop /missions /vouch /level /profile /progress /live /metalhead",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [
+        "discord"
+      ],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/discord/interactions",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/discord-interactions",
+          "description": ""
+        }
+      ],
+      "position": 580
+    },
+    {
+      "slug": "budget-guidelines",
+      "appSlug": "pizzadao-org",
+      "title": "Budget guidelines",
+      "summary": "Public spending and reimbursement guidelines (numbers come from settings)",
+      "body": null,
+      "audiences": [
+        "hosts"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/budget",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/budget",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/payments/policy.ts",
+          "description": ""
+        }
+      ],
+      "position": 590
+    },
+    {
+      "slug": "payment-requests",
+      "appSlug": "pizzadao-org",
+      "title": "Payment requests",
+      "summary": "Payment requests with a review queue, fraud checks and a fast lane",
+      "body": null,
+      "audiences": [
+        "members",
+        "ops"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": "payments.requestFormEnabled",
+      "liveUrl": "/payments",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/payments",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/payments",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/admin/payments",
+          "description": ""
+        }
+      ],
+      "position": 600
+    },
+    {
+      "slug": "tax-forms",
+      "appSlug": "pizzadao-org",
+      "title": "Online tax forms",
+      "summary": "Payees fill W-9 / W-8BEN / W-8BEN-E online",
+      "body": null,
+      "audiences": [
+        "hosts",
+        "partners"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/tax-form",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/tax-form",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "backend/src/services/taxFormPdf.service.ts",
+          "description": ""
+        }
+      ],
+      "position": 610
+    },
+    {
+      "slug": "articles",
+      "appSlug": "pizzadao-org",
+      "title": "Articles",
+      "summary": "Member articles with images, comments, reactions and a gallery view",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/articles",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/articles",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/articles.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/article-comments.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/article-reactions.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/ui/articles",
+          "description": ""
+        }
+      ],
+      "position": 620
+    },
+    {
+      "slug": "city-chats",
+      "appSlug": "pizzadao-org",
+      "title": "City chats",
+      "summary": "Directory of city Telegram groups and a nudge to join your nearest one",
+      "body": null,
+      "audiences": [
+        "members",
+        "hosts"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/chats",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/chats",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/chats.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/city-telegram",
+          "description": ""
+        }
+      ],
+      "position": 630
+    },
+    {
+      "slug": "telegram",
+      "appSlug": "pizzadao-org",
+      "title": "Telegram",
+      "summary": "Link Telegram from the bot, DMs and posts to city groups",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/telegram",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/telegram",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/ui/telegram",
+          "description": ""
+        }
+      ],
+      "position": 640
+    },
+    {
+      "slug": "support",
+      "appSlug": "pizzadao-org",
+      "title": "Support",
+      "summary": "Support tickets and a suggestion button on every page",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/support",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/support",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/support-tickets.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/ui/SuggestionModal.tsx",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/suggestions",
+          "description": ""
+        }
+      ],
+      "position": 650
+    },
+    {
+      "slug": "newsletter",
+      "appSlug": "pizzadao-org",
+      "title": "Newsletter",
+      "summary": "Newsletter consent with double opt-in, confirm and unsubscribe; member opt-in",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/newsletter",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/newsletter",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/(marketing)/newsletter",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/public/newsletter",
+          "description": ""
+        }
+      ],
+      "position": 660
+    },
+    {
+      "slug": "reengage-digest",
+      "appSlug": "pizzadao-org",
+      "title": "Reengage digest",
+      "summary": "Weekly opt-in digest email for quiet members",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [
+        "email"
+      ],
+      "status": "live",
+      "access": "public",
+      "toggleKey": "reengage.enabled",
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/reengage",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/cron/reengage",
+          "description": ""
+        }
+      ],
+      "position": 670
+    },
+    {
+      "slug": "reach-map",
+      "appSlug": "pizzadao-org",
+      "title": "Reach map",
+      "summary": "Public map of PizzaDAO reach with city and country levels",
+      "body": null,
+      "audiences": [
+        "members",
+        "partners"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/home",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/map-levels",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/api/public/map-levels",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/(marketing)/_site/components/Reach.tsx",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/admin/map-levels",
+          "description": ""
+        }
+      ],
+      "position": 680
+    },
+    {
+      "slug": "pizza-passport",
+      "appSlug": "pizzadao-org",
+      "title": "Pizza passport",
+      "summary": "Collect stamps at partner pizzerias by QR check-in",
+      "body": null,
+      "audiences": [
+        "members",
+        "partners"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": "passport.enabled",
+      "liveUrl": "/passport",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/passport",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/passport",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/ui/passport",
+          "description": ""
+        }
+      ],
+      "position": 690
+    },
+    {
+      "slug": "marketing-site",
+      "appSlug": "pizzadao-org",
+      "title": "Marketing site",
+      "summary": "About, partners, community, brand system and contact pages (in the app, noindex until the domain move); forms Off",
+      "body": null,
+      "audiences": [
+        "partners"
+      ],
+      "tags": [],
+      "status": "beta",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/about",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/(marketing)",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/marketing-site.ts",
+          "description": ""
+        }
+      ],
+      "position": 700
+    },
+    {
+      "slug": "rsvp-events",
+      "appSlug": "rsvpizza",
+      "title": "RSVP event pages",
+      "summary": "Create an event page with RSVPs, waitlist, password or share-to-unlock, add-to-calendar, custom URL",
+      "body": null,
+      "audiences": [
+        "hosts"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "https://www.rsv.pizza/new",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/pages/NewEventPage.tsx",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/pages/EventPage.tsx",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "backend/src/routes/party.routes.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "backend/src/routes/rsvp.routes.ts",
+          "description": ""
+        }
+      ],
+      "position": 710
+    },
+    {
+      "slug": "guest-preferences",
+      "appSlug": "rsvpizza",
+      "title": "Guest preferences",
+      "summary": "Guests give topping and dietary preferences; the host gets a pizza and drinks order recommendation",
+      "body": null,
+      "audiences": [
+        "hosts"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "algorithm.md",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/components/RSVPModal.tsx",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/components/PizzaSettings.tsx",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/components/BeverageSettings.tsx",
+          "description": ""
+        }
+      ],
+      "position": 720
+    },
+    {
+      "slug": "pizza-ordering",
+      "appSlug": "rsvpizza",
+      "title": "Pizza ordering",
+      "summary": "Find nearby pizzerias and order (online, email order, AI phone call); AI ordering via Open Pizza behind a flag",
+      "body": null,
+      "audiences": [
+        "hosts"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/components/PizzaOrderFlow.tsx",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/components/PizzeriaSearch.tsx",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "supabase/functions/ai-phone-order",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "supabase/functions/search-pizzerias",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "backend/src/services/pizzaMcp.client.ts",
+          "description": ""
+        }
+      ],
+      "position": 730
+    },
+    {
+      "slug": "host-dashboard",
+      "appSlug": "rsvpizza",
+      "title": "Host dashboard",
+      "summary": "Host dashboard: guest list, invites and CSV import, co-hosts, checklist, staffing, music/DJ, displays, raffle, party kit, venue, budget",
+      "body": null,
+      "audiences": [
+        "hosts"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/pages/HostPage.tsx",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/components/checklist",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/components/staffing",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/components/music",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/components/raffle",
+          "description": ""
+        }
+      ],
+      "position": 740
+    },
+    {
+      "slug": "flyers",
+      "appSlug": "rsvpizza",
+      "title": "Flyers",
+      "summary": "Generated event and partner flyers, graphics dashboard, social post composer",
+      "body": null,
+      "audiences": [
+        "hosts"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/graphics",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/components/flyer",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/pages/GraphicsDashboard.tsx",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/pages/PostComposerPage.tsx",
+          "description": ""
+        }
+      ],
+      "position": 750
+    },
+    {
+      "slug": "check-in",
+      "appSlug": "rsvpizza",
+      "title": "Check in",
+      "summary": "QR check-in and scanner, peer vouching, guest scorecard game, attendance fraud checks",
+      "body": null,
+      "audiences": [
+        "hosts"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/checkin",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/components/CheckInScanner.tsx",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/components/scorecard",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "backend/src/routes/checkin.routes.ts",
+          "description": ""
+        }
+      ],
+      "position": 760
+    },
+    {
+      "slug": "donations",
+      "appSlug": "rsvpizza",
+      "title": "Donations",
+      "summary": "Event donations in fiat or crypto, donor highlights",
+      "body": null,
+      "audiences": [
+        "hosts"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/components/DonationForm.tsx",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/components/CryptoDonationWidget.tsx",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "backend/src/routes/donation.routes.ts",
+          "description": ""
+        }
+      ],
+      "position": 770
+    },
+    {
+      "slug": "rsvp-nft",
+      "appSlug": "rsvpizza",
+      "title": "RSVP NFTs",
+      "summary": "Optional NFT for guests (Base, Monad), embedded wallets for guests",
+      "body": null,
+      "audiences": [
+        "hosts",
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "contracts/RSVPizzaNFT.sol",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "supabase/functions/mint-nft",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "backend/src/routes/nft.routes.ts",
+          "description": ""
+        }
+      ],
+      "position": 780
+    },
+    {
+      "slug": "photos",
+      "appSlug": "rsvpizza",
+      "title": "Photos",
+      "summary": "Event photo uploads, public photo feed and slideshow, voting",
+      "body": null,
+      "audiences": [
+        "hosts",
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/photos",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/pages/PhotosFeedPage.tsx",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/components/photos",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "backend/src/routes/photo.routes.ts",
+          "description": ""
+        }
+      ],
+      "position": 790
+    },
+    {
+      "slug": "surveys",
+      "appSlug": "rsvpizza",
+      "title": "Surveys",
+      "summary": "Post-event guest survey and host survey",
+      "body": null,
+      "audiences": [
+        "hosts"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/pages/SurveyPage.tsx",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "backend/src/routes/survey.routes.ts",
+          "description": ""
+        }
+      ],
+      "position": 800
+    },
+    {
+      "slug": "gpp",
+      "appSlug": "rsvpizza",
+      "title": "Global Pizza Party",
+      "summary": "Global Pizza Party: city sign-up with host agreement and budget, events map, pizzerias map, leaderboard, event search",
+      "body": null,
+      "audiences": [
+        "hosts",
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/gpp",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/pages/GPPLandingPage.tsx",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/pages/GPP27CreatePage.tsx",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/pages/EventsMapPage.tsx",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "backend/src/routes/gpp27.routes.ts",
+          "description": ""
+        }
+      ],
+      "position": 810
+    },
+    {
+      "slug": "reimbursements",
+      "appSlug": "rsvpizza",
+      "title": "Reimbursements",
+      "summary": "Receipt upload with OCR, payouts in USDC on Base or wire, regional payment portals, fraud flags, host fast pass",
+      "body": null,
+      "audiences": [
+        "hosts",
+        "ops"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/payments",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/pages/PaymentsAdminPage.tsx",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/components/payouts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "backend/src/routes/payout.routes.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "backend/src/services/ocr.service.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "backend/src/services/hostFastPass.service.ts",
+          "description": ""
+        }
+      ],
+      "position": 820
+    },
+    {
+      "slug": "underboss-dashboard",
+      "appSlug": "rsvpizza",
+      "title": "Underboss dashboard",
+      "summary": "Regional lead dashboard: approve events, filters, surveys, outreach, Telegram coverage",
+      "body": null,
+      "audiences": [
+        "crews",
+        "ops"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "admin",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/pages/UnderbossDashboard.tsx",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "backend/src/routes/underboss.routes.ts",
+          "description": ""
+        }
+      ],
+      "position": 830
+    },
+    {
+      "slug": "sponsors",
+      "appSlug": "rsvpizza",
+      "title": "Sponsors",
+      "summary": "Partner pipeline, sponsor dashboard, intake forms, one-sheet, MOU, invoices with payment portal and bank reconciliation, partner reports",
+      "body": null,
+      "audiences": [
+        "partners"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/partners",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/components/sponsors",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/pages/InvoicePage.tsx",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/pages/MouPage.tsx",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "backend/src/routes/invoice.routes.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "backend/src/services/mercury.service.ts",
+          "description": ""
+        }
+      ],
+      "position": 840
+    },
+    {
+      "slug": "telegram-city-groups",
+      "appSlug": "rsvpizza",
+      "title": "Telegram city groups",
+      "summary": "Molto Benny broadcasts to city groups, host DM submissions (receipts, photos), reminders, a send proxy for the member app",
+      "body": null,
+      "audiences": [
+        "hosts",
+        "crews"
+      ],
+      "tags": [
+        "telegram"
+      ],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "backend/src/routes/telegram.routes.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "backend/src/routes/telegram-inbound.routes.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "backend/src/routes/service-telegram.routes.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "backend/src/services/telegramSend.ts",
+          "description": ""
+        }
+      ],
+      "position": 850
+    },
+    {
+      "slug": "pizza-price-index",
+      "appSlug": "rsvpizza",
+      "title": "Pizza Price Index",
+      "summary": "Pizza Price Index: public map of pizza prices by country from party receipts, past years, public submissions",
+      "body": null,
+      "audiences": [
+        "partners",
+        "members",
+        "builders"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/pizza-index",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/pages/PizzaIndexPage.tsx",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "backend/src/services/pizzaIndex.service.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "backend/src/routes/pizza-index.routes.ts",
+          "description": ""
+        }
+      ],
+      "position": 860
+    },
+    {
+      "slug": "event-assistant",
+      "appSlug": "rsvpizza",
+      "title": "Event assistant",
+      "summary": "Ask questions about events in natural language",
+      "body": null,
+      "audiences": [
+        "hosts",
+        "ops"
+      ],
+      "tags": [],
+      "status": "beta",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "backend/src/services/eventAssistant.service.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/components/EventAssistant.tsx",
+          "description": ""
+        }
+      ],
+      "position": 870
+    },
+    {
+      "slug": "white-label",
+      "appSlug": "rsvpizza",
+      "title": "White label",
+      "summary": "Branded event sites for partners on their own subdomain, event series with landing pages",
+      "body": null,
+      "audiences": [
+        "partners"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/pages/SeriesLandingPage.tsx",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "docs/whitelabel-deploy.md",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "backend/src/routes/series.routes.ts",
+          "description": ""
+        }
+      ],
+      "position": 880
+    },
+    {
+      "slug": "shipping",
+      "appSlug": "rsvpizza",
+      "title": "Shipping",
+      "summary": "Party-kit shipping dashboard",
+      "body": null,
+      "audiences": [
+        "ops"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "admin",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/pages/ShippingDashboard.tsx",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "backend/src/routes/shipping.routes.ts",
+          "description": ""
+        }
+      ],
+      "position": 890
+    },
+    {
+      "slug": "side-events",
+      "appSlug": "rsvpizza",
+      "title": "Side events",
+      "summary": "Conference side events",
+      "body": null,
+      "audiences": [
+        "hosts"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/side",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "frontend/src/pages/SideCreatePage.tsx",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "backend/src/routes/side.routes.ts",
+          "description": ""
+        }
+      ],
+      "position": 900
+    },
+    {
+      "slug": "rsvp-api",
+      "appSlug": "rsvpizza",
+      "title": "RSVP REST API",
+      "summary": "REST API v1 for parties, guests and webhooks with API keys",
+      "body": null,
+      "audiences": [
+        "builders"
+      ],
+      "tags": [
+        "reusable"
+      ],
+      "status": "beta",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "backend/src/routes/v1",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "backend/src/swagger.ts",
+          "description": ""
+        }
+      ],
+      "position": 910
+    },
+    {
+      "slug": "sizzle-reels",
+      "appSlug": "rsvpizza",
+      "title": "Sizzle reels",
+      "summary": "On-demand highlight reels for hosts",
+      "body": null,
+      "audiences": [
+        "hosts"
+      ],
+      "tags": [],
+      "status": "off",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "/",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "reel-worker",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rsv-pizza",
+          "path": "backend/src/routes/reel.routes.ts",
+          "description": ""
+        }
+      ],
+      "position": 920
+    },
+    {
+      "slug": "rare-pizzas-mint",
+      "appSlug": "rare-pizzas",
+      "title": "Rare Pizzas mint and redeem",
+      "summary": "Buy a Rare Pizzas Box and redeem it for a pizza by recipe; check if a box was redeemed",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "https://rarepizzas.com",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/rare-pizzas",
+          "path": "src/app/mint",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rare-pizzas",
+          "path": "src/lib/box-redemption.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rare-pizzas",
+          "path": "src/lib/contracts.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizza-smartcontract",
+          "path": "",
+          "description": ""
+        }
+      ],
+      "position": 930
+    },
+    {
+      "slug": "rare-pizzas-toppings",
+      "appSlug": "rare-pizzas",
+      "title": "Rare Pizzas toppings",
+      "summary": "Browse 314 artist toppings by class and rarity; topping pages with every pizza that has it",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "https://rarepizzas.com/toppings",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/rare-pizzas",
+          "path": "src/app/toppings",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rare-pizzas",
+          "path": "src/app/topping/[sku]",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rare-pizzas",
+          "path": "src/lib/toppings.ts",
+          "description": ""
+        }
+      ],
+      "position": 940
+    },
+    {
+      "slug": "rare-pizzas-collection",
+      "appSlug": "rare-pizzas",
+      "title": "Rare Pizzas collection",
+      "summary": "Your boxes, pizzas and toppings; share your collection; send NFTs; favorites",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "https://rarepizzas.com/my-toppings",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/rare-pizzas",
+          "path": "src/app/my-toppings",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rare-pizzas",
+          "path": "src/app/collection/[address]",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rare-pizzas",
+          "path": "src/lib/share.ts",
+          "description": ""
+        }
+      ],
+      "position": 950
+    },
+    {
+      "slug": "rare-pizzas-marketplace",
+      "appSlug": "rare-pizzas",
+      "title": "Rare Pizzas marketplace",
+      "summary": "Marketplace: OpenSea listings plus on-site Seaport listings and offers, floor prices",
+      "body": null,
+      "audiences": [
+        "members",
+        "builders"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "https://rarepizzas.com/marketplace",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/rare-pizzas",
+          "path": "src/app/marketplace",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rare-pizzas",
+          "path": "src/lib/seaport.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rare-pizzas",
+          "path": "src/lib/opensea-api.ts",
+          "description": ""
+        }
+      ],
+      "position": 960
+    },
+    {
+      "slug": "rare-pizzas-leaderboard",
+      "appSlug": "rare-pizzas",
+      "title": "Rare Pizzas leaderboard",
+      "summary": "Collector leaderboard with ENS names; pizza tweet composer",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "https://rarepizzas.com/leaderboard",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/rare-pizzas",
+          "path": "src/app/leaderboard",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rare-pizzas",
+          "path": "src/app/compose",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rare-pizzas",
+          "path": "src/lib/leaderboard-ingestion.ts",
+          "description": ""
+        }
+      ],
+      "position": 970
+    },
+    {
+      "slug": "mixtape",
+      "appSlug": "mixtape",
+      "title": "Mixtape",
+      "summary": "Buy mixtape NFTs in USDC on Base, stream, track listening time, leaderboard, artist pages",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "https://pizzadao.github.io/mixtape/",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/mixtape",
+          "path": "app/player",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/mixtape",
+          "path": "app/leaderboard",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/mixtape",
+          "path": "app/artists",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/mixtape",
+          "path": "contracts/PizzaMixtapeNFT.sol",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/mixtape",
+          "path": "hooks/useMixtapePurchase.ts",
+          "description": ""
+        }
+      ],
+      "position": 980
+    },
+    {
+      "slug": "proof-of-pizza",
+      "appSlug": "proof-of-pizza",
+      "title": "Proof of Pizza",
+      "summary": "Submit a pizza receipt photo, AI reads it, admins approve and pay back in USDC on Base",
+      "body": null,
+      "audiences": [
+        "hosts",
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "https://proofof.pizza",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/proof-of-pizza",
+          "path": "src/components/SubmissionForm.tsx",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/proof-of-pizza",
+          "path": "src/app/api/analyze-receipt",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/proof-of-pizza",
+          "path": "src/components/SubmissionQueue.tsx",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/proof-of-pizza",
+          "path": "src/lib/server-wallet.ts",
+          "description": ""
+        }
+      ],
+      "position": 990
+    },
+    {
+      "slug": "zaave",
+      "appSlug": "zaave",
+      "title": "Zaave",
+      "summary": "Supply USDC to Aave on Base and see the interest as pizzas; no contract, no fee",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "https://zaave.vercel.app",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/zaave",
+          "path": "app",
+          "description": ""
+        }
+      ],
+      "position": 1000
+    },
+    {
+      "slug": "open-pizza-pos",
+      "appSlug": "open-pizza",
+      "title": "Open Pizza point of sale",
+      "summary": "Pizzeria point of sale: counter terminal (offline PWA), kitchen display, back office, online ordering",
+      "body": null,
+      "audiences": [
+        "partners"
+      ],
+      "tags": [],
+      "status": "beta",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "https://pos-pizza-dao.vercel.app",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pos",
+          "path": "src/app/(terminal)",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pos",
+          "path": "src/app/(kitchen)",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pos",
+          "path": "src/app/(admin)",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pos",
+          "path": "src/app/(shop)",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pos",
+          "path": "PLAN.md",
+          "description": ""
+        }
+      ],
+      "position": 1010
+    },
+    {
+      "slug": "open-pizza-modules",
+      "appSlug": "open-pizza",
+      "title": "Open Pizza modules",
+      "summary": "Open Pizza stack for pizzerias: shared core API, AI ordering (MCP), kiosk, delivery, guest CRM and loyalty, catering, websites, menu boards, back of house...",
+      "body": "Open Pizza stack for pizzerias: shared core API, AI ordering (MCP), kiosk, delivery, guest CRM and loyalty, catering, websites, menu boards, back of house, workforce",
+      "audiences": [
+        "partners",
+        "builders"
+      ],
+      "tags": [],
+      "status": "private",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/core",
+          "private": true
+        },
+        {
+          "repo": "PizzaDAO/pizza-mcp",
+          "private": true
+        },
+        {
+          "repo": "PizzaDAO/kiosk",
+          "private": true
+        },
+        {
+          "repo": "PizzaDAO/driver",
+          "private": true
+        },
+        {
+          "repo": "PizzaDAO/guests",
+          "private": true
+        },
+        {
+          "repo": "PizzaDAO/catering",
+          "private": true
+        },
+        {
+          "repo": "PizzaDAO/sites",
+          "private": true
+        },
+        {
+          "repo": "PizzaDAO/boards",
+          "private": true
+        },
+        {
+          "repo": "PizzaDAO/backofhouse",
+          "private": true
+        },
+        {
+          "repo": "PizzaDAO/workforce",
+          "private": true
+        }
+      ],
+      "position": 1020
+    },
+    {
+      "slug": "pizza-content",
+      "appSlug": "pizza-content",
+      "title": "Pizza content",
+      "summary": "Library of pizza GIFs, memes, videos, music and art with submissions and requests",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "https://pizza-content.vercel.app",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizza-content",
+          "path": "src/app",
+          "description": ""
+        }
+      ],
+      "position": 1030
+    },
+    {
+      "slug": "gpp-photo-archive",
+      "appSlug": "gpp-photo-archive",
+      "title": "GPP photo archive",
+      "summary": "Global Pizza Party photo archive",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "https://dow-pizza-party.vercel.app",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/gpp-pics",
+          "path": "src",
+          "description": ""
+        }
+      ],
+      "position": 1040
+    },
+    {
+      "slug": "pizza-personality",
+      "appSlug": "pizza-personality",
+      "title": "Pizza personality",
+      "summary": "\"Pizza personality\" quiz",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "https://project-pizza-dao.vercel.app",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizza-personality",
+          "path": "",
+          "description": ""
+        }
+      ],
+      "position": 1050
+    },
+    {
+      "slug": "proposal-guide",
+      "appSlug": "proposal-guide",
+      "title": "Proposal guide",
+      "summary": "Interactive guide to writing a proposal",
+      "body": null,
+      "audiences": [
+        "members"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "https://propose.pizzadao.xyz",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/proposalguide",
+          "path": "",
+          "description": ""
+        }
+      ],
+      "position": 1060
+    },
+    {
+      "slug": "brand-kit",
+      "appSlug": "brand-kit",
+      "title": "Brand kit",
+      "summary": "Logos, assets and style guide",
+      "body": null,
+      "audiences": [
+        "members",
+        "partners",
+        "builders"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "https://pizzadao.xyz/brand",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-brand-kit",
+          "path": "app",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-brand-kit",
+          "path": "public",
+          "description": ""
+        }
+      ],
+      "position": 1070
+    },
+    {
+      "slug": "pizza-chef",
+      "appSlug": "games",
+      "title": "Pizza Chef",
+      "summary": "Pizza Chef, a small PizzaDAO game.",
+      "audiences": [
+        "members"
+      ],
+      "tags": [
+        "game"
+      ],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "https://pizza-chef-six.vercel.app",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizza-chef",
+          "path": "",
+          "description": ""
+        }
+      ],
+      "position": 1080,
+      "body": null
+    },
+    {
+      "slug": "agarpizza",
+      "appSlug": "games",
+      "title": "Agar Pizza",
+      "summary": "Agar Pizza, a small PizzaDAO game.",
+      "audiences": [
+        "members"
+      ],
+      "tags": [
+        "game"
+      ],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "https://agarpizza.vercel.app",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/agarpizza",
+          "path": "",
+          "description": ""
+        }
+      ],
+      "position": 1090,
+      "body": null
+    },
+    {
+      "slug": "pizza-party-simulator",
+      "appSlug": "games",
+      "title": "Pizza Party Simulator",
+      "summary": "Pizza Party Simulator, a small PizzaDAO game.",
+      "audiences": [
+        "members"
+      ],
+      "tags": [
+        "game"
+      ],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "https://pizza-party-simulator.vercel.app",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizza-party-simulator",
+          "path": "",
+          "description": ""
+        }
+      ],
+      "position": 1100,
+      "body": null
+    },
+    {
+      "slug": "picky-pizza",
+      "appSlug": "games",
+      "title": "Picky Pizza",
+      "summary": "Picky Pizza, a small PizzaDAO game.",
+      "audiences": [
+        "members"
+      ],
+      "tags": [
+        "game"
+      ],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "https://pizzadao.github.io/picky_pizza",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/picky_pizza",
+          "path": "",
+          "description": ""
+        }
+      ],
+      "position": 1110,
+      "body": null
+    },
+    {
+      "slug": "molto-benny-delivery",
+      "appSlug": "games",
+      "title": "Molto Benny Delivery",
+      "summary": "Molto Benny Delivery, a small PizzaDAO game.",
+      "audiences": [
+        "members"
+      ],
+      "tags": [
+        "game"
+      ],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "https://pizzadao.github.io/moltobennydelivery",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/moltobennydelivery",
+          "path": "",
+          "description": ""
+        }
+      ],
+      "position": 1120,
+      "body": null
+    },
+    {
+      "slug": "bitcoin-pizza-blastoff",
+      "appSlug": "games",
+      "title": "Bitcoin Pizza Blastoff",
+      "summary": "Bitcoin Pizza Blastoff, a small PizzaDAO game.",
+      "audiences": [
+        "members"
+      ],
+      "tags": [
+        "game"
+      ],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/Bitcoin-Pizza_Blastoff",
+          "path": "",
+          "description": ""
+        }
+      ],
+      "position": 1130,
+      "body": null
+    },
+    {
+      "slug": "pizza-faucet",
+      "appSlug": "games",
+      "title": "Pizza Faucet",
+      "summary": "Pizza Faucet, a small PizzaDAO game.",
+      "audiences": [
+        "members"
+      ],
+      "tags": [
+        "game"
+      ],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": "https://pizzafaucet.xyz",
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/mealticket-pizzafaucet",
+          "path": "",
+          "description": ""
+        }
+      ],
+      "position": 1140,
+      "body": null
+    },
+    {
+      "slug": "admin-settings",
+      "appSlug": "pizzadao-org",
+      "title": "Admin settings",
+      "summary": "DB-driven switches, channels, roles and tunables with safe defaults and env kill switches",
+      "body": null,
+      "audiences": [
+        "ops",
+        "builders"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "admin",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/admin/settings",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/settings",
+          "description": ""
+        }
+      ],
+      "position": 1150
+    },
+    {
+      "slug": "sheets-to-db",
+      "appSlug": "pizzadao-org",
+      "title": "Sheets to database import",
+      "summary": "Import framework that moved members, crews, tasks and rosters from Google Sheets into the database",
+      "body": null,
+      "audiences": [
+        "ops",
+        "builders"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "admin",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/sheets-import",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/admin/sheets",
+          "description": ""
+        }
+      ],
+      "position": 1160
+    },
+    {
+      "slug": "member-merge",
+      "appSlug": "pizzadao-org",
+      "title": "Member merge",
+      "summary": "Merge duplicate members (dry run first, reversible)",
+      "body": null,
+      "audiences": [
+        "ops"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "admin",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/members/merge.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/admin/members/merge",
+          "description": ""
+        }
+      ],
+      "position": 1170
+    },
+    {
+      "slug": "activation",
+      "appSlug": "pizzadao-org",
+      "title": "Activation",
+      "summary": "Member activation handoff board",
+      "body": null,
+      "audiences": [
+        "ops",
+        "crews"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "admin",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/admin/activation",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/activation.ts",
+          "description": ""
+        }
+      ],
+      "position": 1180
+    },
+    {
+      "slug": "roster-audit",
+      "appSlug": "pizzadao-org",
+      "title": "Roster audit",
+      "summary": "Crew roster audit against Discord",
+      "body": null,
+      "audiences": [
+        "ops"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "admin",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/roster-audit.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/admin/roster-audit",
+          "description": ""
+        }
+      ],
+      "position": 1190
+    },
+    {
+      "slug": "call-admin",
+      "appSlug": "pizzadao-org",
+      "title": "Call admin",
+      "summary": "Review, hide lines, re-transcribe and publish calls",
+      "body": null,
+      "audiences": [
+        "ops"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "admin",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/admin/calls",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/calls/retranscribe.ts",
+          "description": ""
+        }
+      ],
+      "position": 1200
+    },
+    {
+      "slug": "telegram-admin",
+      "appSlug": "pizzadao-org",
+      "title": "Telegram admin",
+      "summary": "Telegram link and group status",
+      "body": null,
+      "audiences": [
+        "ops"
+      ],
+      "tags": [],
+      "status": "live",
+      "access": "admin",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/admin/telegram",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/telegram/admin.ts",
+          "description": ""
+        }
+      ],
+      "position": 1210
+    },
+    {
+      "slug": "discord-recorder",
+      "appSlug": "metalhead",
+      "title": "Discord voice recorder",
+      "summary": "Discord voice recorder with per-speaker tracks and DAVE support.",
+      "body": null,
+      "audiences": [
+        "builders"
+      ],
+      "tags": [
+        "reusable"
+      ],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "recorder",
+          "description": ""
+        }
+      ],
+      "position": 1220
+    },
+    {
+      "slug": "discord-interactions",
+      "appSlug": "pizzadao-org",
+      "title": "Discord interactions handler",
+      "summary": "Slash-command handler on Next.js route handlers, no gateway bot.",
+      "body": null,
+      "audiences": [
+        "builders"
+      ],
+      "tags": [
+        "reusable"
+      ],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/discord-interactions",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/discord-rest.ts",
+          "description": ""
+        }
+      ],
+      "position": 1230
+    },
+    {
+      "slug": "settings-registry",
+      "appSlug": "pizzadao-org",
+      "title": "Typed settings registry",
+      "summary": "Typed settings registry with env kill switches and preview-safe toggles.",
+      "body": null,
+      "audiences": [
+        "builders"
+      ],
+      "tags": [
+        "reusable"
+      ],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/settings",
+          "description": ""
+        }
+      ],
+      "position": 1240
+    },
+    {
+      "slug": "secret-ballot",
+      "appSlug": "pizzadao-org",
+      "title": "Secret ballot voting",
+      "summary": "Secret, changeable token-holder voting.",
+      "body": null,
+      "audiences": [
+        "builders"
+      ],
+      "tags": [
+        "reusable"
+      ],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/proposals",
+          "description": ""
+        }
+      ],
+      "position": 1250
+    },
+    {
+      "slug": "sheets-gviz",
+      "appSlug": "pizzadao-org",
+      "title": "Google Sheets GViz parser",
+      "summary": "Google Sheets GViz parser that handles Tables headers.",
+      "body": null,
+      "audiences": [
+        "builders"
+      ],
+      "tags": [
+        "reusable"
+      ],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/lib/gviz-parser.ts",
+          "description": ""
+        }
+      ],
+      "position": 1260
+    },
+    {
+      "slug": "editorial-ui",
+      "appSlug": "pizzadao-org",
+      "title": "Editorial page primitives",
+      "summary": "Editorial page primitives for Next.js pages.",
+      "body": null,
+      "audiences": [
+        "builders"
+      ],
+      "tags": [
+        "reusable"
+      ],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "app/ui/shared/Editorial.tsx",
+          "description": ""
+        }
+      ],
+      "position": 1270
+    },
+    {
+      "slug": "attendance-nft",
+      "appSlug": "pizzadao-org",
+      "title": "Attendance NFT contract",
+      "summary": "Non-transferable attendance NFT contract (Foundry).",
+      "body": null,
+      "audiences": [
+        "builders"
+      ],
+      "tags": [
+        "reusable"
+      ],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-org",
+          "path": "contracts/src/CallSlices.sol",
+          "description": ""
+        }
+      ],
+      "position": 1280
+    },
+    {
+      "slug": "pizza-radio-bot",
+      "appSlug": "pizza-radio",
+      "title": "Discord music bot",
+      "summary": "Discord music bot with an HTTP control API.",
+      "body": null,
+      "audiences": [
+        "builders"
+      ],
+      "tags": [
+        "reusable"
+      ],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizza-radio",
+          "path": "src",
+          "description": ""
+        }
+      ],
+      "position": 1290
+    },
+    {
+      "slug": "metalhead-rag",
+      "appSlug": "metalhead-qa",
+      "title": "Docs crawl, embed and answer",
+      "summary": "Crawl, chunk, embed and answer over community docs.",
+      "body": null,
+      "audiences": [
+        "builders"
+      ],
+      "tags": [
+        "reusable"
+      ],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizzadao-crew-indexer",
+          "path": "src",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizzadao-crew-qa",
+          "path": "src",
+          "description": ""
+        }
+      ],
+      "position": 1300
+    },
+    {
+      "slug": "call-announcer",
+      "appSlug": "google-apps-scripts",
+      "title": "Crew call announcer",
+      "summary": "Apps Script that announces crew calls to Discord and X from Sheets.",
+      "body": null,
+      "audiences": [
+        "builders"
+      ],
+      "tags": [
+        "reusable"
+      ],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/google-apps-scripts",
+          "path": "SecretService",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/google-apps-scripts",
+          "path": "ThinClient",
+          "description": ""
+        }
+      ],
+      "position": 1310
+    },
+    {
+      "slug": "seaport-market",
+      "appSlug": "rare-pizzas",
+      "title": "Seaport listings and offers",
+      "summary": "Seaport listings and offers for an NFT collection.",
+      "body": null,
+      "audiences": [
+        "builders"
+      ],
+      "tags": [
+        "reusable"
+      ],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/rare-pizzas",
+          "path": "src/lib/seaport.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/rare-pizzas",
+          "path": "src/app/marketplace",
+          "description": ""
+        }
+      ],
+      "position": 1320
+    },
+    {
+      "slug": "usdc-reimburse",
+      "appSlug": "proof-of-pizza",
+      "title": "USDC reimbursements",
+      "summary": "Receipt OCR plus server-wallet USDC payouts on Base.",
+      "body": null,
+      "audiences": [
+        "builders"
+      ],
+      "tags": [
+        "reusable"
+      ],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/proof-of-pizza",
+          "path": "src/lib/server-wallet.ts",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/proof-of-pizza",
+          "path": "src/app/api/analyze-receipt",
+          "description": ""
+        }
+      ],
+      "position": 1330
+    },
+    {
+      "slug": "pizza-generator",
+      "appSlug": "pizza-generator",
+      "title": "Generative pizza art tools",
+      "summary": "Generative pizza art and recipe tools.",
+      "body": null,
+      "audiences": [
+        "builders"
+      ],
+      "tags": [
+        "reusable"
+      ],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizza-oven-js",
+          "path": "",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizza-oven-py",
+          "path": "",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizza-assets",
+          "path": "",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizza-box-assets-js",
+          "path": "",
+          "description": ""
+        },
+        {
+          "repo": "PizzaDAO/pizza-recipes-pipeline",
+          "path": "",
+          "description": ""
+        }
+      ],
+      "position": 1340
+    },
+    {
+      "slug": "rare-pizzas-contracts",
+      "appSlug": "rare-pizzas-contracts",
+      "title": "Rare Pizzas contracts",
+      "summary": "Rare Pizzas smart contracts.",
+      "body": null,
+      "audiences": [
+        "builders"
+      ],
+      "tags": [
+        "reusable"
+      ],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pizza-smartcontract",
+          "path": "",
+          "description": ""
+        }
+      ],
+      "position": 1350
+    },
+    {
+      "slug": "pos-saas",
+      "appSlug": "open-pizza",
+      "title": "Multi-tenant pizzeria POS",
+      "summary": "Multi-tenant pizzeria POS on Supabase RLS.",
+      "body": null,
+      "audiences": [
+        "builders"
+      ],
+      "tags": [
+        "reusable"
+      ],
+      "status": "live",
+      "access": "public",
+      "toggleKey": null,
+      "liveUrl": null,
+      "docsUrl": null,
+      "code": [
+        {
+          "repo": "PizzaDAO/pos",
+          "path": "",
+          "description": ""
+        }
+      ],
+      "position": 1360
+    }
+  ]
+}

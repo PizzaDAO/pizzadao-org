@@ -267,6 +267,13 @@ describe('settings registry', () => {
       ['newsletter.fromName', ''],
       ['newsletter.fromAddress', ''],
       ['newsletter.replyTo', ''],
+      ['features.publicEnabled', false],
+      ['features.exportEnabled', false],
+      ['features.navLinkEnabled', false],
+      ['features.showOps', false],
+      ['features.introText', ''],
+      ['features.contributeUrl', ''],
+      ['features.githubCacheMinutes', 60],
     ])
   })
 
