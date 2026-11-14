@@ -25,4 +25,11 @@ describe('createPrivateThread', () => {
     const f = vi.fn().mockResolvedValueOnce(res(200, { id: '555555' })).mockResolvedValue(res(404))
     expect(await createPrivateThread(input, { fetchImpl: f as unknown as typeof fetch, botToken: 't' })).toEqual({ ok: false, reason: 'add_member_http_404', threadId: '555555' })
   })
+  it('reuses an existing thread: no create call, members added, intro posted', async () => {
+    const f = vi.fn().mockResolvedValue(res(204))
+    const r = await createPrivateThread({ ...input, existingThreadId: '555555' }, { fetchImpl: f as unknown as typeof fetch, botToken: 't' })
+    expect(r).toEqual({ ok: true, threadId: '555555' })
+    expect(f.mock.calls.map((c) => c[1].method)).toEqual(['PUT', 'PUT', 'POST'])
+    expect(f.mock.calls[0][0]).toBe('https://discord.com/api/v10/channels/555555/thread-members/1')
+  })
 })

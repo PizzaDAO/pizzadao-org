@@ -45,12 +45,16 @@ export async function saveOwnProfile(discordId: string, input: ProfileInput): Pr
   if (!isSnowflake(discordId)) return { ok: false, reason: 'bad_input' }
   const cfg = await buddySettings()
   const existing = await prisma.buddyProfile.findUnique({ where: { discordId } })
+  // An admin removal sticks: the member cannot opt back in until an admin re-adds them.
+  if (existing?.removedAt) return { ok: false, reason: 'not_eligible' }
+  // No row is created unless the member is opting in (and, below, passes the level gate).
+  if (!existing && input.active !== true) return { ok: false, reason: 'bad_input' }
   if (input.active === true && !existing?.active) {
     const exempt = !!existing?.addedBy
     if (!exempt && !isBuddyEligible(await getCurrentLevel(discordId), cfg.minLevel)) return { ok: false, reason: 'not_eligible' }
   }
   const languages = (input.languages ?? existing?.languages ?? []).map((l) => l.trim().slice(0, 40)).filter(Boolean).slice(0, 8)
-  const maxActive = buddyCapacity(input.maxActive ?? existing?.maxActive ?? 1, cfg.cap)
+  const maxActive = buddyCapacity(input.maxActive ?? existing?.maxActive ?? cfg.cap, cfg.cap)
   const memberId = existing?.memberId ?? (await fetchMemberIdByDiscordId(discordId).catch(() => null))
   const data = {
     memberId,
@@ -68,7 +72,7 @@ export async function adminAddBuddy(discordId: string, actor: string): Promise<{
   if (!isSnowflake(discordId)) return { ok: false, reason: 'bad_input' }
   const cfg = await buddySettings()
   const memberId = await fetchMemberIdByDiscordId(discordId).catch(() => null)
-  const data = { memberId, active: true, paused: false, addedBy: actor }
+  const data = { memberId, active: true, paused: false, addedBy: actor, removedAt: null }
   await prisma.buddyProfile.upsert({
     where: { discordId },
     create: { discordId, maxActive: buddyCapacity(cfg.cap, cfg.cap), ...data },
@@ -77,9 +81,12 @@ export async function adminAddBuddy(discordId: string, actor: string): Promise<{
   return { ok: true }
 }
 
-/** Admin: stop someone being offered as a buddy. Their current pairs are left alone (end them separately). */
+/**
+ * Admin: stop someone being offered as a buddy. Their current pairs are left alone (end them separately).
+ * The removal sticks: addedBy is cleared and removedAt set, so the member cannot opt back in (an admin can re-add).
+ */
 export async function adminRemoveBuddy(discordId: string): Promise<{ ok: boolean }> {
-  const r = await prisma.buddyProfile.updateMany({ where: { discordId }, data: { active: false } })
+  const r = await prisma.buddyProfile.updateMany({ where: { discordId }, data: { active: false, addedBy: null, removedAt: new Date() } })
   return { ok: r.count > 0 }
 }
 
@@ -166,13 +173,42 @@ export async function completeIfDue(pair: ActivePair, traineeLevel: number, comp
     await rewardBuddy({ pairId: pair.id, buddyDiscordId: pair.buddyDiscordId })
   } catch (e) {
     console.error('[buddy] reward failed', pair.id, e)
+    // Recorded so the daily run / admin "Check now" retries it (retryPendingRewards).
+    await prisma.buddyEvent
+      .create({ data: { pairId: pair.id, kind: 'reward_pending', actor: 'system', data: { error: e instanceof Error ? e.message.slice(0, 200) : 'unknown' } } })
+      .catch(() => {})
   }
   return true
 }
 
+const REWARD_DONE_KINDS = ['reward_granted', 'reward_skipped']
+
+/**
+ * Retry the rewards that failed at completion (a `reward_pending` event and no granted/skipped one yet).
+ * Only while buddy.rewardEnabled is on. rewardBuddy writes its own outcome row, so a pair is retried until it has one.
+ */
+export async function retryPendingRewards(limit = 50): Promise<number> {
+  if (!(await toggleEnabled('buddy.rewardEnabled'))) return 0
+  const pairs = await prisma.buddyPair.findMany({
+    where: { status: 'COMPLETED', events: { some: { kind: 'reward_pending' }, none: { kind: { in: REWARD_DONE_KINDS } } } },
+    select: { id: true, buddyDiscordId: true },
+    take: limit,
+  })
+  let rewarded = 0
+  for (const pair of pairs) {
+    try {
+      await rewardBuddy({ pairId: pair.id, buddyDiscordId: pair.buddyDiscordId })
+      rewarded++
+    } catch (e) {
+      console.error('[buddy] reward retry failed', pair.id, e)
+    }
+  }
+  return rewarded
+}
+
 /** Check every active pair and complete the ones whose trainee is done. Used by the daily run and the admin page. */
-export async function completeDuePairs(): Promise<{ checked: number; completed: number }> {
-  if (!(await toggleEnabled('buddy.enabled'))) return { checked: 0, completed: 0 }
+export async function completeDuePairs(): Promise<{ checked: number; completed: number; rewardsRetried: number }> {
+  if (!(await toggleEnabled('buddy.enabled'))) return { checked: 0, completed: 0, rewardsRetried: 0 }
   const cfg = await buddySettings()
   const pairs = await prisma.buddyPair.findMany({
     where: { status: { in: ACTIVE } },
@@ -183,5 +219,6 @@ export async function completeDuePairs(): Promise<{ checked: number; completed: 
     const level = await getCurrentLevel(pair.traineeDiscordId)
     if (await completeIfDue(pair, level, cfg.completionLevel)) completed++
   }
-  return { checked: pairs.length, completed }
+  const rewardsRetried = await retryPendingRewards()
+  return { checked: pairs.length, completed, rewardsRetried }
 }

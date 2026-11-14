@@ -539,8 +539,10 @@ describe('oregano-41907 welcome', () => {
     expect(where.dm).toBeNull()
     expect(where.channel).toBeNull()
     const cutoff = where.welcomedAt.lt.getTime()
-    expect(before - cutoff).toBeGreaterThanOrEqual(15 * 60_000 - 5)
-    expect(before - cutoff).toBeLessThan(15 * 60_000 + 5_000)
+    const after = Date.now()
+    // The cutoff is "now at the call" minus 15 minutes, and the call happened between before and after.
+    expect(cutoff).toBeGreaterThanOrEqual(before - 15 * 60_000)
+    expect(cutoff).toBeLessThanOrEqual(after - 15 * 60_000)
   })
 
   it('finished rows always get a non-null dm and channel outcome', async () => {

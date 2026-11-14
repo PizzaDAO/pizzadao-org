@@ -15,9 +15,20 @@ export interface IcsSession {
 
 const stamp = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')
 
-/** Escape a TEXT value (backslash, semicolon, comma, newline). */
+// Control characters other than tab, CR and LF (those two are handled as line breaks where text allows them).
+const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g
+
+/** A value that may not contain a line break at all (UID, URL): control characters and breaks removed. */
+export const icsPlain = (v: string): string => v.replace(/[\r\n]/g, '').replace(CONTROL, '')
+
+/** Escape a TEXT value: control characters dropped, backslash, semicolon, comma escaped, CRLF / CR / LF become \\n. */
 export function icsEscape(v: string): string {
-  return v.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n')
+  return v
+    .replace(CONTROL, '')
+    .replace(/\\/g, '\\\\')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,')
+    .replace(/\r\n|\r|\n/g, '\\n')
 }
 
 /** Fold a content line to at most 75 octets per physical line (continuations start with one space). */
@@ -51,13 +62,13 @@ export function buildIcs(s: IcsSession, opts: { host: string; now?: Date } = { h
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     'BEGIN:VEVENT',
-    `UID:session-${s.id}@${opts.host}`,
+    `UID:${icsPlain(`session-${s.id}@${opts.host}`)}`,
     `DTSTAMP:${stamp(opts.now ?? new Date())}`,
     `DTSTART:${stamp(s.startsAt)}`,
     `DTEND:${stamp(s.endsAt)}`,
     `SUMMARY:${icsEscape(s.title)}`,
     `DESCRIPTION:${icsEscape(description)}`,
-    ...(s.url ? [`URL:${s.url}`] : []),
+    ...(s.url ? [`URL:${icsPlain(s.url)}`] : []),
     'END:VEVENT',
     'END:VCALENDAR',
   ]

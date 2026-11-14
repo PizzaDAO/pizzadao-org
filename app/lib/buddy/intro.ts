@@ -20,13 +20,16 @@ export interface IntroDeps {
   createThread: (input: Parameters<typeof createPrivateThread>[0]) => Promise<ThreadResult>
 }
 
+const CLAIM_STALE_MS = 2 * 60 * 1000
+
 const defaultDeps: IntroDeps = { createThread: (input) => createPrivateThread(input) }
 
 export async function introducePair(pairId: string, actor: string, deps: IntroDeps = defaultDeps): Promise<IntroResult> {
   const pair = await prisma.buddyPair.findUnique({ where: { id: pairId } })
   if (!pair) return { mode: 'dry-run', ok: false, reason: 'pair_not_found' }
   if (pair.status !== 'MATCHED' && pair.status !== 'INTRODUCED') return { mode: 'dry-run', ok: false, reason: 'pair_not_active' }
-  if (pair.threadId) return { mode: 'live', ok: false, reason: 'already_introduced' }
+  // A thread without introducedAt is a half-made intro (the thread exists but the members or the post failed): Retry reuses it.
+  if (pair.threadId && pair.introducedAt) return { mode: 'live', ok: false, reason: 'already_introduced' }
 
   const live = await toggleEnabled('buddy.introThreadsEnabled')
   const mode = live ? 'live' : 'dry-run'
@@ -46,17 +49,40 @@ export async function introducePair(pairId: string, actor: string, deps: IntroDe
     await prisma.buddyEvent.create({ data: { pairId, kind: 'intro_failed', actor, data: { reason: 'no_channel' } } })
     return { mode, ok: false, reason: 'no_channel' }
   }
-  const result = await deps.createThread({ channelId, name, content, userIds: [pair.traineeDiscordId, pair.buddyDiscordId] })
+  // Claim the pair before calling Discord so two concurrent intros cannot make two threads. A claim older
+  // than CLAIM_STALE_MS (a crashed run) can be taken over.
+  const now = new Date()
+  const claim = await prisma.buddyPair.updateMany({
+    where: {
+      id: pairId,
+      introducedAt: null,
+      status: { in: ['MATCHED', 'INTRODUCED'] },
+      OR: [{ introStartedAt: null }, { introStartedAt: { lt: new Date(now.getTime() - CLAIM_STALE_MS) } }],
+    },
+    data: { introStartedAt: now },
+  })
+  if (claim.count !== 1) return { mode, ok: false, reason: 'intro_in_progress' }
+
+  const result = await deps.createThread({
+    channelId,
+    name,
+    content,
+    userIds: [pair.traineeDiscordId, pair.buddyDiscordId],
+    ...(pair.threadId ? { existingThreadId: pair.threadId } : {}),
+  })
   if (!result.ok) {
-    await prisma.buddyEvent.create({ data: { pairId, kind: 'intro_failed', actor, data: { reason: result.reason } } })
+    // Keep a thread that was made before the failure, so Retry reuses it instead of opening another.
+    if (result.threadId && !pair.threadId) {
+      await prisma.buddyPair.updateMany({ where: { id: pairId, threadId: null }, data: { threadId: result.threadId } })
+    }
+    await prisma.buddyPair.updateMany({ where: { id: pairId }, data: { introStartedAt: null } })
+    await prisma.buddyEvent.create({ data: { pairId, kind: 'intro_failed', actor, data: { reason: result.reason, ...(result.threadId ? { threadId: result.threadId } : {}) } } })
     return { mode, ok: false, reason: result.reason }
   }
-  // Only the first introduction keeps its thread id (a double click must not overwrite it).
-  const now = new Date()
-  const claimed = await prisma.buddyPair.updateMany({
-    where: { id: pairId, threadId: null, status: { in: ['MATCHED', 'INTRODUCED'] } },
-    data: { threadId: result.threadId, status: 'INTRODUCED', introducedAt: now },
+  const done = await prisma.buddyPair.updateMany({
+    where: { id: pairId, introducedAt: null, status: { in: ['MATCHED', 'INTRODUCED'] } },
+    data: { threadId: result.threadId, status: 'INTRODUCED', introducedAt: new Date(), introStartedAt: null },
   })
-  await prisma.buddyEvent.create({ data: { pairId, kind: 'introduced', actor, data: { threadId: result.threadId, recorded: claimed.count === 1 } } })
+  await prisma.buddyEvent.create({ data: { pairId, kind: 'introduced', actor, data: { threadId: result.threadId, recorded: done.count === 1 } } })
   return { mode, ok: true, threadId: result.threadId }
 }

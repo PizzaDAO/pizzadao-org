@@ -6,7 +6,7 @@ import { prisma } from '@/app/lib/db'
 import { toggleEnabled } from '@/app/lib/settings/toggles'
 import { completedLevelBy, getCurrentLevel } from '@/app/lib/missions'
 import { readSignedUpMembers } from '@/app/lib/member-registration'
-import { fetchMemberByDiscordId } from '@/app/lib/sheets/member-repository'
+import { fetchMemberByDiscordId, fetchMemberIdByDiscordId } from '@/app/lib/sheets/member-repository'
 import { ACTIVE_PAIR_STATUSES, buildChecklist, isBuddyEligible, isActiveStatus, type ChecklistItem } from './rules'
 import { buddySettings, completeIfDue } from './service'
 
@@ -38,15 +38,27 @@ function threadUrl(threadId: string | null): string | null {
 
 /** The facts the checklist ticks from: existing mission, attendance and vouch data. */
 export async function loadChecklist(pair: {
+  id?: string
   introducedAt: Date | null
   traineeDiscordId: string
   traineeMemberId: string | null
   buddyDiscordId: string
-}, traineeLevel: number, completionLevel: number, buddyMemberId: string | null): Promise<ChecklistItem[]> {
+}, traineeLevel: number, completionLevel: number, buddyMemberIdIn: string | null): Promise<ChecklistItem[]> {
+  // Lazily backfill ids that were null when the pair / profile was made (the sheet lookup can fail then).
+  let { traineeMemberId } = pair
+  let buddyMemberId = buddyMemberIdIn
+  if (!traineeMemberId) {
+    traineeMemberId = await fetchMemberIdByDiscordId(pair.traineeDiscordId).catch(() => null)
+    if (traineeMemberId && pair.id) await prisma.buddyPair.updateMany({ where: { id: pair.id, traineeMemberId: null }, data: { traineeMemberId } }).catch(() => {})
+  }
+  if (!buddyMemberId) {
+    buddyMemberId = await fetchMemberIdByDiscordId(pair.buddyDiscordId).catch(() => null)
+    if (buddyMemberId) await prisma.buddyProfile.updateMany({ where: { discordId: pair.buddyDiscordId, memberId: null }, data: { memberId: buddyMemberId } }).catch(() => {})
+  }
   const [attendance, vouches] = await Promise.all([
     prisma.attendanceSummary.findUnique({ where: { discordId: pair.traineeDiscordId }, select: { totalCalls: true } }),
-    pair.traineeMemberId && buddyMemberId
-      ? prisma.vouch.count({ where: { followerId: buddyMemberId, followeeId: pair.traineeMemberId } })
+    traineeMemberId && buddyMemberId
+      ? prisma.vouch.count({ where: { followerId: buddyMemberId, followeeId: traineeMemberId } })
       : Promise.resolve(0),
   ])
   return buildChecklist({
@@ -89,13 +101,13 @@ export async function getMyBuddyState(discordId: string): Promise<MyBuddyState> 
       role,
       status,
       partner: { discordId: partnerId, name: partner?.name || 'A member' },
-      threadUrl: threadUrl(row.threadId),
+      threadUrl: row.introducedAt ? threadUrl(row.threadId) : null,
       checklist: await loadChecklist(row, traineeLevel, cfg.completionLevel, buddyProfile?.memberId ?? null),
     })
   }
   return {
     enabled: true,
-    eligible: isBuddyEligible(level, cfg.minLevel) || !!profile?.addedBy,
+    eligible: !profile?.removedAt && (isBuddyEligible(level, cfg.minLevel) || !!profile?.addedBy),
     minLevel: cfg.minLevel,
     maxActiveCap: cfg.cap,
     profile: profile ? { active: profile.active, paused: profile.paused, maxActive: profile.maxActive, languages: profile.languages } : null,
@@ -125,19 +137,17 @@ export async function getAdminOverview(): Promise<AdminBuddyOverview> {
     toggleEnabled('buddy.rewardEnabled'),
     buddySettings(),
   ])
-  const [names, profiles, pairs] = await Promise.all([
+  const [names, profiles, pairs, loadRows, traineeRows] = await Promise.all([
     readSignedUpMembers().catch(() => new Map<string, string>()),
     prisma.buddyProfile.findMany({ orderBy: { createdAt: 'asc' } }),
     prisma.buddyPair.findMany({ orderBy: { createdAt: 'desc' }, take: PAIR_LIMIT, include: { events: { orderBy: { at: 'desc' }, take: 1 } } }),
+    // Dedicated counts over ALL active pairs: the list above is only the newest PAIR_LIMIT.
+    prisma.buddyPair.groupBy({ by: ['buddyDiscordId'], where: { status: { in: ACTIVE } }, _count: { _all: true } }),
+    prisma.buddyPair.findMany({ where: { status: { in: ACTIVE } }, select: { traineeDiscordId: true } }),
   ])
   const nameOf = (id: string) => names.get(id) || id
-  const activeByBuddy = new Map<string, number>()
-  const hasBuddy = new Set<string>()
-  for (const p of pairs) {
-    if (!isActiveStatus(p.status)) continue
-    activeByBuddy.set(p.buddyDiscordId, (activeByBuddy.get(p.buddyDiscordId) ?? 0) + 1)
-    hasBuddy.add(p.traineeDiscordId)
-  }
+  const activeByBuddy = new Map<string, number>(loadRows.map((r) => [r.buddyDiscordId, r._count._all]))
+  const hasBuddy = new Set<string>(traineeRows.map((r) => r.traineeDiscordId))
   const ids = [...names.keys()]
   const finished = await completedLevelBy(ids, cfg.completionLevel).catch(() => new Set<string>())
   const buddyIds = new Set(profiles.filter((p) => p.active).map((p) => p.discordId))
@@ -165,7 +175,7 @@ export async function getAdminOverview(): Promise<AdminBuddyOverview> {
       status: p.status,
       trainee: { discordId: p.traineeDiscordId, name: nameOf(p.traineeDiscordId) },
       buddy: { discordId: p.buddyDiscordId, name: nameOf(p.buddyDiscordId) },
-      threadId: p.threadId,
+      threadId: p.introducedAt ? p.threadId : null, // a half-made intro shows as not introduced, so Retry intro stays visible
       createdAt: p.createdAt.toISOString(),
       endedReason: p.endedReason,
       lastEvent: p.events[0]?.kind ?? null,
