@@ -6,6 +6,7 @@ vi.mock('@/app/lib/db', () => ({ prisma: {} }))
 import { SETTINGS, SETTING_KEYS, TRANSCRIPTION_KEYTERMS_DEFAULT, isSettingKey, parseSetting } from './registry'
 import { ECONOMY_SETTINGS } from './economy-settings'
 import { CONTENT_SETTINGS } from './content-settings'
+import { DEFAULT_BUDDY_INTRO_TEXT } from './buddy-settings'
 
 const ECONOMY_KEYS = new Set<string>([...Object.keys(ECONOMY_SETTINGS), ...Object.keys(CONTENT_SETTINGS)])
 import { CALL_TRANSCRIPT_MIN_LEVEL, CALL_SUMMARY_MIN_LEVEL, CALL_ACTION_ITEMS_MIN_LEVEL, CALL_CHAPTERS_MIN_LEVEL } from '@/app/lib/calls/transcript-access'
@@ -267,6 +268,40 @@ describe('settings registry', () => {
       ['newsletter.fromName', ''],
       ['newsletter.fromAddress', ''],
       ['newsletter.replyTo', ''],
+      ['newsletter.draftEnabled', false],
+      ['newsletter.xSpaceEnabled', true],
+      ['newsletter.xSpaceLocalTime', '16:20'],
+      ['newsletter.xSpaceTimeZone', 'America/New_York'],
+      ['newsletter.xSpaceDayOfMonth', 22],
+      ['newsletter.xProfileUrl', ''],
+      ['newsletter.approverRoleIds', []],
+      ['newsletter.draftModel', ''],
+      ['newsletter.promptExtra', ''],
+      ['newsletter.articlesWindowDays', 31],
+      ['newsletter.articlesMax', 5],
+      ['newsletter.eventsWindowDays', 45],
+      ['newsletter.maxCallCrews', 8],
+      ['newsletter.callOwnerNames', true],
+      ['education.editEnabled', false],
+      ['education.publicListingEnabled', false],
+      ['education.dashboardCardEnabled', false],
+      ['education.defaultLengthMinutes', 60],
+      ['education.descriptionTemplate', ''],
+      ['education.publicIntroText', ''],
+      ['education.sessionCrewIds', ['education']],
+      ['buddy.enabled', false],
+      ['buddy.introThreadsEnabled', false],
+      ['buddy.rewardEnabled', false],
+      ['buddy.minLevel', 4],
+      ['buddy.maxActivePerBuddy', 2],
+      ['buddy.completionLevel', 2],
+      ['buddy.rewardMissionId', 0],
+      ['discord.buddyChannelId', ''],
+      ['buddy.introText', DEFAULT_BUDDY_INTRO_TEXT],
+      ['manuals.freshnessEnabled', false],
+      ['manuals.staleAfterDays', 365],
+      ['manuals.hideDrafts', false],
+      ['manuals.hideReplaced', false],
       ['features.publicEnabled', false],
       ['features.exportEnabled', false],
       ['features.navLinkEnabled', false],

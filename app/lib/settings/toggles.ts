@@ -40,6 +40,10 @@ export const TOGGLES = {
     legacy: (raw) => ['true', '1'].includes((raw ?? '').trim().toLowerCase()),
   },
   'education.sessionAnnounceEnabled': { env: 'EDUCATION_SESSION_ANNOUNCE_ENABLED', legacy: ON_WORDS },
+  // Off unless turned on: manage page edits, the public /learn page and the dashboard card.
+  'education.editEnabled': { env: 'EDUCATION_EDIT_ENABLED', legacy: ON_WORDS },
+  'education.publicListingEnabled': { env: 'EDUCATION_PUBLIC_LISTING_ENABLED', legacy: ON_WORDS },
+  'education.dashboardCardEnabled': { env: 'EDUCATION_DASHBOARD_CARD_ENABLED', legacy: ON_WORDS },
   'calls.dstFixEnabled': { env: 'CALL_DST_FIX_ENABLED', legacy: ON_WORDS },
   'calls.endSongTriggerEnabled': { env: 'CALL_END_SONG_ENABLED', legacy: ON_WORDS },
   'calls.playOutCommandEnabled': { env: 'CALL_PLAY_OUT_COMMAND_ENABLED', legacy: ON_WORDS },
@@ -127,6 +131,18 @@ export const TOGGLES = {
   // Off unless turned on: newsletter consent (double opt-in emails, member checkbox).
   'newsletter.confirmEmailsEnabled': { env: 'NEWSLETTER_CONFIRM_EMAILS_ENABLED', legacy: ON_WORDS },
   'newsletter.memberOptInEnabled': { env: 'NEWSLETTER_MEMBER_OPT_IN_ENABLED', legacy: ON_WORDS },
+  // Off unless turned on: the buddy system (plans/buddy-system.md, phase 1).
+  'buddy.enabled': { env: 'BUDDY_ENABLED', legacy: ON_WORDS },
+  'buddy.introThreadsEnabled': { env: 'BUDDY_INTRO_THREADS_ENABLED', legacy: ON_WORDS },
+  'buddy.rewardEnabled': { env: 'BUDDY_REWARD_ENABLED', legacy: ON_WORDS },
+  'newsletter.draftEnabled': { env: 'NEWSLETTER_DRAFT_ENABLED', legacy: ON_WORDS },
+  // On unless the env var is an explicit off: the X Space invite block and naming people on finished call items in new drafts.
+  'newsletter.xSpaceEnabled': { env: 'NEWSLETTER_XSPACE_ENABLED', legacy: (raw) => !envKillsToggle(raw) },
+  'newsletter.callOwnerNames': { env: 'NEWSLETTER_CALL_OWNER_NAMES', legacy: (raw) => !envKillsToggle(raw) },
+  // Off unless turned on: review markers on the manuals page, and hiding drafts / replaced manuals.
+  'manuals.freshnessEnabled': { env: 'MANUALS_FRESHNESS_ENABLED', legacy: ON_WORDS },
+  'manuals.hideDrafts': { env: 'MANUALS_HIDE_DRAFTS', legacy: ON_WORDS },
+  'manuals.hideReplaced': { env: 'MANUALS_HIDE_REPLACED', legacy: ON_WORDS },
   // Off unless turned on: the public features catalog (page, exports, header link, ops tools).
   'features.publicEnabled': { env: 'FEATURES_PUBLIC_ENABLED', legacy: ON_WORDS },
   'features.exportEnabled': { env: 'FEATURES_EXPORT_ENABLED', legacy: ON_WORDS },

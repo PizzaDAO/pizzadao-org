@@ -2545,6 +2545,8 @@ model Manual {
   author      String   @default("")
   lastUpdated String   @default("")
   notes       String   @default("")
+  reviewedAt   DateTime? // when the manual was last checked against the current app
+  supersededBy String? // an in-app path (e.g. /handbook/host-a-party) that replaces this manual
   position    Int
   active      Boolean  @default(true)
   createdAt   DateTime @default(now())
@@ -2963,11 +2965,20 @@ model CrewSession {
   generalMessageId  String? // post in the general announcements channel
   telegramQueued    Boolean  @default(false)
   lastError         String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  // Manage page, public listing and edit-in-place (plans/education-sessions-on-site.md).
+  status            String    @default("SCHEDULED") // PROPOSED | SCHEDULED | CANCELED
+  canceledAt        DateTime?
+  public            Boolean   @default(true) // shown on the public listing
+  recordingId       String?
+  recordingUrl      String?
+  updatedBy         String? // discordId of the last editor
+  proposedBy        String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   @@unique([crewId, dedupeKey])
   @@index([crewId, startsAt])
+  @@index([startsAt])
 }
 
 // One spoken call-updates run (plans/metalhead-reads-updates.md): the claim, what was said (hash and
@@ -3040,6 +3051,76 @@ model NewsletterSubscriber {
   @@index([memberId])
 }
 
+// A monthly newsletter issue (plans/monthly-newsletter.md, phase 2). `sections` is the editable
+// structured content; `contentHash` is the sha256 of subject + preheader + sections + issue date +
+// Space URL at the moment of approval (null while a draft). Any edit after approval returns the issue
+// to "draft" and clears the approval. Status: draft | approved | sent | cancelled.
+model NewsletterIssue {
+  id              String    @id @default(cuid())
+  slug            String    @unique
+  status          String    @default("draft")
+  issueDate       DateTime // the day the issue goes out (the X Space invite wording follows it)
+  periodStart     DateTime
+  periodEnd       DateTime
+  subject         String    @default("")
+  preheader       String    @default("")
+  sections        Json
+  sources         Json? // ids of the calls, articles, spotlight rows, events used (no text)
+  xSpaceUrl       String?
+  model           String?
+  generatedAt     DateTime?
+  createdBy       String?
+  editedBy        String?
+  editedAt        DateTime?
+  approvedBy      String?
+  approvedAt      DateTime?
+  contentHash     String?
+  sponsorNotified Boolean   @default(false)
+  sendAfter       DateTime?
+  sentAt          DateTime?
+  publishedAt     DateTime?
+  recipientCount  Int       @default(0)
+  sentCount       Int       @default(0)
+  failedCount     Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  sends  NewsletterSend[]
+  events NewsletterIssueEvent[]
+
+  @@index([status, periodEnd])
+}
+
+// One row per (issue, subscriber): claimed before the send so a retry never double-sends. Created now,
+// used by the sender in phase 4.
+model NewsletterSend {
+  id           String          @id @default(cuid())
+  issueId      String
+  issue        NewsletterIssue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  subscriberId String
+  status       String          @default("SENDING") // SENDING | SENT | FAILED
+  resendId     String?
+  error        String? // short code, never an address
+  createdAt    DateTime        @default(now())
+  sentAt       DateTime?
+
+  @@unique([issueId, subscriberId])
+  @@index([issueId, status])
+}
+
+// Audit trail of an issue: generate, edit, approve, unapprove, test-send, cancel.
+model NewsletterIssueEvent {
+  id        String          @id @default(cuid())
+  issueId   String
+  issue     NewsletterIssue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  action    String
+  actor     String?
+  data      Json?
+  createdAt DateTime        @default(now())
+
+  @@index([issueId, createdAt])
+}
+
 // A message sent through the marketing contact and partners forms. `emailed` records whether the
 // notification to the team went out (the row is kept either way).
 model ContactSubmission {
@@ -3054,6 +3135,61 @@ model ContactSubmission {
   createdAt    DateTime @default(now())
 
   @@index([createdAt])
+}
+
+// ===== BUDDY SYSTEM (plans/buddy-system.md, phase 1: manual matching) =====
+
+// A member who offered to buddy a new member. `active` = opted in, `paused` = temporarily off.
+model BuddyProfile {
+  discordId     String    @id
+  memberId      String?
+  active        Boolean   @default(false)
+  paused        Boolean   @default(false)
+  languages     String[]  @default([])
+  maxActive     Int       @default(2)
+  lastMatchedAt DateTime?
+  addedBy       String? // Discord id of the admin who added them by hand, if any
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+// One trainee with one buddy. status: QUEUED | MATCHED | INTRODUCED | COMPLETED | EXPIRED | DECLINED | ENDED.
+// At most one active (QUEUED, MATCHED or INTRODUCED) pair per trainee: a partial unique index in the
+// migration (Prisma cannot express it).
+model BuddyPair {
+  id               String       @id @default(cuid())
+  traineeDiscordId String
+  traineeMemberId  String?
+  buddyDiscordId   String
+  status           String
+  score            Float?
+  threadId         String?
+  createdBy        String? // Discord id of the admin who made the pair
+  introducedAt     DateTime?
+  firstHelloAt     DateTime?
+  vouchedAt        DateTime?
+  completedAt      DateTime?
+  endedReason      String?
+  lastNudgeAt      DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  events           BuddyEvent[]
+
+  @@index([buddyDiscordId, status])
+  @@index([traineeDiscordId])
+}
+
+// Audit trail and dedupe rows for a pair (paired, introduced, intro_dry_run, ended, completed, reward_*).
+model BuddyEvent {
+  id     String    @id @default(cuid())
+  pairId String
+  kind   String
+  actor  String
+  at     DateTime  @default(now())
+  data   Json?
+  pair   BuddyPair @relation(fields: [pairId], references: [id], onDelete: Cascade)
+
+  @@index([pairId, kind])
 }
 
 // Public features catalog (plans/features-catalog.md). Rows import unpublished and stay hidden until an

@@ -5,6 +5,7 @@
 import { createHash } from 'crypto'
 import { isValidTimeZone, zonedWallTimeToUtc } from '@/app/lib/calls/zoned-time'
 
+/** The crew the feature shipped for; the crews that may schedule are the education.sessionCrewIds setting. */
 export const EDUCATION_CREW_ID = 'education'
 export const MAX_TITLE = 100 // Discord event name limit
 export const MAX_DESCRIPTION = 1000 // Discord event description limit
@@ -61,6 +62,42 @@ export function parseSessionInput(raw: unknown, now: Date = new Date()): Session
   }
 }
 
+export const MAX_RECORDING_URL = 500
+export const SESSION_STATUS = { SCHEDULED: 'SCHEDULED', CANCELED: 'CANCELED', PROPOSED: 'PROPOSED' } as const
+
+export interface SessionExtras {
+  public: boolean
+  recordingUrl: string | null
+}
+
+/** The optional fields next to the times: the public flag (default on) and a manual recording link (https only). */
+export function parseSessionExtras(raw: unknown): SessionExtras {
+  const b = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  const url = clean(b.recordingUrl)
+  if (url) {
+    let ok = url.length <= MAX_RECORDING_URL
+    try {
+      ok = ok && new URL(url).protocol === 'https:'
+    } catch {
+      ok = false
+    }
+    if (!ok) throw new SessionInputError('The recording link must be a full https:// address.')
+  }
+  return { public: b.public === undefined ? true : b.public === true, recordingUrl: url || null }
+}
+
+/** The times/fields of a stored row, as the pure builders take them. */
+export function rowToTimes(r: { title: string; presenter: string | null; description: string; timeZone: string; startsAt: Date; endsAt: Date }): SessionTimes {
+  return { title: r.title, presenter: r.presenter, description: r.description, timeZone: r.timeZone, startsAt: r.startsAt, endsAt: r.endsAt }
+}
+
+/** Wall-clock date (YYYY-MM-DD) and time (HH:MM) of an instant in a zone, to prefill the edit form. */
+export function wallParts(at: Date, timeZone: string): { date: string; time: string } {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(at)
+  const g = (t: string) => parts.find((p) => p.type === t)?.value ?? '00'
+  return { date: `${g('year')}-${g('month')}-${g('day')}`, time: `${g('hour')}:${g('minute')}` }
+}
+
 /** Stable per (crew, title, start): submitting the same session twice is one session. */
 export function dedupeKey(crewId: string, s: Pick<SessionTimes, 'title' | 'startsAt'>): string {
   return createHash('sha256').update(`${crewId}\n${s.title.trim().toLowerCase()}\n${s.startsAt.toISOString()}`).digest('hex').slice(0, 32)
@@ -113,6 +150,36 @@ export function buildAnnouncement(s: SessionTimes, eventUrl: string | null): str
     .filter((l): l is string => l !== null)
     .join('\n')
     .slice(0, 2000)
+}
+
+/** The Discord PATCH body for an edit: only the fields the form owns (the event keeps its channel and type). */
+export function buildEventPatch(s: SessionTimes, imageDataUri?: string): Record<string, unknown> {
+  const full = buildEventPayload(s, { id: '0', type: 2 }, imageDataUri)
+  return {
+    name: full.name,
+    scheduled_start_time: full.scheduled_start_time,
+    scheduled_end_time: full.scheduled_end_time,
+    description: full.description,
+    ...(full.image ? { image: full.image } : {}),
+  }
+}
+
+/** Discord scheduled event status: 4 = CANCELED (only a SCHEDULED event can be canceled). */
+export const EVENT_STATUS_CANCELED = 4
+
+/** The announcement after a cancel: says so first, drops the reminder link, never pings anyone. */
+export function buildCancelledAnnouncement(s: SessionTimes): string {
+  const unix = Math.floor(s.startsAt.getTime() / 1000)
+  return [`❌ **Cancelled: ${s.title}**`, s.presenter ? `Was to be presented by ${s.presenter}` : null, '', `🕒 Was <t:${unix}:F>`]
+    .filter((l): l is string => l !== null)
+    .join('\n')
+    .slice(0, 2000)
+}
+
+/** A short follow-up reply when the time or title of a posted session changed. */
+export function buildUpdateNote(s: SessionTimes): string {
+  const unix = Math.floor(s.startsAt.getTime() / 1000)
+  return `🔄 Updated: **${s.title}** is now <t:${unix}:F> (<t:${unix}:R>).`
 }
 
 /** Telegram text: plain, with the date written out in the session's zone (Telegram has no <t:> tags). */

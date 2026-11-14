@@ -23,6 +23,8 @@ export interface SessionData {
   disavowNavLabel?: string;
   /** Proposals nav entry: present (true) only while voting or the proposal history is on. */
   showProposals?: boolean;
+  /** Sessions nav entry: present (true) only while the public /learn page is on. */
+  showSessions?: boolean;
 }
 
 export const LOGGED_OUT_SESSION: SessionData = {

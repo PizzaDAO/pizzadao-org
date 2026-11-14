@@ -8,7 +8,7 @@ const prismaMock = {
     findUnique: vi.fn(async ({ where }: { where: { crewId_dedupeKey: { crewId: string; dedupeKey: string } } }) =>
       rows.find((r) => r.crewId === where.crewId_dedupeKey.crewId && r.dedupeKey === where.crewId_dedupeKey.dedupeKey) ?? null),
     create: vi.fn(async ({ data }: { data: Row }) => {
-      const r = { id: `s${rows.length + 1}`, eventId: null, announceMessageId: null, generalMessageId: null, telegramQueued: false, ...data }
+      const r = { id: `s${rows.length + 1}`, eventId: null, announceMessageId: null, generalMessageId: null, telegramQueued: false, status: 'SCHEDULED', ...data }
       rows.push(r)
       return r
     }),
@@ -55,7 +55,7 @@ beforeEach(() => {
 
 describe('scheduleEducationSession', () => {
   it('does nothing and creates no row when switched off', async () => {
-    const r = await scheduleEducationSession(session, 'u1', deps({ enabled: async () => false }))
+    const r = await scheduleEducationSession('education', session, 'u1', deps({ enabled: async () => false }))
     expect(r.status).toBe('disabled')
     expect(rows).toHaveLength(0)
     expect(eventReq).not.toHaveBeenCalled()
@@ -63,7 +63,7 @@ describe('scheduleEducationSession', () => {
   })
 
   it('creates the event with the flyer, posts with no mentions, queues Telegram', async () => {
-    const r = await scheduleEducationSession(session, 'u1', deps())
+    const r = await scheduleEducationSession('education', session, 'u1', deps())
     expect(r).toMatchObject({ status: 'scheduled', event: 'done', announcement: 'done', general: 'skipped', telegram: 'done', eventUrl: 'https://discord.com/events/555555/999001' })
     const body = (eventReq.mock.calls[0] as unknown as [{ method: string; body: { image: string; channel_id: string } }])[0]
     expect(body.method).toBe('POST')
@@ -82,14 +82,14 @@ describe('scheduleEducationSession', () => {
 
   it('posts to the general channel only when configured', async () => {
     channels['discord.educationGeneralChannelId'] = '333333'
-    const r = await scheduleEducationSession(session, 'u1', deps())
+    const r = await scheduleEducationSession('education', session, 'u1', deps())
     expect(r.general).toBe('done')
     expect(postFile).toHaveBeenCalledTimes(2)
   })
 
   it('is idempotent: a second submit creates and posts nothing more', async () => {
-    await scheduleEducationSession(session, 'u1', deps())
-    const r = await scheduleEducationSession(session, 'u2', deps())
+    await scheduleEducationSession('education', session, 'u1', deps())
+    const r = await scheduleEducationSession('education', session, 'u2', deps())
     expect(r.status).toBe('already')
     expect(r).toMatchObject({ event: 'already', announcement: 'already', telegram: 'already' })
     expect(rows).toHaveLength(1)
@@ -100,25 +100,25 @@ describe('scheduleEducationSession', () => {
 
   it('a failed step is retried on the next submit without redoing the done ones', async () => {
     postFile.mockRejectedValueOnce(new DiscordPostError('Missing Access', 403))
-    const first = await scheduleEducationSession(session, 'u1', deps())
+    const first = await scheduleEducationSession('education', session, 'u1', deps())
     expect(first).toMatchObject({ status: 'partial', event: 'done', announcement: 'failed' })
     expect(rows[0].announceMessageId).toBeNull()
-    const second = await scheduleEducationSession(session, 'u1', deps())
+    const second = await scheduleEducationSession('education', session, 'u1', deps())
     expect(second).toMatchObject({ event: 'already', announcement: 'done' })
     expect(eventReq).toHaveBeenCalledTimes(1)
   })
 
   it('an uncertain failure (5xx) keeps the claim so it is never double posted', async () => {
     postFile.mockRejectedValueOnce(new DiscordPostError('boom', 502))
-    const first = await scheduleEducationSession(session, 'u1', deps())
+    const first = await scheduleEducationSession('education', session, 'u1', deps())
     expect(first.announcement).toBe('uncertain')
-    const second = await scheduleEducationSession(session, 'u1', deps())
+    const second = await scheduleEducationSession('education', session, 'u1', deps())
     expect(second.announcement).toBe('uncertain')
     expect(postFile).toHaveBeenCalledTimes(1)
   })
 
   it('not configured: no channels set', async () => {
-    const r = await scheduleEducationSession(session, 'u1', deps({ channelId: async () => '' }))
+    const r = await scheduleEducationSession('education', session, 'u1', deps({ channelId: async () => '' }))
     expect(r.status).toBe('not-configured')
     expect(rows).toHaveLength(0)
   })
@@ -127,11 +127,11 @@ describe('scheduleEducationSession', () => {
 describe('resetPendingSteps', () => {
   it('clears only PENDING markers', async () => {
     postFile.mockRejectedValueOnce(new DiscordPostError('boom', 502))
-    await scheduleEducationSession(session, 'u1', deps())
+    await scheduleEducationSession('education', session, 'u1', deps())
     expect(rows[0].announceMessageId).toBe('PENDING')
     expect(await resetPendingSteps(rows[0].id as string)).toEqual({ cleared: 1 })
     expect(rows[0]).toMatchObject({ announceMessageId: null, eventId: '999001' })
-    const r = await scheduleEducationSession(session, 'u1', deps())
+    const r = await scheduleEducationSession('education', session, 'u1', deps())
     expect(r.announcement).toBe('done')
   })
 })

@@ -62,6 +62,8 @@ export const TABLES: TableSpec[] = [
   { kind: 'relabel', model: 'CrewTaskProposal', field: 'leadMemberId' },
   { kind: 'relabel', model: 'CrewTask', field: 'leadMemberId' },
   { kind: 'relabel', model: 'CrewRole', field: 'memberId' },
+  { kind: 'relabel', model: 'BuddyProfile', field: 'memberId' },
+  { kind: 'relabel', model: 'BuddyPair', field: 'traineeMemberId' },
   { kind: 'unique', model: 'SocialAccount', field: 'memberId', scope: ['platform'] },
   { kind: 'unique', model: 'MemberWallet', field: 'memberId', scope: ['walletAddress'] },
   { kind: 'unique', model: 'TaskClaimEvent', field: 'memberId', scope: ['taskKey'], earliest: 'claimedAt' },
@@ -86,6 +88,7 @@ export const VOUCH_MODEL = 'Vouch'
 export const PK_OVERRIDES: Record<string, string> = {
   AttendanceSummary: 'discordId',
   TelegramHostMatch: 'discordId',
+  BuddyProfile: 'discordId',
   UnlockScanState: 'memberId',
   MemberProfileExtras: 'memberId',
   MemberPfp: 'memberId',

@@ -15,7 +15,7 @@
 import type { Metadata } from "next";
 
 /** Marketing routes other than "/" itself. "/home" is the home page's own path until it takes over "/". */
-export const MARKETING_PATHS = ["/about", "/partners", "/community", "/brand-system", "/contact", "/privacy", "/terms", "/home", "/newsletter", "/features"] as const;
+export const MARKETING_PATHS = ["/about", "/partners", "/community", "/brand-system", "/contact", "/privacy", "/terms", "/home", "/newsletter", "/learn", "/features"] as const;
 
 /** Marketing routes that go in sitemap.xml once indexable ("/" is already listed there). */
 export const MARKETING_SITEMAP_PATHS = ["/about", "/partners", "/community", "/brand-system", "/contact", "/privacy", "/terms"] as const;

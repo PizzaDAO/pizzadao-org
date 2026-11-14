@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { ValidationError } from '@/app/lib/errors/api-errors'
-import { requireEducationManager } from '@/app/lib/education-sessions/access'
+import { requireSessionManager } from '@/app/lib/education-sessions/access'
 import { parseSessionInput, SessionInputError } from '@/app/lib/education-sessions/build'
 import { flyerResponse } from '@/app/lib/education-sessions/flyer'
 
@@ -15,7 +15,7 @@ type Ctx = { params: Promise<{ crewId: string }> }
 
 const GET_HANDLER = async (request: NextRequest, { params }: Ctx) => {
   const { crewId } = await params
-  await requireEducationManager(crewId)
+  await requireSessionManager(crewId)
   const q = request.nextUrl.searchParams
   let s
   try {

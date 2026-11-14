@@ -45,9 +45,10 @@ describe("data/features-seed.json", () => {
     expect(text).not.toMatch(/Dread Pizza|Roberts|snax|samweinrott|@gmail|\b\d{17,20}\b/i);
   });
 
-  it("records no LICENSE choice: repos without one stay unlicensed", () => {
+  it("records the chosen license (GPL-3.0) for the repos that now have a LICENSE file", () => {
     for (const a of seed.apps) if (!a.license) expect(a.licenseNote ?? "").not.toMatch(/MIT|Apache/);
-    expect(seed.apps.find((a) => a.slug === "pizzadao-org")!.license).toBeNull();
+    for (const slug of ["pizzadao-org", "rsvpizza", "rare-pizzas", "mixtape", "proof-of-pizza", "open-pizza", "zaave"]) expect(seed.apps.find((a) => a.slug === slug)!.license, slug).toBe("GPL-3.0");
+    expect(seed.apps.find((a) => a.slug === "pizzadao-org")!.licenseNote).toBeNull();
   });
 
   it("the private Open Pizza modules row is private, with repo names only", () => {
