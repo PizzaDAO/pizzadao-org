@@ -44,6 +44,7 @@ import { YourCrews, type CrewOption } from "./components/YourCrews";
 import { SliceClaimsCard } from "../../ui/slices/SliceClaims";
 import { NextActionPanel } from "./components/NextActionPanel";
 import { LevelCard } from "./components/LevelCard";
+import { SessionsCard } from "./components/SessionsCard";
 import { StartHere } from "./components/StartHere";
 import { BoxMafiaSuggestion } from "./components/BoxMafiaSuggestion";
 import { RecentActivity } from "./components/RecentActivity";
@@ -283,6 +284,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                     )}
 
                     <LevelCard card={summary?.levelCard} />
+                    <SessionsCard />
 
                     <SliceClaimsCard />
                     <nav className="flex flex-wrap gap-x-5 text-sm" aria-label={t("handbook")}>

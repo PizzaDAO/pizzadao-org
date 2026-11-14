@@ -40,6 +40,10 @@ export const TOGGLES = {
     legacy: (raw) => ['true', '1'].includes((raw ?? '').trim().toLowerCase()),
   },
   'education.sessionAnnounceEnabled': { env: 'EDUCATION_SESSION_ANNOUNCE_ENABLED', legacy: ON_WORDS },
+  // Off unless turned on: manage page edits, the public /learn page and the dashboard card.
+  'education.editEnabled': { env: 'EDUCATION_EDIT_ENABLED', legacy: ON_WORDS },
+  'education.publicListingEnabled': { env: 'EDUCATION_PUBLIC_LISTING_ENABLED', legacy: ON_WORDS },
+  'education.dashboardCardEnabled': { env: 'EDUCATION_DASHBOARD_CARD_ENABLED', legacy: ON_WORDS },
   'calls.dstFixEnabled': { env: 'CALL_DST_FIX_ENABLED', legacy: ON_WORDS },
   'calls.endSongTriggerEnabled': { env: 'CALL_END_SONG_ENABLED', legacy: ON_WORDS },
   'calls.playOutCommandEnabled': { env: 'CALL_PLAY_OUT_COMMAND_ENABLED', legacy: ON_WORDS },

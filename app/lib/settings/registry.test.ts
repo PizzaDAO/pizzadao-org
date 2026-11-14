@@ -267,6 +267,13 @@ describe('settings registry', () => {
       ['newsletter.fromName', ''],
       ['newsletter.fromAddress', ''],
       ['newsletter.replyTo', ''],
+      ['education.editEnabled', false],
+      ['education.publicListingEnabled', false],
+      ['education.dashboardCardEnabled', false],
+      ['education.defaultLengthMinutes', 60],
+      ['education.descriptionTemplate', ''],
+      ['education.publicIntroText', ''],
+      ['education.sessionCrewIds', ['education']],
     ])
   })
 

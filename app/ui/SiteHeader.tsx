@@ -9,7 +9,7 @@ import { useSession } from "@/app/lib/hooks/use-session";
 import { PizzaDAOLogo } from "./PizzaDAOLogo";
 import { isMarketingPath } from "@/app/lib/marketing-site";
 
-type NavItem = { href: string; label: string; proposalsOnly?: boolean; disavowOnly?: boolean; membersOnly?: boolean; adminOnly?: boolean; analyticsOnly?: boolean; match?: (path: string) => boolean };
+type NavItem = { href: string; label: string; proposalsOnly?: boolean; sessionsOnly?: boolean; disavowOnly?: boolean; membersOnly?: boolean; adminOnly?: boolean; analyticsOnly?: boolean; match?: (path: string) => boolean };
 const GROUPS: { key: string; items: NavItem[] }[] = [
   { key: "community", items: [
     { href: "/crews", label: "crews", match: p => p === "/crews" || p.startsWith("/crew/") },
@@ -28,6 +28,7 @@ const GROUPS: { key: string; items: NavItem[] }[] = [
     { href: "/manuals", label: "manuals" },
     { href: "/turtles", label: "turtles" },
     { href: "/calls", label: "calls" },
+    { href: "/learn", label: "sessions", sessionsOnly: true },
     { href: "/proposals", label: "proposals", proposalsOnly: true },
     { href: "/disavow", label: "disavow", disavowOnly: true },
     { href: "/nfts", label: "nfts" },
@@ -83,7 +84,7 @@ export default function SiteHeader() {
   if (HIDDEN_ON.has(pathname) || isMarketingPath(pathname)) return null;
   const loggedIn = !!session?.authenticated;
   const dashboardHref = session?.memberId ? `/dashboard/${session.memberId}` : "/";
-  const groups = GROUPS.map(group => ({ ...group, items: group.items.filter(item => (!item.membersOnly || loggedIn) && (!item.adminOnly || session?.canManageShop) && (!item.analyticsOnly || session?.isAdmin) && (!item.disavowOnly || session?.canViewDisavow === true) && (!item.proposalsOnly || session?.showProposals === true)) }));
+  const groups = GROUPS.map(group => ({ ...group, items: group.items.filter(item => (!item.membersOnly || loggedIn) && (!item.adminOnly || session?.canManageShop) && (!item.analyticsOnly || session?.isAdmin) && (!item.disavowOnly || session?.canViewDisavow === true) && (!item.proposalsOnly || session?.showProposals === true) && (!item.sessionsOnly || session?.showSessions === true)) }));
   const linkClass = "flex min-h-11 items-center rounded-xl px-3 py-2 text-sm no-underline transition-colors hover:bg-foreground/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tomato-readable";
   const account = loggedIn ? (
     <Link href={dashboardHref} className="btn-pill min-h-11 bg-foreground text-background no-underline" aria-current={pathname.startsWith("/dashboard/") ? "page" : undefined}>{t("dashboard")}</Link>

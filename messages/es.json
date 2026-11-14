@@ -614,6 +614,7 @@
     "pep": "Ganar y gastar PEP",
     "articles": "Historias",
     "calls": "Historial de llamadas",
+    "sessions": "Sesiones",
     "proposals": "Propuestas",
     "chats": "Chats",
     "manuals": "Manuales de crews",
@@ -890,6 +891,14 @@
     "howToAttend": "Cómo asistir a una llamada",
     "gettingStarted": "Primeros pasos",
     "handbook": "Guía de PizzaDAO",
+    "sessionsCard": {
+      "overline": "Próxima sesión",
+      "none": "Todavía no hay ninguna sesión programada.",
+      "by": "con {presenter}",
+      "viewAll": "Todas las sesiones",
+      "schedule": "Programar una sesión",
+      "manage": "Gestionar sesiones"
+    },
     "levelCard": {
       "overline": "Tu nivel",
       "level": "Nivel {level}",

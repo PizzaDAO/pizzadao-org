@@ -39,3 +39,30 @@ export async function postMessageWithFile(
     return { id: null }
   }
 }
+
+/**
+ * Edit a bot message in place and REPLACE its attachment with a new file (multipart PATCH: the
+ * `attachments` list names only the new file, so the old flyer is dropped, not appended).
+ */
+export async function editMessageWithFile(
+  target: { channelId: string; messageId: string; botToken: string },
+  body: Omit<DiscordMessageBody, 'embeds' | 'components'>,
+  file: { name: string; type: string; data: Buffer },
+  fetchImpl: typeof fetch = fetch,
+): Promise<void> {
+  if (!/^\d{5,25}$/.test(target.channelId) || !/^\d{5,25}$/.test(target.messageId)) throw new DiscordPostError('Bad channel or message id', 400)
+  const form = new FormData()
+  form.set('payload_json', JSON.stringify({ ...body, attachments: [{ id: 0, filename: file.name }] }))
+  form.set('files[0]', new Blob([new Uint8Array(file.data)], { type: file.type }), file.name)
+  const res = await fetchImpl(`https://discord.com/api/v10/channels/${target.channelId}/messages/${target.messageId}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bot ${target.botToken}` },
+    body: form,
+    cache: 'no-store',
+    signal: AbortSignal.timeout(15_000),
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    throw new DiscordPostError(`Discord API error ${res.status} editing message ${target.messageId}: ${text.slice(0, 300)}`, res.status)
+  }
+}

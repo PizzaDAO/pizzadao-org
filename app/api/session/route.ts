@@ -97,6 +97,8 @@ export async function GET() {
     toggleEnabled("proposals.historyEnabled").catch(() => false),
   ]);
   const showProposals = votingOn || historyOn;
+  // Sessions nav entry: shown while the public /learn page is switched on (fails closed).
+  const showSessions = await toggleEnabled("education.publicListingEnabled").catch(() => false);
 
   // PFP is a quick fs check - include it to avoid a separate request
   let pfpPath: string | null = null;
@@ -135,6 +137,7 @@ export async function GET() {
       canManageShop,
       ...(disavowFlags ?? {}),
       ...(showProposals ? { showProposals: true } : {}),
+      ...(showSessions ? { showSessions: true } : {}),
     },
     {
       headers: { "Cache-Control": "private, max-age=300" },

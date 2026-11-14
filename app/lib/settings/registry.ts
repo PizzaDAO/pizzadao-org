@@ -25,6 +25,7 @@ import { SITE_SETTINGS } from './site-settings'
 import { CALL_UPDATES_SETTINGS } from './call-updates-settings'
 import { MEMBERS_SETTINGS } from './members-settings'
 import { MARKETING_SETTINGS } from './marketing-settings'
+import { EDUCATION_SETTINGS } from './education-settings'
 import { NEWSLETTER_SETTINGS } from './newsletter-settings'
 import { ADMIN_ROLE_IDS, DREAD_PIZZA_ROBERTS_ROLE_ID, MISSION_REVIEWER_ROLE_IDS } from '@/app/ui/constants'
 
@@ -2392,6 +2393,7 @@ export const SETTINGS = {
   ...MEMBERS_SETTINGS,
   ...MARKETING_SETTINGS,
   ...NEWSLETTER_SETTINGS,
+  ...EDUCATION_SETTINGS,
   // The Work Payment responses sheet. Empty = form ingest does nothing. Never committed to the repo, and
   // never sent anywhere except this admin settings page (private: true) and the ingest job.
   'payments.formSheetId': {
