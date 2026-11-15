@@ -1,9 +1,10 @@
-import { test, expect, type BrowserContext } from '@playwright/test';
+import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import en from '../../messages/en.json';
 import es from '../../messages/es.json';
 import fr from '../../messages/fr.json';
 
 const catalogs = { en, es, fr };
+const BROWSER_NAME = 'Browser Pepperoni';
 async function fixtures(context: BrowserContext, state: { draft?: unknown; profile?: Record<string, unknown>; failSave?: boolean; loginStatus?: string } = {}) {
   await context.route('**/api/**', async route => {
     const path = new URL(route.request().url()).pathname;
@@ -14,10 +15,19 @@ async function fixtures(context: BrowserContext, state: { draft?: unknown; profi
     else if (path === '/api/crew-mappings') json = { crews: [] };
     else if (path === '/api/onboarding/draft') json = { draft: state.draft };
     else if (path === '/api/auth/magic-login/request') { state.draft = route.request().postDataJSON().signupDraft; json = { status: state.loginStatus || 'sent' }; status = state.loginStatus ? 422 : 200; }
+    else if (path === '/api/namegen') json = { cached: false, topping: 'Pepperoni', mafiaMovieTitle: 'The Godfather', resolvedMovieTitle: 'The Godfather', tmdbMovieId: '238', releaseDate: '1972-03-14', mediaType: 'movie', style: 'balanced', suggestions: [BROWSER_NAME, 'Browser Mozzarella', 'Browser Basil'], origins: {}, sigs: {} };
     else if (path.startsWith('/api/member-lookup/')) json = { found: false };
     else if (path === '/api/profile') { state.profile = route.request().postDataJSON(); status = state.failSave ? 503 : 200; json = state.failSave ? { error: 'Please retry saving' } : { ok: true, sheets: { memberId: '990001' } }; }
     await route.fulfill({ status, json });
   });
+}
+// The restored draft keeps the topping and name but not the film, so a resumed visitor only re-picks the film.
+async function pickGeneratedName(page: Page, m: typeof en, toppingRestored = false) {
+  if (!toppingRestored) await page.getByRole('textbox', { name: m.onboarding.name.toppingLabel.replace(/^§ \d+ · /, ''), exact: true }).fill('Pepperoni');
+  await page.getByRole('textbox', { name: m.onboarding.name.filmPickerAriaLabel, exact: true }).fill('The Godfather');
+  await page.getByRole('button', { name: m.onboarding.name.generateButton, exact: true }).click();
+  await page.getByRole('button', { name: new RegExp(BROWSER_NAME) }).click();
+  await page.getByRole('button', { name: m.onboarding.name.claimThisName, exact: true }).click();
 }
 for (const locale of ['en', 'es', 'fr'] as const) for (const theme of ['light', 'dark']) {
   test(`${locale} ${theme}: explore, sign up, resume in a fresh browser, save`, async ({ page, context, browser, baseURL }, testInfo) => {
@@ -34,14 +44,13 @@ for (const locale of ['en', 'es', 'fr'] as const) for (const theme of ['light', 
     const nav = page.getByRole('button', { name: mobile ? m.nav.openMenu : m.nav.community, exact: true });
     await nav.click(); await page.keyboard.press('Escape'); await expect(nav).toBeFocused();
     await page.goto('/join');
-    await page.getByRole('textbox', { name: m.onboarding.name.displayNameLabel, exact: true }).fill('Browser Member');
-    await page.getByRole('button', { name: m.onboarding.name.useDisplayName, exact: true }).click();
+    await pickGeneratedName(page, m);
     await page.getByRole('textbox', { name: m.onboarding.city.inputAriaLabel, exact: true }).fill('Testville');
     await page.getByRole('button', { name: m.onboarding.chrome.continueViaDm, exact: true }).click();
     await page.getByRole('textbox', { name: m.onboarding.magicLogin.usernameAriaLabel }).fill('test_member');
     await page.getByRole('button', { name: m.onboarding.magicLogin.sendButton, exact: true }).click();
     await expect(page.getByText(m.onboarding.magicLogin.checkDmsHeadline, { exact: true })).toBeVisible();
-    expect(state.draft).toMatchObject({ mafiaName: 'Browser Member', city: 'Testville' });
+    expect(state.draft).toMatchObject({ mafiaName: BROWSER_NAME, city: 'Testville' });
 
     // A second context has no localStorage/cookies from the originating browser.
     // Authenticated draft API is mocked; ownership/expiry are covered in route tests.
@@ -53,8 +62,10 @@ for (const locale of ['en', 'es', 'fr'] as const) for (const theme of ['light', 
     await resumed.goto(`${baseURL}/?resumeSignup=1&discordId=test-discord&discordJoined=1`);
     await expect(resumed.getByText(m.onboarding.chrome.draftRestored, { exact: true })).toBeVisible();
     expect(state.profile).toBeUndefined(); // A DM link alone must not silently create a profile.
-    await expect(resumed.getByRole('textbox', { name: m.onboarding.name.displayNameLabel, exact: true })).toHaveValue('Browser Member');
-    await resumed.getByRole('button', { name: m.onboarding.name.useDisplayName, exact: true }).click();
+    // The restored draft shows the saved name in the summary and keeps the topping pick;
+    // the name step only offers generated names, so re-generate and claim one to continue.
+    await expect(resumed.getByText(BROWSER_NAME, { exact: true })).toBeVisible();
+    await pickGeneratedName(resumed, m, true);
     await expect(resumed.getByRole('textbox', { name: m.onboarding.city.inputAriaLabel, exact: true })).toHaveValue('Testville');
     state.failSave = true;
     await resumed.getByRole('button', { name: m.onboarding.chrome.finishSignup, exact: true }).click();
@@ -62,7 +73,7 @@ for (const locale of ['en', 'es', 'fr'] as const) for (const theme of ['light', 
     state.failSave = false;
     await resumed.getByRole('button', { name: m.onboarding.chrome.finishSignup, exact: true }).click();
     await expect(resumed.getByRole('link', { name: m.onboarding.finale.continueButton, exact: true })).toHaveAttribute('href', '/dashboard/990001');
-    expect(state.profile).toMatchObject({ mafiaName: 'Browser Member', city: 'Testville', autoAssignMemberId: true });
+    expect(state.profile).toMatchObject({ mafiaName: BROWSER_NAME, city: 'Testville', autoAssignMemberId: true });
     expect(await resumed.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
     expect(errors).toEqual([]);
     await fresh.close();
