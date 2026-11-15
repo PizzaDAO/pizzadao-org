@@ -150,7 +150,7 @@ export function MemberHoverCard({
             aria-describedby={open ? cardId : undefined}
         >
             {children}
-            {open && <CardPopover id={cardId} memberId={memberId} anchorRef={rootRef} cardRef={cardRef} />}
+            {open && <CardPopover id={cardId} memberId={memberId} anchorRef={rootRef} cardRef={cardRef} onClose={() => setOpen(false)} />}
         </span>
     );
 }
@@ -160,11 +160,13 @@ function CardPopover({
     memberId,
     anchorRef,
     cardRef,
+    onClose,
 }: {
     id: string;
     memberId: string;
     anchorRef: React.RefObject<HTMLSpanElement | null>;
     cardRef: React.RefObject<HTMLSpanElement | null>;
+    onClose: () => void;
 }) {
     const t = useTranslations("memberCard");
     // Rendered in a portal on document.body with fixed coordinates so no ancestor stacking context
@@ -185,6 +187,11 @@ function CardPopover({
             const h = card.offsetHeight;
             const vw = window.innerWidth;
             const vh = window.innerHeight;
+            // Trigger scrolled fully out of view: close rather than pin the card to an edge.
+            if (a.bottom <= 0 || a.top >= vh || a.right <= 0 || a.left >= vw) {
+                onClose();
+                return;
+            }
             let top = a.bottom + CARD_GAP;
             // Flip above when it does not fit below and there is room above.
             if (top + h > vh - VIEWPORT_MARGIN && a.top - CARD_GAP - h >= VIEWPORT_MARGIN) top = a.top - CARD_GAP - h;
@@ -203,7 +210,7 @@ function CardPopover({
             window.removeEventListener("scroll", place, true);
             window.removeEventListener("resize", place);
         };
-    }, [anchorRef, cardRef]);
+    }, [anchorRef, cardRef, onClose]);
 
     useEffect(() => {
         let alive = true;
