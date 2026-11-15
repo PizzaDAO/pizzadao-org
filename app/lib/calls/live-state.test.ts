@@ -8,7 +8,7 @@ import { prisma } from '@/app/lib/db'
 import type { Settings } from '@/app/lib/settings'
 import { SETTINGS, type SettingKey } from '@/app/lib/settings/registry'
 import { EMPTY_POST_FILTER } from './post-filters'
-import { betterStreamLink, findLiveSessionById, findLiveSessions, findStreamLink, handleLiveState, isSessionLive, liveStateSchema, normalizeStreamLink, parseStreamLinks, streamLinkFor, type LiveStateBody } from './live-state'
+import { betterStreamLink, findLiveSessionById, findLiveSessions, findStreamLink, handleLiveState, isSessionLive, liveStateSchema, mergePresence, normalizeStreamLink, parseStreamLinks, streamLinkFor, type LiveStateBody } from './live-state'
 
 function fakeSettings(over: Partial<Record<SettingKey, unknown>> = {}): Settings {
   return {
@@ -117,7 +117,7 @@ describe('handleLiveState', () => {
     expect(await handleLiveState(body({ streamLink: 'https://x.com/i/broadcasts/abc' }), deps())).toBe('ok')
     const arg = sessions.create.mock.calls[0][0] as unknown as { data: Record<string, unknown> }
     expect(arg.data).toMatchObject({ sessionId: 'evt-1700000000000', crewId: 'ops', hidden: false, endedAt: null, streamLink: 'https://x.com/i/broadcasts/abc' })
-    expect(arg.data.presence).toEqual([{ discordId: '111111111111111', displayName: 'Ann', presentSec: 30, inChannel: true }])
+    expect(arg.data.presence).toEqual([{ discordId: '111111111111111', displayName: 'Ann', presentSec: 30, inChannel: true, leftAt: null }])
   })
 
   it('ignores a stream link that is not an x.com broadcast or status link', async () => {
@@ -190,5 +190,29 @@ describe('handleLiveState', () => {
     const presence = (sessions.create.mock.calls[0][0] as unknown as { data: { presence: Array<{ displayName: string }> } }).data.presence
     expect(presence).toHaveLength(1)
     expect(presence[0].displayName).toBe('A nn')
+  })
+})
+
+describe('mergePresence (leave times)', () => {
+  const P = (id: string, inChannel: boolean, leftAt?: number | null) => ({ discordId: id, displayName: id, presentSec: 60, inChannel, ...(leftAt !== undefined ? { leftAt } : {}) })
+  it('stamps leftAt when someone who was in is now out, keeps it while out, clears it on rejoin', () => {
+    const first = mergePresence([P('a', true), P('b', true)], [P('a', true), P('b', false)], 1000)
+    expect(first.map((p) => p.leftAt)).toEqual([null, 1000])
+    const later = mergePresence(first, [P('a', true), P('b', false)], 5000)
+    expect(later[1].leftAt).toBe(1000)
+    const back = mergePresence(later, [P('a', true), P('b', true)], 9000)
+    expect(back[1].leftAt).toBeNull()
+    const gone = mergePresence(back, [P('a', true), P('b', false)], 12000)
+    expect(gone[1].leftAt).toBe(12000)
+  })
+  it('gives no time to someone first seen already out, or from data without leave times', () => {
+    expect(mergePresence([], [P('c', false)], 1000)[0].leftAt).toBeNull()
+    expect(mergePresence([P('c', false)], [P('c', false)], 1000)[0].leftAt).toBeNull()
+  })
+  it('stores the stamped presence on a heartbeat (old recorder bodies work unchanged)', async () => {
+    sessions.findUnique.mockResolvedValue({ endedAt: null, crewId: 'ops', crewLabel: 'Ops', streamLink: null, presence: [P('111111111111111', true)] } as never)
+    await handleLiveState(body({ present: [{ discordId: '111111111111111', displayName: 'Ann', presentSec: 30, inChannel: false }] }), deps())
+    const data = (sessions.updateMany.mock.calls[0][0] as unknown as { data: { presence: Array<{ leftAt: number | null }> } }).data
+    expect(data.presence[0].leftAt).toBe(1_700_000_100_000)
   })
 })
