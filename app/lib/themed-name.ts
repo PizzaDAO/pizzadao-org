@@ -32,7 +32,7 @@ const PIZZA_WORDS = [
   "vegetable", "veggie", "meat", "pepperone", "chilorio", "chikanda",
   // more common toppings
   "ham", "cheddar", "avocado", "cilantro", "broccoli", "fig", "barbecue", "hamburger", "pork",
-  "giardiniera", "nduja",
+  "giardiniera", "nduja", "alfredo", "carbonara", "paprika",
 ];
 
 /** Common misspellings, matched exactly (no fuzzy matching). */
