@@ -10,6 +10,7 @@
  */
 import { prisma } from '@/app/lib/db'
 import { createNotification } from '@/app/lib/notifications'
+import { clearDisavowVoteNotificationFor, clearDisavowVoteNotifications } from '@/app/lib/action-notifications'
 import { getMembersWithRoles } from '@/app/lib/discord'
 import { DREAD_PIZZA_ROBERTS_ROLE_ID } from '@/app/ui/constants'
 import { DAY_MS, REDACTED } from './constants'
@@ -62,9 +63,10 @@ async function notify(
   title: string,
   message: string,
   linkUrl: string,
+  metadata?: Record<string, string>,
 ) {
   try {
-    await createNotification({ type: type as never, recipientId, title, message, linkUrl })
+    await createNotification({ type: type as never, recipientId, title, message, linkUrl, metadata })
   } catch (e) {
     console.error('[disavow] notification failed', type, (e as Error)?.name)
   }
@@ -178,7 +180,7 @@ async function notifyDpr(disavowalId: string, exclude: string[]) {
     const dpr = await getMembersWithRoles([DREAD_PIZZA_ROBERTS_ROLE_ID])
     for (const id of dpr) {
       if (exclude.includes(id)) continue
-      await notify('DISAVOW_VOTE_NEEDED', id, 'A vote is needed', 'A disavow nomination needs your vote.', `/disavow/${disavowalId}`)
+      await notify('DISAVOW_VOTE_NEEDED', id, 'A vote is needed', 'A disavow nomination needs your vote.', `/disavow/${disavowalId}`, { disavowalId })
     }
   } catch (e) {
     console.error('[disavow] DPR notify failed', (e as Error)?.name)
@@ -234,6 +236,7 @@ export async function castVote(input: {
     return true
   })
   if (!accepted) return { ok: false, code: 'closed' }
+  await clearDisavowVoteNotificationFor(round.disavowalId, input.voterDiscordId)
   const outcome = await settleRound(round.id, now)
   return { ok: true, outcome }
 }
@@ -321,6 +324,7 @@ export async function settleRound(roundId: string, now: Date = new Date()): Prom
   })
   if (!res) return 'pending' // someone else settled it, or it was cancelled
   if (!res.won) return res.outcome
+  await clearDisavowVoteNotifications(pre.disavowalId)
 
   // Best-effort notifications after commit. No names, no content. When a LIST
   // round closes, every submitter (original and duplicate) gets the identical neutral notice, so a
@@ -353,7 +357,7 @@ export async function withdrawSubmission(submissionId: string, actor: string, no
   const sub = await prisma.disavowSubmission.findUnique({ where: { id: submissionId } })
   if (!sub || sub.submitterDiscordId !== actor) return 'not_found'
   if (sub.withdrawnAt) return 'already'
-  return prisma.$transaction(async tx => {
+  const result = await prisma.$transaction(async tx => {
     await advisoryLock(tx) // same lock as nominate, taken first: a withdrawal can't interleave with a nomination
     const open = await tx.disavowRound.findMany({ where: { disavowalId: sub.disavowalId, state: 'OPEN' }, select: { id: true } })
     for (const r of open) await lockRound(tx, r.id)
@@ -366,10 +370,16 @@ export async function withdrawSubmission(submissionId: string, actor: string, no
       if (r.count > 0) {
         await tx.disavowRound.updateMany({ where: { disavowalId: sub.disavowalId, state: 'OPEN' }, data: { state: 'CANCELLED', closedAt: now } })
         await logEvent(tx, sub.disavowalId, 'WITHDRAWN', actor, { from: 'NOMINATED', to: 'WITHDRAWN' })
+        return 'cancelled' as const
       }
     }
     return 'ok' as const
   })
+  if (result === 'cancelled') {
+    await clearDisavowVoteNotifications(sub.disavowalId)
+    return 'ok'
+  }
+  return result
 }
 
 /**
@@ -437,6 +447,7 @@ export async function unsuspend(id: string, actor: string): Promise<'ok' | 'not_
     await logEvent(tx, id, 'UNSUSPENDED', actor, { from: 'SUSPENDED', to: 'LISTED' })
     return true
   })
+  if (ok) await clearDisavowVoteNotifications(id)
   return ok ? 'ok' : 'bad_state'
 }
 

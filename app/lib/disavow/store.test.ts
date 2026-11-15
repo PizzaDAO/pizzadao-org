@@ -137,6 +137,10 @@ vi.mock('@/app/lib/db', () => {
   return { prisma }
 })
 vi.mock('@/app/lib/notifications', () => ({ createNotification: vi.fn(async () => ({})) }))
+vi.mock('@/app/lib/action-notifications', () => ({
+  clearDisavowVoteNotifications: vi.fn(async () => 0),
+  clearDisavowVoteNotificationFor: vi.fn(async () => 0),
+}))
 vi.mock('@/app/lib/discord', () => ({ getMembersWithRoles: vi.fn(async () => ['dpr1', 'dpr2', 'dpr3']) }))
 // The person behind member 77 is Discord subjD with wallet WALLET1. Everyone else only has their Discord id.
 vi.mock('./match', () => ({
@@ -156,6 +160,7 @@ vi.mock('./match', () => ({
 }))
 
 import { createNotification } from '@/app/lib/notifications'
+import { clearDisavowVoteNotificationFor, clearDisavowVoteNotifications } from '@/app/lib/action-notifications'
 import { viewerIdentifiers } from './match'
 import * as rulesModule from './rules'
 import { DEFAULT_DISAVOW_RULES } from './rules'
@@ -202,6 +207,7 @@ describe('nominate', () => {
     expect(calls.map(c => c.recipientId)).toEqual(['dpr1', 'dpr2', 'dpr3'])
     for (const c of calls) {
       expect(c.type).toBe('DISAVOW_VOTE_NEEDED')
+      expect(c.metadata).toEqual({ disavowalId: state.disavowal[0].id })
       expect(`${c.title} ${c.message}`).not.toMatch(/Randy|subjD|77/)
     }
   })
@@ -675,6 +681,45 @@ describe('nominate hardening', () => {
     await nominate({ ...nominateInput({ nominatorDiscordId: 'b' }), defer: w => { queued.push(w) } })
     expect(queued).toHaveLength(0)
     expect(createNotification).not.toHaveBeenCalled()
+  })
+})
+
+describe('vote notifications are cleared', () => {
+  it('a vote clears the voter\'s own notification, the closing vote clears everyone\'s', async () => {
+    const r = await nominate({ ...nominateInput(), now: T0 })
+    if (!r.ok) throw new Error('setup')
+    const round = state.round[0]
+    const early = new Date(T0.getTime() + 2 * D)
+    await castVote({ disavowalId: r.id, roundId: round.id, voterDiscordId: 'dpr1', choice: 'YES', now: early })
+    expect(clearDisavowVoteNotificationFor).toHaveBeenCalledWith(r.id, 'dpr1')
+    expect(clearDisavowVoteNotifications).not.toHaveBeenCalled()
+    for (const v of ['dpr2', 'dpr3']) await castVote({ disavowalId: r.id, roundId: round.id, voterDiscordId: v, choice: 'YES', now: early })
+    expect(clearDisavowVoteNotifications).not.toHaveBeenCalled() // decided only after day 7
+    await settleRound(round.id, new Date(T0.getTime() + 8 * D))
+    expect(clearDisavowVoteNotifications).toHaveBeenCalledWith(r.id)
+  })
+
+  it('a rejected vote clears nothing', async () => {
+    const r = await nominate({ ...nominateInput(), now: T0 })
+    if (!r.ok) throw new Error('setup')
+    const res = await castVote({ disavowalId: r.id, roundId: state.round[0].id, voterDiscordId: 'nom', choice: 'YES', now: T0 })
+    expect(res.ok).toBe(false)
+    expect(clearDisavowVoteNotificationFor).not.toHaveBeenCalled()
+  })
+
+  it('withdrawing the last submission (round cancelled) clears everyone\'s', async () => {
+    const n = await nominate({ ...nominateInput(), now: T0 })
+    if (!n.ok) throw new Error('setup')
+    await withdrawSubmission(state.submission[0].id, 'nom', T0)
+    expect(clearDisavowVoteNotifications).toHaveBeenCalledWith(n.id)
+  })
+
+  it('unsuspending (REMOVE round cancelled) clears everyone\'s', async () => {
+    const { id, later } = await listedEntry()
+    await suspend(id, 'dpr1', later)
+    vi.mocked(clearDisavowVoteNotifications).mockClear()
+    expect(await unsuspend(id, 'dpr1')).toBe('ok')
+    expect(clearDisavowVoteNotifications).toHaveBeenCalledWith(id)
   })
 })
 

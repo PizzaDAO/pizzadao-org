@@ -14,6 +14,7 @@ const deps = (over: Partial<GiveVouchDeps> = {}): GiveVouchDeps => ({
   dailyLimit: vi.fn(async () => 10),
   create: vi.fn(async () => ({})),
   emit: vi.fn(async () => null),
+  clearRequest: vi.fn(async () => 0),
   notify: vi.fn(async () => null),
   now: () => NOW,
   ...over,
@@ -28,6 +29,21 @@ describe('giveVouch', () => {
     expect(d.emit).toHaveBeenCalledWith('d1', 'vouch_created', '42')
     expect(d.emit).toHaveBeenCalledWith('500', 'vouch_received', '7')
     expect(d.notify).toHaveBeenCalledWith('7', 'Voucher', '42', '500')
+  })
+
+  it('clears the voucher\'s own vouch request from the target, even when the target has no Discord id', async () => {
+    const d = deps()
+    await run(d)
+    expect(d.clearRequest).toHaveBeenCalledWith('d1', '7')
+    const d2 = deps()
+    await run(d2, '8')
+    expect(d2.clearRequest).toHaveBeenCalledWith('d1', '8')
+  })
+
+  it('clears nothing when the vouch is refused', async () => {
+    const d = deps({ exists: vi.fn(async () => true) })
+    await run(d)
+    expect(d.clearRequest).not.toHaveBeenCalled()
   })
 
   it('a target with no Discord id still gets the vouch, just no events or notification for them', async () => {
