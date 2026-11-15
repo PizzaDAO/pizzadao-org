@@ -4,6 +4,7 @@ import { REMOTE_IMAGE_PATTERNS } from "./app/lib/image-hosts";
 import { legacyAssetRedirects, legacyDashboardRedirects } from "./app/lib/legacy-paths";
 import { marketingHomeAtRoot, wizardParamRedirects } from "./app/lib/marketing-site";
 import { hstsHeaderValue } from "./app/lib/hsts";
+import { COMMUNITY_CALL_ATTENDANCE_ID, NON_ROSTER_CREW_IDS } from "./app/lib/crew-id";
 import { SITE_URL } from "./app/lib/site-url";
 
 // Points next-intl at the request-config module that resolves locale + loads
@@ -112,7 +113,9 @@ const nextConfig: NextConfig = {
     // /app and bare /api (people typing the old app.pizzadao.org address as a path) go to the wizard,
     // which is what the old app host's "/" showed. Exact paths only: /api/* routes are untouched.
     const appEntry = ["/app", "/api"].map((source) => ({ source, destination: "/start", permanent: false }));
-    const legacy = [...appEntry, ...legacyDashboardRedirects(), ...legacyAssetRedirects()];
+    // The Community Call is not a crew: its old crew page goes to the call list, filtered to it, before the page renders.
+    const communityCall = [...NON_ROSTER_CREW_IDS].map((id) => ({ source: `/crew/${id}`, destination: `/calls?crew=${COMMUNITY_CALL_ATTENDANCE_ID}`, permanent: false }));
+    const legacy = [...appEntry, ...communityCall, ...legacyDashboardRedirects(), ...legacyAssetRedirects()];
     return marketingHomeAtRoot() ? [...wizardParamRedirects(), ...legacy, { source: "/home", destination: "/", permanent: false }] : legacy;
   },
   async headers() {
