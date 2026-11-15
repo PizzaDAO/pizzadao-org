@@ -7,6 +7,7 @@
 // (src/components/FilmPoster.tsx).
 "use client";
 
+import Image from "next/image";
 import { type MafiaFilm } from "@/app/lib/mafia-films";
 import { useFilmPoster } from "@/app/lib/hooks/use-film-poster";
 
@@ -96,10 +97,12 @@ export function FilmPoster({ film, index }: Props) {
       }}
     >
       {posterSrc && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <Image
           src={posterSrc}
           alt=""
+          fill
+          sizes="(min-width: 1024px) 200px, (min-width: 640px) 25vw, 50vw"
+          unoptimized
           loading="lazy"
           onLoad={onLoaded}
           className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${

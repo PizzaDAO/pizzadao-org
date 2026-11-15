@@ -27,6 +27,11 @@ export function marketingIndexable(): boolean {
   return isOn(process.env.NEXT_PUBLIC_MARKETING_INDEXABLE);
 }
 
+/** Vercel Speed Insights script is only requested once it is enabled for the project (default off). */
+export function speedInsightsEnabled(): boolean {
+  return isOn(process.env.NEXT_PUBLIC_SPEED_INSIGHTS_ENABLED);
+}
+
 export function marketingHomeAtRoot(): boolean {
   return isOn(process.env.NEXT_PUBLIC_MARKETING_HOME_AT_ROOT);
 }

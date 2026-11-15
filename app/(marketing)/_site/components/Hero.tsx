@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 const heroCrowd = "/marketing/assets/hero-crowd.jpg";
 import { ArrowRight, ArrowUpRight } from "lucide-react";
 
@@ -56,13 +57,12 @@ const Hero = () => {
         {/* Contained hero image */}
         <figure className="mt-12 md:mt-16">
           <div className="relative overflow-hidden rounded-2xl" data-benny="true">
-            <img
+            <Image sizes="(min-width: 1280px) 1200px, 100vw" preload
               src={heroCrowd}
               alt="A packed Bitcoin Pizza Day crowd glowing under amber stage lights at a global PizzaDAO event"
               className="block aspect-[3/4] w-full object-cover md:aspect-[16/10]"
               width={1920}
               height={1200}
-              fetchPriority="high"
             />
           </div>
           <figcaption className="ui mt-4 flex flex-col items-start justify-between gap-1.5 text-[10px] uppercase tracking-[0.22em] text-cream/75 md:flex-row md:items-center md:text-[11px]">
