@@ -61,7 +61,7 @@ export default async function LanePage({ params, searchParams }: Props) {
     const isPinned = pinnedSlug === slug || wantsPin; // the pin is written on arrival when coming from a card
     const submitDone = completion?.status === "PENDING" || completion?.status === "APPROVED";
     const progress = computeProgress(lane.steps, row?.doneStepIds ?? [], submitDone);
-    const missionHref = mission ? `/missions#mission-${mission.id}` : null;
+    const missionHref = mission?.isActive ? `/missions#mission-${mission.id}` : null;
     const statusLabel = !completion
         ? t("missionOpen")
         : completion.status === "APPROVED"
@@ -73,14 +73,14 @@ export default async function LanePage({ params, searchParams }: Props) {
 
     return (
         <EditorialPage width="max-w-3xl">
-            <PinOnArrive slug={slug} pick={wantsPin} />
+            <PinOnArrive slug={slug} pick={wantsPin} memberId={memberId} />
             <EditorialMasthead overline={`${t("overline", { n: String(index).padStart(2, "0") })} · ${lane.tag}`} title={lane.title} dek={lane.summary}>
                 <div className="flex flex-wrap items-center gap-2.5">
                     <Link href="/community#ways-in" className={pillOutline}>{`← ${t("allLanes")}`}</Link>
                     {isPinned ? (
                         <span className="rounded-full border border-[hsl(var(--foreground)/0.25)] px-3 py-1 text-sm font-bold">{t("pinned")}</span>
                     ) : (
-                        <PinButton slug={slug} label={t("pin")} busyLabel={t("pinning")} errorLabel={t("saveError")} />
+                        <PinButton slug={slug} memberId={memberId} label={t("pin")} busyLabel={t("pinning")} errorLabel={t("saveError")} />
                     )}
                     <span className="text-sm text-foreground/70">{t("progress", { done: progress.done, total: progress.total })}</span>
                 </div>
@@ -108,6 +108,7 @@ export default async function LanePage({ params, searchParams }: Props) {
                     <LaneStepItem
                         key={s.id}
                         slug={slug}
+                        memberId={memberId}
                         stepId={s.id}
                         index={i + 1}
                         title={s.title}
@@ -119,6 +120,7 @@ export default async function LanePage({ params, searchParams }: Props) {
                         markUndone={t("markUndone")}
                         submitHint={t("submitStepHint")}
                         submitHref={missionHref}
+                        submitLabel={t("missionSubmit")}
                         errorLabel={t("saveError")}
                     >
                         {s.body.trim() && <HandbookMarkdown content={renderPlaceholders(s.body, facts)} />}

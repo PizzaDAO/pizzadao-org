@@ -143,6 +143,14 @@ export async function updateLane(slug: string, patch: LanePatch, actor: string, 
   }
   if (audit.length === 0) return { changed: [] }
 
+  // A published lane with a submit step must have a mission for that step to point at.
+  const willPublish = 'published' in data ? (data.published as boolean) : current.published
+  const missionAfter = 'missionId' in data ? (data.missionId as number | null) : (current.missionId ?? null)
+  if (willPublish && missionAfter === null && ('published' in data || 'missionId' in data)) {
+    const submitSteps = await prisma.laneStep.count({ where: { laneSlug: slug, kind: 'submit' } })
+    if (submitSteps > 0) throw new LaneEditError(400, 'Pick a mission before publishing: this lane has a submit step')
+  }
+
   const n = noteOf(note)
   await prisma.$transaction(async (tx) => {
     await tx.lane.update({ where: { slug }, data: { ...data, updatedBy: actor } as never })
@@ -257,6 +265,11 @@ export async function moveStep(id: string, direction: 'up' | 'down', actor: stri
 export async function deleteStep(id: string, actor: string, note?: unknown): Promise<void> {
   const step = await prisma.laneStep.findUnique({ where: { id } })
   if (!step) throw new LaneEditError(404, 'Step not found')
+  const lane = await prisma.lane.findUnique({ where: { slug: step.laneSlug }, select: { published: true } })
+  if (lane?.published) {
+    const n = await prisma.laneStep.count({ where: { laneSlug: step.laneSlug } })
+    if (n <= 1) throw new LaneEditError(409, 'Unpublish the lane before deleting its last step')
+  }
   await prisma.$transaction(async (tx) => {
     await tx.laneStep.delete({ where: { id } })
     await tx.appSettingChange.create({

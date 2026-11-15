@@ -12,6 +12,8 @@ vi.mock('@/app/lib/lanes/admin', async (orig) => ({
   moveStep: vi.fn(),
   deleteStep: vi.fn(),
 }))
+const invalidateLaneLinks = vi.fn()
+vi.mock('@/app/lib/lanes', () => ({ invalidateLaneLinks: () => invalidateLaneLinks() }))
 vi.mock('@/app/lib/settings/store', () => ({
   listChanges: vi.fn(async () => [{ id: 1, key: 'lane:host:title' }, { id: 2, key: 'laneStep:x:body' }, { id: 3, key: 'mission:3:title' }, { id: 4, key: 'landing' }]),
 }))
@@ -76,6 +78,16 @@ describe('/api/admin/lanes', () => {
     expect(createStep).toHaveBeenCalledWith('host', expect.objectContaining({ title: 'New' }), ADMIN, undefined)
     await DELETE(req('DELETE', { stepId: 's1' }))
     expect(deleteStep).toHaveBeenCalledWith('s1', ADMIN, undefined)
+  })
+
+  it('expires the cached public lane links after a successful write, not after a refused one', async () => {
+    await PATCH(req('PATCH', { slug: 'host', published: true }))
+    await DELETE(req('DELETE', { stepId: 's1' }))
+    expect(invalidateLaneLinks).toHaveBeenCalledTimes(2)
+    invalidateLaneLinks.mockClear()
+    m(updateLane).mockRejectedValue(new LaneEditError(400, 'nope'))
+    await PATCH(req('PATCH', { slug: 'host', published: true }))
+    expect(invalidateLaneLinks).not.toHaveBeenCalled()
   })
 
   it('400 without a slug or step id; editor errors map to their status', async () => {

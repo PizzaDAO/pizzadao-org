@@ -20,6 +20,7 @@ import { PROFILE_STEPS, type ProfileStepKey } from "./profile-completion";
 export type NextActionKind =
   | ProfileStepKey
   | "submit_mission"
+  | "submit_lane_mission"
   | "awaiting_review"
   | "get_vouches"
   | "review_notification"
@@ -57,7 +58,7 @@ export interface NextActionInput {
     title: string | null;
     completedThisLevel: number;
     totalThisLevel: number;
-    nextMission: { id: number; title: string } | null;
+    nextMission: { id: number; title: string; fromLane?: true } | null;
     /** True when *all* level-N missions have been submitted but at least one
      * is still PENDING (awaiting reviewer). */
     awaitingReview: boolean;
@@ -100,6 +101,19 @@ export function resolveNextAction(input: NextActionInput): NextAction {
   }
 
   // 4. Mission ready to submit
+  if (level.nextMission?.fromLane) {
+    // The pinned lane's mission (at or below the member's level; see pickNextMission).
+    return {
+      kind: "submit_lane_mission",
+      level: level.current,
+      headline: "Your lane mission is ready",
+      body: level.nextMission.title,
+      primaryCta: {
+        label: "Submit your lane mission",
+        href: `/missions#mission-${level.nextMission.id}`,
+      },
+    };
+  }
   if (level.nextMission) {
     return {
       kind: "submit_mission",

@@ -708,6 +708,10 @@
         "headline": "Tu próxima misión está lista",
         "cta": "Enviar misión de nivel {level}"
       },
+      "submit_lane_mission": {
+        "headline": "La misión de tu carril está lista",
+        "cta": "Enviar la misión de tu carril"
+      },
       "awaiting_review": {
         "headline": "Esperando revisión — sigue construyendo",
         "body": "Misiones de nivel {level} enviadas.",

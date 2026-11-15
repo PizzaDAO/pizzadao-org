@@ -2,6 +2,7 @@
  * Lane reads and member writes (plans/lane-cards-mission-onboarding.md). Everything public is
  * gated by the `onboarding.laneCardsEnabled` toggle and fails closed (a read error means "off").
  */
+import { revalidateTag, unstable_cache } from 'next/cache'
 import { prisma } from '@/app/lib/db'
 import { toggleEnabled } from '@/app/lib/settings/toggles'
 import { applyStepTick, computeProgress, pickPinned } from './progress'
@@ -39,12 +40,39 @@ export async function lanesEnabled(): Promise<boolean> {
   }
 }
 
-/** slug -> guide href for every published lane; empty while the toggle is off or on any failure. */
+const LANE_LINKS_TAG = 'lane-links'
+const LANE_LINKS_TTL_SECONDS = 60
+
+async function loadPublishedSlugs(): Promise<string[]> {
+  const rows = await prisma.lane.findMany({ where: { published: true }, select: { slug: true } })
+  return rows.map((r: { slug: string }) => r.slug)
+}
+
+/** Expire the cached public lane links at once; the admin lane writes call this. Never throws. */
+export function invalidateLaneLinks(): void {
+  try {
+    revalidateTag(LANE_LINKS_TAG, { expire: 0 })
+  } catch {
+    // Outside a Next request (scripts, tests): nothing is cached.
+  }
+}
+
+/**
+ * slug -> guide href for every published lane; empty while the toggle is off or on any failure. The
+ * toggle is read live; only the lane list is cached (short TTL, tag `lane-links`, expired by the
+ * admin lane writes), so /community does not query lanes on every request.
+ */
 export async function getPublicLaneLinks(): Promise<Record<string, string>> {
   try {
     if (!(await lanesEnabled())) return {}
-    const rows = await prisma.lane.findMany({ where: { published: true }, select: { slug: true } })
-    return Object.fromEntries(rows.map((r: { slug: string }) => [r.slug, `/lanes/${r.slug}?pick=1`]))
+    let slugs: string[]
+    try {
+      slugs = await unstable_cache(loadPublishedSlugs, ['lane-links-v1'], { revalidate: LANE_LINKS_TTL_SECONDS, tags: [LANE_LINKS_TAG] })()
+    } catch {
+      // Outside a Next request (scripts, tests) there is no data cache; a real read error re-throws from here.
+      slugs = await loadPublishedSlugs()
+    }
+    return Object.fromEntries(slugs.map((slug) => [slug, `/lanes/${slug}?pick=1`]))
   } catch {
     return {}
   }
@@ -85,11 +113,11 @@ export async function pinLane(discordId: string, slug: string, source: LaneSourc
   const lane = await prisma.lane.findFirst({ where: { slug, published: true }, select: { slug: true } })
   if (!lane) return false
   const now = new Date()
-  await prisma.memberLane.upsert({
-    where: { discordId_laneSlug: { discordId, laneSlug: slug } },
-    create: { discordId, laneSlug: slug, source, pinnedAt: now },
-    update: { pinnedAt: now },
-  })
+  // One INSERT ... ON CONFLICT so concurrent first writes (two tabs, a card plus a button) cannot collide on the primary key.
+  await prisma.$executeRaw`
+    INSERT INTO "MemberLane" ("discordId", "laneSlug", "source", "doneStepIds", "pinnedAt", "firstSeenAt", "updatedAt")
+    VALUES (${discordId}, ${slug}, ${source}, ARRAY[]::TEXT[], ${now}, ${now}, ${now})
+    ON CONFLICT ("discordId", "laneSlug") DO UPDATE SET "pinnedAt" = EXCLUDED."pinnedAt", "updatedAt" = EXCLUDED."updatedAt"`
   return true
 }
 
@@ -102,16 +130,36 @@ export async function setStepDone(discordId: string, slug: string, stepId: strin
   })
   if (!lane) return null
   const stepIds = lane.steps.filter((s) => s.kind !== 'submit').map((s) => s.id)
-  const row = await prisma.memberLane.findUnique({ where: { discordId_laneSlug: { discordId, laneSlug: slug } } })
-  const next = applyStepTick(row?.doneStepIds ?? [], stepId, done, stepIds)
-  if (!row) {
-    // Only record a row when something was ticked; an unknown step id on a fresh member writes nothing.
-    if (next.length === 0) return []
-    await prisma.memberLane.create({ data: { discordId, laneSlug: slug, source: 'guide', doneStepIds: next } })
-    return next
+  if (!stepIds.includes(stepId)) {
+    // Unknown step or a submit step: nothing to write, just report the member's current ticks.
+    const row = await prisma.memberLane.findUnique({ where: { discordId_laneSlug: { discordId, laneSlug: slug } } })
+    return applyStepTick(row?.doneStepIds ?? [], stepId, done, stepIds)
   }
-  await prisma.memberLane.update({ where: { discordId_laneSlug: { discordId, laneSlug: slug } }, data: { doneStepIds: next } })
-  return next
+  // Each write is one atomic statement (array_append / array_remove, INSERT ... ON CONFLICT), so concurrent
+  // ticks never lose each other and two first visits never collide on the primary key.
+  const now = new Date()
+  let rows: Array<{ doneStepIds: string[] | null }>
+  if (done) {
+    rows = await prisma.$queryRaw`
+      INSERT INTO "MemberLane" ("discordId", "laneSlug", "source", "doneStepIds", "firstSeenAt", "updatedAt")
+      VALUES (${discordId}, ${slug}, 'guide', ARRAY[${stepId}]::TEXT[], ${now}, ${now})
+      ON CONFLICT ("discordId", "laneSlug") DO UPDATE SET
+        "doneStepIds" = CASE
+          WHEN ${stepId}::TEXT = ANY(COALESCE("MemberLane"."doneStepIds", ARRAY[]::TEXT[])) THEN COALESCE("MemberLane"."doneStepIds", ARRAY[]::TEXT[])
+          ELSE array_append(COALESCE("MemberLane"."doneStepIds", ARRAY[]::TEXT[]), ${stepId}::TEXT)
+        END,
+        "updatedAt" = EXCLUDED."updatedAt"
+      RETURNING "doneStepIds"`
+  } else {
+    rows = await prisma.$queryRaw`
+      UPDATE "MemberLane"
+      SET "doneStepIds" = array_remove(COALESCE("doneStepIds", ARRAY[]::TEXT[]), ${stepId}::TEXT), "updatedAt" = ${now}
+      WHERE "discordId" = ${discordId} AND "laneSlug" = ${slug}
+      RETURNING "doneStepIds"`
+  }
+  // Report current steps only (ids of deleted steps drop out).
+  const valid = new Set(stepIds)
+  return (rows[0]?.doneStepIds ?? []).filter((id) => valid.has(id))
 }
 
 export async function getMemberLane(discordId: string, slug: string) {

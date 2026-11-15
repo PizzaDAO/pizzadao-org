@@ -41,3 +41,25 @@ export function applyStepTick(current: string[], stepId: string, done: boolean, 
   else next.delete(stepId)
   return [...next]
 }
+
+export interface NextMissionLike {
+  id: number
+  title: string
+}
+
+/**
+ * The dashboard's next mission. The pinned lane's mission wins only when it is at or below the
+ * member's current level (so a lane never skips them past the level they are working on, and the
+ * level track is never blocked); otherwise the member's own next level mission stays. A lane pick is
+ * flagged `fromLane` so the CTA can say so.
+ */
+export function pickNextMission(
+  levelMission: NextMissionLike | null,
+  laneMission: (NextMissionLike & { level?: number }) | null,
+  currentLevel: number,
+): (NextMissionLike & { fromLane?: true }) | null {
+  if (laneMission && typeof laneMission.level === 'number' && laneMission.level <= currentLevel) {
+    return { id: laneMission.id, title: laneMission.title, fromLane: true }
+  }
+  return levelMission
+}

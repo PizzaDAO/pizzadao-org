@@ -56,6 +56,16 @@ describe("resolveNextAction", () => {
         expect(action.body).toBe("Post your first vouch");
     });
 
+    it("returns submit_lane_mission with its own copy when the next mission is the pinned lane's", () => {
+        const input = baseInput();
+        input.level.nextMission = { id: 40, title: "Host a slice night", fromLane: true };
+        const action = resolveNextAction(input);
+        expect(action.kind).toBe("submit_lane_mission");
+        expect(action.primaryCta.label).toBe("Submit your lane mission");
+        expect(action.primaryCta.href).toBe("/missions#mission-40");
+        expect(action.body).toBe("Host a slice night");
+    });
+
     it("returns awaiting_review when all level missions submitted but pending", () => {
         const input = baseInput();
         input.level.nextMission = null;
