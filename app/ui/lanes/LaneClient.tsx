@@ -25,14 +25,15 @@ async function post(url: string, body: Record<string, unknown>): Promise<boolean
 
 /**
  * After a pin or a tick the dashboard's lane card and next action are out of date, but the summary
- * is cached for a minute (React Query staleTime plus the response's max-age). Re-fetch it past the
- * HTTP cache (`reload` also refreshes the stored copy) and mark the query stale, so the dashboard
+ * is cached for a minute (React Query staleTime, the response's max-age, and the route's in-memory
+ * entry). Re-fetch it with `fresh=1` (the route rebuilds its entry and answers no-store) past the
+ * HTTP cache (`reload`) and mark the query stale, so the dashboard
  * shows the change on the next visit. Best effort; failures are ignored.
  */
 export function useRefreshDashboardSummary(memberId: string) {
     const queryClient = useQueryClient();
     return () => {
-        void fetch(`/api/dashboard-summary?memberId=${encodeURIComponent(memberId)}`, { cache: "reload" })
+        void fetch(`/api/dashboard-summary?memberId=${encodeURIComponent(memberId)}&fresh=1`, { cache: "reload" })
             .catch(() => undefined)
             .finally(() => void queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] }));
     };

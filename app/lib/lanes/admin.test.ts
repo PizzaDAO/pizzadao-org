@@ -91,6 +91,31 @@ describe('createStep', () => {
   })
 })
 
+describe('submit steps on a published lane need a mission', () => {
+  const published = { ...lane, published: true }
+  it('createStep refuses a submit step with no mission, allows it with one or on a draft', async () => {
+    m(prisma.lane.findUnique).mockResolvedValue(published)
+    await expect(createStep('host', { title: 'x', kind: 'submit' }, ADMIN)).rejects.toMatchObject({ status: 400, message: /Pick a mission/ })
+    expect(prisma.laneStep.create).not.toHaveBeenCalled()
+    await createStep('host', { title: 'x', kind: 'do' }, ADMIN)
+    m(prisma.lane.findUnique).mockResolvedValue({ ...published, missionId: 29 })
+    await createStep('host', { title: 'x', kind: 'submit' }, ADMIN)
+    m(prisma.lane.findUnique).mockResolvedValue(lane)
+    await createStep('host', { title: 'x', kind: 'submit' }, ADMIN)
+    expect(prisma.laneStep.create).toHaveBeenCalledTimes(3)
+  })
+  it('updateStep refuses changing a step to submit with no mission', async () => {
+    const step = { id: 's2', laneSlug: 'host', title: 'B', body: '', linkHref: null, linkLabel: null, kind: 'do', position: 2 }
+    m(prisma.laneStep.findUnique).mockResolvedValue(step)
+    m(prisma.lane.findUnique).mockResolvedValue(published)
+    await expect(updateStep('s2', { kind: 'submit' }, ADMIN)).rejects.toMatchObject({ status: 400, message: /Pick a mission/ })
+    expect(prisma.laneStep.update).not.toHaveBeenCalled()
+    expect((await updateStep('s2', { title: 'C' }, ADMIN)).changed).toEqual(['title'])
+    m(prisma.lane.findUnique).mockResolvedValue({ ...published, missionId: 29 })
+    expect((await updateStep('s2', { kind: 'submit' }, ADMIN)).changed).toEqual(['kind'])
+  })
+})
+
 describe('updateStep / moveStep / deleteStep', () => {
   const step = { id: 's2', laneSlug: 'host', title: 'B', body: '', linkHref: null, linkLabel: null, kind: 'do', position: 2 }
   it('updates changed fields with audit rows', async () => {
@@ -127,6 +152,17 @@ describe('updateStep / moveStep / deleteStep', () => {
     m(prisma.laneStep.count).mockResolvedValue(1)
     await deleteStep('s2', ADMIN)
     expect(prisma.laneStep.delete).toHaveBeenCalledTimes(1)
+  })
+  it('locks the lane row and checks the step count inside the transaction', async () => {
+    m(prisma.laneStep.findUnique).mockResolvedValue(step)
+    m(prisma.lane.findUnique).mockResolvedValue({ ...lane, published: true })
+    const order: string[] = []
+    m(prisma.$queryRaw).mockImplementation(async () => void order.push('lock'))
+    m(prisma.laneStep.count).mockImplementation(async () => (order.push('count'), 1))
+    await expect(deleteStep('s2', ADMIN)).rejects.toMatchObject({ status: 409 })
+    expect(order).toEqual(['lock', 'count'])
+    expect(prisma.laneStep.delete).not.toHaveBeenCalled()
+    m(prisma.$queryRaw).mockReset()
   })
   it('deletes with an audit row', async () => {
     m(prisma.laneStep.findUnique).mockResolvedValue(step)
