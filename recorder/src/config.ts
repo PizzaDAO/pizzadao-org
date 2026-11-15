@@ -82,7 +82,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     discordToken: req('DISCORD_BOT_TOKEN'),
     guildId: req('DISCORD_GUILD_ID'),
     callChannelId: env.CALL_VOICE_CHANNEL_ID?.trim() || DEFAULT_CALL_VOICE_CHANNEL_ID,
-    appBaseUrl: (env.APP_BASE_URL?.trim() || 'https://app.pizzadao.org').replace(/\/$/, ''),
+    appBaseUrl: (env.APP_BASE_URL?.trim() || 'https://pizzadao.org').replace(/\/$/, ''),
     recorderApiKey: req('RECORDER_API_KEY'),
     deepgramApiKey: env.DEEPGRAM_API_KEY?.trim() || undefined,
     dataDir: env.DATA_DIR?.trim() || '/data',
