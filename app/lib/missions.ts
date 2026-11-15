@@ -4,6 +4,7 @@ import { PIZZA_NOOB_GRADUATE_LEVEL } from './trainee-nick'
 import { Prisma, type ReviewAction } from '@prisma/client'
 import { creditInTx, getOrCreateEconomy, lockWallet } from './economy'
 import { createNotification } from './notifications'
+import { clearReviewNotifications, REVIEW_LINK_URL } from './review-notifications'
 import { getMembersWithRoles } from './discord'
 import { DREAD_PIZZA_ROBERTS_ROLE_ID, MISSION_REVIEWER_ROLE_IDS } from '../ui/constants'
 import { dprOnlyMinLevel, missionReviewerRoleIds, reviewerRoleSetting } from './mission-review-access'
@@ -361,7 +362,7 @@ export async function submitMissionCompletion(
   }
 
   // Notify reviewers that a mission needs manual review
-  notifyReviewers(discordId, mission.title, mission.level).catch(() => {})
+  notifyReviewers(discordId, mission.title, mission.level, undefined, { completionId: completion.id, missionId }).catch(() => {})
 
   return completion
 }
@@ -605,6 +606,9 @@ export async function approveMission(
     include: { mission: true },
   })
 
+  // The reviewers' "needs review" pings are settled (fail-soft).
+  await clearReviewNotifications(completionId)
+
   // Notify the user
   createNotification({
     type: 'MISSION_APPROVED',
@@ -676,6 +680,8 @@ export async function rejectMission(
     where: { id: completionId },
     include: { mission: true },
   })
+
+  await clearReviewNotifications(completionId)
 
   // Notify the user
   createNotification({
@@ -964,6 +970,8 @@ export async function notifyReviewers(
   missionTitle: string,
   level: number,
   message = `New submission for "${truncate(missionTitle, 50)}" needs approval.`,
+  /** Lets a review clear these again (review-notifications.ts); legacy rows had none. */
+  ref?: { completionId: number; missionId: number },
 ) {
   const dprFrom = await dprOnlyMinLevel()
   // The same list that may approve (the narrowed setting, else the built-in reviewers).
@@ -982,7 +990,8 @@ export async function notifyReviewers(
           actorId: submitterDiscordId,
           title: 'Mission Needs Review',
           message,
-          linkUrl: '/missions',
+          metadata: ref ? { completionId: ref.completionId, missionId: ref.missionId } : undefined,
+          linkUrl: REVIEW_LINK_URL,
         })
       )
   )

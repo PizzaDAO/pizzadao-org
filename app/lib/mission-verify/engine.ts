@@ -27,6 +27,7 @@
 import { Prisma, type MissionHold } from '@prisma/client'
 import { prisma } from '../db'
 import { createNotification } from '../notifications'
+import { clearReviewNotificationsFor } from '../review-notifications'
 import { notifyReviewers, recordReviewEvent, rejectionSnapshot, settleLevels } from '../missions'
 import { queueReviewCardSync, reviewCardsEnabled, syncReviewCardsFor } from './review-cards'
 import { NEW_REVIEW_ROUND } from './review-ids'
@@ -489,6 +490,8 @@ async function maybeFlag(row: Row, r: VerifyResult, m: MissionRow, report: RunRe
 /** In-app notifications (DB only). Discord DMs and #work posts: ./notify.ts. */
 function notifyInApp(discordId: string, report: RunReport, policy: HoldPolicy) {
   for (const c of report.checks) {
+    // The submission left PENDING (also the silent "recorded" approval): settle the reviewers' pings (fail-soft).
+    if (c.outcome === 'approved' || c.outcome === 'recorded') void clearReviewNotificationsFor(discordId, c.missionId)
     if (c.outcome === 'approved') {
       createNotification({
         type: 'MISSION_APPROVED',
@@ -502,9 +505,22 @@ function notifyInApp(discordId: string, report: RunReport, policy: HoldPolicy) {
     }
     if (c.outcome === 'held' || c.outcome === 'reopened') {
       const why = c.holdReason ? holdLabel(c.holdReason, policy) : 'needs a reviewer'
-      notifyReviewers(discordId, c.title, c.level, `"${c.title.slice(0, 50)}" was auto-verified and needs your approval (${why}).`).catch(
-        () => {},
-      )
+      void notifyHeld(discordId, c, `"${c.title.slice(0, 50)}" was auto-verified and needs your approval (${why}).`)
     }
   }
+}
+
+/** Ping the reviewers about a held / reopened completion, with its id so the review can clear the ping. */
+async function notifyHeld(discordId: string, c: MissionCheck, message: string) {
+  let ref: { completionId: number; missionId: number } | undefined
+  try {
+    const row = await prisma.missionCompletion.findUnique({
+      where: { missionId_discordId: { missionId: c.missionId, discordId } },
+      select: { id: true },
+    })
+    if (row) ref = { completionId: row.id, missionId: c.missionId }
+  } catch {
+    /* the ping still goes out, just without a completion id */
+  }
+  await notifyReviewers(discordId, c.title, c.level, message, ref).catch(() => {})
 }
