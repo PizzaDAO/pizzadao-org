@@ -1,6 +1,7 @@
 import { activationActor, recordActivationLater as recordActivation } from "@/app/lib/activation";
 import { sanitizeSignupDraft } from "@/app/lib/signup-draft";
 import { readRefCookie } from "@/app/lib/referral-cookie";
+import { readLaneCookie } from "@/app/lib/lanes/cookie";
 import { NextResponse } from "next/server";
 import { enforceRateLimit } from "@/app/lib/rate-limit";
 import { requestMagicLogin } from "@/app/lib/magic-login";
@@ -20,6 +21,8 @@ export async function POST(req: Request) {
     actor = draft?.sessionId || activationActor(body.actor);
     const ref = readRefCookie(req);
     if (draft && ref && draft.invitedBy === undefined) draft.invitedBy = { memberId: ref, name: "", viaLink: true };
+    const laneCookie = readLaneCookie(req);
+    if (draft && laneCookie && !draft.lane) draft.lane = laneCookie;
     const username = String(body?.username ?? "").trim();
 
     if (username.length < 2 || username.length > 32) {

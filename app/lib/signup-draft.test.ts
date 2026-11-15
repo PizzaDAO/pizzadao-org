@@ -15,4 +15,11 @@ describe("signup drafts", () => {
     const draft = sanitizeSignupDraft({ mafiaName: 'Test', city: 'Paris', sessionId: 'test-session', memberId: '-1', timezone: 'Unknown/Place' });
     expect(draft?.memberId).toBeUndefined(); expect(draft?.timezone).toBeUndefined();
   });
+  it("keeps a valid lane slug and drops junk", () => {
+    const base = { mafiaName: 'Test', city: 'Paris', sessionId: 'test-session' };
+    expect(sanitizeSignupDraft({ ...base, lane: 'host' })?.lane).toBe('host');
+    expect(sanitizeSignupDraft({ ...base, lane: ' grow-2 ' })?.lane).toBe('grow-2');
+    for (const lane of ['Host', '../x', 'a'.repeat(33), '', 7, null, { slug: 'host' }]) expect(sanitizeSignupDraft({ ...base, lane })?.lane).toBeUndefined();
+    expect(sanitizeSignupDraft(base)).not.toHaveProperty('lane');
+  });
 });

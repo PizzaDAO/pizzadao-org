@@ -37,9 +37,11 @@ export default async function LanePage({ params, searchParams }: Props) {
 
     const pickPath = `/lanes/${slug}?pick=1`;
     const session = await getSession();
-    if (!session?.discordId) redirect(`/join?returnTo=${encodeURIComponent(pickPath)}`);
+    // Visitors sign up (or log in) with the lane carried along; existing members come back here through returnTo.
+    const joinPath = `/join?lane=${slug}&returnTo=${encodeURIComponent(pickPath)}`;
+    if (!session?.discordId) redirect(joinPath);
     const memberId = await fetchMemberIdByDiscordId(session.discordId).catch(() => null);
-    if (!memberId) redirect(`/join?returnTo=${encodeURIComponent(pickPath)}`);
+    if (!memberId) redirect(joinPath);
 
     const t = await getTranslations("lanes");
     const locale = await resolveLocale();

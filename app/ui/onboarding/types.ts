@@ -92,6 +92,9 @@ export type WizardData = {
   // cookie); null = "no one"; otherwise the inviter.
   invitedBy?: InvitedBy | null;
 
+  // The lane card the visitor came from (/join?lane=<slug>); pinned when the profile is created.
+  lane?: string;
+
   // Step 5: Crews
   crews: string[];
 

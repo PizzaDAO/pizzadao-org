@@ -533,6 +533,8 @@
       "optionalNumber": "Choose a member number (optional)",
       "numberAssigned": "We’ll assign your member number when you finish. Choose roles and crews from your dashboard later.",
       "restoreFailed": "We could not restore your saved signup. Refresh to retry, or enter your details again.",
+      "laneBanner": "Your lane: {tag} · {title}",
+      "laneGuideButton": "Start your {lane} guide",
       "draftRestored": "Your signup was restored. Review your name and city before creating your profile.",
       "finishSignup": "Create my profile"
     },

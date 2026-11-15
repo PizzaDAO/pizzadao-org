@@ -533,6 +533,8 @@
       "optionalNumber": "Choisir un numéro de membre (facultatif)",
       "numberAssigned": "Votre numéro de membre sera attribué à la fin. Vous pourrez choisir vos rôles et équipes depuis votre tableau de bord.",
       "restoreFailed": "Votre inscription n’a pas pu être restaurée. Actualisez pour réessayer ou saisissez vos informations à nouveau.",
+      "laneBanner": "Votre parcours : {tag} · {title}",
+      "laneGuideButton": "Commencer votre guide {lane}",
       "draftRestored": "Votre inscription a été restaurée. Vérifiez votre nom et votre ville avant de créer votre profil.",
       "finishSignup": "Créer mon profil"
     },

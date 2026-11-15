@@ -5,7 +5,7 @@ import fr from '../../messages/fr.json';
 
 const catalogs = { en, es, fr };
 const BROWSER_NAME = 'Browser Pepperoni';
-async function fixtures(context: BrowserContext, state: { draft?: unknown; profile?: Record<string, unknown>; failSave?: boolean; loginStatus?: string } = {}) {
+async function fixtures(context: BrowserContext, state: { draft?: unknown; profile?: Record<string, unknown>; failSave?: boolean; loginStatus?: string; lane?: boolean } = {}) {
   await context.route('**/api/**', async route => {
     const path = new URL(route.request().url()).pathname;
     let status = 200; let json: unknown = {};
@@ -16,8 +16,9 @@ async function fixtures(context: BrowserContext, state: { draft?: unknown; profi
     else if (path === '/api/onboarding/draft') json = { draft: state.draft };
     else if (path === '/api/auth/magic-login/request') { state.draft = route.request().postDataJSON().signupDraft; json = { status: state.loginStatus || 'sent' }; status = state.loginStatus ? 422 : 200; }
     else if (path === '/api/namegen') json = { cached: false, topping: 'Pepperoni', mafiaMovieTitle: 'The Godfather', resolvedMovieTitle: 'The Godfather', tmdbMovieId: '238', releaseDate: '1972-03-14', mediaType: 'movie', style: 'balanced', suggestions: [BROWSER_NAME, 'Browser Mozzarella', 'Browser Basil'], origins: {}, sigs: {} };
+    else if (path === '/api/lanes/intent') { status = state.lane ? 200 : 404; json = state.lane ? { ok: true, lane: { slug: 'host', tag: 'Host', title: 'Throw a party' } } : { error: 'Not found' }; }
     else if (path.startsWith('/api/member-lookup/')) json = { found: false };
-    else if (path === '/api/profile') { state.profile = route.request().postDataJSON(); status = state.failSave ? 503 : 200; json = state.failSave ? { error: 'Please retry saving' } : { ok: true, sheets: { memberId: '990001' } }; }
+    else if (path === '/api/profile') { state.profile = route.request().postDataJSON(); status = state.failSave ? 503 : 200; json = state.failSave ? { error: 'Please retry saving' } : { ok: true, sheets: { memberId: '990001' }, ...(state.lane && state.profile?.lane === 'host' ? { lane: { slug: 'host', href: '/lanes/host' } } : {}) }; }
     await route.fulfill({ status, json });
   });
 }
@@ -79,6 +80,32 @@ for (const locale of ['en', 'es', 'fr'] as const) for (const theme of ['light', 
     await fresh.close();
   });
 }
+
+test('lane cards: the picked lane rides the signup draft, shows a banner and the finale leads to the guide', async ({ browser, baseURL }, testInfo) => {
+  const state: { draft?: unknown; profile?: Record<string, unknown>; lane: boolean } = { lane: true, draft: { mafiaName: BROWSER_NAME, city: 'Testville', sessionId: 'lane-session-1', topping: 'Pepperoni', lane: 'host' } };
+  const context = await browser.newContext({ viewport: testInfo.project.use.viewport, locale: 'en', reducedMotion: 'reduce' });
+  await context.addCookies([{ name: 'NEXT_LOCALE', value: 'en', url: baseURL! }]);
+  await fixtures(context, state);
+  const page = await context.newPage();
+  await page.goto(`${baseURL}/?resumeSignup=1&discordId=test-discord&discordJoined=1`);
+  await expect(page.getByText(en.onboarding.chrome.laneBanner.replace('{tag}', 'Host').replace('{title}', 'Throw a party'), { exact: true })).toBeVisible();
+  await pickGeneratedName(page, en, true);
+  await page.getByRole('button', { name: en.onboarding.chrome.finishSignup, exact: true }).click();
+  const cta = page.getByRole('link', { name: en.onboarding.chrome.laneGuideButton.replace('{lane}', 'Host'), exact: true });
+  await expect(cta).toHaveAttribute('href', '/lanes/host');
+  expect(state.profile).toMatchObject({ lane: 'host' });
+  await context.close();
+});
+
+test('lane cards off: a stale lane pick is dropped and nothing changes', async ({ page, context, baseURL }) => {
+  const state: { profile?: Record<string, unknown> } = {};
+  await context.addCookies([{ name: 'NEXT_LOCALE', value: 'en', url: baseURL! }]);
+  await fixtures(context, state);
+  await page.goto('/join?lane=host');
+  await expect(page.getByRole('textbox', { name: en.onboarding.name.filmPickerAriaLabel, exact: true })).toBeVisible();
+  await expect(page.getByText('Throw a party')).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem(Object.keys(localStorage).find(k => /onboard|wizard/i.test(k)) || '') || '{}').lane ?? null)).toBeNull();
+});
 
 test('closed DMs offer recovery and an expired link returns to login', async ({ page, context }) => {
   await context.addCookies([{ name: 'NEXT_LOCALE', value: 'en', url: 'http://127.0.0.1:' + (process.env.ACTIVATION_TEST_PORT || '3106') }]);

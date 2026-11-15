@@ -9,6 +9,7 @@ import { parseMafiaJoinParams } from "@/app/lib/mafia-join-params";
 import { filmCode, rerollCode, toppingCode } from "@/app/lib/mafia-funnel";
 import { MAFIA_FILMS } from "@/app/lib/mafia-films";
 import { sanitizeSignupDraft } from "@/app/lib/signup-draft";
+import { isLaneSlug } from "@/app/lib/lanes/links";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
@@ -207,6 +208,62 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
     };
   }, []);
 
+  // --- Lane card pick: /join?lane=<slug> ---
+  // The slug lives in WizardData (localStorage, and the signup draft for a DM link opened on another
+  // device). The server confirms it is a published lane while the setting is on, remembers it in the
+  // httpOnly pd_lane cookie, and returns the name for the banner; anything else clears it, so with
+  // the setting off nothing changes.
+  const [laneCta, setLaneCta] = useState<string | null>(null);
+  const [laneInfo, setLaneInfo] = useState<{ slug: string; tag: string; title: string } | null>(null);
+  useEffect(() => {
+    if (!dataReady) return;
+    const param = new URLSearchParams(window.location.search).get("lane");
+    if (param && isLaneSlug(param) && param !== data.lane) {
+      setData((p) => ({ ...p, lane: param }));
+      return;
+    }
+    const slug = data.lane;
+    if (!slug) return;
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/lanes/intent", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ slug }),
+        });
+        const json = res.ok ? await res.json() : null;
+        if (!alive) return;
+        if (json?.lane?.slug === slug) setLaneInfo({ slug, tag: String(json.lane.tag || ""), title: String(json.lane.title || "") });
+        else if (res.status === 404 || res.status === 400) {
+          setLaneInfo(null);
+          setData((p) => (p.lane === slug ? { ...p, lane: undefined } : p));
+        }
+      } catch {}
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [dataReady, data.lane]);
+
+  // Where an existing member who just logged in lands: their lane guide when they picked one.
+  async function laneLanding(): Promise<string | null> {
+    if (!data.lane) return null;
+    try {
+      const res = await fetch("/api/lanes/intent", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: data.lane }),
+      });
+      const json = res.ok ? await res.json() : null;
+      return json?.lane?.slug === data.lane ? `/lanes/${data.lane}?pick=1` : null;
+    } catch {
+      return null;
+    }
+  }
+
   // --- Initialize flow based on URL params and session ---
   useEffect(() => {
     if (!dataReady || hasProcessedParams.current) return;
@@ -353,7 +410,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
           }),
         });
         if (claimRes.ok) {
-          router.push(`/dashboard/${lookup.memberId}`);
+          router.push((await laneLanding()) ?? `/dashboard/${lookup.memberId}`);
           return;
         }
       }
@@ -363,7 +420,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
         const hasPendingClaim = localStorage.getItem(PENDING_CLAIM_KEY) === "1";
         if (!hasPendingClaim) {
           // Auto-login
-          router.push(`/dashboard/${lookup.memberId || discordId}`);
+          router.push((await laneLanding()) ?? `/dashboard/${lookup.memberId || discordId}`);
           return;
         }
         // User completed wizard, show review
@@ -528,6 +585,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
           crews: data.crews,
           // L3.1: undefined = not asked (the server uses the invite-link cookie), "" = no one.
           invitedBy: data.invitedBy === undefined ? undefined : (data.invitedBy?.memberId ?? ""),
+          lane: data.lane,
           memberId: data.memberId,
           autoAssignMemberId: !data.memberId,
           discordId: verifiedDiscordId || data.discordId,
@@ -549,7 +607,10 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
       localStorage.removeItem(PENDING_CLAIM_KEY);
       setData(p => ({ ...p, memberId: String(memberId) }));
       localStorage.removeItem(LS_KEY);
-      const redirectTo = memberId ? `/dashboard/${memberId}` : WIZARD_HOME;
+      // Lane cards: the server pinned the picked lane, so the finale leads to its guide.
+      const laneHref = typeof result?.lane?.href === "string" && /^\/lanes\/[a-z0-9-]{1,32}$/.test(result.lane.href) ? result.lane.href : null;
+      const redirectTo = laneHref ?? (memberId ? `/dashboard/${memberId}` : WIZARD_HOME);
+      if (laneHref && laneInfo) setLaneCta(laneInfo.tag);
       setFlow({ type: "success", redirectTo });
     } catch (e: unknown) {
       setIsSubmitting(false);
@@ -709,6 +770,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
         mafiaName={data.mafiaName || data.discordNick || "Made"}
         memberId={data.memberId}
         dashboardHref={flow.redirectTo}
+        ctaLabel={laneCta ? t("laneGuideButton", { lane: laneCta }) : undefined}
         topping={data.topping || undefined}
         filmId={claimFilm?.id}
         filmTitle={claimFilm?.title ?? (filmTitle || undefined)}
@@ -836,6 +898,11 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
           </button>
         </div>
 
+        {laneInfo && (
+          <p role="status" className="rounded-xl bg-secondary p-4 text-sm">
+            {t("laneBanner", { tag: laneInfo.tag, title: laneInfo.title })}
+          </p>
+        )}
         {restoredDraft && <p role="status" className="rounded-xl bg-secondary p-4 text-sm">{t("draftRestored")}</p>}
         {/* Error display */}
         {error && (

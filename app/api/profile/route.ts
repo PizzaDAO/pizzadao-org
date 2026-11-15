@@ -19,6 +19,8 @@ import { UnauthorizedError, ForbiddenError, ValidationError, ExternalServiceErro
 import { fetchMemberById, fetchMemberByDiscordId, fetchMemberIdByDiscordId, invalidateMembersCache } from "@/app/lib/sheets/member-repository";
 import { chooseInviter, recordReferral, type RecordReferralResult } from "@/app/lib/referrals";
 import { creditPendingItemGrantsOnLogin } from "@/app/lib/shop-grants";
+import { LANE_COOKIE, laneCookieOptions, normalizeLaneSlug, readLaneCookie } from "@/app/lib/lanes/cookie";
+import { lanesEnabled, pinLane } from "@/app/lib/lanes";
 import { readRefCookie, refCookieOptions, REF_COOKIE } from "@/app/lib/referral-cookie";
 import { emitMissionEvent } from "@/app/lib/mission-verify/events";
 import { syncDiscordMember } from "@/app/lib/services/discord-api";
@@ -399,6 +401,22 @@ const POST_HANDLER = async (req: Request) => {
     }
   }
 
+  // Lane cards: pin the lane the visitor picked on the community page (body, else the pd_lane
+  // cookie) for a first onboarding. Only a published lane while the setting is on; never fails
+  // the profile save.
+  const laneCookie = readLaneCookie(req);
+  let lane: { slug: string; href: string } | null = null;
+  if (firstOnboarding && payload.discordId) {
+    const slug = normalizeLaneSlug(body.lane) ?? laneCookie;
+    if (slug) {
+      try {
+        if ((await lanesEnabled()) && (await pinLane(payload.discordId, slug, "signup"))) lane = { slug, href: `/lanes/${slug}` };
+      } catch (e) {
+        console.error("[profile] lane pin failed", e);
+      }
+    }
+  }
+
   const res = NextResponse.json({
     ok: true,
     discord: discordResult,
@@ -406,7 +424,9 @@ const POST_HANDLER = async (req: Request) => {
     welcome: welcomeResult,
     isNewSignup,
     referral: referral ? { outcome: referral.outcome } : null,
+    ...(lane ? { lane } : {}),
   });
+  if (laneCookie) res.cookies.set(LANE_COOKIE, "", laneCookieOptions(req, 0));
   if (cookieRef) res.cookies.set(REF_COOKIE, "", refCookieOptions(req, 0));
   if (firstOnboarding) {
     recordActivation("profile_created", { actor: payload.sessionId, discordId: payload.discordId });

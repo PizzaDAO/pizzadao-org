@@ -533,6 +533,8 @@
       "optionalNumber": "Elegir un número de miembro (opcional)",
       "numberAssigned": "Te asignaremos un número de miembro al terminar. Podrás elegir roles y equipos desde tu panel después.",
       "restoreFailed": "No pudimos recuperar tu registro. Actualiza para reintentar o vuelve a introducir tus datos.",
+      "laneBanner": "Tu carril: {tag} · {title}",
+      "laneGuideButton": "Empieza tu guía de {lane}",
       "draftRestored": "Hemos recuperado tu registro. Revisa tu nombre y ciudad antes de crear el perfil.",
       "finishSignup": "Crear mi perfil"
     },

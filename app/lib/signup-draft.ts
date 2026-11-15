@@ -1,8 +1,9 @@
+import { isLaneSlug } from "./lanes/links";
 import { sanitizeDisplayName, sliceUnits } from "./display-name";
 
 export const SIGNUP_DRAFT_COOKIE = "pd_signup_draft";
 export const SIGNUP_DRAFT_TTL_SECONDS = 30 * 60;
-export type SignupDraft = { mafiaName: string; city: string; sessionId: string; memberId?: string; timezone?: string; cityRegion?: string; topping?: string; invitedBy?: { memberId: string; name: string; viaLink?: boolean } | null };
+export type SignupDraft = { mafiaName: string; city: string; sessionId: string; memberId?: string; timezone?: string; cityRegion?: string; topping?: string; invitedBy?: { memberId: string; name: string; viaLink?: boolean } | null; lane?: string };
 
 /** Only profile fields; never restore identity, roles, permissions, or arbitrary JSON. */
 export function sanitizeSignupDraft(value: unknown): SignupDraft | null {
@@ -28,5 +29,7 @@ export function sanitizeSignupDraft(value: unknown): SignupDraft | null {
   if (inviter && typeof inviter.memberId === "string" && /^\d{1,10}$/.test(inviter.memberId)) {
     draft.invitedBy = { memberId: inviter.memberId, name: sliceUnits(String(inviter.name || ""), 80), viaLink: inviter.viaLink === true };
   }
+  const lane = typeof v.lane === "string" ? v.lane.trim() : "";
+  if (isLaneSlug(lane)) draft.lane = lane;
   return draft;
 }
