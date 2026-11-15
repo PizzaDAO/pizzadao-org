@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => { process.env.SESSION_SECRET ||= "test-secret"; return { used: vi.fn(), verify: vi.fn() }; });
+const mocks = vi.hoisted(() => { process.env.SESSION_SECRET ||= "test-secret"; return { used: vi.fn(), verify: vi.fn(), limit: vi.fn() }; });
+vi.mock("@/app/lib/rate-limit", () => ({ enforceRateLimit: mocks.limit }));
 vi.mock("@/app/lib/magic-login", () => ({ anyMagicLinkUsed: mocks.used }));
 vi.mock("@/app/lib/session", () => ({ COOKIE_NAME: "pizzadao_session", verifySession: mocks.verify }));
 import { GET } from "./route";
@@ -12,12 +13,13 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.verify.mockImplementation((t?: string) => (t === "good" ? { discordId: "123", createdAt: Date.now() } : null));
   mocks.used.mockResolvedValue(false);
+  mocks.limit.mockResolvedValue(null);
 });
 
 describe("magic login status", () => {
   it("reports a session that appeared in this browser (link opened in another tab)", async () => {
     const res = await get("pizzadao_session=good");
-    expect(await res.json()).toEqual({ loggedIn: true, openedElsewhere: false });
+    expect(await res.json()).toMatchObject({ loggedIn: true, openedElsewhere: false, sessionCreatedAt: expect.any(Number) });
     expect(res.headers.get("cache-control")).toBe("no-store");
     expect(mocks.used).not.toHaveBeenCalled();
   });
@@ -33,6 +35,13 @@ describe("magic login status", () => {
     expect(mocks.used).toHaveBeenCalledWith([]);
     const res = await get();
     expect(await res.json()).toEqual({ loggedIn: false, openedElsewhere: false });
+  });
+  it("is rate limited under its own generous bucket", async () => {
+    mocks.limit.mockResolvedValue(new Response(null, { status: 429 }));
+    const res = await get("pizzadao_session=good");
+    expect(res.status).toBe(429);
+    expect(mocks.limit).toHaveBeenCalledWith(expect.any(Request), "magic-login-status");
+    expect(mocks.used).not.toHaveBeenCalled();
   });
   it("fails quiet when the lookup fails", async () => {
     mocks.used.mockRejectedValue(new Error("db down"));

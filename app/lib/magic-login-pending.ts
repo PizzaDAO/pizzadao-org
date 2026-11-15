@@ -12,9 +12,11 @@
  *     browser, other tab) or that its link was used without logging THIS browser in (opened elsewhere);
  *   - the link's landing can tell it was opened in a browser that did not ask for it, and say so.
  *
- * This only ever reports on, or to, the browser that holds the cookie. It never moves a session from
- * one browser to another, so a link requested by someone else (an attacker typing a victim's name)
- * cannot log the requester in.
+ * This only ever reports to the browser that holds the cookie. It never moves a session from one
+ * browser to another, so a link requested by someone else (an attacker typing a victim's name)
+ * cannot log the requester in. The requester DOES learn that the link was clicked (not by whom or
+ * where); the per-member request limit bounds that, and the landing notice reads neutrally for a
+ * member who never asked for a link.
  */
 import { createHmac, timingSafeEqual } from "crypto";
 

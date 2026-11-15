@@ -46,7 +46,7 @@ export async function POST(req: Request) {
       case "sent": {
         // Remember in this browser which link it asked for, so this tab can tell when the link was
         // opened (here or elsewhere) and the link's landing can tell whether it is the same browser.
-        const res = NextResponse.json({ status: "sent" });
+        const res = NextResponse.json({ status: "sent", sentAt: Date.now() });
         res.cookies.set(
           MAGIC_PENDING_COOKIE,
           addPendingId(readRequestCookie(req, MAGIC_PENDING_COOKIE), result.tokenId),

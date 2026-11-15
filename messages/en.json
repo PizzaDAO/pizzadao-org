@@ -461,7 +461,7 @@
       "elsewhereHowTo": "To log in here, log in with Discord below, or send a new link and copy it (long-press on a phone) into this browser's address bar.",
       "sendNewLinkButton": "Send a new link",
       "landedTitle": "You're logged in in this browser.",
-      "landedMessage": "Asked for the link in another browser or on another device? That page stays logged out. Keep going here, or open {site} in your usual browser and log in there with Discord.",
+      "landedMessage": "If you asked for it in another browser or on another device, that page stays logged out: keep going here, or open {site} there and log in with Discord. If you didn't ask for a login link, you can ignore this.",
       "landedDismiss": "Got it"
     },
     "claim": {

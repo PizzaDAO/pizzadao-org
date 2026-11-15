@@ -461,7 +461,7 @@
       "elsewhereHowTo": "Pour te connecter ici, connecte-toi avec Discord ci-dessous, ou demande un nouveau lien et copie-le (appui long sur mobile) dans la barre d'adresse de ce navigateur.",
       "sendNewLinkButton": "Envoyer un nouveau lien",
       "landedTitle": "Tu es connecté dans ce navigateur.",
-      "landedMessage": "Tu as demandé le lien dans un autre navigateur ou sur un autre appareil ? Cette page reste déconnectée. Continue ici, ou ouvre {site} dans ton navigateur habituel et connecte-toi avec Discord.",
+      "landedMessage": "Si tu l'as demandé dans un autre navigateur ou sur un autre appareil, cette page reste déconnectée : continue ici, ou ouvre {site} là-bas et connecte-toi avec Discord. Si tu n'as pas demandé de lien de connexion, tu peux ignorer ce message.",
       "landedDismiss": "Compris"
     },
     "claim": {

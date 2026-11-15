@@ -461,7 +461,7 @@
       "elsewhereHowTo": "Para entrar aquí, entra con Discord abajo, o pide un enlace nuevo y cópialo (mantén pulsado en el móvil) en la barra de direcciones de este navegador.",
       "sendNewLinkButton": "Enviar un enlace nuevo",
       "landedTitle": "Has entrado en este navegador.",
-      "landedMessage": "¿Pediste el enlace en otro navegador o dispositivo? Esa página sigue sin sesión. Sigue aquí, o abre {site} en tu navegador habitual y entra allí con Discord.",
+      "landedMessage": "Si lo pediste en otro navegador o dispositivo, esa página sigue sin sesión: sigue aquí, o abre {site} allí y entra con Discord. Si no pediste un enlace de acceso, puedes ignorar esto.",
       "landedDismiss": "Entendido"
     },
     "claim": {

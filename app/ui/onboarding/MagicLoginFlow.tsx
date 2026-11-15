@@ -34,11 +34,11 @@ export function discordLoginHref(search: string): string {
 type State =
   | { step: "form" }
   | { step: "sending" }
-  | { step: "sent"; username: string; hasDraft?: boolean }
+  | { step: "sent"; username: string; hasDraft?: boolean; sentAt?: number }
   | { step: "elsewhere"; username: string }
   | { step: "error"; code: string; message: string; username: string };
 
-export type LoginStatus = { loggedIn: boolean; openedElsewhere: boolean };
+export type LoginStatus = { loggedIn: boolean; openedElsewhere: boolean; sessionCreatedAt?: number };
 
 /** This browser's login state as seen by the "check your DMs" tab; null when it can't tell. */
 export async function fetchLoginStatus(): Promise<LoginStatus | null> {
@@ -46,7 +46,8 @@ export async function fetchLoginStatus(): Promise<LoginStatus | null> {
     const res = await fetch("/api/auth/magic-login/status", { credentials: "include", cache: "no-store" });
     if (!res?.ok) return null;
     const body = await res.json();
-    return { loggedIn: body?.loggedIn === true, openedElsewhere: body?.openedElsewhere === true };
+    const sessionCreatedAt = typeof body?.sessionCreatedAt === "number" ? body.sessionCreatedAt : undefined;
+    return { loggedIn: body?.loggedIn === true, openedElsewhere: body?.openedElsewhere === true, sessionCreatedAt };
   } catch {
     return null;
   }
@@ -62,6 +63,26 @@ export async function landingAfterLogin(search: string): Promise<string> {
   } catch {}
   // No resumeSignup here: this tab's own signup draft is still in its localStorage.
   return loggedInLanding(me, { returnTo: params.get("returnTo"), wizardHome: WIZARD_HOME });
+}
+
+/** /login skips its form for a logged-in visitor only without a login error, or after "already used". */
+export function shouldAutoContinue(loginError?: string | null): boolean {
+  return !loginError || loginError === "link_already_used";
+}
+
+/** ?switch=1 keeps the form for a logged-in visitor who wants to log in as someone else. */
+export function isSwitching(search: string): boolean {
+  return new URLSearchParams(search).get("switch") === "1";
+}
+
+/**
+ * Whether the session the status reports came from this link rather than one the browser already
+ * had (possible with ?switch=1). Both times are server clocks; 5 s of slack covers skew between
+ * instances. Missing times count as new.
+ */
+export function isNewSession(status: LoginStatus, sentAt: number | undefined): boolean {
+  if (sentAt === undefined || status.sessionCreatedAt === undefined) return true;
+  return status.sessionCreatedAt >= sentAt - 5000;
 }
 
 /** How often the "check your DMs" tab looks for the login, and for how long (the link lives 10 min). */
@@ -93,7 +114,10 @@ export function MagicLoginFlow({ onBack, loginError, navigate = assignLocation }
 
   // Already logged in here (e.g. the link was opened in another tab, or a second open of the same
   // link bounced to "already used"): carry on to where the login was headed instead of the form.
+  // Not for other login errors (they must be seen), nor with ?switch=1 (log in as someone else).
+  const autoContinue = shouldAutoContinue(loginError);
   useEffect(() => {
+    if (!autoContinue || isSwitching(window.location.search)) return;
     let alive = true;
     fetchLoginStatus().then(async (status) => {
       if (!alive || !status?.loggedIn) return;
@@ -101,13 +125,15 @@ export function MagicLoginFlow({ onBack, loginError, navigate = assignLocation }
       if (alive) navigate(href);
     });
     return () => { alive = false; };
-  }, [navigate]);
+  }, [navigate, autoContinue]);
 
   // "Check your DMs": the link usually opens in a NEW tab, the computer's default browser, or the
   // Discord app's own browser, so this tab would never notice the login. Watch for it: logged in
   // here -> continue; link used but still logged out here -> it was opened somewhere else, say so.
-  // Not for a signup draft: that link carries the draft and continues signup wherever it opens.
+  // Not when a signup draft was sent: that link carries the draft and continues signup wherever it
+  // opens, so this tab must not run signup too.
   const watching = state.step === "sent" && !state.hasDraft ? state.username : null;
+  const sentAt = state.step === "sent" ? state.sentAt : undefined;
   useEffect(() => {
     if (!watching) return;
     let stopped = false;
@@ -120,7 +146,7 @@ export function MagicLoginFlow({ onBack, loginError, navigate = assignLocation }
       const status = await fetchLoginStatus();
       busy = false;
       if (stopped || !status) return;
-      if (status.loggedIn) {
+      if (status.loggedIn && isNewSession(status, sentAt)) {
         stop();
         navigate(await landingAfterLogin(window.location.search));
       } else if (status.openedElsewhere) {
@@ -139,17 +165,21 @@ export function MagicLoginFlow({ onBack, loginError, navigate = assignLocation }
       window.removeEventListener("focus", onVisible);
     }
     return stop;
-  }, [watching, navigate]);
+  }, [watching, sentAt, navigate]);
 
   async function handleSubmit(retryUsername?: string) {
     const name = retryUsername || username.trim();
     if (name.length < 2) return;
 
     setState({ step: "sending" });
-    let signupDraft = null;
-    try { signupDraft = sanitizeSignupDraft(JSON.parse(localStorage.getItem(LS_KEY) || "null")); } catch {}
+    let localDraft = null;
+    try { localDraft = sanitizeSignupDraft(JSON.parse(localStorage.getItem(LS_KEY) || "null")); } catch {}
+    const onboarding = new URLSearchParams(window.location.search).get("onboarding") === "1";
+    // The server stores a draft only on the onboarding path, so only send it there: then "a draft
+    // was sent" is exactly "this link carries a signup draft".
+    const signupDraft = onboarding ? localDraft : null;
 
-    const actor = signupDraft?.sessionId || crypto.randomUUID();
+    const actor = localDraft?.sessionId || crypto.randomUUID();
     try {
       const res = await fetch("/api/auth/magic-login/request", {
         method: "POST",
@@ -159,14 +189,15 @@ export function MagicLoginFlow({ onBack, loginError, navigate = assignLocation }
           actor,
           signupDraft,
           returnTo: new URLSearchParams(window.location.search).get("returnTo"),
-          onboarding: new URLSearchParams(window.location.search).get("onboarding") === "1",
+          onboarding,
         }),
       });
 
       const data = await res.json();
 
       if (res.ok) {
-        setState({ step: "sent", username: name, hasDraft: !!signupDraft && new URLSearchParams(window.location.search).get("onboarding") === "1" });
+        const sentAt = typeof data?.sentAt === "number" ? data.sentAt : undefined;
+        setState({ step: "sent", username: name, hasDraft: !!signupDraft, sentAt });
         return;
       }
 

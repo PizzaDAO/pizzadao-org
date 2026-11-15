@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { COOKIE_NAME, verifySession } from "@/app/lib/session";
 import { anyMagicLinkUsed } from "@/app/lib/magic-login";
+import { enforceRateLimit } from "@/app/lib/rate-limit";
 import { MAGIC_PENDING_COOKIE, readPendingIds, readRequestCookie } from "@/app/lib/magic-login-pending";
 
 export const runtime = "nodejs";
@@ -10,10 +11,17 @@ export const runtime = "nodejs";
  *   loggedIn:        this browser now has a session (the link was opened in another tab here).
  *   openedElsewhere: a link THIS browser asked for was used, but this browser is still logged out,
  *                    so it was opened in another browser (Discord's in-app browser, another device).
- * Only reports on links listed in this browser's own httpOnly pending cookie; never logs anyone in.
+ * Reports only on links listed in this browser's own signed, httpOnly pending cookie, and never logs
+ * anyone in. It does tell the requester that their link was clicked: someone who requests a link
+ * for another member's name learns when that member clicks it (nothing more). The per-member
+ * request limit (3 links per 15 min) bounds how often that can be probed.
  */
 export async function GET(req: Request) {
-  const loggedIn = !!verifySession(readRequestCookie(req, COOKIE_NAME));
+  const limited = await enforceRateLimit(req, "magic-login-status");
+  if (limited) return limited;
+
+  const session = verifySession(readRequestCookie(req, COOKIE_NAME));
+  const loggedIn = !!session;
   let openedElsewhere = false;
   if (!loggedIn) {
     const ids = readPendingIds(readRequestCookie(req, MAGIC_PENDING_COOKIE));
@@ -24,5 +32,7 @@ export async function GET(req: Request) {
       openedElsewhere = false;
     }
   }
-  return NextResponse.json({ loggedIn, openedElsewhere }, { headers: { "Cache-Control": "no-store" } });
+  // sessionCreatedAt lets a tab that was already logged in (?switch=1) tell the new login from the old.
+  const body = session ? { loggedIn, openedElsewhere, sessionCreatedAt: Number(session.createdAt) } : { loggedIn, openedElsewhere };
+  return NextResponse.json(body, { headers: { "Cache-Control": "no-store" } });
 }
