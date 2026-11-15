@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRef } from "react";
 const t2010 = "/marketing/assets/timeline-2010.jpg";
 const tFounding = "/marketing/assets/timeline-founding.jpg";
@@ -135,7 +136,7 @@ const Timeline = () => {
 
               {/* Image */}
               <figure className="mk-grain relative mt-5 overflow-hidden rounded-2xl">
-                <img
+                <Image sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
                   src={c.img}
                   alt={c.alt}
                   loading="lazy"
