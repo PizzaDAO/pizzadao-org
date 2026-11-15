@@ -100,7 +100,8 @@ describe('submitMissionCompletion', () => {
 
   it('never approves on submit (the old no-proof missions too): PENDING, nothing paid', async () => {
     mockFn(prisma.mission.findUnique).mockResolvedValue(AUTO_L1)
-    mockFn(prisma.missionCompletion.findUnique).mockResolvedValue(null)
+    // First lookup: no earlier row; the reviewer ping re-checks the new row by id (still PENDING).
+    mockFn(prisma.missionCompletion.findUnique).mockResolvedValueOnce(null).mockResolvedValue({ status: 'PENDING' })
     mockFn(prisma.missionCompletion.create).mockImplementation(async ({ data }: { data: object }) => ({ id: 5, ...data, mission: AUTO_L1 }))
 
     const c = await submitMissionCompletion('user-1', 1, 'https://x.com/me', 'hi')

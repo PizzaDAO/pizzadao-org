@@ -973,6 +973,12 @@ export async function notifyReviewers(
   /** Lets a review clear these again (review-notifications.ts); legacy rows had none. */
   ref?: { completionId: number; missionId: number },
 ) {
+  // The submit route fires this without waiting, so a fast verifier can approve first: only ping while
+  // the completion is still PENDING (the clear already ran, nothing would ever clear these pings).
+  if (ref) {
+    const current = await prisma.missionCompletion.findUnique({ where: { id: ref.completionId }, select: { status: true } })
+    if (current?.status !== 'PENDING') return
+  }
   const dprFrom = await dprOnlyMinLevel()
   // The same list that may approve (the narrowed setting, else the built-in reviewers).
   const roleIds = level >= dprFrom

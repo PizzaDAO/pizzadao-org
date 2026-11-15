@@ -340,7 +340,7 @@ export async function runVerifiers(discordId: string, opts: RunOptions): Promise
     if (report.approved.length || report.held.length || report.reopened.length || report.levelsPaid.length || report.checks.some((c) => c.outcome === 'recorded')) {
       invalidateProgressCache(discordId)
     }
-    notifyInApp(discordId, report, policy)
+    await notifyInApp(discordId, report, policy)
     // Discord review cards (Phase 3): post one for a new hold / reopen, and
     // update an existing card the verifier just approved or held.
     const cardMissions = report.checks
@@ -488,10 +488,10 @@ async function maybeFlag(row: Row, r: VerifyResult, m: MissionRow, report: RunRe
 }
 
 /** In-app notifications (DB only). Discord DMs and #work posts: ./notify.ts. */
-function notifyInApp(discordId: string, report: RunReport, policy: HoldPolicy) {
+async function notifyInApp(discordId: string, report: RunReport, policy: HoldPolicy) {
   for (const c of report.checks) {
-    // The submission left PENDING (also the silent "recorded" approval): settle the reviewers' pings (fail-soft).
-    if (c.outcome === 'approved' || c.outcome === 'recorded') void clearReviewNotificationsFor(discordId, c.missionId)
+    // The submission left PENDING (also the silent "recorded" approval): settle the reviewers' pings (fail-soft, awaited: post-response work can be dropped).
+    if (c.outcome === 'approved' || c.outcome === 'recorded') await clearReviewNotificationsFor(discordId, c.missionId)
     if (c.outcome === 'approved') {
       createNotification({
         type: 'MISSION_APPROVED',
