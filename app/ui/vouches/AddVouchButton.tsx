@@ -40,7 +40,8 @@ export function AddVouchButton({
     (async () => {
       try {
         const res = await fetch(
-          `/api/vouches?memberId=${encodeURIComponent(currentMemberId!)}&limit=200`,
+          `/api/vouches?memberId=${encodeURIComponent(currentMemberId!)}&limit=200&fresh=1`,
+          { cache: "no-store" },
         );
         if (res.ok) {
           const data = await res.json();
