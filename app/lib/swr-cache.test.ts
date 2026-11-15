@@ -104,4 +104,18 @@ describe("swrGet", () => {
     expect(await cacheLock("lk", 60)).toBeTruthy();
     await cacheDel("lk");
   });
+
+  it("treats a cached value failing isValid as a miss", async () => {
+    await cacheSet("k", { value: { notCrews: 1 }, fetchedAt: Date.now() }, 600);
+    const load = vi.fn().mockResolvedValue({ crews: [] });
+    const out = await swrGet("k", load, { ...opts, schedule, isValid: (v: { crews?: unknown }) => Array.isArray(v?.crews) });
+    expect(out).toEqual({ value: { crews: [] }, cached: false });
+  });
+
+  it("swrInvalidate also deletes legacy keys", async () => {
+    await cacheSet("legacy", { crews: [] }, 600);
+    await swrInvalidate("k", "legacy");
+    const load = vi.fn().mockResolvedValue({ crews: [1] });
+    expect((await swrGet("legacy", load, { ...opts, schedule })).cached).toBe(false);
+  });
 });

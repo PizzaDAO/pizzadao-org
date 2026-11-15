@@ -496,12 +496,16 @@ async function attachTasks(crews: CrewOption[], forceRefresh: boolean): Promise<
 }
 
 const CREW_MAPPINGS_KEEP = 60 * 60 * 24; // stale lists stay servable for a day
-const DB_CACHE_KEY = "crew-mappings:db:v1";
-const sheetCacheKey = () => `crew-mappings:v7:${SHEET_ID}`;
+// Previous formats (a bare { crews }) may still be written by older deployments sharing this
+// cache; the SWR envelope lives under separate keys so the two never read each other's values.
+const LEGACY_DB_CACHE_KEY = "crew-mappings:db:v1";
+const legacySheetCacheKey = () => `crew-mappings:v7:${SHEET_ID}`;
+const DB_CACHE_KEY = "crew-mappings:db:v2:swr";
+const sheetCacheKey = () => `crew-mappings:v8:swr:${SHEET_ID}`;
 
 /** Forget the cached crew list (after an edit on the website). */
 export async function invalidateCrewMappingsCache(): Promise<void> {
-  await Promise.all([swrInvalidate(DB_CACHE_KEY), swrInvalidate(sheetCacheKey())]);
+  await Promise.all([swrInvalidate(DB_CACHE_KEY, LEGACY_DB_CACHE_KEY), swrInvalidate(sheetCacheKey(), legacySheetCacheKey())]);
 }
 
 /**
@@ -526,7 +530,7 @@ export async function getCrewMappings(forceRefresh = false, opts: { staleWhileRe
       await attachTasks(crews, forceRefresh);
       return { crews };
     },
-    { freshSeconds: CACHE_TTL.CREW_MAPPINGS, keepSeconds: CREW_MAPPINGS_KEEP, forceRefresh, serveStale: opts.staleWhileRevalidate === true },
+    { freshSeconds: CACHE_TTL.CREW_MAPPINGS, keepSeconds: CREW_MAPPINGS_KEEP, forceRefresh, isValid: (v) => Array.isArray(v?.crews), serveStale: opts.staleWhileRevalidate === true },
   );
   return { ...value, cached };
 }
