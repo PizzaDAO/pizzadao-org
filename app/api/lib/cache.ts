@@ -72,6 +72,31 @@ export async function cacheDel(key: string): Promise<void> {
 }
 
 /**
+ * Take a short-lived lock (set-if-absent). Returns an owner token when this caller holds it, else null.
+ * If the cache itself is unreachable it returns a token so work is never blocked.
+ */
+export async function cacheLock(key: string, ttlSeconds: number): Promise<string | null> {
+  const token = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  try {
+    if (isKVConfigured()) {
+      const res = await kv.set(key, token, { nx: true, ex: ttlSeconds });
+      return res !== null ? token : null;
+    }
+    const entry = memoryCache.get(key);
+    if (entry && Date.now() <= entry.expiresAt) return null;
+    memoryCache.set(key, { value: token, expiresAt: Date.now() + ttlSeconds * 1000 });
+    return token;
+  } catch {
+    return token;
+  }
+}
+
+/** Release a lock only if it is still ours (it may have expired and been taken by someone else). */
+export async function cacheUnlock(key: string, token: string): Promise<void> {
+  if ((await cacheGet<string>(key)) === token) await cacheDel(key);
+}
+
+/**
  * Get or set pattern - fetch from cache or compute and cache
  */
 export async function cacheGetOrSet<T>(

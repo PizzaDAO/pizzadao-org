@@ -3,7 +3,7 @@
 // and does not even read the session while the feature flag is off.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-vi.mock("@/app/api/profile-summary/[id]/route", () => ({ composeProfileSummary: vi.fn() }));
+vi.mock("@/app/api/profile-summary/[id]/route", () => ({ composeProfileSummary: vi.fn(), getPublicProfileSummary: vi.fn(async () => null) }));
 vi.mock("./ProfileClient", () => ({ ProfileClient: () => null }));
 vi.mock("@/app/lib/db");
 vi.mock("@/app/lib/session", () => ({ getSession: vi.fn() }));

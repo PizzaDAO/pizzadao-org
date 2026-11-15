@@ -22,7 +22,7 @@ export const dynamic = "force-dynamic";
 export default async function CrewsPage() {
   let crews = null;
   try {
-    ({ crews } = await getCrewMappings());
+    ({ crews } = await getCrewMappings(false, { staleWhileRevalidate: true }));
   } catch {
     // Sheets unreachable: the client fetches /api/crew-mappings on mount.
   }

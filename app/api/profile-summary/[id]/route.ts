@@ -331,6 +331,26 @@ export async function composeProfileSummary(
 // GET handler
 // ---------------------------------------------------------------------------
 
+/**
+ * The viewer-independent summary (cached 5 min in memory). Shared by the API route and the
+ * profile page, which prefills it on the server. Null when the member does not exist.
+ */
+export async function getPublicProfileSummary(id: string): Promise<ProfileSummary | null> {
+    const cached = CACHE.get(id);
+    if (cached && Date.now() - cached.time < CACHE_TTL_MS) return cached.data;
+    const base = await composeProfileSummary({ memberId: id, viewerMemberId: null });
+    if (base) {
+        // Bound cache growth.
+        if (CACHE.size > CACHE_MAX) {
+            const oldest = Array.from(CACHE.entries()).sort((a, b) => a[1].time - b[1].time)[0]?.[0];
+            if (oldest) CACHE.delete(oldest);
+        }
+        // A summary missing its rank (still computing) is not memoised, so the next load picks it up.
+        if (!INCOMPLETE.has(base)) CACHE.set(id, { time: Date.now(), data: base });
+    }
+    return base;
+}
+
 export async function GET(
     _req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
@@ -356,24 +376,7 @@ export async function GET(
             }
         })();
 
-        let base: ProfileSummary | null;
-        const cached = CACHE.get(id);
-        if (cached && Date.now() - cached.time < CACHE_TTL_MS) {
-            base = cached.data;
-        } else {
-            base = await composeProfileSummary({ memberId: id, viewerMemberId: null });
-            if (base) {
-                // Bound cache growth.
-                if (CACHE.size > CACHE_MAX) {
-                    const oldest = Array.from(CACHE.entries()).sort(
-                        (a, b) => a[1].time - b[1].time
-                    )[0]?.[0];
-                    if (oldest) CACHE.delete(oldest);
-                }
-                // A summary missing its rank (still computing) is not memoised, so the next load picks it up.
-                if (!INCOMPLETE.has(base)) CACHE.set(id, { time: Date.now(), data: base });
-            }
-        }
+        const base = await getPublicProfileSummary(id);
 
         if (!base) {
             return NextResponse.json({ error: "Member not found" }, { status: 404 });
