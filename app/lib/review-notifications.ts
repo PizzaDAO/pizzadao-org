@@ -68,10 +68,14 @@ export function planStaleReviews(
 }
 
 /** The where clause matching every unread review notification of one completion (both styles). */
-export function reviewNotificationWhere(c: { id: number; discordId: string; missionTitle: string }): Prisma.NotificationWhereInput {
+export function reviewNotificationWhere(
+  c: { id: number; discordId: string; missionTitle: string },
+  cutoff?: Date,
+): Prisma.NotificationWhereInput {
   return {
     type: 'MISSION_SUBMITTED',
     readAt: null,
+    ...(cutoff ? { createdAt: { lte: cutoff } } : {}),
     OR: [
       { metadata: { path: ['completionId'], equals: c.id } },
       {
@@ -86,8 +90,10 @@ export function reviewNotificationWhere(c: { id: number; discordId: string; miss
 /**
  * Mark the review notifications of a completion read for every recipient. Fail-soft: a failure
  * is logged and swallowed, it must never break the review action. Returns the rows marked.
+ * `cutoff` is when the submission left PENDING (captured before the committing write): a ping
+ * created after it (a fresh submission) stays unread.
  */
-export async function clearReviewNotifications(completionId: number): Promise<number> {
+export async function clearReviewNotifications(completionId: number, cutoff: Date = new Date()): Promise<number> {
   try {
     const completion = await prisma.missionCompletion.findUnique({
       where: { id: completionId },
@@ -95,7 +101,7 @@ export async function clearReviewNotifications(completionId: number): Promise<nu
     })
     if (!completion) return 0
     const r = await prisma.notification.updateMany({
-      where: reviewNotificationWhere({ id: completion.id, discordId: completion.discordId, missionTitle: completion.mission.title }),
+      where: reviewNotificationWhere({ id: completion.id, discordId: completion.discordId, missionTitle: completion.mission.title }, cutoff),
       data: { readAt: new Date() },
     })
     return r.count
@@ -106,13 +112,13 @@ export async function clearReviewNotifications(completionId: number): Promise<nu
 }
 
 /** Same, for a completion known only by member + mission (the verifier engine). */
-export async function clearReviewNotificationsFor(discordId: string, missionId: number): Promise<number> {
+export async function clearReviewNotificationsFor(discordId: string, missionId: number, cutoff: Date = new Date()): Promise<number> {
   try {
     const completion = await prisma.missionCompletion.findUnique({
       where: { missionId_discordId: { missionId, discordId } },
       select: { id: true },
     })
-    return completion ? await clearReviewNotifications(completion.id) : 0
+    return completion ? await clearReviewNotifications(completion.id, cutoff) : 0
   } catch (e) {
     console.error(`[review-notifications] clearing ${discordId}/${missionId} failed:`, e)
     return 0

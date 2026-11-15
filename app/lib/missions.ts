@@ -576,6 +576,7 @@ export async function approveMission(
 
   // Conditional PENDING -> APPROVED transition: of concurrent reviews of the
   // same submission exactly one wins (and writes the one audit event).
+  const settledAt = new Date()
   const won = await prisma.$transaction(async (tx) => {
     const reviewed = await tx.missionCompletion.updateMany({
       where: { id: completionId, status: 'PENDING' },
@@ -607,7 +608,7 @@ export async function approveMission(
   })
 
   // The reviewers' "needs review" pings are settled (fail-soft).
-  await clearReviewNotifications(completionId)
+  await clearReviewNotifications(completionId, settledAt)
 
   // Notify the user
   createNotification({
@@ -651,6 +652,7 @@ export async function rejectMission(
 
   // Conditional PENDING -> REJECTED transition: of concurrent reviews of the
   // same submission exactly one wins.
+  const settledAt = new Date()
   const won = await prisma.$transaction(async (tx) => {
     const reviewed = await tx.missionCompletion.updateMany({
       where: { id: completionId, status: 'PENDING' },
@@ -681,7 +683,7 @@ export async function rejectMission(
     include: { mission: true },
   })
 
-  await clearReviewNotifications(completionId)
+  await clearReviewNotifications(completionId, settledAt)
 
   // Notify the user
   createNotification({

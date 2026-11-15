@@ -120,9 +120,12 @@ describe('clearReviewNotifications', () => {
   it('marks every unread review ping of the completion read for all recipients', async () => {
     mockFn(prisma.missionCompletion.findUnique).mockResolvedValue({ id: 9, discordId: 'sub-1', mission: { title: 'Join Pepperoni Mafia' } })
     mockFn(prisma.notification.updateMany).mockResolvedValue({ count: 4 })
-    expect(await clearReviewNotifications(9)).toBe(4)
+    const cutoff = new Date('2026-01-01T00:00:00Z')
+    expect(await clearReviewNotifications(9, cutoff)).toBe(4)
     const arg = mockFn(prisma.notification.updateMany).mock.calls[0][0]
-    expect(arg.where).toEqual(reviewNotificationWhere({ id: 9, discordId: 'sub-1', missionTitle: 'Join Pepperoni Mafia' }))
+    expect(arg.where).toEqual(reviewNotificationWhere({ id: 9, discordId: 'sub-1', missionTitle: 'Join Pepperoni Mafia' }, cutoff))
+    // a fresh submission's ping (created after the transition) is outside the clear
+    expect(arg.where.createdAt).toEqual({ lte: cutoff })
     expect(arg.data.readAt).toBeInstanceOf(Date)
   })
 

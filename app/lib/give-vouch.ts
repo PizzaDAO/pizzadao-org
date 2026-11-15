@@ -77,7 +77,12 @@ export async function giveVouch(
   const target = await deps.fetchTarget(input.targetMemberId)
   if (!target) return { ok: false, reason: 'not-found' }
 
-  if (await deps.exists(voucher.memberId, input.targetMemberId)) return { ok: false, reason: 'duplicate' }
+  // A repeat still settles the voucher's own "vouch for me" request (the vouch it asks for exists).
+  const clearRequest = () => deps.clearRequest(input.voucherDiscordId, input.targetMemberId)
+  if (await deps.exists(voucher.memberId, input.targetMemberId)) {
+    defer(clearRequest)
+    return { ok: false, reason: 'duplicate' }
+  }
 
   const limit = await deps.dailyLimit()
   const recent = await deps.countRecent(voucher.memberId, new Date(deps.now().getTime() - DAY_MS))
@@ -86,11 +91,14 @@ export async function giveVouch(
   try {
     await deps.create(voucher.memberId, input.targetMemberId)
   } catch (err) {
-    if (isUniqueViolation(err)) return { ok: false, reason: 'duplicate' }
+    if (isUniqueViolation(err)) {
+      defer(clearRequest)
+      return { ok: false, reason: 'duplicate' }
+    }
     throw err
   }
 
-  defer(() => deps.clearRequest(input.voucherDiscordId, input.targetMemberId))
+  defer(clearRequest)
   const targetDiscordId = String(target['discordId'] ?? '').trim()
   // L5.2 "Vouch for another member" for the voucher; L4.2 "Get vouched by a member" for the target.
   defer(() => deps.emit(input.voucherDiscordId, 'vouch_created', voucher.memberId))
