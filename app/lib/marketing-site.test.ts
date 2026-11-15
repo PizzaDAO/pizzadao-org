@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { MARKETING_PATHS, MARKETING_SITEMAP_PATHS, isMarketingPath, marketingHomeAtRoot, marketingIndexable, marketingRobots } from "./marketing-site";
+import { MARKETING_PATHS, MARKETING_SITEMAP_PATHS, WIZARD_QUERY_KEYS, isMarketingPath, wizardParamRedirects, marketingHomeAtRoot, marketingIndexable, marketingRobots } from "./marketing-site";
 
 afterEach(() => vi.unstubAllEnvs());
 
@@ -33,5 +33,14 @@ describe("marketing switches", () => {
   it("the sitemap list is a subset of the marketing routes and leaves out /home", () => {
     for (const p of MARKETING_SITEMAP_PATHS) expect(MARKETING_PATHS).toContain(p);
     expect(MARKETING_SITEMAP_PATHS).not.toContain("/home");
+  });
+
+  it("sends / with a wizard query key to /start only while the home page is at /", () => {
+    expect(wizardParamRedirects()).toEqual([]);
+    vi.stubEnv("NEXT_PUBLIC_MARKETING_HOME_AT_ROOT", "1");
+    const rules = wizardParamRedirects();
+    expect(rules.map((r) => r.has[0].key)).toEqual([...WIZARD_QUERY_KEYS]);
+    for (const r of rules) expect(r).toMatchObject({ source: "/", destination: "/start", permanent: false });
+    expect(WIZARD_QUERY_KEYS).toContain("discordId");
   });
 });

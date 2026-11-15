@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
 import { REMOTE_IMAGE_PATTERNS } from "./app/lib/image-hosts";
 import { legacyAssetRedirects, legacyDashboardRedirects } from "./app/lib/legacy-paths";
-import { marketingHomeAtRoot } from "./app/lib/marketing-site";
+import { marketingHomeAtRoot, wizardParamRedirects } from "./app/lib/marketing-site";
 import { hstsHeaderValue } from "./app/lib/hsts";
 import { SITE_URL } from "./app/lib/site-url";
 
@@ -107,7 +107,7 @@ const nextConfig: NextConfig = {
     // which is what the old app host's "/" showed. Exact paths only: /api/* routes are untouched.
     const appEntry = ["/app", "/api"].map((source) => ({ source, destination: "/start", permanent: false }));
     const legacy = [...appEntry, ...legacyDashboardRedirects(), ...legacyAssetRedirects()];
-    return marketingHomeAtRoot() ? [...legacy, { source: "/home", destination: "/", permanent: false }] : legacy;
+    return marketingHomeAtRoot() ? [...wizardParamRedirects(), ...legacy, { source: "/home", destination: "/", permanent: false }] : legacy;
   },
   async headers() {
     return [
