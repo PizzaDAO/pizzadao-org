@@ -1,6 +1,7 @@
 import { json, rejectUnsafeWrite } from '@/app/lib/admin-guard'
 import { requireSession } from '@/app/lib/auth-guards'
 import { memberIdForLanes } from '@/app/lib/lanes/member'
+import { enforceRateLimit } from '@/app/lib/rate-limit'
 import { lanesEnabled, pinLane, type LaneSource } from '@/app/lib/lanes'
 
 export const runtime = 'nodejs'
@@ -15,6 +16,9 @@ const SOURCES: readonly LaneSource[] = ['card', 'dashboard', 'guide']
  */
 export async function POST(request: Request) {
   if (!(await lanesEnabled())) return json({ error: 'Not found' }, 404)
+  // Before the session and member lookups, which can hit the members sheet.
+  const limited = await enforceRateLimit(request, 'lane-pin')
+  if (limited) return limited
   const auth = await requireSession()
   if (!auth.ok) return auth.response
   const unsafe = rejectUnsafeWrite(request)

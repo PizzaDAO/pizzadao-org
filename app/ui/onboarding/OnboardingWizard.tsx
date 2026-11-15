@@ -10,6 +10,7 @@ import { filmCode, rerollCode, toppingCode } from "@/app/lib/mafia-funnel";
 import { MAFIA_FILMS } from "@/app/lib/mafia-films";
 import { sanitizeSignupDraft } from "@/app/lib/signup-draft";
 import { isLaneSlug } from "@/app/lib/lanes/links";
+import { loginPageHref } from "@/app/lib/login-return";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
@@ -64,6 +65,12 @@ export type OnboardingWizardProps = {
 // Where the wizard itself lives: "/" today, "/start" once the marketing home takes over "/".
 // A lane pick older than the pd_lane cookie is dropped.
 const LANE_PICK_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000;
+
+// Forget the httpOnly pd_lane cookie when the wizard drops a lane pick (the client cannot clear it itself).
+// Fire and forget: it never touches wizard state, so it cannot re-trigger the lane effect.
+function forgetLaneCookie() {
+  fetch("/api/lanes/intent", { method: "DELETE", credentials: "include", keepalive: true }).catch(() => {});
+}
 
 const WIZARD_HOME = marketingHomeAtRoot() ? "/start" : "/";
 
@@ -239,6 +246,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
     if (!slug) return;
     if (data.laneAt && Date.now() - data.laneAt > LANE_PICK_MAX_AGE_MS) {
       setData((p) => ({ ...p, lane: undefined, laneAt: undefined }));
+      forgetLaneCookie();
       return;
     }
     if (!data.laneAt) {
@@ -262,6 +270,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
           rejectedLanes.current.add(slug);
           setLaneInfo(null);
           setData((p) => (p.lane === slug ? { ...p, lane: undefined, laneAt: undefined } : p));
+          forgetLaneCookie();
         }
       } catch {}
     })();
@@ -273,9 +282,13 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
   // Where an existing member who just logged in lands: their lane guide when they picked one.
   async function laneLanding(): Promise<string | null> {
     const slug = data.lane;
-    if (!slug || (data.laneAt && Date.now() - data.laneAt > LANE_PICK_MAX_AGE_MS)) return null;
+    if (!slug) return null;
     // The pick is used once: a later login must not be sent to the guide by a stale value.
     setData((p) => ({ ...p, lane: undefined, laneAt: undefined }));
+    if (data.laneAt && Date.now() - data.laneAt > LANE_PICK_MAX_AGE_MS) {
+      forgetLaneCookie();
+      return null;
+    }
     try {
       const res = await fetch("/api/lanes/intent", {
         method: "POST",
@@ -284,6 +297,8 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
         body: JSON.stringify({ slug }),
       });
       const json = res.ok ? await res.json() : null;
+      // The cookie only carried the pick across the login; the guide link has it now.
+      forgetLaneCookie();
       return json?.lane?.slug === slug ? `/lanes/${slug}?pick=1` : null;
     } catch {
       return null;
@@ -659,7 +674,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
         localStorage.setItem(LS_KEY, JSON.stringify(data));
         localStorage.setItem(PENDING_CLAIM_KEY, "1");
       } catch {}
-      router.push("/login?onboarding=1");
+      router.push(loginPageHref(window.location.search, "onboarding=1"));
       return;
     }
     submitAll();
@@ -822,7 +837,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
       return (
         <WelcomeStep
           onJoin={() => goToStep(1)}
-          onLogin={() => router.push("/login")}
+          onLogin={() => router.push(loginPageHref(window.location.search))}
         />
       );
     }
