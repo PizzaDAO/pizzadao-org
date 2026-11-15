@@ -11,6 +11,7 @@ import CornerLinks from "@/app/ui/CornerLinks";
 import SiteHeader from "@/app/ui/SiteHeader";
 import { XConnectNotice } from "@/app/ui/XConnectNotice";
 import { GlobalBallotPreparer } from "@/app/proposals/_components/GlobalBallotPreparer";
+import { speedInsightsEnabled } from "@/app/lib/marketing-site";
 import { SITE_URL } from "@/app/lib/site-url";
 
 // Fonts are self-hosted (app/fonts, latin subset; licenses alongside) so the
@@ -91,7 +92,7 @@ export default async function RootLayout({
         </NextIntlClientProvider>
         {/* Suggestion + GitHub links - Fixed Bottom Right */}
         <CornerLinks />
-        <SpeedInsights />
+        {speedInsightsEnabled() && <SpeedInsights />}
       </body>
     </html>
   );
