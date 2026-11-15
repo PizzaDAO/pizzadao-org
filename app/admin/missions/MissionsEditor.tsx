@@ -40,6 +40,15 @@ export interface MissionsLabels {
     noHistory: string;
     errorGeneric: string;
     loadError: string;
+    addTitle: string;
+    addHelp: string;
+    addMissionTitle: string;
+    addMissionDescription: string;
+    addProof: string;
+    addProofUrl: string;
+    addProofNone: string;
+    addButton: string;
+    added: string;
 }
 
 interface AdminMission {
@@ -271,6 +280,64 @@ function MissionBox({ m, labels, onSaved }: { m: AdminMission; labels: MissionsL
     );
 }
 
+function AddAnytimeMission({ labels, onSaved }: { labels: MissionsLabels; onSaved: () => void }) {
+    const [title, setTitle] = useState("");
+    const [description, setDescription] = useState("");
+    const [proofKind, setProofKind] = useState<"URL" | "NONE">("URL");
+    const [state, setState] = useState<"idle" | "saving" | "saved">("idle");
+    const [error, setError] = useState<string | null>(null);
+
+    async function create() {
+        setError(null);
+        setState("saving");
+        const res = await fetch("/api/admin/missions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title: title.trim(), description: description.trim() || null, proofKind }),
+            cache: "no-store",
+        });
+        const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+        if (!res.ok) {
+            setError(typeof data.error === "string" ? data.error : labels.errorGeneric);
+            setState("idle");
+            return;
+        }
+        setTitle("");
+        setDescription("");
+        setState("saved");
+        onSaved();
+    }
+
+    return (
+        <section className="grid gap-2 rounded-2xl border p-4" style={border}>
+            <h2 className="m-0 font-[family-name:var(--font-display)] text-xl font-black">{labels.addTitle}</h2>
+            <p className="m-0 text-xs text-foreground/50">{labels.addHelp}</p>
+            <label className="grid gap-1 text-sm">
+                <span className="text-foreground/50">{labels.addMissionTitle}</span>
+                <input value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} className="rounded-lg border bg-background px-2 py-1" style={border} />
+            </label>
+            <label className="grid gap-1 text-sm">
+                <span className="text-foreground/50">{labels.addMissionDescription}</span>
+                <textarea value={description} maxLength={1000} rows={2} onChange={(e) => setDescription(e.target.value)} className="rounded-lg border bg-background px-2 py-1" style={border} />
+            </label>
+            <div className="flex flex-wrap items-end gap-3 text-sm">
+                <label className="grid gap-1">
+                    <span className="text-foreground/50">{labels.addProof}</span>
+                    <select value={proofKind} onChange={(e) => setProofKind(e.target.value as "URL" | "NONE")} className="rounded-lg border bg-background px-2 py-1" style={border}>
+                        <option value="URL">{labels.addProofUrl}</option>
+                        <option value="NONE">{labels.addProofNone}</option>
+                    </select>
+                </label>
+                <button type="button" disabled={!title.trim() || state === "saving"} onClick={() => void create()} className="rounded-lg bg-tomato px-3 py-1.5 font-bold text-white disabled:opacity-40">
+                    {state === "saving" ? labels.saving : labels.addButton}
+                </button>
+                {state === "saved" && <span role="status" className="text-foreground/60">{labels.added}</span>}
+            </div>
+            {error && <p role="alert" className="m-0 text-sm text-tomato">{error}</p>}
+        </section>
+    );
+}
+
 export function MissionsEditor({ labels }: { labels: MissionsLabels }) {
     const [levels, setLevels] = useState<AdminLevel[] | null>(null);
     const [changes, setChanges] = useState<Change[]>([]);
@@ -297,6 +364,7 @@ export function MissionsEditor({ labels }: { labels: MissionsLabels }) {
     return (
         <div className="grid gap-6">
             {nonProd && <p role="alert" className="m-0 rounded-xl border border-tomato bg-tomato/10 p-3 text-sm font-bold">{labels.nonProdBanner}</p>}
+            <AddAnytimeMission labels={labels} onSaved={load} />
             {levels.map((lvl) => (
                 <section key={lvl.level} className="grid gap-3 rounded-2xl border p-4" style={border}>
                     <h2 className="m-0 font-[family-name:var(--font-display)] text-xl font-black">{lvl.level === 0 ? labels.anytime : fill(labels.level, { level: String(lvl.level) })}</h2>

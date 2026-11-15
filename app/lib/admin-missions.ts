@@ -298,6 +298,59 @@ export async function updateMission(
   return { changed: audit.map((a) => a.field) }
 }
 
+export interface NewAnytimeMission {
+  title?: unknown
+  description?: unknown
+  proofKind?: unknown
+}
+
+/**
+ * Create a level 0 "Anytime" bonus mission (plans/lane-cards-mission-onboarding.md). It starts
+ * inactive with a 0 reward and manual review; activation and the reward then go through the
+ * normal editor. Level 0 never affects level completion. The index is the next free one at level 0
+ * (retried on a unique conflict with a concurrent create).
+ */
+export async function createAnytimeMission(input: NewAnytimeMission, actor: string, note?: unknown): Promise<{ id: number; index: number }> {
+  if (typeof input.title !== 'string' || !input.title.trim() || input.title.trim().length > TITLE_MAX) {
+    throw new MissionEditError(400, `title must be 1 to ${TITLE_MAX} characters`)
+  }
+  const title = input.title.trim()
+  let description: string | null = null
+  if (input.description !== undefined && input.description !== null) {
+    if (typeof input.description !== 'string' || input.description.length > DESCRIPTION_MAX) {
+      throw new MissionEditError(400, `description must be at most ${DESCRIPTION_MAX} characters`)
+    }
+    description = input.description.trim() || null
+  }
+  const proofKind = input.proofKind ?? 'URL'
+  if (proofKind !== 'NONE' && proofKind !== 'URL') throw new MissionEditError(400, 'proofKind must be NONE or URL')
+  const n = typeof note === 'string' && note.trim() ? note.trim().slice(0, 300) : null
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const created = await prisma.$transaction(async (tx) => {
+        const last = await tx.mission.findFirst({ where: { level: 0 }, orderBy: { index: 'desc' }, select: { index: true } })
+        const index = (last?.index ?? -1) + 1
+        const m = await tx.mission.create({
+          data: { level: 0, index, title, description, reward: 0, isActive: false, bonus: true, bonusReward: 0, verifierKey: 'manual', proofKind },
+          select: { id: true, index: true },
+        })
+        await tx.appSettingChange.create({
+          data: { key: `mission:${m.id}:created`, oldValue: jsonOrDbNull(null), newValue: jsonOrDbNull({ level: 0, index, title, proofKind }), changedBy: actor, note: n },
+        })
+        return m
+      })
+      clearMissionCaches()
+      return created
+    } catch (e) {
+      const code = (e as { code?: string } | null)?.code
+      if (code === 'P2002' && attempt < 2) continue
+      throw e
+    }
+  }
+  throw new MissionEditError(409, 'Could not allocate a mission index; retry')
+}
+
 export interface LevelPatch {
   reward?: unknown
   levelTitle?: unknown

@@ -46,6 +46,7 @@ import {
 import { MISSION_REVIEWER_ROLE_IDS } from "@/app/ui/constants";
 import { resolvePfpUrlAsync } from "@/app/lib/pfp";
 import { internalError } from "@/app/lib/errors/error-response";
+import { getPinnedLaneSummary, lanesEnabled, type PinnedLaneSummary } from "@/app/lib/lanes";
 
 export const runtime = "nodejs";
 
@@ -123,6 +124,11 @@ export interface DashboardSummary {
     };
     /** jalapeno-34126 — setup checklist backing the hero completion meter. */
     profileCompletion: ProfileCompletion;
+    /**
+     * The "find your lane" card (setting onboarding.laneCardsEnabled, off by default: `enabled: false`
+     * means the page renders nothing). `pinned` is the member's pinned, published lane with progress.
+     */
+    lane: { enabled: boolean; pinned: PinnedLaneSummary | null };
     /** woodfired-65373 — Box Mafia role suggestion; card shows only when "missing". */
     boxMafia: { status: BoxMafiaStatus; purchaseUrl: string; dailyPep: number };
 }
@@ -276,6 +282,10 @@ export async function GET(request: NextRequest) {
             dailyPep: boxMafiaDailyPep(incomeSettings),
         };
 
+        // --- Lane (off unless onboarding.laneCardsEnabled) ---
+        const laneOn = await safe(lanesEnabled(), false);
+        const pinnedLane = laneOn ? await safe(getPinnedLaneSummary(discordId), null) : null;
+
         // --- Level info ---
         const levelTitle = await safe(getLevelTitle(currentLevel), null);
         const currentLevelMissions = ((missionsByLevel as any)[currentLevel] || []).filter((m: { bonus?: boolean }) => !m.bonus);
@@ -294,9 +304,18 @@ export async function GET(request: NextRequest) {
         const nextMissionRaw = currentLevelMissions.find(
             (m: { id: number }) => !submittedMissionIds.has(m.id)
         );
-        const nextMission = nextMissionRaw
-            ? { id: nextMissionRaw.id, title: nextMissionRaw.title }
-            : null;
+        // The pinned lane's mission comes first while the member has not submitted it.
+        const laneMissionRaw =
+            pinnedLane?.missionId != null && !submittedMissionIds.has(pinnedLane.missionId)
+                ? Object.values(missionsByLevel as Record<string, any[]>)
+                      .flat()
+                      .find((m) => m.id === pinnedLane.missionId && m.isActive !== false)
+                : undefined;
+        const nextMission = laneMissionRaw
+            ? { id: laneMissionRaw.id, title: laneMissionRaw.title }
+            : nextMissionRaw
+              ? { id: nextMissionRaw.id, title: nextMissionRaw.title }
+              : null;
 
         // awaitingReview: all level missions submitted, at least one still PENDING.
         const levelProgressEntries = progress.filter(
@@ -462,6 +481,7 @@ export async function GET(request: NextRequest) {
             levelCard,
             startHere,
             profileCompletion,
+            lane: { enabled: laneOn, pinned: pinnedLane },
             boxMafia,
         };
 

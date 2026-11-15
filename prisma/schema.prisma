@@ -3258,3 +3258,50 @@ model FeatureEntry {
   @@index([appSlug])
   @@index([published, position])
 }
+
+// A "find your lane" track (plans/lane-cards-mission-onboarding.md). Edited in /admin/lanes.
+model Lane {
+  slug              String     @id @db.VarChar(32) // host | build | create | gather | experiment | grow
+  tag               String     @db.VarChar(24) // card overline, e.g. "Host"
+  title             String     @db.VarChar(80)
+  summary           String     @db.VarChar(280) // guide header dek
+  missionId         Int? // the mission this lane pins (null = guide only); no FK so a missing mission degrades to guide-only
+  stretchMissionIds Int[]      @default([])
+  crewId            String? // suggested crew (join prompt on the guide)
+  position          Int        @default(0)
+  published         Boolean    @default(false) // unpublished lanes: card stays unlinked, /lanes/<slug> is not found
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  updatedBy         String?
+  steps             LaneStep[]
+}
+
+model LaneStep {
+  id        String   @id @default(cuid())
+  laneSlug  String
+  position  Int
+  title     String   @db.VarChar(120)
+  body      String // Markdown (no raw HTML), max 4000, {{guide placeholders}} allowed
+  linkHref  String?  @db.VarChar(300) // internal path, or https on an allowlisted host
+  linkLabel String?  @db.VarChar(60)
+  kind      String   @default("do") // read | do | submit (submit = the mission's submit step)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lane      Lane     @relation(fields: [laneSlug], references: [slug], onDelete: Cascade)
+
+  @@index([laneSlug, position])
+}
+
+// A member's lane(s). The row with the latest pinnedAt is the pinned one.
+model MemberLane {
+  discordId   String
+  laneSlug    String
+  source      String // signup | card | dashboard | guide
+  doneStepIds String[]  @default([])
+  pinnedAt    DateTime?
+  firstSeenAt DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@id([discordId, laneSlug])
+  @@index([discordId, pinnedAt])
+}

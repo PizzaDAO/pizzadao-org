@@ -152,6 +152,8 @@ export const TOGGLES = {
   // Off unless turned on: redirect page requests on the old app host to the main site, and carry the login across.
   'site.hostRedirectEnabled': { env: 'SITE_HOST_REDIRECT_ENABLED', legacy: ON_WORDS },
   'site.sessionBridgeEnabled': { env: 'SITE_SESSION_BRIDGE_ENABLED', legacy: ON_WORDS },
+  // Off unless turned on: lane cards link to guides and members can pin a lane (plans/lane-cards-mission-onboarding.md).
+  'onboarding.laneCardsEnabled': { env: 'LANE_CARDS_ENABLED', legacy: ON_WORDS },
 } as const satisfies Partial<Record<SettingKey, ToggleDef>>
 
 export type ToggleKey = keyof typeof TOGGLES

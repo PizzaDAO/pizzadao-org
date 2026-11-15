@@ -22,6 +22,7 @@ import { MAP_LEVELS_SETTINGS } from './map-levels-settings'
 import { REMINDERS_SETTINGS } from './reminders-settings'
 import { CREWS_SETTINGS } from './crews-settings'
 import { SITE_SETTINGS } from './site-settings'
+import { LANE_SETTINGS } from './lane-settings'
 import { CALL_UPDATES_SETTINGS } from './call-updates-settings'
 import { MEMBERS_SETTINGS } from './members-settings'
 import { MARKETING_SETTINGS } from './marketing-settings'
@@ -2394,6 +2395,7 @@ export const SETTINGS = {
   ...REMINDERS_SETTINGS,
   ...CREWS_SETTINGS,
   ...SITE_SETTINGS,
+  ...LANE_SETTINGS,
   ...CALL_UPDATES_SETTINGS,
   ...MEMBERS_SETTINGS,
   ...MARKETING_SETTINGS,

@@ -8,6 +8,7 @@ vi.mock('@/app/lib/admin-missions', async (orig) => ({
   listAdminLevels: vi.fn(async () => []),
   updateMission: vi.fn(),
   updateLevel: vi.fn(),
+  createAnytimeMission: vi.fn(),
 }))
 vi.mock('@/app/lib/settings/store', () => ({
   listChanges: vi.fn(async () => [
@@ -17,8 +18,8 @@ vi.mock('@/app/lib/settings/store', () => ({
 
 import { getSession } from '@/app/lib/session'
 import { isDreadPizzaRoberts } from '@/app/lib/mission-review-access'
-import { MissionEditError, updateLevel, updateMission } from '@/app/lib/admin-missions'
-import { GET, PATCH } from './route'
+import { createAnytimeMission, MissionEditError, updateLevel, updateMission } from '@/app/lib/admin-missions'
+import { GET, PATCH, POST } from './route'
 
 const m = (f: unknown) => f as ReturnType<typeof vi.fn>
 const req = (method: string, body?: unknown, headers: Record<string, string> = {}) =>
@@ -83,5 +84,29 @@ describe('/api/admin/missions', () => {
   it('needs a missionId or a level', async () => {
     expect((await PATCH(req('PATCH', { title: 'x' }))).status).toBe(400)
     expect((await PATCH(req('PATCH', { missionId: '3' }))).status).toBe(400)
+  })
+})
+
+describe('POST /api/admin/missions (add an Anytime mission)', () => {
+  it('401 / 403 for non-DPR, 415 / 403 for unsafe writes, never creating', async () => {
+    m(getSession).mockResolvedValue(null)
+    expect((await POST(req('POST', { title: 'x' }))).status).toBe(401)
+    m(getSession).mockResolvedValue({ discordId: '5' })
+    m(isDreadPizzaRoberts).mockResolvedValue(false)
+    expect((await POST(req('POST', { title: 'x' }))).status).toBe(403)
+    m(isDreadPizzaRoberts).mockResolvedValue(true)
+    expect((await POST(req('POST', { title: 'x' }, { 'content-type': 'text/plain' }))).status).toBe(415)
+    expect((await POST(req('POST', { title: 'x' }, { origin: 'https://evil.test' }))).status).toBe(403)
+    expect(createAnytimeMission).not.toHaveBeenCalled()
+  })
+
+  it('creates with the actor and returns 201; editor errors map to their status', async () => {
+    m(createAnytimeMission).mockResolvedValueOnce({ id: 31, index: 5 })
+    const res = await POST(req('POST', { title: 'T', description: 'd', proofKind: 'URL', note: 'n' }))
+    expect(res.status).toBe(201)
+    expect(await res.json()).toEqual({ ok: true, id: 31, index: 5 })
+    expect(createAnytimeMission).toHaveBeenCalledWith({ title: 'T', description: 'd', proofKind: 'URL' }, '400000000000000001', 'n')
+    m(createAnytimeMission).mockRejectedValueOnce(new MissionEditError(400, 'title must be 1 to 120 characters'))
+    expect((await POST(req('POST', { title: '' }))).status).toBe(400)
   })
 })
