@@ -8,8 +8,9 @@
 // handling, owner banner, etc.) lives in <ProfileClient/>.
 
 import type { Metadata } from "next";
-import { composeProfileSummary } from "@/app/api/profile-summary/[id]/route";
+import { composeProfileSummary, getPublicProfileSummary } from "@/app/api/profile-summary/[id]/route";
 import { ProfileClient } from "./ProfileClient";
+import type { ProfileSummaryData } from "@/app/lib/hooks/use-api";
 import { getSession } from "@/app/lib/session";
 import { disavowEnabled } from "@/app/lib/disavow/constants";
 import { canViewDisavowList } from "@/app/lib/disavow/access";
@@ -86,8 +87,21 @@ export default async function ProfilePage({
     params: Promise<{ id: string }>;
 }) {
     const { id } = await params;
-    const buddyRecognition = await getBuddyRecognition(id).catch(() => null);
-    return <ProfileClient id={id} disavowWarning={await loadDisavowWarning(id)} buddyRecognition={buddyRecognition} />;
+    // Load the public summary here (same code and cache as /api/profile-summary) so the page
+    // paints without a client fetch; the client refetches to add owner-only fields.
+    const [buddyRecognition, initialSummary, disavowWarning] = await Promise.all([
+        getBuddyRecognition(id).catch(() => null),
+        getPublicProfileSummary(id).catch(() => null),
+        loadDisavowWarning(id),
+    ]);
+    return (
+        <ProfileClient
+            id={id}
+            disavowWarning={disavowWarning}
+            buddyRecognition={buddyRecognition}
+            initialSummary={initialSummary as unknown as ProfileSummaryData | null}
+        />
+    );
 }
 
 /**

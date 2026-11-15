@@ -26,7 +26,7 @@ import { ContributionsBlock } from "../../ui/profile/ContributionsBlock";
 import { PassportBlock } from "../../ui/profile/PassportBlock";
 import { CollectionsLazy } from "../../ui/profile/CollectionsLazy";
 import { AttendanceCard } from "../../ui/attendance-card";
-import { useProfileSummary } from "../../lib/hooks/use-api";
+import { useProfileSummary, type ProfileSummaryData } from "../../lib/hooks/use-api";
 import { norm } from "../../lib/strings";
 import { DisavowChip } from "../../disavow/_components/DisavowChip";
 import { BuddyRecognitionBlock } from "../../ui/profile/BuddyRecognitionBlock";
@@ -43,14 +43,16 @@ interface ProfileClientProps {
     disavowWarning?: { id: string; label: string } | null;
     /** Loaded server-side, public fields only; null while buddy.publicRecognitionEnabled is off or there is nothing to show. */
     buddyRecognition?: BuddyRecognition | null;
+    /** Viewer-independent summary loaded on the server so the page paints without a client fetch. */
+    initialSummary?: ProfileSummaryData | null;
 }
 
-export function ProfileClient({ id, disavowWarning = null, buddyRecognition = null }: ProfileClientProps) {
+export function ProfileClient({ id, disavowWarning = null, buddyRecognition = null, initialSummary = null }: ProfileClientProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const asVisitor = searchParams?.get("as") === "visitor";
 
-    const { data, isLoading, error } = useProfileSummary(id);
+    const { data, isLoading, error } = useProfileSummary(id, initialSummary);
 
     if (isLoading) {
         return (

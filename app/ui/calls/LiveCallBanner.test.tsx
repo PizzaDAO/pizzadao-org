@@ -51,7 +51,7 @@ describe("<LiveCallBanner />", () => {
         const { readFileSync } = await import("fs");
         const { join } = await import("path");
         const root = join(__dirname, "..", "..");
-        expect(readFileSync(join(root, "calls", "page.tsx"), "utf-8")).toContain("<LiveCallBanner");
+        expect(readFileSync(join(root, "calls", "CallsClient.tsx"), "utf-8")).toContain("<LiveCallBanner");
         expect(readFileSync(join(root, "dashboard", "[id]", "page.tsx"), "utf-8")).toContain("<LiveCallBanner");
     });
 });

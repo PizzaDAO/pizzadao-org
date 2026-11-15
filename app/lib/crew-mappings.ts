@@ -6,7 +6,8 @@
 
 import type { GvizResponse } from "@/app/lib/gviz-parser";
 import { getTaskLinks, getColumnHyperlinks } from "@/app/api/lib/google-sheets";
-import { cacheGet, cacheSet, cacheDel, CACHE_TTL } from "@/app/api/lib/cache";
+import { swrGet } from "@/app/lib/swr-cache";
+import { cacheDel, CACHE_TTL } from "@/app/api/lib/cache";
 import { fetchGviz, buildGvizUrl, GvizFetchError } from "@/app/lib/sheets/gviz";
 import { SHEET_IDS, SHEET_TABS } from "@/app/lib/sheets/config";
 import { norm as normalizeSpaces } from "@/app/lib/strings";
@@ -494,6 +495,7 @@ async function attachTasks(crews: CrewOption[], forceRefresh: boolean): Promise<
   );
 }
 
+const CREW_MAPPINGS_KEEP = 60 * 60 * 24; // stale lists stay servable for a day
 const DB_CACHE_KEY = "crew-mappings:db:v1";
 const sheetCacheKey = () => `crew-mappings:v7:${SHEET_ID}`;
 
@@ -513,20 +515,16 @@ export async function getCrewMappings(forceRefresh = false): Promise<{ crews: Cr
   const fromDb = await usesDb("crews");
   const cacheKey = fromDb ? DB_CACHE_KEY : sheetCacheKey();
 
-  if (!forceRefresh) {
-    const cached = await cacheGet<{ crews: CrewOption[] }>(cacheKey);
-    if (cached) {
-      return { ...cached, cached: true };
-    }
-  }
-
-  const crews = fromDb ? await fetchCrewsFromDb() : (await fetchCrewMappingsFromSheet(forceRefresh)).crews;
-
-  // Parallel fetch tasks for crews that have a sheet
-  await attachTasks(crews, forceRefresh);
-
-  const payload = { crews };
-  await cacheSet(cacheKey, payload, CACHE_TTL.CREW_MAPPINGS);
-
-  return { ...payload, cached: false };
+  // Stale-while-revalidate: serve the last list at once and refresh behind the response; only a
+  // truly empty cache (or a force refresh) waits on the source and the task sheets.
+  const { value, cached } = await swrGet(
+    cacheKey,
+    async () => {
+      const crews = fromDb ? await fetchCrewsFromDb() : (await fetchCrewMappingsFromSheet(forceRefresh)).crews;
+      await attachTasks(crews, forceRefresh);
+      return { crews };
+    },
+    { freshSeconds: CACHE_TTL.CREW_MAPPINGS, keepSeconds: CREW_MAPPINGS_KEEP, forceRefresh },
+  );
+  return { ...value, cached };
 }

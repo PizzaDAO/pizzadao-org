@@ -444,7 +444,7 @@ export interface ProfileSummaryData {
  * External shape is identical to the PR2 hook so the profile page composition
  * is untouched.
  */
-export function useProfileSummary(memberId: string | undefined) {
+export function useProfileSummary(memberId: string | undefined, initialData?: ProfileSummaryData | null) {
   return useQuery<ProfileSummaryData>({
     queryKey: ['profile-summary', memberId],
     queryFn: async () => {
@@ -459,6 +459,9 @@ export function useProfileSummary(memberId: string | undefined) {
     staleTime: 60_000,
     gcTime: 10 * 60 * 1000,
     retry: false,
+    // Server-prefilled public summary: render it at once, then refetch right away so the
+    // viewer-specific fields (isOwner, viewerId) arrive.
+    ...(initialData ? { initialData, initialDataUpdatedAt: 0 } : {}),
   })
 }
 

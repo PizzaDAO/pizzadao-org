@@ -72,6 +72,29 @@ export async function cacheDel(key: string): Promise<void> {
 }
 
 /**
+ * Take a short-lived lock (set-if-absent). Returns true when this caller holds it.
+ * If the cache itself is unreachable it returns true so work is never blocked.
+ */
+export async function cacheLock(key: string, ttlSeconds: number): Promise<boolean> {
+  try {
+    if (isKVConfigured()) {
+      const res = await kv.set(key, 1, { nx: true, ex: ttlSeconds });
+      return res !== null;
+    }
+    const entry = memoryCache.get(key);
+    if (entry && Date.now() <= entry.expiresAt) return false;
+    memoryCache.set(key, { value: 1, expiresAt: Date.now() + ttlSeconds * 1000 });
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+export async function cacheUnlock(key: string): Promise<void> {
+  await cacheDel(key);
+}
+
+/**
  * Get or set pattern - fetch from cache or compute and cache
  */
 export async function cacheGetOrSet<T>(
