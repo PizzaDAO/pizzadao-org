@@ -197,13 +197,18 @@ export async function GET(request: NextRequest) {
             );
         }
 
+        // ?fresh=1 or a no-cache request (the lane page after a pin/tick) skips the in-memory
+        // entry, rebuilds it, and keeps the browser from storing the answer.
+        const fresh =
+            request.nextUrl.searchParams.get("fresh") === "1" ||
+            /\bno-cache\b/i.test(request.headers.get("cache-control") ?? "");
+        const cacheControl = fresh ? "private, no-store" : "private, max-age=60, stale-while-revalidate=300";
+
         // Cache hit?
-        const cached = CACHE.get(requestedMemberId);
+        const cached = fresh ? undefined : CACHE.get(requestedMemberId);
         if (cached && Date.now() - cached.time < CACHE_TTL_MS) {
             return NextResponse.json(cached.data, {
-                headers: {
-                    "Cache-Control": "private, max-age=60, stale-while-revalidate=300",
-                },
+                headers: { "Cache-Control": cacheControl },
             });
         }
 
@@ -491,9 +496,7 @@ export async function GET(request: NextRequest) {
         CACHE.set(memberId, { time: Date.now(), data: summary });
 
         return NextResponse.json(summary, {
-            headers: {
-                "Cache-Control": "private, max-age=60, stale-while-revalidate=300",
-            },
+            headers: { "Cache-Control": cacheControl },
         });
     } catch (error) {
         return internalError(error, "dashboard-summary", "Failed to load dashboard summary");

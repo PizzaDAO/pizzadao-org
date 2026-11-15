@@ -24,6 +24,8 @@ export const SUMMARY_MAX = 280
 export const MAX_STRETCH = 5
 const CREW_ID = /^[a-z0-9_-]{1,40}$/
 
+const SUBMIT_NEEDS_MISSION = 'Pick a mission before publishing: this lane has a submit step'
+
 type Audit = Array<{ field: string; oldValue: unknown; newValue: unknown }>
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
@@ -148,7 +150,7 @@ export async function updateLane(slug: string, patch: LanePatch, actor: string, 
   const missionAfter = 'missionId' in data ? (data.missionId as number | null) : (current.missionId ?? null)
   if (willPublish && missionAfter === null && ('published' in data || 'missionId' in data)) {
     const submitSteps = await prisma.laneStep.count({ where: { laneSlug: slug, kind: 'submit' } })
-    if (submitSteps > 0) throw new LaneEditError(400, 'Pick a mission before publishing: this lane has a submit step')
+    if (submitSteps > 0) throw new LaneEditError(400, SUBMIT_NEEDS_MISSION)
   }
 
   const n = noteOf(note)
@@ -190,6 +192,12 @@ function checkLink(v: unknown): string | null {
   return r.value
 }
 
+/** A submit step on a published lane with no mission would point at nothing: refuse it. */
+async function assertSubmitStepAllowed(slug: string): Promise<void> {
+  const lane = await prisma.lane.findUnique({ where: { slug }, select: { published: true, missionId: true } })
+  if (lane?.published && (lane.missionId ?? null) === null) throw new LaneEditError(400, SUBMIT_NEEDS_MISSION)
+}
+
 export async function createStep(slug: string, input: StepInput, actor: string, note?: unknown): Promise<{ id: string }> {
   if (!isLaneSlug(slug)) throw new LaneEditError(400, 'Invalid lane')
   const lane = await prisma.lane.findUnique({ where: { slug }, select: { slug: true } })
@@ -200,6 +208,7 @@ export async function createStep(slug: string, input: StepInput, actor: string, 
   const linkLabel = checkLabel(input.linkLabel)
   if (input.kind !== undefined && !isStepKind(input.kind)) throw new LaneEditError(400, 'kind must be read, do or submit')
   const kind = (input.kind as string | undefined) ?? 'do'
+  if (kind === 'submit') await assertSubmitStepAllowed(slug)
 
   return prisma.$transaction(async (tx) => {
     const last = await tx.laneStep.findFirst({ where: { laneSlug: slug }, orderBy: { position: 'desc' }, select: { position: true } })
@@ -231,6 +240,7 @@ export async function updateStep(id: string, patch: StepInput, actor: string, no
     set('kind', current.kind, patch.kind)
   }
   if (audit.length === 0) return { changed: [] }
+  if (data.kind === 'submit') await assertSubmitStepAllowed(current.laneSlug)
   const n = noteOf(note)
   await prisma.$transaction(async (tx) => {
     await tx.laneStep.update({ where: { id }, data: data as never })
@@ -265,12 +275,14 @@ export async function moveStep(id: string, direction: 'up' | 'down', actor: stri
 export async function deleteStep(id: string, actor: string, note?: unknown): Promise<void> {
   const step = await prisma.laneStep.findUnique({ where: { id } })
   if (!step) throw new LaneEditError(404, 'Step not found')
-  const lane = await prisma.lane.findUnique({ where: { slug: step.laneSlug }, select: { published: true } })
-  if (lane?.published) {
-    const n = await prisma.laneStep.count({ where: { laneSlug: step.laneSlug } })
-    if (n <= 1) throw new LaneEditError(409, 'Unpublish the lane before deleting its last step')
-  }
   await prisma.$transaction(async (tx) => {
+    // Lock the lane row so two concurrent deletes (or an unpublish) serialize on the check below.
+    await tx.$queryRaw`SELECT slug FROM "Lane" WHERE slug = ${step.laneSlug} FOR UPDATE`
+    const lane = await tx.lane.findUnique({ where: { slug: step.laneSlug }, select: { published: true } })
+    if (lane?.published) {
+      const n = await tx.laneStep.count({ where: { laneSlug: step.laneSlug } })
+      if (n <= 1) throw new LaneEditError(409, 'Unpublish the lane before deleting its last step')
+    }
     await tx.laneStep.delete({ where: { id } })
     await tx.appSettingChange.create({
       data: { key: `laneStep:${id}:deleted`, oldValue: jsonOrDbNull({ lane: step.laneSlug, title: step.title, kind: step.kind }), newValue: jsonOrDbNull(null), changedBy: actor, note: noteOf(note) },
