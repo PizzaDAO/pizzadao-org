@@ -16,6 +16,20 @@ import { FILM_WIKI_SLUG } from "@/app/lib/mafia-films";
 const cache = new Map<string, string | null>();
 const inflight = new Map<string, Promise<string | null>>();
 
+const THUMB_WIDTH = 330;
+
+/** Re-size a Wikipedia summary-API thumbnail URL to THUMB_WIDTH, hitting the
+ * /thumb/ path directly. Already-small images (`thumbnail_unscaled`, i.e. the
+ * original file is the thumbnail) are left alone: Wikimedia rejects a thumb
+ * wider than the source. */
+function posterThumbUrl(src: string, width?: number): string {
+  if (/\/\d{2,4}px-/.test(src)) return src.replace(/\/\d{2,4}px-/, `/${THUMB_WIDTH}px-`);
+  if (width && width <= THUMB_WIDTH) return src;
+  const m = src.match(/^(https:\/\/upload\.wikimedia\.org\/wikipedia\/[^/]+)\/((?:[0-9a-f]\/[0-9a-f]{2}\/)[^/?]+)/);
+  if (!m) return src;
+  return `${m[1]}/thumb/${m[2]}/${THUMB_WIDTH}px-${m[2].split("/").pop()}`;
+}
+
 async function fetchPoster(slug: string): Promise<string | null> {
   if (cache.has(slug)) return cache.get(slug) ?? null;
   if (inflight.has(slug)) return inflight.get(slug)!;
@@ -27,13 +41,17 @@ async function fetchPoster(slug: string): Promise<string | null> {
       (
         data: {
           originalimage?: { source?: string };
-          thumbnail?: { source?: string };
+          thumbnail?: { source?: string; width?: number };
         } | null,
       ) => {
-        const src =
-          data?.originalimage?.source || data?.thumbnail?.source || null;
-        // Upscale the thumbnail URL when possible (Wikipedia thumb pattern).
-        const upscaled = src ? src.replace(/\/(\d{2,4})px-/, "/640px-") : null;
+        // Prefer the API's `thumbnail` (small, direct upload.wikimedia.org URL,
+        // no redirect) over `originalimage` (full-size file). Wikimedia only
+        // serves standard thumbnail widths (others 429), so use 330px: enough
+        // for a 200px tile at 1.5x. Files without a thumbnail are small, so
+        // their original is fine.
+        const upscaled = data?.thumbnail?.source
+          ? posterThumbUrl(data.thumbnail.source, data.thumbnail.width)
+          : data?.originalimage?.source ?? null;
         cache.set(slug, upscaled);
         return upscaled;
       },
