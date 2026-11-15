@@ -31,8 +31,14 @@ export interface RemoteConfig {
   transcriptionKeyterms: string[]
   /** Which voice channels may be recorded and which a crew's call uses (calls.recordableVoiceChannels, calls.crewVoiceChannels). */
   voiceChannels: VoiceChannelSettings
-  /** Live call view heartbeat (calls.liveViewEnabled, calls.livePushSeconds). */
-  liveView: { enabled: boolean; pushSeconds: number }
+  /**
+   * Live call view heartbeat (calls.liveViewEnabled, calls.livePushSeconds). After a recording stops at its
+   * limit with people still there, the live state carries on until the channel has been empty for
+   * afterRecordingEmptySeconds (calls.liveAfterRecordingEmptySeconds), the event ends, another call starts
+   * in the channel, or maxHours after the recording started (calls.liveMaxHours). An older app sends
+   * neither: the defaults apply.
+   */
+  liveView: { enabled: boolean; pushSeconds: number; afterRecordingEmptySeconds: number; maxHours: number }
 }
 
 export const REMOTE_CONFIG_OFF: RemoteConfig = {
@@ -51,7 +57,7 @@ export const REMOTE_CONFIG_OFF: RemoteConfig = {
   supersedeMaxDeferMinutes: 0,
   transcriptionKeyterms: [],
   voiceChannels: VOICE_CHANNELS_OFF,
-  liveView: { enabled: false, pushSeconds: 20 },
+  liveView: { enabled: false, pushSeconds: 20, afterRecordingEmptySeconds: 120, maxHours: 4 },
 }
 
 export const REMOTE_CONFIG_TIMEOUT_MS = 5_000
@@ -124,6 +130,8 @@ export function parseRemoteConfig(raw: unknown, previous?: RemoteConfig | null):
     liveView: {
       enabled: lv.enabled === true,
       pushSeconds: int(lv.pushSeconds, d.liveView.pushSeconds, 10, 120),
+      afterRecordingEmptySeconds: int(lv.afterRecordingEmptySeconds, d.liveView.afterRecordingEmptySeconds, 30, 1800),
+      maxHours: int(lv.maxHours, d.liveView.maxHours, 1, 12),
     },
   }
 }

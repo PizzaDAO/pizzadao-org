@@ -59,9 +59,13 @@ const view = (over: { settings?: Settings; cursors?: Map<string, string>; filter
 describe('public endpoint payload', () => {
   it('has title, crew, start, stream link and head count only: no names or member ids', async () => {
     const out = await publicLiveView(ON, NOW)
-    expect(out.calls).toEqual([{ sessionId: 'evt-1', title: 'Ops call', crewLabel: 'Ops', crewId: 'ops', startedAt: session.startedAt.toISOString(), streamLink: 'https://x.com/i/broadcasts/fallback', presentCount: 3 }])
+    expect(out.calls).toEqual([{ sessionId: 'evt-1', title: 'Ops call', crewLabel: 'Ops', crewId: 'ops', startedAt: session.startedAt.toISOString(), streamLink: 'https://x.com/i/broadcasts/fallback', presentCount: 3, recordingEnded: false }])
     const json = JSON.stringify(out)
     for (const leak of ['Ann', 'Bob', 'Cy', '111111111111111', 'presence', 'm-ann']) expect(json).not.toContain(leak)
+  })
+  it('says when the recording ended but the call is still live', async () => {
+    vi.mocked(prisma.callLiveSession.findMany).mockResolvedValue([{ ...session, recordingEndedAt: new Date(NOW - 60_000) }] as never)
+    expect((await publicLiveView(ON, NOW)).calls[0].recordingEnded).toBe(true)
   })
   it('is empty when nothing is live or the live view is off', async () => {
     vi.mocked(prisma.callLiveSession.findMany).mockResolvedValue([] as never)

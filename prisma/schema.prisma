@@ -1576,6 +1576,7 @@ model CallLiveSession {
   streamLink String? // first x.com broadcast or status link posted in the call chat
   streamLinkOverride String? // set by a host on the live page; wins over the chat link and the crew setting
   presence   Json      @default("[]") // [{discordId, displayName, presentSec, inChannel}] humans only, max 300
+  recordingEndedAt DateTime? // the recording stopped (its limit) while the call went on; the live view stays up
   updatedAt  DateTime  @updatedAt
 
   @@index([endedAt, lastSeenAt])

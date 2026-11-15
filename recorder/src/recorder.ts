@@ -39,6 +39,7 @@ import type { SessionMeta } from './types.js'
 import { LiveItems, postLive, type LiveRequest } from './live-items.js'
 import { PlayOutListener, postPlayOut, type PlayOutAnswer } from './play-out.js'
 import { LiveStatePusher, postLiveState, type LiveStateBody, type PostResult } from './live-state.js'
+import { AfterRecordingTracker, liveContinuesAfter, occurrenceLive, occurrenceState, type AfterRecordingEnd } from './after-recording.js'
 
 const TICK_MS = 10_000
 const REMINDER_AFTER_MS = 5 * 60_000
@@ -95,10 +96,34 @@ interface ActiveSession {
   playOut: PlayOutListener | null
   /** Heartbeat for the app's live call view (settings snapshot at session start); null: off. */
   liveState: LiveStatePusher | null
+  /** Discord has listed this occurrence as scheduled or active during the session (event-end detection). */
+  eventSeenLive: boolean
+}
+
+/**
+ * The live view of a call whose recording stopped while the call goes on (see after-recording.ts). No voice
+ * connection, no capture: presence comes from the gateway's voice states.
+ */
+interface AfterRecording {
+  sessionId: string
+  eventId: string | null
+  /** Scheduled start of the occurrence that was recorded. */
+  eventStartMs: number | null
+  key: string
+  channelId: string
+  guild: Guild
+  liveState: LiveStatePusher
+  tracker: AfterRecordingTracker
+  /** The recording's end-of-call song, still due at the scheduled end or when the event ends. */
+  endSong: EndSongState | null
+  eventSeenLive: boolean
+  tick: NodeJS.Timeout
 }
 
 export class CallRecorder {
   private current: ActiveSession | null = null
+  /** Live views that outlast their recording, by voice channel. */
+  private readonly after = new Map<string, AfterRecording>()
   private starting: Promise<void> | null = null
   private shuttingDown = false
   private queue: Promise<unknown> = Promise.resolve()
@@ -151,7 +176,12 @@ export class CallRecorder {
 
   /** True for a channel the recorder cares about: a recordable one, or the one it is recording now. */
   isWatchedChannel(channelId: string | null): boolean {
-    return channelId !== null && (this.allowedNow().has(channelId) || this.current?.channelId === channelId)
+    return channelId !== null && (this.allowedNow().has(channelId) || this.current?.channelId === channelId || this.after.has(channelId))
+  }
+
+  /** Calls whose live view outlasts the recording (shown on /health). */
+  liveAfterRecording(): { sessionId: string; channelId: string }[] {
+    return [...this.after.values()].map((a) => ({ sessionId: a.sessionId, channelId: a.channelId }))
   }
 
   get currentEventId(): string | null {
@@ -191,7 +221,9 @@ export class CallRecorder {
     const live = recordable(liveEvents)
     this.slots.observe(live, Date.now(), keep)
     const allEvents = recordable(this.slots.merge(live, keep))
-    if (this.shuttingDown || this.starting) return
+    if (this.shuttingDown) return
+    await this.observeEvents(liveEvents)
+    if (this.starting) return
     if (this.current?.stopping) return
     const cur0 = this.current
     // The session's channel was taken off the allowlist mid-call: stop recording it.
@@ -478,8 +510,12 @@ export class CallRecorder {
         live,
         playOut,
         liveState: this.liveStateFor(rc, { sessionId, eventId: event.id, eventName: event.name, channelId, startedAtMs }),
+        eventSeenLive: false,
         tick: setInterval(() => this.serial(() => this.onTick()), TICK_MS),
       }
+      // A new call in this channel takes over from a live view that outlasted its recording.
+      const prev = this.after.get(channelId)
+      if (prev) await this.endAfter(prev, 'superseded')
       await this.notePresent(this.current)
       this.current.liveState?.start()
       this.current.startPresent = new Set(this.current.present)
@@ -562,7 +598,9 @@ export class CallRecorder {
     this.cancelWelcome(s)
     s.live?.stop()
     s.playOut?.stop()
-    void s.liveState?.stop() // the end notice is fire and forget: it never delays the recording's finish
+    // The recording limit (or a lost connection) is not the end of the call: the live view stays up while people are here.
+    if (s.liveState && liveContinuesAfter(reason) && !this.shuttingDown) this.beginAfter(s, s.liveState, reason)
+    else void s.liveState?.stop() // the end notice is fire and forget: it never delays the recording's finish
     this.log(`stopping ${s.meta.sessionId}: ${reason}`)
     if (s.endSong && isEndSongStop(reason)) {
       // The call really ended with people possibly still here. empty / superseded / shutdown / disconnected never play.
@@ -658,7 +696,7 @@ export class CallRecorder {
   }
 
   /** Ask pizza-radio to play the crew song, at most once per call occurrence. Never throws, never blocks. */
-  private fireEndSong(s: ActiveSession, humans: number, why: string, spoken = false): void {
+  private fireEndSong(s: Pick<ActiveSession, 'endSong' | 'key' | 'channelId'>, humans: number, why: string, spoken = false): void {
     const e = s.endSong
     const radio = this.cfg.pizzaRadio
     if (!e || e.fired || !radio) return
@@ -749,6 +787,7 @@ export class CallRecorder {
   async shutdown(): Promise<void> {
     this.shuttingDown = true
     if (this.starting) await this.starting.catch(() => undefined)
+    for (const a of [...this.after.values()]) await this.endAfter(a, 'shutdown')
     const s = this.current
     if (!s) return
     s.stopping = true
@@ -822,6 +861,13 @@ export class CallRecorder {
 
   /** Late joiners get a one-line welcome (once per person per call). */
   onVoiceState(oldState: VoiceState, newState: VoiceState): void {
+    // A join or leave of a channel whose live view outlasts its recording: refresh who is there now.
+    if (oldState.channelId !== newState.channelId) {
+      for (const ch of new Set([oldState.channelId, newState.channelId])) {
+        const a = ch ? this.after.get(ch) : undefined
+        if (a) this.serial(() => this.afterTick(a))
+      }
+    }
     const s = this.current
     if (!s || s.stopping) return
     // A join or leave of the call channel: record the new member set now, so short visits are measured too.
@@ -910,7 +956,8 @@ export class CallRecorder {
   onMessage(msg: Message): void {
     try {
       const s = this.inSession(msg)
-      if (!s || msg.author?.bot || msg.system) return
+      if (!s) return this.afterChat(msg)
+      if (msg.author?.bot || msg.system) return
       const text = this.chatText(msg)
       if (!text) {
         // Without the MessageContent privileged intent Discord sends empty content.
@@ -990,7 +1037,7 @@ export class CallRecorder {
    * The current set for the live view, right away; names are looked up in the background (a slow or
    * failing lookup never holds up presence, and a failed one is not retried for a few minutes).
    */
-  private feedLiveState(s: ActiveSession, humans: string[]): void {
+  private feedLiveState(s: { liveState: LiveStatePusher | null; guild: Guild }, humans: string[]): void {
     const ls = s.liveState
     if (!ls) return
     try {
@@ -1035,5 +1082,106 @@ export class CallRecorder {
     } catch (err) {
       this.log(`could not note who is in the channel: ${err instanceof Error ? err.message : String(err)}`)
     }
+  }
+
+  // ---- after the recording ---------------------------------------------
+
+  /** The recording stopped while the call goes on: keep its live view up (same session, not recording). */
+  private beginAfter(s: ActiveSession, liveState: LiveStatePusher, reason: StopReason): void {
+    try {
+      const prev = this.after.get(s.channelId)
+      if (prev) void this.endAfter(prev, 'superseded')
+      const lv = (this.remote?.get() ?? REMOTE_CONFIG_OFF).liveView
+      const a: AfterRecording = {
+        sessionId: s.meta.sessionId,
+        eventId: s.meta.eventId,
+        eventStartMs: s.eventStartMs,
+        key: s.key,
+        channelId: s.channelId,
+        guild: s.guild,
+        liveState,
+        tracker: new AfterRecordingTracker(s.meta.startedAtMs, {
+          emptyGraceMs: lv.afterRecordingEmptySeconds * 1000,
+          capMs: lv.maxHours * 3_600_000,
+        }),
+        endSong: s.endSong,
+        eventSeenLive: s.eventSeenLive,
+        tick: setInterval(() => this.serial(() => this.afterTick(a)), TICK_MS),
+      }
+      a.tick.unref?.()
+      this.after.set(s.channelId, a)
+      liveState.markNotRecording()
+      this.log(`recording of ${s.meta.sessionId} stopped (${reason}); the live view stays up while people are in the channel`)
+      this.serial(() => this.afterTick(a))
+    } catch (err) {
+      this.log(`live view after the recording failed: ${err instanceof Error ? err.message : String(err)}`)
+      void liveState.stop()
+    }
+  }
+
+  /** Who is in the channel now; end the live view when it emptied for long enough or the cap passed. Never throws. */
+  private async afterTick(a: AfterRecording): Promise<void> {
+    if (this.after.get(a.channelId) !== a) return
+    let ids: string[] | null = null
+    try {
+      ids = await this.humanIds(a.guild, a.channelId)
+    } catch (err) {
+      this.log(`human count failed: ${err instanceof Error ? err.message : String(err)}`)
+    }
+    if (this.after.get(a.channelId) !== a) return
+    const nowMs = Date.now()
+    if (ids) {
+      a.tracker.observeHumans(ids.length, nowMs)
+      this.feedLiveState(a, ids)
+    }
+    const end = a.tracker.check(nowMs)
+    if (end) return this.endAfter(a, end)
+    if (ids && a.endSong && !a.endSong.fired && a.endSong.endMs !== null && nowMs >= a.endSong.endMs) {
+      // The scheduled end passed after the recording stopped: the song still marks the end of the call.
+      this.fireEndSong(a, ids.length, 'scheduled end')
+    }
+  }
+
+  /** The schedule as Discord reports it now: event-end detection for the live views (and the running session). */
+  private async observeEvents(liveEvents: EventInfo[]): Promise<void> {
+    const cur = this.current
+    if (cur && !cur.stopping && occurrenceLive(liveEvents, cur.meta.eventId, cur.eventStartMs)) cur.eventSeenLive = true
+    for (const a of [...this.after.values()]) {
+      if (!this.allowedNow().has(a.channelId)) {
+        await this.endAfter(a, 'channel-disallowed')
+        continue
+      }
+      const state = occurrenceState(liveEvents, a.eventId, a.eventStartMs)
+      if (state === 'live') a.eventSeenLive = true
+      // Only an occurrence once seen live can be seen to end (one started from slot memory is already gone).
+      // Completed or rolled on: the call ended (song). Canceled or deleted: the call is off (no song).
+      else if (a.eventSeenLive) await this.endAfter(a, state === 'completed' || state === 'rolled' ? 'event-ended' : 'event-canceled')
+    }
+  }
+
+  /** End a live view that outlasted its recording (ended=true, fire and forget). Never throws. */
+  private async endAfter(a: AfterRecording, why: AfterRecordingEnd): Promise<void> {
+    if (this.after.get(a.channelId) !== a) return
+    this.after.delete(a.channelId)
+    clearInterval(a.tick)
+    if (why === 'event-ended' && a.endSong && !a.endSong.fired) {
+      let humans = 0
+      try {
+        humans = await this.humanCount(a.guild, a.channelId)
+      } catch {
+        // cannot tell who is here: stay quiet
+      }
+      this.fireEndSong(a, humans, 'event-ended')
+    }
+    void a.liveState.stop()
+    this.log(`live view of ${a.sessionId} ended: ${why}`)
+  }
+
+  /** A chat message in a channel whose live view outlasts its recording: only the stream link is used. Never throws. */
+  private afterChat(msg: Message): void {
+    const a = this.after.get(msg.channelId)
+    if (!a || msg.author?.bot || msg.system) return
+    const text = this.chatText(msg)
+    if (text) a.liveState.onChat(text)
   }
 }

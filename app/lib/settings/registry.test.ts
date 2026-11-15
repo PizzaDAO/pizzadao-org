@@ -178,6 +178,8 @@ describe('settings registry', () => {
       ['calls.liveStreamLinks', ''],
       ['calls.livePushSeconds', 20],
       ['calls.liveStaleSeconds', 120],
+      ['calls.liveAfterRecordingEmptySeconds', 120],
+      ['calls.liveMaxHours', 4],
       ['calls.liveHostRoleIds', ''],
       ['calls.liveQuestionMaxPerMember', 5],
       ['calls.liveQuestionMinGapSeconds', 20],

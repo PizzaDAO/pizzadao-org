@@ -5,7 +5,8 @@
  *
  * Fails closed: a crew excluded by the private post filter (or a filter that cannot be read) marks
  * the session hidden, and every public reader treats a hidden session as "no call live". An ended
- * session stays ended whatever a late heartbeat says.
+ * session stays ended whatever a late heartbeat says. A heartbeat with `recording: false` (the recording hit
+ * its limit, people are still talking) keeps the session live and sets recordingEndedAt.
  *
  * Keep the body shape in sync with recorder/src/live-state.ts.
  */
@@ -57,6 +58,11 @@ export const liveStateSchema = z.object({
   /** The first stream link the recorder found in the call chat (re-checked here). */
   streamLink: z.string().max(500).nullable().optional(),
   ended: z.boolean().optional(),
+  /**
+   * false: the recording stopped (its limit) but the call goes on; the heartbeat keeps the live view up.
+   * Absent (an older recorder) means recording. Once false it stays so for the session.
+   */
+  recording: z.boolean().optional(),
 })
 export type LiveStateBody = z.infer<typeof liveStateSchema>
 
@@ -170,6 +176,8 @@ export async function handleLiveState(body: LiveStateBody, deps: LiveStateDeps =
     hidden,
     streamLink,
     presence,
+    // Set once, the first time the recorder says it stopped recording; never cleared.
+    ...(body.recording === false && !existing?.recordingEndedAt ? { recordingEndedAt: now } : {}),
   }
   if (!existing) {
     try {

@@ -49,7 +49,7 @@ export type Resolved = { ok: true; call: LiveCall } | { ok: false; message: stri
 
 /** Pure: pick the call a command means. */
 export function pickCall(calls: readonly LiveCall[], channelId: string | undefined, choice: string | undefined): Resolved {
-  if (calls.length === 0) return { ok: false, message: 'No call is being recorded right now.' }
+  if (calls.length === 0) return { ok: false, message: 'No call is live right now.' }
   const here = channelId ? calls.find((c) => c.channelId === channelId) : undefined
   if (here) return { ok: true, call: here }
   if (choice) {

@@ -149,6 +149,37 @@ describe('handleLiveState', () => {
     expect('endedAt' in arg.data).toBe(false)
   })
 
+  it('accepts an older recorder body with no recording flag (no recordingEndedAt written)', async () => {
+    expect(liveStateSchema.safeParse(body()).success).toBe(true)
+    sessions.findUnique.mockResolvedValue({ endedAt: null, crewId: 'ops', crewLabel: 'Ops', streamLink: null, recordingEndedAt: null } as never)
+    expect(await handleLiveState(body(), deps())).toBe('ok')
+    expect('recordingEndedAt' in (sessions.updateMany.mock.calls[0][0] as unknown as { data: Record<string, unknown> }).data).toBe(false)
+  })
+
+  it('recording: false keeps the session live and sets recordingEndedAt once', async () => {
+    expect(liveStateSchema.safeParse({ ...body(), recording: false }).success).toBe(true)
+    expect(liveStateSchema.safeParse({ ...body(), recording: 'no' }).success).toBe(false)
+    sessions.findUnique.mockResolvedValue({ endedAt: null, crewId: 'ops', crewLabel: 'Ops', streamLink: null, recordingEndedAt: null } as never)
+    expect(await handleLiveState(body({ recording: false }), deps())).toBe('ok')
+    const first = sessions.updateMany.mock.calls[0][0] as unknown as { where: Record<string, unknown>; data: Record<string, unknown> }
+    expect(first.where).toEqual({ sessionId: 'evt-1700000000000', endedAt: null })
+    expect(first.data.recordingEndedAt).toEqual(new Date(1_700_000_100_000))
+    expect('endedAt' in first.data).toBe(false)
+    // Already marked: a later heartbeat keeps the first time.
+    sessions.findUnique.mockResolvedValue({ endedAt: null, crewId: 'ops', crewLabel: 'Ops', streamLink: null, recordingEndedAt: new Date(5) } as never)
+    await handleLiveState(body({ recording: false }), deps())
+    expect('recordingEndedAt' in (sessions.updateMany.mock.calls[1][0] as unknown as { data: Record<string, unknown> }).data).toBe(false)
+  })
+
+  it('a not-recording session still ends on ended, and stays ended', async () => {
+    sessions.findUnique.mockResolvedValue({ endedAt: null, crewId: 'ops', crewLabel: 'Ops', streamLink: null, recordingEndedAt: new Date(5) } as never)
+    expect(await handleLiveState(body({ recording: false, ended: true }), deps())).toBe('ended')
+    expect((sessions.updateMany.mock.calls[0][0] as unknown as { data: { endedAt: Date } }).data.endedAt).toEqual(new Date(1_700_000_100_000))
+    sessions.findUnique.mockResolvedValue({ endedAt: new Date(1), recordingEndedAt: new Date(5) } as never)
+    expect(await handleLiveState(body({ recording: false }), deps())).toBe('ended')
+    expect(sessions.updateMany).toHaveBeenCalledTimes(1)
+  })
+
   it('does not revive an ended session on a late heartbeat (even one racing the end)', async () => {
     sessions.findUnique.mockResolvedValue({ endedAt: new Date(1) } as never)
     expect(await handleLiveState(body(), deps())).toBe('ended')

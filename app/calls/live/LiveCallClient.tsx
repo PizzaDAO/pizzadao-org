@@ -168,6 +168,7 @@ function LiveCall({ live, state, items, onChanged, locale }: { live: CallState; 
                     <span className="text-sm text-foreground/70">{t("startedAt", { time: started })}</span>
                 </div>
                 <p className="mt-3 mb-0 text-foreground/80">{t("headCount", { count: live.presentCount })}</p>
+                {live.recordingEnded && <p className="mt-1 mb-0 text-sm text-foreground/60">{t("recordingEnded")}</p>}
                 {live.streamLink && (
                     <a href={live.streamLink} target="_blank" rel="noopener noreferrer" className={`${pillInk} mt-4`}>
                         {t("watchStream")}

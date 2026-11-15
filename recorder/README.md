@@ -57,6 +57,7 @@ The recorder has no database. At the start of each session and every 5 minutes i
 - Welcome message: `calls.welcomeEnabled` (env kill switch `CALL_WELCOME_ENABLED` on the app), `calls.welcomeTemplate`, `calls.welcomeBatchSeconds`, `calls.recordingLine`. Per-member welcomes and the recording line are unchanged.
 - Start-of-call notice: `calls.startNotice` (multiline, max 500 characters, default empty = post nothing). When set, the recorder posts it in the voice channel chat when a call starts (after the welcome greeting when welcomes are on); mentions (`@everyone`, `@here`, roles) are stripped and no mentions are allowed. The `🔴 REC` nickname is unchanged.
 - End-of-call song: `calls.endSongTriggerEnabled` (kill switch `CALL_END_SONG_ENABLED` on the app), `calls.endSongMinHumans`.
+- Live call view: `calls.liveViewEnabled`, `calls.livePushSeconds`, and after a recording stopped at its limit, `calls.liveAfterRecordingEmptySeconds` and `calls.liveMaxHours` (see "After the recording").
 - House band at call start: `calls.startBandEnabled` (kill switch `CALL_START_BAND_ENABLED` on the app), `calls.startBandCalls`, `calls.startBandMaxSongs`.
 - Live action items (only for the Discord events of crews in `calls.liveActionItemsCrews`):
   - spoken, `calls.liveActionItemsEnabled` (kill switch `CALL_LIVE_ACTION_ITEMS_ENABLED`): every `calls.liveChunkSeconds` the speech bursts finished since the last cut are uploaded to `calls/<sessionId>/live/<userId>/<startMs>.ogg` and sent to `POST /api/calls/recorder/live-chunk`. The app transcribes them, looks for new action items and answers with the confirmation to post. The live objects are pruned with the other leftovers after ingest.
@@ -69,14 +70,27 @@ Metalhead never plays audio. When a recorded call really ends it POSTs `{ "crew"
 
 Only crews listed in the setting `calls.endSongCrewMap` ("our crew label = radio crew", one per line) play; pizza-radio knows Amore, Art, Biz Dev, Comms, Events, Finance, Governance, Mafia, Merch, Ops, Real Estate and Tech.
 
-It fires once per call occurrence when:
+It fires at most once per call occurrence, when at least `calls.endSongMinHumans` people are in the channel, on:
 
-- the Discord event ends (`event-ended`), or
-- the scheduled end (the event's end time, else its start plus the crew's call length) passes while people are still in the channel,
+- the scheduled end (the event's end time, else its start plus the crew's call length) passing while people are still in the channel, during the recording or after it (see "After the recording" below), or
+- after a recording stopped at its limit, the Discord event occurrence ending: COMPLETED, or rolled on to its next occurrence. A CANCELED or deleted event ends the live page but plays no song.
 
-and at least `calls.endSongMinHumans` people are in the channel. It never fires on `max-duration` (that is only the recording cap, the call may go on), `empty`, `superseded`, `shutdown` or `disconnected`, nor for an event with no mapped crew.
+The `event-ended` stop reason is also listed as a song trigger, but nothing produces it today: a COMPLETED or CANCELED event never stops a running recording (see event-lifecycle.ts). The song never fires on `max-duration` (that is only the recording cap, the call may go on), `empty`, `superseded`, `shutdown` or `disconnected`, nor for an event with no mapped crew.
 
 The "already played" marker (`DATA_DIR/end-song.json`, survives restarts) is written only after pizza-radio answered: a 2xx, or a 4xx that retrying will not fix (logged once). A network error or 5xx after the retry leaves it unmarked.
+
+## After the recording (live page)
+
+With the live call view on (`calls.liveViewEnabled`), a recording that stops at its limit (`max-duration`) or loses its voice connection (`disconnected`) does not end the call's live page. Recording is unchanged: Metalhead leaves the voice channel and the session is finalized as usual. Only the live-state heartbeat for the same session carries on, with `recording: false` (the page shows "recording ended"). It reports who is in the channel from the gateway's voice states and still picks up a stream link from the call chat. The live page ends when the first of these happens:
+
+- the channel has had no humans for `calls.liveAfterRecordingEmptySeconds` (default 120)
+- the Discord event occurrence, once seen scheduled or active, is completed, rolled on to its next occurrence, canceled or deleted. The occurrence is matched by event id, so an edited start time does not end it; only a jump later by at least half the recurrence interval (else 12 h) while SCHEDULED counts as rolling on. An occurrence never seen live (started from slot memory) can only end the other ways.
+- a new recording starts in that channel
+- the channel is no longer recordable
+- the recorder shuts down
+- `calls.liveMaxHours` (default 4) pass since the recording started
+
+People who join only after the recording stopped are not in the recording's attendance. `/health` lists these calls under `liveAfterRecording`.
 
 ## House band at call start
 

@@ -39,7 +39,7 @@ describe('pickCall', () => {
   })
 
   it('no live call', () => {
-    expect(pickCall([], '123', undefined)).toEqual({ ok: false, message: 'No call is being recorded right now.' })
+    expect(pickCall([], '123', undefined)).toEqual({ ok: false, message: 'No call is live right now.' })
   })
 })
 
@@ -170,7 +170,7 @@ describe('executeMetalhead', () => {
   })
 
   it('no live call / ambiguous call', async () => {
-    expect((await executeMetalhead(JOB, base({ calls: async () => [] }))).headline).toMatch(/No call is being recorded/)
+    expect((await executeMetalhead(JOB, base({ calls: async () => [] }))).headline).toMatch(/No call is live/)
     expect((await executeMetalhead({ ...JOB, channelId: '1' }, base({ calls: async () => [A, B] }))).headline).toMatch(/More than one call/)
   })
 
