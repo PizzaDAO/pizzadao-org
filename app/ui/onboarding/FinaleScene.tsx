@@ -90,6 +90,8 @@ type Props = {
   mafiaName: string;
   memberId?: string;
   dashboardHref: string;
+  /** Replaces the "Continue to dashboard" label (the lane guide link after a lane-card signup). */
+  ctaLabel?: string;
   topping?: string;
   // Recorded with the claim behind the public /made/[id] page.
   filmId?: string;
@@ -125,6 +127,7 @@ export function FinaleScene({
   mafiaName,
   memberId,
   dashboardHref,
+  ctaLabel,
   topping,
   filmId,
   filmTitle,
@@ -724,7 +727,7 @@ export function FinaleScene({
               textDecoration: "none",
             }}
           >
-            {isPublic ? t("joinButton") : t("continueButton")}
+            {isPublic ? t("joinButton") : (ctaLabel ?? t("continueButton"))}
           </a>
           <button
             type="button"

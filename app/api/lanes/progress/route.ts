@@ -1,6 +1,6 @@
 import { json, rejectUnsafeWrite } from '@/app/lib/admin-guard'
 import { requireSession } from '@/app/lib/auth-guards'
-import { fetchMemberIdByDiscordId } from '@/app/lib/sheets/member-repository'
+import { memberIdForLanes } from '@/app/lib/lanes/member'
 import { lanesEnabled, setStepDone } from '@/app/lib/lanes'
 
 export const runtime = 'nodejs'
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
   const unsafe = rejectUnsafeWrite(request)
   if (unsafe) return unsafe
   // Members only, like the guide page: a session without a member profile cannot write lane state.
-  const memberId = await fetchMemberIdByDiscordId(auth.session.discordId).catch(() => null)
+  const memberId = await memberIdForLanes(auth.session.discordId)
   if (!memberId) return json({ error: 'Members only' }, 403)
   const b = (await request.json().catch(() => null)) as Record<string, unknown> | null
   if (!b || typeof b.slug !== 'string' || typeof b.stepId !== 'string' || typeof b.done !== 'boolean') {

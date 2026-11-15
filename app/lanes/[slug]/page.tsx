@@ -12,7 +12,7 @@ import { resolveLocale } from "@/app/lib/i18n/get-locale";
 import { getMemberLane, getPublishedLane, lanesEnabled } from "@/app/lib/lanes";
 import { isLaneSlug } from "@/app/lib/lanes/links";
 import { computeProgress, pickPinned } from "@/app/lib/lanes/progress";
-import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
+import { memberIdForLanes } from "@/app/lib/lanes/member";
 import { HandbookMarkdown } from "@/app/ui/handbook/HandbookMarkdown";
 import { EditorialMasthead, EditorialPage, paperCard, pillOutline, pillTomato } from "@/app/ui/shared/Editorial";
 import { LaneStepItem, PinButton, PinOnArrive } from "@/app/ui/lanes/LaneClient";
@@ -37,9 +37,11 @@ export default async function LanePage({ params, searchParams }: Props) {
 
     const pickPath = `/lanes/${slug}?pick=1`;
     const session = await getSession();
-    if (!session?.discordId) redirect(`/join?returnTo=${encodeURIComponent(pickPath)}`);
-    const memberId = await fetchMemberIdByDiscordId(session.discordId).catch(() => null);
-    if (!memberId) redirect(`/join?returnTo=${encodeURIComponent(pickPath)}`);
+    // Visitors sign up (or log in) with the lane carried along; existing members come back here through returnTo.
+    const joinPath = `/join?lane=${slug}&returnTo=${encodeURIComponent(pickPath)}`;
+    if (!session?.discordId) redirect(joinPath);
+    const memberId = await memberIdForLanes(session.discordId);
+    if (!memberId) redirect(joinPath);
 
     const t = await getTranslations("lanes");
     const locale = await resolveLocale();

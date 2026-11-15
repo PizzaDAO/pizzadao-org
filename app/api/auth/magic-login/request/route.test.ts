@@ -52,4 +52,22 @@ describe("magic login request route", () => {
     expect((await call("sam")).status).toBe(422);
     expect((await call("x")).status).toBe(400);
   });
+  it("adds the pd_lane cookie to the signup draft so a DM link on another device keeps the lane", async () => {
+    mocks.request.mockResolvedValue({ status: "sent" });
+    const draft = { mafiaName: "Tony Pepperoni", city: "Lisbon", sessionId: "test-session-1" };
+    const send = (cookie: string | undefined, signupDraft: unknown) =>
+      POST(new Request("https://app.example/api/auth/magic-login/request", {
+        method: "POST",
+        headers: cookie ? { cookie } : {},
+        body: JSON.stringify({ username: "a_user", onboarding: true, signupDraft }),
+      }));
+    await send("pd_lane=host", draft);
+    expect(mocks.request.mock.calls[0][2].signupDraft).toMatchObject({ lane: "host" });
+    await send("pd_lane=../x", draft);
+    expect(mocks.request.mock.calls[1][2].signupDraft).not.toHaveProperty("lane");
+    await send("pd_lane=build", { ...draft, lane: "host" });
+    expect(mocks.request.mock.calls[2][2].signupDraft).toMatchObject({ lane: "host" });
+    await send("pd_lane=host", null);
+    expect(mocks.request.mock.calls[3][2].signupDraft).toBeNull();
+  });
 });

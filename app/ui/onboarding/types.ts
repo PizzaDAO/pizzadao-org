@@ -92,6 +92,11 @@ export type WizardData = {
   // cookie); null = "no one"; otherwise the inviter.
   invitedBy?: InvitedBy | null;
 
+  // The lane card the visitor came from (/join?lane=<slug>); pinned when the profile is created.
+  lane?: string;
+  /** When the lane was picked (ms); a pick older than the pd_lane cookie is dropped. */
+  laneAt?: number;
+
   // Step 5: Crews
   crews: string[];
 
