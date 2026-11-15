@@ -1076,6 +1076,7 @@
       "untitled": "Appel de crew",
       "startedAt": "Commencé à {time}",
       "watchStream": "Regarder le stream",
+      "recordingEnded": "L'enregistrement est terminé ; l'appel continue.",
       "headCount": "{count, plural, one {# personne dans l'appel} other {# personnes dans l'appel}}",
       "present": "Qui est là",
       "presentSignIn": "Connectez-vous pour voir qui est dans l'appel, poser des questions et lire les action items en direct.",

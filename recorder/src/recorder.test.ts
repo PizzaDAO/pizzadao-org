@@ -1687,6 +1687,169 @@ describe('live call view heartbeat', () => {
     expect(bodies.at(-1)?.ended).toBe(true)
   })
 
+  describe('after the recording stops at its limit', () => {
+    type Body = { sessionId: string; recording?: boolean; ended?: boolean; streamLink?: string; present: Array<{ discordId: string; inChannel: boolean }> }
+    const radio = { url: 'https://radio.example', apiKey: 'radio-secret' }
+    const fetchMock = vi.fn(async (_u: string, _i?: RequestInit) => ({ ok: true, status: 200 }) as Response)
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'setTimeout', 'clearTimeout', 'Date'] })
+      fetchMock.mockReset()
+      fetchMock.mockResolvedValue({ ok: true, status: 200 } as Response)
+      vi.stubGlobal('fetch', fetchMock)
+    })
+    afterEach(() => {
+      vi.useRealTimers()
+      vi.unstubAllGlobals()
+    })
+    const setup = (lv: Record<string, unknown> = {}, extra: Record<string, unknown> = {}) => {
+      const liveStatePost = vi.fn(async (_b: Body) => 'ok' as const)
+      const rc = parseRemoteConfig({ liveView: { enabled: true, pushSeconds: 20, afterRecordingEmptySeconds: 120, maxHours: 4, ...lv }, ...extra })
+      const w = world({ remote: { get: () => rc, refresh: async () => rc } as unknown as RemoteConfigClient, liveStatePost })
+      const bodies = () => liveStatePost.mock.calls.map((c) => c[0])
+      const flush = async () => {
+        while (w.serialJobs.length) await w.serialJobs.shift()!()
+      }
+      /** Let `ms` pass in tick-sized steps, running the queued jobs after each. */
+      const pass = async (ms: number) => {
+        for (let t = 0; t < ms; t += 10_000) {
+          await vi.advanceTimersByTimeAsync(10_000)
+          await flush()
+        }
+      }
+      return { w, bodies, flush, pass }
+    }
+    const sessionOf = (bodies: Body[]) => bodies[0].sessionId
+
+    it('stays live (not recording) while people are in the channel, then ends after the empty grace', async () => {
+      const { w, bodies, flush, pass } = setup()
+      await begin(w)
+      withHumans(w, 2)
+      await w.rec.stop('max-duration')
+      await flush()
+      await w.rec.drain()
+      expect(finalizeSession).toHaveBeenCalledTimes(1) // the recording itself finished as before
+      expect(calls).toContain('capture.stop') // and left the voice channel
+      expect(bodies().some((b) => b.ended)).toBe(false)
+      expect(bodies().at(-1)).toMatchObject({ sessionId: sessionOf(bodies()), recording: false })
+      expect(w.rec.liveAfterRecording()).toHaveLength(1)
+      await pass(30 * 60_000)
+      expect(bodies().some((b) => b.ended)).toBe(false)
+      expect(bodies().at(-1)?.present.filter((p) => p.inChannel)).toHaveLength(2)
+      withHumans(w, 0)
+      await pass(60_000)
+      expect(bodies().some((b) => b.ended)).toBe(false)
+      await pass(80_000)
+      expect(bodies().at(-1)).toMatchObject({ sessionId: sessionOf(bodies()), ended: true, recording: false })
+      expect(bodies().filter((b) => b.ended)).toHaveLength(1)
+      expect(w.rec.liveAfterRecording()).toEqual([])
+    })
+
+    it('ends at the hard cap even with people still here', async () => {
+      const { w, bodies, flush, pass } = setup({ maxHours: 1 })
+      await begin(w)
+      await w.rec.stop('max-duration')
+      await flush()
+      await pass(50 * 60_000)
+      expect(bodies().some((b) => b.ended)).toBe(false)
+      await pass(11 * 60_000)
+      expect(bodies().at(-1)?.ended).toBe(true)
+    })
+
+    it('ends when the Discord event ends (completed, or rolled on to the next occurrence)', async () => {
+      for (const ended of [{ status: EventStatus.Completed }, { status: EventStatus.Scheduled, scheduledStartMs: Date.now() + 7 * 86_400_000 }]) {
+        const { w, bodies, flush } = setup()
+        const e = ev({ scheduledStartMs: Date.now() })
+        await begin(w, e)
+        await w.rec.checkSchedule([e]) // seen ACTIVE while recording
+        await w.rec.stop('max-duration')
+        await flush()
+        await w.rec.checkSchedule([e]) // still running
+        expect(bodies().some((b) => b.ended)).toBe(false)
+        await w.rec.checkSchedule([{ ...e, ...ended }])
+        expect(bodies().at(-1)?.ended).toBe(true)
+        expect(w.rec.liveAfterRecording()).toEqual([])
+      }
+    })
+
+    it('a new recording in the channel ends it; shutdown ends it', async () => {
+      const a = setup()
+      await begin(a.w, ev({ name: 'Ops call' })) // not capped: the next call may start in the channel
+      await a.w.rec.stop('max-duration')
+      await a.flush()
+      const first = sessionOf(a.bodies())
+      await vi.advanceTimersByTimeAsync(60_000)
+      await begin(a.w, ev({ id: '200', name: 'Ops call', scheduledStartMs: Date.now() }))
+      expect(a.w.rec.currentEventId).not.toBeNull() // a new session (here the remembered slot restarts: it is not capped)
+      expect(a.bodies().find((b) => b.sessionId === first && b.ended)).toBeTruthy()
+      expect(a.bodies().at(-1)?.sessionId).not.toBe(first)
+      const b = setup()
+      await begin(b.w)
+      await b.w.rec.stop('max-duration')
+      await b.flush()
+      await b.w.rec.shutdown()
+      expect(b.bodies().at(-1)?.ended).toBe(true)
+      expect(b.w.rec.liveAfterRecording()).toEqual([])
+    })
+
+    it('other stop reasons still end the live view right away', async () => {
+      for (const reason of ['empty', 'superseded', 'event-ended', 'channel-disallowed'] as const) {
+        const { w, bodies, flush } = setup()
+        await begin(w)
+        await w.rec.stop(reason)
+        await flush()
+        expect(bodies().at(-1)?.ended).toBe(true)
+        expect(bodies().some((b) => b.recording === false)).toBe(false)
+        expect(w.rec.liveAfterRecording()).toEqual([])
+      }
+    })
+
+    it('keeps picking up the stream link from the call chat', async () => {
+      const { w, bodies, flush } = setup()
+      await begin(w)
+      await w.rec.stop('max-duration')
+      await flush()
+      w.rec.onMessage(msg('now on https://x.com/i/broadcasts/1abc') as never)
+      await vi.advanceTimersByTimeAsync(0)
+      expect(bodies().at(-1)).toMatchObject({ streamLink: 'https://x.com/i/broadcasts/1abc', recording: false })
+    })
+
+    describe('end-of-call song', () => {
+      const song = {
+        endSong: { enabled: true, minHumans: 1, crewMap: [{ crew: 'Ops Crew', radio: 'Ops' }] },
+        crews: [{ eventId: '100', label: 'Ops Crew' }],
+      }
+      const played = () => fetchMock.mock.calls.filter((c) => String(c[0]).endsWith('/play-crew')).length
+
+      it('still plays at the scheduled end after the recording stopped at its limit, once', async () => {
+        const { w, flush, pass } = setup({}, song)
+        ;(w.cfg as unknown as { pizzaRadio: unknown }).pizzaRadio = radio
+        await begin(w, ev({ scheduledStartMs: Date.now(), scheduledEndMs: Date.now() + 60 * 60_000 }))
+        await w.rec.stop('max-duration')
+        await flush()
+        expect(played()).toBe(0) // the recording limit is not the end of the call
+        await pass(55 * 60_000)
+        expect(played()).toBe(0)
+        await pass(6 * 60_000)
+        await vi.waitFor(() => expect(played()).toBe(1))
+        await pass(5 * 60_000)
+        expect(played()).toBe(1)
+      })
+
+      it('plays when the event ends after the recording stopped', async () => {
+        const { w, flush } = setup({}, song)
+        ;(w.cfg as unknown as { pizzaRadio: unknown }).pizzaRadio = radio
+        const e = ev({ scheduledStartMs: Date.now() })
+        await begin(w, e)
+        await w.rec.checkSchedule([e])
+        await w.rec.stop('max-duration')
+        await flush()
+        expect(played()).toBe(0)
+        await w.rec.checkSchedule([{ ...e, status: EventStatus.Completed }])
+        await vi.waitFor(() => expect(played()).toBe(1))
+      })
+    })
+  })
+
   it('a failing app never breaks the recording', async () => {
     const liveStatePost = vi.fn(async () => 'error' as const)
     const w = world({ remote: remote({ enabled: true }), liveStatePost })

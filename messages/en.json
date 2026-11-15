@@ -1076,6 +1076,7 @@
       "untitled": "Crew call",
       "startedAt": "Started {time}",
       "watchStream": "Watch the stream",
+      "recordingEnded": "Recording has ended; the call is still going.",
       "headCount": "{count, plural, one {# person in the call} other {# people in the call}}",
       "present": "Who is here",
       "presentSignIn": "Sign in to see who is in the call, ask questions and read the live action items.",

@@ -90,6 +90,22 @@ describe('LiveStatePusher', () => {
     p.stop()
   })
 
+  it('after markNotRecording: sends recording=false right away, keeps the heartbeat, and the end carries it too', async () => {
+    const { p, post } = make()
+    p.start()
+    expect(post.mock.calls[0][0].recording).toBeUndefined()
+    p.markNotRecording()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(post).toHaveBeenCalledTimes(2)
+    expect(post.mock.calls[1][0]).toMatchObject({ recording: false })
+    expect(post.mock.calls[1][0].ended).toBeUndefined()
+    expect(p.isRecording).toBe(false)
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(post.mock.calls.at(-1)?.[0]).toMatchObject({ recording: false })
+    await p.stop()
+    expect(post.mock.calls.at(-1)?.[0]).toMatchObject({ recording: false, ended: true })
+  })
+
   it('sends the first stream link from the chat once, and never replaces it', async () => {
     const { p, post } = make()
     p.start()
@@ -158,8 +174,11 @@ describe('postLiveState', () => {
 
 describe('remote config liveView', () => {
   it('is off by default and validates the interval', () => {
-    expect(parseRemoteConfig({}).liveView).toEqual({ enabled: false, pushSeconds: 20 })
-    expect(parseRemoteConfig({ liveView: { enabled: true, pushSeconds: 30 } }).liveView).toEqual({ enabled: true, pushSeconds: 30 })
+    expect(parseRemoteConfig({}).liveView).toEqual({ enabled: false, pushSeconds: 20, afterRecordingEmptySeconds: 120, maxHours: 4 })
+    // An older app sends no after-recording fields: the defaults apply.
+    expect(parseRemoteConfig({ liveView: { enabled: true, pushSeconds: 30 } }).liveView).toEqual({ enabled: true, pushSeconds: 30, afterRecordingEmptySeconds: 120, maxHours: 4 })
+    expect(parseRemoteConfig({ liveView: { enabled: true, pushSeconds: 30, afterRecordingEmptySeconds: 300, maxHours: 6 } }).liveView).toEqual({ enabled: true, pushSeconds: 30, afterRecordingEmptySeconds: 300, maxHours: 6 })
+    expect(parseRemoteConfig({ liveView: { enabled: true, afterRecordingEmptySeconds: 5, maxHours: 99 } }).liveView).toMatchObject({ afterRecordingEmptySeconds: 120, maxHours: 4 })
     expect(parseRemoteConfig({ liveView: { enabled: true, pushSeconds: 1 } }).liveView.pushSeconds).toBe(20)
   })
 })

@@ -1076,6 +1076,7 @@
       "untitled": "Llamada de crew",
       "startedAt": "Empezó {time}",
       "watchStream": "Ver la transmisión",
+      "recordingEnded": "La grabación terminó; la llamada sigue.",
       "headCount": "{count, plural, one {# persona en la llamada} other {# personas en la llamada}}",
       "present": "Quién está aquí",
       "presentSignIn": "Inicia sesión para ver quién está en la llamada, hacer preguntas y leer los action items en vivo.",

@@ -40,8 +40,12 @@ export interface RecorderConfig {
   transcriptionKeyterms: string[]
   /** Channels the recorder may join, and the channel of events that have none of their own (by Discord event id). */
   voiceChannels: { allowed: string[]; byEvent?: { eventId: string; channelId: string }[] }
-  /** Live call view heartbeat: on only while calls.liveViewEnabled is. */
-  liveView: { enabled: boolean; pushSeconds: number }
+  /**
+   * Live call view heartbeat: on only while calls.liveViewEnabled is. After a recording stops at its limit
+   * with people still in the channel, the live state carries on (not recording) until the channel has been
+   * empty for afterRecordingEmptySeconds, the event ends, or maxHours since the recording started pass.
+   */
+  liveView: { enabled: boolean; pushSeconds: number; afterRecordingEmptySeconds: number; maxHours: number }
 }
 
 export const RECORDER_CONFIG_OFF: RecorderConfig = {
@@ -60,7 +64,7 @@ export const RECORDER_CONFIG_OFF: RecorderConfig = {
   supersedeMaxDeferMinutes: 0,
   transcriptionKeyterms: [],
   voiceChannels: { allowed: [], byEvent: [] },
-  liveView: { enabled: false, pushSeconds: 20 },
+  liveView: { enabled: false, pushSeconds: 20, afterRecordingEmptySeconds: 120, maxHours: 4 },
 }
 
 /** Discord event ids of the given crews (normalized ids). A mapping read failure gives none. */
@@ -134,7 +138,12 @@ export async function buildRecorderConfig(): Promise<RecorderConfig> {
     supersedeMaxDeferMinutes: settings.get('calls.supersedeMaxDeferMinutes'),
     transcriptionKeyterms: normalizeKeyterms(parseLines(settings.get('calls.transcriptionTerms'))),
     voiceChannels: await voiceChannelsConfig(settings),
-    liveView: { enabled: resolveToggle('calls.liveViewEnabled', settings), pushSeconds: settings.get('calls.livePushSeconds') },
+    liveView: {
+      enabled: resolveToggle('calls.liveViewEnabled', settings),
+      pushSeconds: settings.get('calls.livePushSeconds'),
+      afterRecordingEmptySeconds: settings.get('calls.liveAfterRecordingEmptySeconds'),
+      maxHours: settings.get('calls.liveMaxHours'),
+    },
   }
 }
 

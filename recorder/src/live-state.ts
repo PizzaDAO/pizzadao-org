@@ -1,7 +1,8 @@
 /**
  * Live state for the app's /calls/live page: a heartbeat (POST /api/calls/recorder/live-state) with who
  * is in the channel (humans only, minutes so far), the stream link once someone posts one in the call
- * chat, and `ended` at stop. Sent every livePushSeconds (remote config), and about 3 s after a join or
+ * chat, `recording: false` once the recording stopped at its limit while the call goes on (the heartbeat then
+ * carries on without a voice connection, see recorder.ts "after the recording"), and `ended` at the end. Sent every livePushSeconds (remote config), and about 3 s after a join or
  * leave. Fire and forget: every failure is logged and dropped, the timeout is short, and nothing here
  * can block or fail the recording. The app answers 204 when the live view is off: then it stays quiet
  * for a while.
@@ -25,6 +26,8 @@ export interface LiveStateBody {
   present: LivePresenceEntry[]
   streamLink?: string | null
   ended?: boolean
+  /** false once the recording stopped (its limit) while the call goes on; omitted while recording. */
+  recording?: boolean
 }
 
 export const MAX_PRESENCE = 300
@@ -161,6 +164,7 @@ export class LiveStatePusher {
   private streamLink: string | null = null
   private pausedUntil = 0
   private stopped = false
+  private recording = true
   private sending = false
   private again = false
   private readonly now: () => number
@@ -212,7 +216,23 @@ export class LiveStatePusher {
       present: this.clock.snapshot(this.now()),
       ...(this.streamLink ? { streamLink: this.streamLink } : {}),
       ...(ended ? { ended: true } : {}),
+      ...(this.recording ? {} : { recording: false }),
     }
+  }
+
+  /**
+   * The recording stopped but the call goes on: the heartbeat carries on with `recording: false` (sent now).
+   * Presence keeps coming from setPresent (gateway voice states; no voice connection needed).
+   */
+  markNotRecording(): void {
+    if (this.stopped || !this.recording) return
+    this.recording = false
+    this.pausedUntil = 0
+    void this.push()
+  }
+
+  get isRecording(): boolean {
+    return this.recording
   }
 
   private async push(): Promise<void> {

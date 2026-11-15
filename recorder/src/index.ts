@@ -158,6 +158,7 @@ const server = createServer((req, res) => {
         ok: ready,
         discord: ready ? 'ready' : 'connecting',
         recording: recorder.status(),
+        liveAfterRecording: recorder.liveAfterRecording(),
         finalizing: recorder.pendingCount,
       }),
     )

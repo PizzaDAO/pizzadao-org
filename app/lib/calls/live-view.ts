@@ -31,6 +31,8 @@ export interface PublicLive {
   presentCount: number
   /** The crew's id (the crew page is /crew/<crewId>); null for a call with no crew. */
   crewId: string | null
+  /** The recording stopped (its limit) but the call is still going. */
+  recordingEnded: boolean
 }
 
 type Session = Awaited<ReturnType<typeof findLiveSessions>>[number]
@@ -46,6 +48,7 @@ function publicFields(s: Session, settings: Settings, excluded: ReadonlySet<stri
     streamLink: streamLinkFor(s, settings),
     presentCount: presenceOf(s).filter((p) => p.inChannel && !excluded.has(p.discordId)).length,
     crewId: s.crewId ?? null,
+    recordingEnded: !!s.recordingEndedAt,
   }
 }
 
