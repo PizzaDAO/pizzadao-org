@@ -111,7 +111,7 @@ type Manual = {
   notes: string
 }
 
-export default function CrewPageClient({ params }: { params: Promise<{ crewId: string }> }) {
+export default function CrewPageClient({ params, featuresLink = false }: { params: Promise<{ crewId: string }>; featuresLink?: boolean }) {
   const { crewId } = use(params)
   const [data, setData] = useState<CrewData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -553,6 +553,11 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
                 </a>
               ) : (
                 crew.channel && <span style={badge()}>💬 #{crew.channel.replace(/^#/, '')}</span>
+              )}
+              {featuresLink && (
+                <Link href="/features" style={{ ...badge(), textDecoration: 'none' }}>
+                  🛠 What we&apos;ve built
+                </Link>
               )}
             </div>
 

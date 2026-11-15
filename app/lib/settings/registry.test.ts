@@ -311,6 +311,7 @@ describe('settings registry', () => {
       ['features.showOps', false],
       ['features.introText', ''],
       ['features.contributeUrl', ''],
+      ['features.crewId', ''],
       ['features.githubCacheMinutes', 60],
     ])
   })
