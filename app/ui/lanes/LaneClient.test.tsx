@@ -81,7 +81,7 @@ describe("dashboard refresh after a write", () => {
         const urls = fetchMock.mock.calls.map((c) => c[0]);
         expect(urls).toContain("/api/lanes/progress");
         const summary = fetchMock.mock.calls.find((c) => String(c[0]).startsWith("/api/dashboard-summary"));
-        expect(summary?.[0]).toBe("/api/dashboard-summary?memberId=m1");
+        expect(summary?.[0]).toBe("/api/dashboard-summary?memberId=m1&fresh=1");
         expect(summary?.[1]).toMatchObject({ cache: "reload" });
     });
 
