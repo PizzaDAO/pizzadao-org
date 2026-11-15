@@ -42,7 +42,7 @@ export async function linkResolves(href: string): Promise<boolean> {
     if (!isHandbookSlug(parts[1])) return false
     return hash ? (await anchorsOf(parts[1])).has(hash) : true
   }
-  return existsSync(join(root, 'app', ...parts, 'page.tsx'))
+  return existsSync(join(root, 'app', ...parts, 'page.tsx')) || existsSync(join(root, 'app', ...parts, '(index)', 'page.tsx'))
 }
 
 describe('handbook content', () => {

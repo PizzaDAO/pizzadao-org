@@ -53,6 +53,8 @@ export async function swrGet<T>(
     // Invalidated while loading: hand back what we read but do not store it.
     if ((await cacheGet<string>(genKey(key))) !== gen) return value;
     await cacheSet<Envelope<T>>(key, { value, fetchedAt: Date.now() }, opts.keepSeconds);
+    // Invalidated between the check and the write: remove what we just stored.
+    if ((await cacheGet<string>(genKey(key))) !== gen) await cacheDel(key);
     return value;
   };
 

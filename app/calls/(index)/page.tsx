@@ -1,6 +1,6 @@
 import { GET } from "@/app/api/calls/route";
 import { prefetchRoute } from "@/app/lib/server-prefetch";
-import CallsClient, { type CallsResponse } from "./CallsClient";
+import CallsClient, { type CallsResponse } from "../CallsClient";
 
 // Rendered per request: the prefill reads live data, which must not be baked in at build time.
 export const dynamic = "force-dynamic";

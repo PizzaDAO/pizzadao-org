@@ -1,6 +1,6 @@
 import { GET } from "@/app/api/crew/members/route";
 import { prefetchRoute } from "@/app/lib/server-prefetch";
-import CrewMembersClient, { type MembersResponse } from "./CrewMembersClient";
+import CrewMembersClient, { type MembersResponse } from "../CrewMembersClient";
 
 // Rendered per request: the prefill reads live data, which must not be baked in at build time.
 export const dynamic = "force-dynamic";

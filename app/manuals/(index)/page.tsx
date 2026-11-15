@@ -1,6 +1,6 @@
 import { GET } from "@/app/api/manuals/route";
 import { prefetchRoute } from "@/app/lib/server-prefetch";
-import ManualsClient, { type ManualsResponse } from "./ManualsClient";
+import ManualsClient, { type ManualsResponse } from "../ManualsClient";
 
 // Rendered per request: the prefill reads live data, which must not be baked in at build time.
 export const dynamic = "force-dynamic";

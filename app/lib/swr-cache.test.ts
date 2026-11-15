@@ -118,4 +118,20 @@ describe("swrGet", () => {
     const load = vi.fn().mockResolvedValue({ crews: [1] });
     expect((await swrGet("legacy", load, { ...opts, schedule })).cached).toBe(false);
   });
+
+  it("removes a value stored just before an invalidation lands", async () => {
+    const load = vi.fn(async () => {
+      return "v";
+    });
+    const cache = await import("@/app/api/lib/cache");
+    const realSet = cache.cacheSet;
+    const spy = vi.spyOn(cache, "cacheSet").mockImplementation(async (k, v, t) => {
+      await realSet(k, v, t);
+      if (k === "k") await swrInvalidate("k");
+    });
+    await swrGet("k", load, { ...opts, schedule });
+    spy.mockRestore();
+    const next = vi.fn().mockResolvedValue("post");
+    expect(await swrGet("k", next, { ...opts, schedule })).toEqual({ value: "post", cached: false });
+  });
 });
