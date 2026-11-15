@@ -489,9 +489,10 @@ async function maybeFlag(row: Row, r: VerifyResult, m: MissionRow, report: RunRe
 
 /** In-app notifications (DB only). Discord DMs and #work posts: ./notify.ts. */
 async function notifyInApp(discordId: string, report: RunReport, policy: HoldPolicy) {
+  const settledAt = new Date()
   for (const c of report.checks) {
     // The submission left PENDING (also the silent "recorded" approval): settle the reviewers' pings (fail-soft, awaited: post-response work can be dropped).
-    if (c.outcome === 'approved' || c.outcome === 'recorded') await clearReviewNotificationsFor(discordId, c.missionId)
+    if (c.outcome === 'approved' || c.outcome === 'recorded') await clearReviewNotificationsFor(discordId, c.missionId, settledAt)
     if (c.outcome === 'approved') {
       createNotification({
         type: 'MISSION_APPROVED',

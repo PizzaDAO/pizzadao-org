@@ -10,6 +10,10 @@ import { prisma } from './db'
  *   - DISAVOW_VOTE_NEEDED { disavowalId }       the voter alone after voting; everyone when the
  *                                               entry's open round closes or is cancelled
  *
+ * Clear-all functions take a `cutoff`: the moment the transition committed (captured by the caller
+ * just before the committing write). Only rows created at or before it are marked, so a ping made a
+ * moment later (a quick resubmit, a new disavow round) is never hidden. It defaults to now.
+ *
  * Every clear is fail-soft (logged and swallowed, returns 0) and runs outside the main
  * transaction, so it can never break the action that triggered it.
  */
@@ -41,9 +45,9 @@ export function disavowalIdOf(row: { metadata: unknown; linkUrl?: string | null 
   return m ? m[1] : null
 }
 
-async function markRead(label: string, where: Prisma.NotificationWhereInput): Promise<number> {
+async function markRead(label: string, where: Prisma.NotificationWhereInput, cutoff?: Date): Promise<number> {
   try {
-    const r = await prisma.notification.updateMany({ where: { ...where, readAt: null }, data: { readAt: new Date() } })
+    const r = await prisma.notification.updateMany({ where: { ...where, readAt: null, ...(cutoff ? { createdAt: { lte: cutoff } } : {}) }, data: { readAt: new Date() } })
     return r.count
   } catch (e) {
     console.error(`[action-notifications] clearing ${label} failed:`, e)
@@ -52,8 +56,8 @@ async function markRead(label: string, where: Prisma.NotificationWhereInput): Pr
 }
 
 /** The bounty's submission was handled (approved, sent back, cancelled, released): clear it for every reviewer. */
-export function clearBountySubmittedNotifications(bountyId: number): Promise<number> {
-  return markRead(`bounty ${bountyId}`, { type: 'BOUNTY_SUBMITTED', metadata: { path: ['bountyId'], equals: bountyId } })
+export function clearBountySubmittedNotifications(bountyId: number, cutoff: Date = new Date()): Promise<number> {
+  return markRead(`bounty ${bountyId}`, { type: 'BOUNTY_SUBMITTED', metadata: { path: ['bountyId'], equals: bountyId } }, cutoff)
 }
 
 /** `recipientDiscordId` vouched for `requesterMemberId`: clear that recipient's own request only. */
@@ -77,8 +81,8 @@ export function disavowVoteWhere(disavowalId: string): Prisma.NotificationWhereI
 }
 
 /** The entry's vote closed or was cancelled: clear it for every recipient. */
-export function clearDisavowVoteNotifications(disavowalId: string): Promise<number> {
-  return markRead(`disavowal ${disavowalId}`, disavowVoteWhere(disavowalId))
+export function clearDisavowVoteNotifications(disavowalId: string, cutoff: Date = new Date()): Promise<number> {
+  return markRead(`disavowal ${disavowalId}`, disavowVoteWhere(disavowalId), cutoff)
 }
 
 /** `voterDiscordId` voted: clear only their own notification. */

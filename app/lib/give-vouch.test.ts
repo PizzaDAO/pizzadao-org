@@ -40,9 +40,23 @@ describe('giveVouch', () => {
     expect(d2.clearRequest).toHaveBeenCalledWith('d1', '8')
   })
 
-  it('clears nothing when the vouch is refused', async () => {
+  it('a repeat vouch (already exists) still clears the voucher\'s request, and nothing else', async () => {
     const d = deps({ exists: vi.fn(async () => true) })
-    await run(d)
+    expect(await run(d)).toEqual({ ok: false, reason: 'duplicate' })
+    expect(d.clearRequest).toHaveBeenCalledWith('d1', '7')
+    expect(d.create).not.toHaveBeenCalled()
+    expect(d.emit).not.toHaveBeenCalled()
+  })
+
+  it('a lost create race (unique violation) also clears the request', async () => {
+    const d = deps({ create: vi.fn(async () => { throw Object.assign(new Error('dup'), { code: 'P2002' }) }) })
+    expect(await run(d)).toEqual({ ok: false, reason: 'duplicate' })
+    expect(d.clearRequest).toHaveBeenCalledWith('d1', '7')
+  })
+
+  it('clears nothing when the vouch is refused for another reason', async () => {
+    const d = deps()
+    await run(d, '42')
     expect(d.clearRequest).not.toHaveBeenCalled()
   })
 

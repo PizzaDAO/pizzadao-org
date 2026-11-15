@@ -55,7 +55,7 @@ export async function rewardBuddy(pair: { pairId: string; buddyDiscordId: string
     select: { id: true },
   })
   // A manual submission that was still PENDING just got approved: settle the reviewers' pings (fail-soft).
-  await clearReviewNotifications(row.id)
+  await clearReviewNotifications(row.id, now)
   await payBonusRewards(pair.buddyDiscordId)
   await log('reward_granted', { missionId })
   return 'granted'

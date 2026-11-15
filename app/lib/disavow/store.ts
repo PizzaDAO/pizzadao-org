@@ -261,6 +261,7 @@ export async function settleRound(roundId: string, now: Date = new Date()): Prom
   const subjectIds = await subjectDiscordIds(pre.disavowal.identifiers)
   const { listingMonths } = await loadDisavowRules()
 
+  const settledAt = new Date()
   const res = await prisma.$transaction(async tx => {
     await lockRound(tx, roundId)
     const round = await tx.disavowRound.findUnique({
@@ -324,7 +325,7 @@ export async function settleRound(roundId: string, now: Date = new Date()): Prom
   })
   if (!res) return 'pending' // someone else settled it, or it was cancelled
   if (!res.won) return res.outcome
-  await clearDisavowVoteNotifications(pre.disavowalId)
+  await clearDisavowVoteNotifications(pre.disavowalId, settledAt)
 
   // Best-effort notifications after commit. No names, no content. When a LIST
   // round closes, every submitter (original and duplicate) gets the identical neutral notice, so a
@@ -357,6 +358,7 @@ export async function withdrawSubmission(submissionId: string, actor: string, no
   const sub = await prisma.disavowSubmission.findUnique({ where: { id: submissionId } })
   if (!sub || sub.submitterDiscordId !== actor) return 'not_found'
   if (sub.withdrawnAt) return 'already'
+  const cancelledAt = new Date()
   const result = await prisma.$transaction(async tx => {
     await advisoryLock(tx) // same lock as nominate, taken first: a withdrawal can't interleave with a nomination
     const open = await tx.disavowRound.findMany({ where: { disavowalId: sub.disavowalId, state: 'OPEN' }, select: { id: true } })
@@ -376,7 +378,7 @@ export async function withdrawSubmission(submissionId: string, actor: string, no
     return 'ok' as const
   })
   if (result === 'cancelled') {
-    await clearDisavowVoteNotifications(sub.disavowalId)
+    await clearDisavowVoteNotifications(sub.disavowalId, cancelledAt)
     return 'ok'
   }
   return result
@@ -437,6 +439,7 @@ export async function unsuspend(id: string, actor: string): Promise<'ok' | 'not_
   const d = await load(id)
   if (!d) return 'not_found'
   if (d.status !== 'SUSPENDED') return 'bad_state'
+  const unsuspendedAt = new Date()
   const ok = await prisma.$transaction(async tx => {
     // Lock the open round first, like settleRound, so the two can't deadlock.
     const open = await tx.disavowRound.findMany({ where: { disavowalId: id, state: 'OPEN' }, select: { id: true } })
@@ -447,7 +450,7 @@ export async function unsuspend(id: string, actor: string): Promise<'ok' | 'not_
     await logEvent(tx, id, 'UNSUSPENDED', actor, { from: 'SUSPENDED', to: 'LISTED' })
     return true
   })
-  if (ok) await clearDisavowVoteNotifications(id)
+  if (ok) await clearDisavowVoteNotifications(id, unsuspendedAt)
   return ok ? 'ok' : 'bad_state'
 }
 

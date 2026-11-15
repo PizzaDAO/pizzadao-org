@@ -696,7 +696,7 @@ describe('vote notifications are cleared', () => {
     for (const v of ['dpr2', 'dpr3']) await castVote({ disavowalId: r.id, roundId: round.id, voterDiscordId: v, choice: 'YES', now: early })
     expect(clearDisavowVoteNotifications).not.toHaveBeenCalled() // decided only after day 7
     await settleRound(round.id, new Date(T0.getTime() + 8 * D))
-    expect(clearDisavowVoteNotifications).toHaveBeenCalledWith(r.id)
+    expect(clearDisavowVoteNotifications).toHaveBeenCalledWith(r.id, expect.any(Date))
   })
 
   it('a rejected vote clears nothing', async () => {
@@ -711,7 +711,7 @@ describe('vote notifications are cleared', () => {
     const n = await nominate({ ...nominateInput(), now: T0 })
     if (!n.ok) throw new Error('setup')
     await withdrawSubmission(state.submission[0].id, 'nom', T0)
-    expect(clearDisavowVoteNotifications).toHaveBeenCalledWith(n.id)
+    expect(clearDisavowVoteNotifications).toHaveBeenCalledWith(n.id, expect.any(Date))
   })
 
   it('unsuspending (REMOVE round cancelled) clears everyone\'s', async () => {
@@ -719,7 +719,7 @@ describe('vote notifications are cleared', () => {
     await suspend(id, 'dpr1', later)
     vi.mocked(clearDisavowVoteNotifications).mockClear()
     expect(await unsuspend(id, 'dpr1')).toBe('ok')
-    expect(clearDisavowVoteNotifications).toHaveBeenCalledWith(id)
+    expect(clearDisavowVoteNotifications).toHaveBeenCalledWith(id, expect.any(Date))
   })
 })
 

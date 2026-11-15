@@ -160,7 +160,7 @@ describe('rejectBounty', () => {
     expect(prisma.economy.update).not.toHaveBeenCalled()
     expect(prisma.economy.updateMany).not.toHaveBeenCalled()
     expect(logTransaction).not.toHaveBeenCalled()
-    expect(clearBountySubmittedNotifications).toHaveBeenCalledWith(10)
+    expect(clearBountySubmittedNotifications).toHaveBeenCalledWith(10, expect.any(Date))
   })
 
   it('the claimer cannot reject their own submission, even as a lead or admin', async () => {
@@ -235,7 +235,7 @@ describe('completeBounty (approve)', () => {
       approvedBy: LEAD,
     })
     expect(notifyBountyCompleted).toHaveBeenCalledWith(CLAIMER, LEAD, 10, 'Fix the bug', 100, 'ops', POSTER)
-    expect(clearBountySubmittedNotifications).toHaveBeenCalledWith(10)
+    expect(clearBountySubmittedNotifications).toHaveBeenCalledWith(10, expect.any(Date))
   })
 
   it('a lost race clears nothing', async () => {
@@ -329,7 +329,7 @@ describe('cancelBounty', () => {
     })
     expect(prisma.economy.update).toHaveBeenCalledWith({ where: { id: POSTER }, data: { wallet: { increment: 100 } } })
     expect(notifyBountyCancelled).toHaveBeenCalledWith(CLAIMER, LEAD, 10, 'Fix the bug', 'ops')
-    expect(clearBountySubmittedNotifications).toHaveBeenCalledWith(10)
+    expect(clearBountySubmittedNotifications).toHaveBeenCalledWith(10, expect.any(Date))
     expect(logTransaction).toHaveBeenCalledTimes(1)
     expect(logTransaction).toHaveBeenCalledWith(prisma, POSTER, 'BOUNTY_REFUND', 100, expect.any(String), {
       bountyId: 10,
@@ -378,7 +378,7 @@ describe('giveUpBounty', () => {
       },
     })
     expect(res.status).toBe('OPEN')
-    expect(clearBountySubmittedNotifications).toHaveBeenCalledWith(10)
+    expect(clearBountySubmittedNotifications).toHaveBeenCalledWith(10, expect.any(Date))
   })
 
   it('from CLAIMED there was no submission notification to clear', async () => {

@@ -45,7 +45,7 @@ describe('rewardBuddy', () => {
     expect(await rewardBuddy(pair)).toBe('granted')
     expect(m.prisma.missionCompletion.upsert.mock.calls[0][0].create).toMatchObject({ missionId: 7, discordId: '222222', status: 'APPROVED' })
     expect(m.pay).toHaveBeenCalledWith('222222')
-    expect(m.clear).toHaveBeenCalledWith(99) // a PENDING manual submission's review pings are settled
+    expect(m.clear).toHaveBeenCalledWith(99, expect.any(Date)) // a PENDING manual submission's review pings are settled
     expect(kinds()).toEqual(['reward_granted'])
   })
   it('skips without a usable mission or when already done', async () => {

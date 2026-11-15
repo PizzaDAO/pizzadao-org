@@ -28,9 +28,18 @@ beforeEach(() => {
 
 describe('BOUNTY_SUBMITTED', () => {
   it('marks every unread notification of the bounty read, for all recipients', async () => {
-    expect(await clearBountySubmittedNotifications(10)).toBe(2)
-    expect(lastWhere()).toEqual({ type: 'BOUNTY_SUBMITTED', metadata: { path: ['bountyId'], equals: 10 }, readAt: null })
+    const cutoff = new Date('2026-01-01T00:00:00Z')
+    expect(await clearBountySubmittedNotifications(10, cutoff)).toBe(2)
+    expect(lastWhere()).toEqual({ type: 'BOUNTY_SUBMITTED', metadata: { path: ['bountyId'], equals: 10 }, readAt: null, createdAt: { lte: cutoff } })
     expect(mockFn(prisma.notification.updateMany).mock.calls[0][0].data.readAt).toBeInstanceOf(Date)
+  })
+
+  it('only clears pings created at or before the transition, so a quick resubmit stays unread', async () => {
+    const cutoff = new Date('2026-01-01T00:00:00Z')
+    await clearBountySubmittedNotifications(10, cutoff)
+    expect(lastWhere().createdAt).toEqual({ lte: cutoff })
+    await clearBountySubmittedNotifications(10) // defaults to now
+    expect(lastWhere().createdAt.lte).toBeInstanceOf(Date)
   })
 
   it('is fail-soft', async () => {
@@ -89,7 +98,8 @@ describe('VOUCH_REQUEST', () => {
 
 describe('DISAVOW_VOTE_NEEDED', () => {
   it('closing clears every recipient\'s, matching metadata or the legacy link of a metadata-less row', async () => {
-    await clearDisavowVoteNotifications('dis-1')
+    const cutoff = new Date('2026-01-01T00:00:00Z')
+    await clearDisavowVoteNotifications('dis-1', cutoff)
     expect(lastWhere()).toEqual({
       type: 'DISAVOW_VOTE_NEEDED',
       OR: [
@@ -97,7 +107,14 @@ describe('DISAVOW_VOTE_NEEDED', () => {
         { metadata: { equals: Prisma.DbNull }, linkUrl: '/disavow/dis-1' },
       ],
       readAt: null,
+      createdAt: { lte: cutoff },
     })
+  })
+
+  it('a new round\'s pings created after the cutoff stay unread', async () => {
+    const cutoff = new Date('2026-01-01T00:00:00Z')
+    await clearDisavowVoteNotifications('dis-1', cutoff)
+    expect(lastWhere().createdAt).toEqual({ lte: cutoff })
   })
 
   it('a vote clears only the voter\'s own', async () => {

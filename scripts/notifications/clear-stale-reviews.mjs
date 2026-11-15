@@ -13,11 +13,12 @@
  * The same pass covers the other "needs action" types (app/lib/action-notifications.ts):
  *   - BOUNTY_SUBMITTED: stale when metadata.bountyId points at a bounty no longer SUBMITTED.
  *   - VOUCH_REQUEST: stale when the recipient already vouched for metadata.requesterMemberId
- *     (the recipient's member id is looked up from the sheet; unresolvable recipients are kept).
+ *     (recipients' member ids come from one members read; unresolvable recipients are kept and counted).
  *   - DISAVOW_VOTE_NEEDED: stale when its disavowal has no OPEN round, or the recipient already
  *     voted on it. Legacy rows without metadata are matched by their exact link /disavow/<id>;
  *     anything unrecognisable is kept.
- * Pass --only=missions|bounties|vouches|disavow to limit the pass.
+ * Pass --only=missions|bounties|vouches|disavow (or a comma list, e.g. --only=bounties,vouches)
+ * to limit the pass.
  *
  * Do not run --apply against production without the go-ahead.
  *
@@ -44,8 +45,15 @@ const { planStaleReviews } = await importApp("app/lib/review-notifications.ts");
 const { planStaleBounties, planStaleVouchRequests, planStaleDisavowVotes, disavowalIdOf } = await importApp("app/lib/action-notifications.ts");
 const { prisma } = await importApp("app/lib/db.ts");
 
-const only = args.only ? String(args.only) : null;
-const wants = (name) => !only || only === name;
+const SECTIONS = ["missions", "bounties", "vouches", "disavow"];
+const usage = `use --only=${SECTIONS.join("|")} (a comma list is fine, e.g. --only=bounties,vouches)`;
+if (args.only !== undefined) {
+  if (args.only === true || !String(args.only).trim()) die(`--only needs a value: ${usage}`);
+  const bad = String(args.only).split(",").map((x) => x.trim()).filter((x) => !SECTIONS.includes(x));
+  if (bad.length) die(`unknown --only value${bad.length > 1 ? "s" : ""}: ${bad.join(", ")}; ${usage}`);
+}
+const only = args.only ? new Set(String(args.only).split(",").map((x) => x.trim())) : null;
+const wants = (name) => !only || only.has(name);
 
 try {
   const host = (() => {
@@ -81,19 +89,21 @@ try {
 
   if (wants("vouches")) {
     const notifications = await unread("VOUCH_REQUEST", {});
-    const { fetchMemberIdByDiscordId } = await importApp("app/lib/sheets/member-repository.ts");
+    const { getSheetData } = await importApp("app/lib/sheets/member-repository.ts");
+    // One members read for every recipient (not one fetch each).
     const memberIdByDiscordId = new Map();
-    for (const d of new Set(notifications.map((n) => n.recipientId))) {
-      try {
-        const m = await fetchMemberIdByDiscordId(d);
-        if (m) memberIdByDiscordId.set(d, String(m));
-      } catch {
-        /* unresolvable: its rows are kept */
-      }
+    let membersFailed = false;
+    try {
+      for (const [d, m] of (await getSheetData()).discordToMember) memberIdByDiscordId.set(String(d), String(m));
+    } catch {
+      membersFailed = true; /* its rows are all kept */
     }
+    const recipients = new Set(notifications.map((n) => n.recipientId));
+    const unresolved = [...recipients].filter((d) => !memberIdByDiscordId.has(d)).length;
+    console.log(`Vouch lookups: ${recipients.size - unresolved}/${recipients.size} recipients resolved to a member${membersFailed ? " (members read FAILED; all kept)" : ""}`);
     const requesters = [...new Set(notifications.map((n) => n.metadata?.requesterMemberId).filter(Boolean))];
     const vouches = requesters.length
-      ? await prisma.vouch.findMany({ where: { followeeId: { in: requesters }, followerId: { in: [...memberIdByDiscordId.values()] } }, select: { followerId: true, followeeId: true } })
+      ? await prisma.vouch.findMany({ where: { followeeId: { in: requesters }, followerId: { in: [...recipients].map((d) => memberIdByDiscordId.get(d)).filter(Boolean) } }, select: { followerId: true, followeeId: true } })
       : [];
     const plan = planStaleVouchRequests(notifications, memberIdByDiscordId, new Set(vouches.map((v) => `${v.followerId}>${v.followeeId}`)));
     sections.push({ label: "VOUCH_REQUEST", total: notifications.length, notifications, ...plan, keptWhy: "recipient has not vouched" });
