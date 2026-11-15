@@ -10,29 +10,42 @@ import { fetchMemberIdByDiscordId } from '@/app/lib/sheets/member-repository'
 
 /** Short enough that a signup landing here moments after a first miss still gets its fresh read. */
 export const FRESH_RETRY_MS = 10_000
+/** How long a fresh hit is remembered: the shared members cache can lag a new profile by about this long. */
+export const FRESH_HIT_MS = 150_000
 const MAX_TRACKED = 5_000
 
-// Per instance and best effort, like the in-memory rate limiter fallback.
-const lastFresh = new Map<string, number>()
+// Per instance and best effort, like the in-memory rate limiter fallback. Only misses of the fresh
+// read are throttled; a fresh hit is remembered so the next requests (the pin on arrival, the first
+// ticks) do not depend on the lagging cache.
+const lastMiss = new Map<string, number>()
+const recentHits = new Map<string, { memberId: string; at: number }>()
 
 export function __resetLaneFreshRetries() {
-  lastFresh.clear()
+  lastMiss.clear()
+  recentHits.clear()
 }
 
-function allowFresh(discordId: string, now: number): boolean {
-  const last = lastFresh.get(discordId)
-  if (last !== undefined && now - last < FRESH_RETRY_MS) return false
-  if (lastFresh.size >= MAX_TRACKED) {
-    for (const [k, t] of lastFresh) if (now - t >= FRESH_RETRY_MS) lastFresh.delete(k)
-    if (lastFresh.size >= MAX_TRACKED) lastFresh.clear()
-  }
-  lastFresh.set(discordId, now)
-  return true
+function bounded<V>(map: Map<string, V>, at: (v: V) => number, ttl: number, now: number) {
+  if (map.size < MAX_TRACKED) return
+  for (const [k, v] of map) if (now - at(v) >= ttl) map.delete(k)
+  if (map.size >= MAX_TRACKED) map.clear()
 }
 
 export async function memberIdForLanes(discordId: string, now = Date.now()): Promise<string | null> {
   const cached = await fetchMemberIdByDiscordId(discordId).catch(() => null)
   if (cached) return cached
-  if (!allowFresh(discordId, now)) return null
-  return fetchMemberIdByDiscordId(discordId, { fresh: true }).catch(() => null)
+  const hit = recentHits.get(discordId)
+  if (hit && now - hit.at < FRESH_HIT_MS) return hit.memberId
+  const miss = lastMiss.get(discordId)
+  if (miss !== undefined && now - miss < FRESH_RETRY_MS) return null
+  const fresh = await fetchMemberIdByDiscordId(discordId, { fresh: true }).catch(() => null)
+  if (fresh) {
+    bounded(recentHits, (v) => v.at, FRESH_HIT_MS, now)
+    recentHits.set(discordId, { memberId: fresh, at: now })
+    lastMiss.delete(discordId)
+  } else {
+    bounded(lastMiss, (v) => v, FRESH_RETRY_MS, now)
+    lastMiss.set(discordId, now)
+  }
+  return fresh
 }
