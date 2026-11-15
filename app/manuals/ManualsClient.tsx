@@ -146,10 +146,15 @@ function ManualCard({ manual, index, markers }: { manual: Manual; index: number;
   );
 }
 
-export default function ManualsPage() {
-  const [manuals, setManuals] = useState<Manual[]>([]);
-  const [markers, setMarkers] = useState(false);
-  const [loading, setLoading] = useState(true);
+export interface ManualsResponse {
+  manuals: Manual[];
+  freshness?: { enabled?: boolean };
+}
+
+export default function ManualsPage({ initialData }: { initialData?: ManualsResponse | null } = {}) {
+  const [manuals, setManuals] = useState<Manual[]>(initialData?.manuals ?? []);
+  const [markers, setMarkers] = useState(initialData?.freshness?.enabled === true);
+  const [loading, setLoading] = useState(!initialData);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [crewFilter, setCrewFilter] = useState("");
@@ -169,6 +174,7 @@ export default function ManualsPage() {
   }, []);
 
   useEffect(() => {
+    if (initialData) return; // prefilled on the server
     async function fetchManuals() {
       try {
         const res = await fetch("/api/manuals");
@@ -184,6 +190,7 @@ export default function ManualsPage() {
     }
 
     fetchManuals();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Get unique crews and statuses for dropdowns

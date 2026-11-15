@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
 import { REMOTE_IMAGE_PATTERNS } from "./app/lib/image-hosts";
 import { legacyAssetRedirects, legacyDashboardRedirects } from "./app/lib/legacy-paths";
-import { marketingHomeAtRoot } from "./app/lib/marketing-site";
+import { marketingHomeAtRoot, wizardParamRedirects } from "./app/lib/marketing-site";
 import { hstsHeaderValue } from "./app/lib/hsts";
 import { SITE_URL } from "./app/lib/site-url";
 
@@ -90,6 +90,12 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["ogg-opus-decoder"],
   images: {
     remotePatterns: REMOTE_IMAGE_PATTERNS,
+    formats: ["image/avif", "image/webp"],
+    // Phone-first widths: most visitors are on mobile, so keep the small steps dense.
+    deviceSizes: [360, 480, 640, 768, 1024, 1280, 1536, 1920],
+    imageSizes: [32, 48, 64, 96, 128, 192, 256, 384],
+    // Optimized variants rarely change; cache them for 30 days at the edge/browser.
+    minimumCacheTTL: 60 * 60 * 24 * 30,
   },
   // The marketing home page lives at /home. While NEXT_PUBLIC_MARKETING_HOME_AT_ROOT is on, "/" serves
   // it (a rewrite, so the address stays "/") and /home redirects to "/"; the onboarding wizard is
@@ -107,7 +113,7 @@ const nextConfig: NextConfig = {
     // which is what the old app host's "/" showed. Exact paths only: /api/* routes are untouched.
     const appEntry = ["/app", "/api"].map((source) => ({ source, destination: "/start", permanent: false }));
     const legacy = [...appEntry, ...legacyDashboardRedirects(), ...legacyAssetRedirects()];
-    return marketingHomeAtRoot() ? [...legacy, { source: "/home", destination: "/", permanent: false }] : legacy;
+    return marketingHomeAtRoot() ? [...wizardParamRedirects(), ...legacy, { source: "/home", destination: "/", permanent: false }] : legacy;
   },
   async headers() {
     return [

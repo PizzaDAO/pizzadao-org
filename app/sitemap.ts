@@ -78,7 +78,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
 
   if (crews.status === "fulfilled") {
-    for (const c of realCrews(crews.value.crews)) {
+    for (const c of realCrews(crews.value.crews ?? [])) {
       if (!c.id) continue;
       entries.push({
         url: `${SITE_URL}/crew/${encodeURIComponent(c.id)}`,

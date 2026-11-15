@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import {
@@ -21,6 +21,12 @@ interface CallEntry {
   crewId: string;
   crewLabel: string;
   attendeeCount: number;
+}
+
+export interface CallsResponse {
+  calls: CallEntry[];
+  pagination: Pagination;
+  filters?: { crews: CrewFilterCount[] };
 }
 
 interface Pagination {
@@ -52,18 +58,17 @@ interface CallDetail {
 
 const PAGE_LIMIT = 20;
 
-export default function CallsPage() {
+export default function CallsPage({ initialData }: { initialData?: CallsResponse | null } = {}) {
   const t = useTranslations("callsPage");
   const locale = useLocale();
-  const [calls, setCalls] = useState<CallEntry[]>([]);
-  const [pagination, setPagination] = useState<Pagination>({
-    page: 1,
-    limit: PAGE_LIMIT,
-    total: 0,
-    totalPages: 1,
-  });
-  const [crewCounts, setCrewCounts] = useState<CrewFilterCount[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [calls, setCalls] = useState<CallEntry[]>(initialData?.calls ?? []);
+  const [pagination, setPagination] = useState<Pagination>(
+    initialData?.pagination ?? { page: 1, limit: PAGE_LIMIT, total: 0, totalPages: 1 },
+  );
+  const [crewCounts, setCrewCounts] = useState<CrewFilterCount[]>(initialData?.filters?.crews ?? []);
+  const [loading, setLoading] = useState(!initialData);
+  // The server prefilled the default view (page 1, no filters); skip that one fetch.
+  const usedInitial = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [crewFilter, setCrewFilter] = useState<string[]>([]);
   const [sort, setSort] = useState("newest");
@@ -110,7 +115,15 @@ export default function CallsPage() {
   }, []);
 
   useEffect(() => {
-    if (filterReady) fetchCalls();
+    if (!filterReady) return;
+    const isDefaultView = page === 1 && crewFilter.length === 0 && sort === "newest";
+    if (initialData && !usedInitial.current && isDefaultView) {
+      usedInitial.current = true;
+      return;
+    }
+    usedInitial.current = true;
+    fetchCalls();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchCalls, filterReady]);
 
   function toggleCrew(id: string) {

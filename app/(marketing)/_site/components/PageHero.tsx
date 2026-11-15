@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import type { ReactNode } from "react";
 
 type Props = {
@@ -116,7 +117,7 @@ const PageHero = ({
               {tapedImage && (
                 <figure className="taped mt-10 hidden w-[72%] -rotate-[2.2deg] bg-cream-warm p-3 pb-4 shadow-[0_28px_56px_-26px_hsl(0_0%_0%/0.4),0_6px_18px_-8px_hsl(0_0%_0%/0.18)] transition-transform duration-700 hover:rotate-0 md:ml-auto md:block">
                   <div className="mk-paper-soft relative overflow-hidden" data-benny="true">
-                    <img
+                    <Image sizes="(min-width: 768px) 40vw, 100vw" width={1200} height={1500}
                       src={tapedImage.src}
                       alt={tapedImage.alt}
                       loading="eager"

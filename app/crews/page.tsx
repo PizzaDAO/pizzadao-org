@@ -24,7 +24,7 @@ export default async function CrewsPage() {
   let crews = null;
   try {
     // Only real crews: the Community Call is a call, not a crew.
-    crews = realCrews((await getCrewMappings()).crews);
+    crews = realCrews((await getCrewMappings(false, { staleWhileRevalidate: true })).crews);
   } catch {
     // Sheets unreachable: the client fetches /api/crew-mappings on mount.
   }

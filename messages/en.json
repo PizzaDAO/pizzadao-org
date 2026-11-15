@@ -1078,6 +1078,8 @@
       "watchStream": "Watch the stream",
       "headCount": "{count, plural, one {# person in the call} other {# people in the call}}",
       "present": "Who is here",
+      "stoppedBy": "Stopped by",
+      "leftAgo": "{count, plural, =0 {left just now} other {left # min ago}}",
       "presentSignIn": "Sign in to see who is in the call, ask questions and read the live action items.",
       "signIn": "Sign in",
       "minutes": "{count} min",

@@ -1,7 +1,47 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
+
 const party = "/marketing/assets/party.jpg";
+const VIDEO_SRC = "/media/video/wen-pizza-nyc.mp4";
+
+/**
+ * Loads and plays the clip only while it is on screen (and the visitor has not asked for reduced
+ * motion, in which case the poster stays). The 7MB file is never fetched until then.
+ */
+function useInViewVideo() {
+  const ref = useRef<HTMLVideoElement>(null);
+  const [src, setSrc] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setSrc(VIDEO_SRC);
+          void el.play().catch(() => {});
+        } else {
+          el.pause();
+        }
+      },
+      { rootMargin: "100px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  // Once src is attached, start playback (autoPlay covers it, this is for browsers that wait).
+  useEffect(() => {
+    if (src) void ref.current?.play().catch(() => {});
+  }, [src]);
+
+  return { ref, src };
+}
+
 const MomentReel = () => {
+  const { ref: videoRef, src: videoSrc } = useInViewVideo();
   return (
     <section
       id="moments"
@@ -9,17 +49,11 @@ const MomentReel = () => {
     >
       {/* Ambient WenPizza video layer - same source as the phone, softened and yellow-tinted */}
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden bg-butter">
-        <video
-          src="/media/video/wen-pizza-nyc.mp4"
-          poster={party}
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="none"
+        {/* Same poster as the phone, blurred in CSS: no second video download */}
+        <div
           aria-hidden="true"
-          tabIndex={-1}
-          className="h-full w-full scale-[1.08] object-cover opacity-90 blur-[6px] saturate-[0.85] contrast-90 brightness-110"
+          className="h-full w-full scale-[1.08] bg-cover bg-center opacity-90 blur-[6px] saturate-[0.85] contrast-90 brightness-110"
+          style={{ backgroundImage: `url(${party})` }}
         />
         {/* Bright butter wash to keep yellow vivid and avoid muddy tones */}
         <div className="absolute inset-0 bg-butter/60 mix-blend-multiply" />
@@ -83,7 +117,8 @@ const MomentReel = () => {
                     {/* Notch */}
                     <div className="absolute left-1/2 top-2 z-10 h-5 w-24 -translate-x-1/2 rounded-full bg-ink/95" />
                     <video
-                      src="/media/video/wen-pizza-nyc.mp4"
+                      ref={videoRef}
+                      src={videoSrc}
                       poster={party}
                       autoPlay
                       muted

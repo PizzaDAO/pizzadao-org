@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ARCHIVE, type PizzaPhoto } from "@/app/(marketing)/_site/lib/pizzadaoPhotos";
 
@@ -217,7 +218,7 @@ const ArchivalFrame = ({ photo, slot, index, onOpen }: FrameProps) => {
         className={`relative overflow-hidden bg-ink ${slot.aspect}`}
       >
 
-        <img
+        <Image sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw" width={1600} height={1200}
           key={current.src}
           src={current.src}
           alt={`${current.city}, ${current.country} - PizzaDAO gathering`}
@@ -227,7 +228,7 @@ const ArchivalFrame = ({ photo, slot, index, onOpen }: FrameProps) => {
           className={`absolute inset-0 h-full w-full object-cover transition-transform duration-[1600ms] ease-out group-hover:scale-[1.025] ${filter}`}
         />
         {incoming && (
-          <img
+          <Image sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw" width={1600} height={1200}
             key={incoming.src}
             src={incoming.src}
             alt=""
@@ -377,7 +378,7 @@ const Lightbox = ({
         className="relative z-[1] flex max-h-full max-w-[1280px] flex-col items-center"
       >
         <div className="relative overflow-hidden bg-ink shadow-[0_60px_140px_-30px_hsl(0_0%_0%/0.9)]">
-          <img
+          <Image sizes="100vw" width={1600} height={1200}
             src={photo.src}
             alt={`${photo.city}, ${photo.country} - PizzaDAO gathering`}
             className="block max-h-[78vh] w-auto max-w-full object-contain [filter:saturate(0.92)_contrast(1.06)]"

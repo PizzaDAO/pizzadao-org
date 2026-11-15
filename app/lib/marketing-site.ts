@@ -27,8 +27,26 @@ export function marketingIndexable(): boolean {
   return isOn(process.env.NEXT_PUBLIC_MARKETING_INDEXABLE);
 }
 
+/** Vercel Speed Insights script is only requested once it is enabled for the project (default off). */
+export function speedInsightsEnabled(): boolean {
+  return isOn(process.env.NEXT_PUBLIC_SPEED_INSIGHTS_ENABLED);
+}
+
 export function marketingHomeAtRoot(): boolean {
   return isOn(process.env.NEXT_PUBLIC_MARKETING_HOME_AT_ROOT);
+}
+
+/**
+ * Query keys the onboarding wizard reads. Sign-in callbacks, the magic-link login, the dashboard's
+ * edit link and referral/lane links all point at "/?<key>=…"; once "/" is the marketing home they
+ * must reach the wizard at /start instead (the query string carries over on the redirect).
+ */
+export const WIZARD_QUERY_KEYS = ["discordId", "resumeSignup", "edit", "memberId", "loginError", "ref", "lane"] as const;
+
+/** next.config redirects: "/" with any wizard query key goes to /start while the marketing home is at "/". */
+export function wizardParamRedirects() {
+  if (!marketingHomeAtRoot()) return [];
+  return WIZARD_QUERY_KEYS.map((key) => ({ source: "/", has: [{ type: "query" as const, key }], destination: "/start", permanent: false }));
 }
 
 /** Whether a pathname is rendered by the marketing layout (the app header and corner links hide there). */

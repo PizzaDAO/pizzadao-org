@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { isOptimizableImage } from "@/app/lib/image-hosts";
@@ -42,7 +42,7 @@ interface TurtleFilterCount {
   count: number;
 }
 
-interface MembersResponse {
+export interface MembersResponse {
   members: PublicMember[];
   pagination: Pagination;
   filters: {
@@ -53,17 +53,16 @@ interface MembersResponse {
 
 const PAGE_LIMIT = 24;
 
-export default function CrewMembersPage() {
-  const [members, setMembers] = useState<PublicMember[]>([]);
-  const [pagination, setPagination] = useState<Pagination>({
-    page: 1,
-    limit: PAGE_LIMIT,
-    total: 0,
-    totalPages: 1,
-  });
-  const [crewCounts, setCrewCounts] = useState<CrewFilterCount[]>([]);
-  const [turtleCounts, setTurtleCounts] = useState<TurtleFilterCount[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function CrewMembersPage({ initialData }: { initialData?: MembersResponse | null } = {}) {
+  const [members, setMembers] = useState<PublicMember[]>(initialData?.members ?? []);
+  const [pagination, setPagination] = useState<Pagination>(
+    initialData?.pagination ?? { page: 1, limit: PAGE_LIMIT, total: 0, totalPages: 1 },
+  );
+  const [crewCounts, setCrewCounts] = useState<CrewFilterCount[]>(initialData?.filters?.crews ?? []);
+  const [turtleCounts, setTurtleCounts] = useState<TurtleFilterCount[]>(initialData?.filters?.turtles ?? []);
+  const [loading, setLoading] = useState(!initialData);
+  // The server prefilled the default view (page 1, no filters); skip that one fetch.
+  const usedInitial = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -126,7 +125,14 @@ export default function CrewMembersPage() {
   }, [page, search, crewFilter, turtleFilter, sort]);
 
   useEffect(() => {
+    const isDefaultView = page === 1 && !search && !crewFilter && !turtleFilter && sort === "name_asc";
+    if (initialData && !usedInitial.current && isDefaultView) {
+      usedInitial.current = true;
+      return;
+    }
+    usedInitial.current = true;
     fetchMembers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchMembers]);
 
   // Debounce search input
@@ -743,6 +749,7 @@ function MemberCardItem({
                     {new Date(member.lastCallDate).toLocaleDateString("en-US", {
                       month: "short",
                       day: "numeric",
+                      timeZone: "UTC",
                     })}
                   </>
                 )}
