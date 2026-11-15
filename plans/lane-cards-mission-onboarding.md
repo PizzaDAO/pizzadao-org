@@ -190,7 +190,7 @@ existing PATCH (which already confirms reward changes). No verifier choice beyon
 `scripts/lanes/seed.mjs [--apply]`: inserts the six lanes **unpublished** with draft steps if the
 slug is missing; never overwrites an existing row (DB is the source of truth after the first run).
 Resolves `missionId` by title lookup and prints what it could not find. Running `--apply` against
-production needs Snax's OK. Draft steps (generic, short, linking to existing material):
+production needs the project lead's OK. Draft steps (generic, short, linking to existing material):
 
 - **Host**: read the host guide (`/handbook/host-a-party#before`); budget and the cap
   (`#budget`, `{{hostCapUsd}}`); pizza math; create the rsv.pizza event; announce
@@ -244,7 +244,7 @@ Changed
 
 1. **Data + admin (no public change)**: migration, toggle, `/admin/lanes`, "Add Anytime mission",
    seed script. After merge: apply the migration, create the four new missions in the admin
-   (inactive), run the seed dry run, then `--apply` with Snax's OK.
+   (inactive), run the seed dry run, then `--apply` with the project lead's OK.
 2. **Guide + logged-in flow**: `/lanes/[slug]`, pin/progress APIs, card links on `/community`,
    dashboard `LaneCard`, StartHere/next-mission preference, missions chip.
 3. **Signup carry-through**: `/join?lane`, `pd_lane` cookie, signup-draft allowlist, profile pin,
@@ -311,7 +311,7 @@ Vercel preview (`vercel-deploy`; set `LANE_CARDS_ENABLED=1` on the preview env o
    `/join`.
 7. Clean up test `MemberLane` rows.
 
-## 11. Decisions for Snax (recommendation in bold)
+## 11. Decisions for the project lead (recommendation in bold)
 
 1. Visitors without a profile: straight into signup, or a lane preview page first?
    **Straight into signup with a lane banner** (what was asked; fewer clicks).

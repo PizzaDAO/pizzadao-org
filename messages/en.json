@@ -708,6 +708,10 @@
         "headline": "Your next mission is ready",
         "cta": "Submit Level {level} mission"
       },
+      "submit_lane_mission": {
+        "headline": "Your lane mission is ready",
+        "cta": "Submit your lane mission"
+      },
       "awaiting_review": {
         "headline": "Waiting on review — keep building",
         "body": "Level {level} missions submitted.",

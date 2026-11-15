@@ -63,6 +63,13 @@ export function localizeNextAction(a: NextAction, t: Translator): NextAction {
                     ? { ...a.primaryCta, label: t("nextAction.submit_mission.cta", { level }) }
                     : a.primaryCta,
             };
+        case "submit_lane_mission":
+            // body = the mission's title (data) — left as-is.
+            return {
+                ...a,
+                headline: t("nextAction.submit_lane_mission.headline"),
+                primaryCta: { ...a.primaryCta, label: t("nextAction.submit_lane_mission.cta") },
+            };
         case "awaiting_review":
             return {
                 ...a,

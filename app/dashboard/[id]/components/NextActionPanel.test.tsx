@@ -78,6 +78,19 @@ describe("<NextActionPanel />", () => {
         );
     });
 
+    it("renders the lane mission variant with its own label, not 'Submit Level N mission'", () => {
+        const a = makeAction({
+            kind: "submit_lane_mission",
+            headline: "Your lane mission is ready",
+            body: "Host a slice night",
+            primaryCta: { label: "Submit your lane mission", href: "/missions#mission-40" },
+        });
+        renderWithIntl(<NextActionPanel nextAction={a} />);
+        expect(screen.getByText("Host a slice night")).toBeInTheDocument();
+        expect(screen.getByRole("link", { name: /Submit your lane mission/ })).toHaveAttribute("href", "/missions#mission-40");
+        expect(screen.queryByText(/Submit Level/)).not.toBeInTheDocument();
+    });
+
     it("renders the power_user_review variant", () => {
         const a = makeAction({
             kind: "power_user_review",

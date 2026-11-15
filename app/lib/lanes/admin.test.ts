@@ -47,8 +47,23 @@ describe('updateLane', () => {
   it('will not publish a lane with no steps', async () => {
     m(prisma.laneStep.count).mockResolvedValue(0)
     await expect(updateLane('host', { published: true }, ADMIN)).rejects.toThrow(/at least one step/)
-    m(prisma.laneStep.count).mockResolvedValue(2)
+    // 2 steps in total, none of them a submit step.
+    m(prisma.laneStep.count).mockResolvedValueOnce(2).mockResolvedValueOnce(0)
     expect((await updateLane('host', { published: true }, ADMIN)).changed).toEqual(['published'])
+  })
+  it('will not publish a lane whose submit step has no mission, but does once a mission is set', async () => {
+    m(prisma.laneStep.count).mockImplementation(async (a: { where: { kind?: string } }) => (a.where.kind === 'submit' ? 1 : 3))
+    await expect(updateLane('host', { published: true }, ADMIN)).rejects.toThrow(/Pick a mission/)
+    expect(prisma.lane.update).not.toHaveBeenCalled()
+    m(prisma.mission.findUnique).mockResolvedValue({ id: 29 })
+    expect((await updateLane('host', { published: true, missionId: 29 }, ADMIN)).changed).toEqual(['missionId', 'published'])
+    m(prisma.laneStep.count).mockImplementation(async (a: { where: { kind?: string } }) => (a.where.kind === 'submit' ? 0 : 3))
+    expect((await updateLane('host', { published: true }, ADMIN)).changed).toEqual(['published'])
+  })
+  it('will not clear the mission of a published lane that has a submit step', async () => {
+    m(prisma.lane.findUnique).mockResolvedValue({ ...lane, missionId: 3, published: true })
+    m(prisma.laneStep.count).mockResolvedValue(1)
+    await expect(updateLane('host', { missionId: null }, ADMIN)).rejects.toThrow(/Pick a mission/)
   })
   it('404 for an unknown lane', async () => {
     m(prisma.lane.findUnique).mockResolvedValue(null)
@@ -96,6 +111,22 @@ describe('updateStep / moveStep / deleteStep', () => {
     m(prisma.laneStep.findMany).mockResolvedValue([{ id: 's1' }, { id: 's2' }])
     await moveStep('s1', 'up', ADMIN)
     expect(prisma.laneStep.update).not.toHaveBeenCalled()
+  })
+  it('refuses to delete the last step of a published lane (409), but allows it on a draft', async () => {
+    m(prisma.laneStep.findUnique).mockResolvedValue(step)
+    m(prisma.lane.findUnique).mockResolvedValue({ ...lane, published: true })
+    m(prisma.laneStep.count).mockResolvedValue(1)
+    await expect(deleteStep('s2', ADMIN)).rejects.toMatchObject({ status: 409 })
+    expect(prisma.laneStep.delete).not.toHaveBeenCalled()
+    m(prisma.laneStep.count).mockResolvedValue(2)
+    await deleteStep('s2', ADMIN)
+    expect(prisma.laneStep.delete).toHaveBeenCalledTimes(1)
+    vi.clearAllMocks()
+    m(prisma.laneStep.findUnique).mockResolvedValue(step)
+    m(prisma.lane.findUnique).mockResolvedValue({ ...lane, published: false })
+    m(prisma.laneStep.count).mockResolvedValue(1)
+    await deleteStep('s2', ADMIN)
+    expect(prisma.laneStep.delete).toHaveBeenCalledTimes(1)
   })
   it('deletes with an audit row', async () => {
     m(prisma.laneStep.findUnique).mockResolvedValue(step)

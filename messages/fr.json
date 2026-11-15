@@ -708,6 +708,10 @@
         "headline": "Ta prochaine mission t'attend",
         "cta": "Soumettre la mission de niveau {level}"
       },
+      "submit_lane_mission": {
+        "headline": "La mission de ton parcours t'attend",
+        "cta": "Soumettre la mission de ton parcours"
+      },
       "awaiting_review": {
         "headline": "En attente de validation — continue sur ta lancée",
         "body": "Missions de niveau {level} soumises.",

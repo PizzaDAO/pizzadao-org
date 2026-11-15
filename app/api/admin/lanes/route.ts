@@ -1,5 +1,6 @@
 import { requireDpr, rejectUnsafeWrite, json, isNonProductionDeploy } from '@/app/lib/admin-guard'
 import { createStep, deleteStep, LaneEditError, listAdminLanes, moveStep, updateLane, updateStep } from '@/app/lib/lanes/admin'
+import { invalidateLaneLinks } from '@/app/lib/lanes'
 import { listChanges } from '@/app/lib/settings/store'
 
 export const runtime = 'nodejs'
@@ -32,7 +33,10 @@ async function guarded(request: Request, run: (b: Record<string, unknown>, actor
   const b = (await request.json().catch(() => null)) as Record<string, unknown> | null
   if (!b || typeof b !== 'object' || Array.isArray(b)) return json({ error: 'Invalid body' }, 400)
   try {
-    return await run(b, auth.session.discordId)
+    const res = await run(b, auth.session.discordId)
+    // Any successful lane write can change which lanes are published: expire the cached /community links.
+    invalidateLaneLinks()
+    return res
   } catch (e) {
     if (e instanceof LaneEditError) return json({ error: e.message }, e.status)
     console.error('[admin lanes] save failed:', e)

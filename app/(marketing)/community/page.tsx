@@ -9,9 +9,10 @@ export const metadata = pageMeta({
 });
 
 // The lane cards link to their guides only while the lane cards setting is on and the lane is
-// published (plans/lane-cards-mission-onboarding.md). Read at most every 5 minutes; any failure
-// means no links (getPublicLaneLinks never throws).
-export const revalidate = 300;
+// published (plans/lane-cards-mission-onboarding.md). The page is dynamic (the root layout reads
+// cookies), so there is no page-level revalidate; getPublicLaneLinks caches the lane list for a
+// short time (tag `lane-links`, expired by the admin lane writes). Any failure means no links
+// (getPublicLaneLinks never throws).
 
 export default async function Page() {
   const laneLinks = await getPublicLaneLinks();

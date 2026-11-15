@@ -1,5 +1,6 @@
 import { json, rejectUnsafeWrite } from '@/app/lib/admin-guard'
 import { requireSession } from '@/app/lib/auth-guards'
+import { fetchMemberIdByDiscordId } from '@/app/lib/sheets/member-repository'
 import { lanesEnabled, pinLane, type LaneSource } from '@/app/lib/lanes'
 
 export const runtime = 'nodejs'
@@ -10,7 +11,7 @@ const SOURCES: readonly LaneSource[] = ['card', 'dashboard', 'guide']
 /**
  * POST /api/lanes/pin {slug, source?}: make a published lane the member's pinned lane
  * (plans/lane-cards-mission-onboarding.md). Idempotent; the latest pin wins. 404 while the lane
- * cards setting is off, 401 without a session, 404 for an unknown or unpublished lane.
+ * cards setting is off, 401 without a session, 403 without a member profile, 404 for an unknown or unpublished lane.
  */
 export async function POST(request: Request) {
   if (!(await lanesEnabled())) return json({ error: 'Not found' }, 404)
@@ -18,6 +19,9 @@ export async function POST(request: Request) {
   if (!auth.ok) return auth.response
   const unsafe = rejectUnsafeWrite(request)
   if (unsafe) return unsafe
+  // Members only, like the guide page: a session without a member profile cannot write lane state.
+  const memberId = await fetchMemberIdByDiscordId(auth.session.discordId).catch(() => null)
+  if (!memberId) return json({ error: 'Members only' }, 403)
   const b = (await request.json().catch(() => null)) as Record<string, unknown> | null
   if (!b || typeof b.slug !== 'string') return json({ error: 'slug is required' }, 400)
   const source = SOURCES.includes(b.source as LaneSource) ? (b.source as LaneSource) : 'guide'

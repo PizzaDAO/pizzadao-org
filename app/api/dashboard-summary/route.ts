@@ -47,6 +47,7 @@ import { MISSION_REVIEWER_ROLE_IDS } from "@/app/ui/constants";
 import { resolvePfpUrlAsync } from "@/app/lib/pfp";
 import { internalError } from "@/app/lib/errors/error-response";
 import { getPinnedLaneSummary, lanesEnabled, type PinnedLaneSummary } from "@/app/lib/lanes";
+import { pickNextMission } from "@/app/lib/lanes/progress";
 
 export const runtime = "nodejs";
 
@@ -68,7 +69,7 @@ export interface DashboardSummary {
         title: string | null;
         completedThisLevel: number;
         totalThisLevel: number;
-        nextMission: { id: number; title: string } | null;
+        nextMission: { id: number; title: string; fromLane?: true } | null;
     };
     pep: { balance: number };
     vouches: { total: number; recent: number };
@@ -304,18 +305,20 @@ export async function GET(request: NextRequest) {
         const nextMissionRaw = currentLevelMissions.find(
             (m: { id: number }) => !submittedMissionIds.has(m.id)
         );
-        // The pinned lane's mission comes first while the member has not submitted it.
+        // The pinned lane's mission comes first while the member has not submitted it, but only when
+        // it sits at or below the member's own level track (pickNextMission), so a lane never jumps
+        // the member past the level they are working on.
         const laneMissionRaw =
             pinnedLane?.missionId != null && !submittedMissionIds.has(pinnedLane.missionId)
                 ? Object.values(missionsByLevel as Record<string, any[]>)
                       .flat()
                       .find((m) => m.id === pinnedLane.missionId && m.isActive !== false)
                 : undefined;
-        const nextMission = laneMissionRaw
-            ? { id: laneMissionRaw.id, title: laneMissionRaw.title }
-            : nextMissionRaw
-              ? { id: nextMissionRaw.id, title: nextMissionRaw.title }
-              : null;
+        const nextMission = pickNextMission(
+            nextMissionRaw ? { id: nextMissionRaw.id, title: nextMissionRaw.title } : null,
+            laneMissionRaw ? { id: laneMissionRaw.id, title: laneMissionRaw.title, level: laneMissionRaw.level } : null,
+            currentLevel,
+        );
 
         // awaitingReview: all level missions submitted, at least one still PENDING.
         const levelProgressEntries = progress.filter(

@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 
 async function post(url: string, body: Record<string, unknown>): Promise<boolean> {
     try {
@@ -22,20 +23,41 @@ async function post(url: string, body: Record<string, unknown>): Promise<boolean
     }
 }
 
+/**
+ * After a pin or a tick the dashboard's lane card and next action are out of date, but the summary
+ * is cached for a minute (React Query staleTime plus the response's max-age). Re-fetch it past the
+ * HTTP cache (`reload` also refreshes the stored copy) and mark the query stale, so the dashboard
+ * shows the change on the next visit. Best effort; failures are ignored.
+ */
+export function useRefreshDashboardSummary(memberId: string) {
+    const queryClient = useQueryClient();
+    return () => {
+        void fetch(`/api/dashboard-summary?memberId=${encodeURIComponent(memberId)}`, { cache: "reload" })
+            .catch(() => undefined)
+            .finally(() => void queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] }));
+    };
+}
+
 /** When the page was opened from a community card (?pick=1), pin the lane once and drop the param. */
-export function PinOnArrive({ slug, pick }: { slug: string; pick: boolean }) {
+export function PinOnArrive({ slug, pick, memberId }: { slug: string; pick: boolean; memberId: string }) {
     const router = useRouter();
+    const refreshSummary = useRefreshDashboardSummary(memberId);
     const done = useRef(false);
     useEffect(() => {
         if (!pick || done.current) return;
         done.current = true;
-        void post("/api/lanes/pin", { slug, source: "card" }).then(() => router.replace(`/lanes/${slug}`));
+        void post("/api/lanes/pin", { slug, source: "card" }).then((ok) => {
+            if (ok) refreshSummary();
+            router.replace(`/lanes/${slug}`);
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- pin once per arrival
     }, [pick, slug, router]);
     return null;
 }
 
-export function PinButton({ slug, label, busyLabel, errorLabel }: { slug: string; label: string; busyLabel: string; errorLabel: string }) {
+export function PinButton({ slug, memberId, label, busyLabel, errorLabel }: { slug: string; memberId: string; label: string; busyLabel: string; errorLabel: string }) {
     const router = useRouter();
+    const refreshSummary = useRefreshDashboardSummary(memberId);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState(false);
     return (
@@ -48,8 +70,10 @@ export function PinButton({ slug, label, busyLabel, errorLabel }: { slug: string
                     setError(false);
                     const ok = await post("/api/lanes/pin", { slug, source: "guide" });
                     setBusy(false);
-                    if (ok) router.refresh();
-                    else setError(true);
+                    if (ok) {
+                        refreshSummary();
+                        router.refresh();
+                    } else setError(true);
                 }}
                 className="btn-pill min-h-11 border border-[hsl(var(--foreground)/0.25)] bg-transparent text-foreground hover:bg-[hsl(var(--foreground)/0.06)] disabled:opacity-50"
             >
@@ -61,9 +85,10 @@ export function PinButton({ slug, label, busyLabel, errorLabel }: { slug: string
 }
 
 export function LaneStepItem({
-    slug, stepId, index, title, kind, initialDone, linkHref, linkLabel, markDone, markUndone, submitHint, submitHref, errorLabel, children,
+    slug, memberId, stepId, index, title, kind, initialDone, linkHref, linkLabel, markDone, markUndone, submitHint, submitHref, submitLabel, errorLabel, children,
 }: {
     slug: string;
+    memberId: string;
     stepId: string;
     index: number;
     title: string;
@@ -76,13 +101,19 @@ export function LaneStepItem({
     submitHint: string;
     /** Where a "submit" step sends the member (the mission). */
     submitHref: string | null;
+    /** Link text for a "submit" step. */
+    submitLabel: string;
     errorLabel: string;
     children?: ReactNode;
 }) {
+    const refreshSummary = useRefreshDashboardSummary(memberId);
     const [done, setDone] = useState(initialDone);
     const [error, setError] = useState(false);
     const isSubmit = kind === "submit";
-    const external = !!linkHref && /^https:/.test(linkHref);
+    // A submit step always links to the mission (never an admin-set link) and only while that mission is open.
+    const href = isSubmit ? submitHref : linkHref;
+    const label = isSubmit ? submitLabel : linkLabel || linkHref;
+    const external = !isSubmit && !!href && /^https:/.test(href);
 
     async function toggle() {
         const next = !done;
@@ -92,6 +123,8 @@ export function LaneStepItem({
         if (!ok) {
             setDone(!next);
             setError(true);
+        } else {
+            refreshSummary();
         }
     }
 
@@ -116,14 +149,14 @@ export function LaneStepItem({
                     </h3>
                     {children}
                     {isSubmit && <p className="m-0 text-sm text-foreground/70">{submitHint}</p>}
-                    {(isSubmit ? submitHref : linkHref) && (
+                    {href && (
                         external ? (
-                            <a href={linkHref as string} target="_blank" rel="noopener noreferrer" className="w-fit text-sm underline underline-offset-2">
-                                {linkLabel || linkHref}
+                            <a href={href} target="_blank" rel="noopener noreferrer" className="w-fit text-sm underline underline-offset-2">
+                                {label}
                             </a>
                         ) : (
-                            <Link href={(isSubmit ? submitHref : linkHref) as string} className="w-fit text-sm underline underline-offset-2">
-                                {linkLabel || (isSubmit ? submitHref : linkHref)}
+                            <Link href={href} className="w-fit text-sm underline underline-offset-2">
+                                {label}
                             </Link>
                         )
                     )}

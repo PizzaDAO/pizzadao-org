@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { applyStepTick, computeProgress, pickPinned } from './progress'
+import { applyStepTick, computeProgress, pickNextMission, pickPinned } from './progress'
 
 const steps = [
   { id: 'a', kind: 'read' },
@@ -43,5 +43,23 @@ describe('applyStepTick', () => {
   })
   it('drops ids of deleted steps while saving', () => {
     expect(applyStepTick(['a', 'gone'], 'b', true, ['a', 'b'])).toEqual(['a', 'b'])
+  })
+})
+
+describe('pickNextMission', () => {
+  const level = { id: 14, title: 'Level mission' }
+  const lane = { id: 40, title: 'Lane mission', level: 2 }
+  it('prefers the lane mission when it is at or below the member level, flagged as from the lane', () => {
+    expect(pickNextMission(level, lane, 2)).toEqual({ id: 40, title: 'Lane mission', fromLane: true })
+    expect(pickNextMission(level, { ...lane, level: 1 }, 3)).toEqual({ id: 40, title: 'Lane mission', fromLane: true })
+    expect(pickNextMission(null, lane, 2)?.fromLane).toBe(true)
+  })
+  it('keeps the member level mission when the lane mission is above their level, so progression is never blocked', () => {
+    expect(pickNextMission(level, { ...lane, level: 3 }, 2)).toEqual(level)
+    expect(pickNextMission(null, { ...lane, level: 3 }, 2)).toBeNull()
+  })
+  it('keeps the level mission with no lane mission or an unknown level', () => {
+    expect(pickNextMission(level, null, 2)).toEqual(level)
+    expect(pickNextMission(level, { id: 40, title: 'x' }, 2)).toEqual(level)
   })
 })
