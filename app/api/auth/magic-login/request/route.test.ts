@@ -1,11 +1,12 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ request: vi.fn(), activation: vi.fn() }));
+const mocks = vi.hoisted(() => { process.env.SESSION_SECRET ||= "test-secret"; return { request: vi.fn(), activation: vi.fn() }; });
 vi.mock("@/app/lib/rate-limit", () => ({ enforceRateLimit: async () => null }));
 vi.mock("@/app/lib/magic-login", () => ({ requestMagicLogin: mocks.request }));
 vi.mock("@/app/lib/activation", () => ({ activationActor: () => undefined, recordActivationLater: mocks.activation }));
 vi.mock("@/app/lib/referral-cookie", () => ({ readRefCookie: () => null }));
 import { POST } from "./route";
+import { readPendingIds } from "@/app/lib/magic-login-pending";
 
 const call = (username: unknown) =>
   POST(new Request("https://app.example/api/auth/magic-login/request", { method: "POST", body: JSON.stringify({ username }) }));
@@ -14,7 +15,7 @@ beforeEach(() => vi.clearAllMocks());
 
 describe("magic login request route", () => {
   it("returns 200 on sent", async () => {
-    mocks.request.mockResolvedValue({ status: "sent" });
+    mocks.request.mockResolvedValue({ status: "sent", tokenId: "tok1" });
     expect((await call("a_user")).status).toBe(200);
   });
   it("returns 404 with username guidance on not_found", async () => {
@@ -53,7 +54,7 @@ describe("magic login request route", () => {
     expect((await call("x")).status).toBe(400);
   });
   it("adds the pd_lane cookie to the signup draft so a DM link on another device keeps the lane", async () => {
-    mocks.request.mockResolvedValue({ status: "sent" });
+    mocks.request.mockResolvedValue({ status: "sent", tokenId: "tok1" });
     const draft = { mafiaName: "Tony Pepperoni", city: "Lisbon", sessionId: "test-session-1" };
     const send = (cookie: string | undefined, signupDraft: unknown) =>
       POST(new Request("https://app.example/api/auth/magic-login/request", {
@@ -69,5 +70,28 @@ describe("magic login request route", () => {
     expect(mocks.request.mock.calls[2][2].signupDraft).toMatchObject({ lane: "host" });
     await send("pd_lane=host", null);
     expect(mocks.request.mock.calls[3][2].signupDraft).toBeNull();
+  });
+  it("remembers in this browser which links it asked for (httpOnly, magic-login paths only)", async () => {
+    mocks.request.mockResolvedValue({ status: "sent", tokenId: "tok1" });
+    const first = await call("a_user");
+    const cookie = first.headers.get("set-cookie")!;
+    expect(cookie).toMatch(/^pd_magic_pending=/);
+    expect(cookie).toContain("HttpOnly");
+    expect(cookie).toContain("Path=/api/auth/magic-login");
+    const value = decodeURIComponent(cookie.split(";")[0].slice("pd_magic_pending=".length));
+    expect(readPendingIds(value)).toEqual(["tok1"]);
+
+    mocks.request.mockResolvedValue({ status: "sent", tokenId: "tok2" });
+    const second = await POST(new Request("https://app.example/api/auth/magic-login/request", {
+      method: "POST",
+      headers: { cookie: `pd_magic_pending=${encodeURIComponent(value)}` },
+      body: JSON.stringify({ username: "a_user" }),
+    }));
+    const value2 = decodeURIComponent(second.headers.get("set-cookie")!.split(";")[0].slice("pd_magic_pending=".length));
+    expect(readPendingIds(value2)).toEqual(["tok1", "tok2"]);
+  });
+  it("sets no pending cookie when nothing was sent", async () => {
+    mocks.request.mockResolvedValue({ status: "not_found" });
+    expect((await call("nobody")).headers.get("set-cookie")).toBeNull();
   });
 });

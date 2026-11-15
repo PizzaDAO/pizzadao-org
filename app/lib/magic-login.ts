@@ -16,7 +16,7 @@ function hashToken(raw: string): string {
 }
 
 export type MagicLoginResult =
-  | { status: "sent" }
+  | { status: "sent"; tokenId: string }
   | { status: "not_found" }
   | { status: "ambiguous" }
   | { status: "lookup_failed" }
@@ -174,7 +174,8 @@ export async function requestMagicLogin(
   const tokenHash = hashToken(rawToken);
 
   // Store hash in DB
-  await prisma.magicLoginToken.create({
+  const created = await prisma.magicLoginToken.create({
+    select: { id: true },
     data: {
       tokenHash,
       ...(draft ? { signupDraft: draft } : {}),
@@ -217,11 +218,18 @@ export async function requestMagicLogin(
   }
 
   recordActivation("dm_sent", { actor: draft?.sessionId, discordId });
-  return { status: "sent" };
+  return { status: "sent", tokenId: created.id };
+}
+
+/** Whether any of these links (ids from the asking browser's pending cookie) has been used. */
+export async function anyMagicLinkUsed(ids: string[]): Promise<boolean> {
+  if (ids.length === 0) return false;
+  const used = await prisma.magicLoginToken.count({ where: { id: { in: ids }, usedAt: { not: null } } });
+  return used > 0;
 }
 
 export type VerifyResult =
-  | { valid: true; discordId: string; username: string; nick: string | null; draft?: SignupDraft; tokenHash?: string }
+  | { valid: true; tokenId?: string; discordId: string; username: string; nick: string | null; draft?: SignupDraft; tokenHash?: string }
   | { valid: false; reason: "invalid" | "expired" | "used" };
 
 export async function verifyMagicToken(rawToken: string): Promise<VerifyResult> {
@@ -247,6 +255,7 @@ export async function verifyMagicToken(rawToken: string): Promise<VerifyResult> 
   recordActivation("discord_verified", { actor: draft?.sessionId, discordId: token.discordId });
   return {
     valid: true,
+    tokenId: token.id,
     ...(draft ? { draft, tokenHash } : {}),
     discordId: token.discordId,
     username: token.username,

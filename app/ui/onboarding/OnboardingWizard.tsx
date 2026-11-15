@@ -10,7 +10,7 @@ import { filmCode, rerollCode, toppingCode } from "@/app/lib/mafia-funnel";
 import { MAFIA_FILMS } from "@/app/lib/mafia-films";
 import { sanitizeSignupDraft } from "@/app/lib/signup-draft";
 import { isLaneSlug } from "@/app/lib/lanes/links";
-import { loginPageHref } from "@/app/lib/login-return";
+import { loginPageHref, loginReturnPath } from "@/app/lib/login-return";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
@@ -73,6 +73,12 @@ function forgetLaneCookie() {
 }
 
 const WIZARD_HOME = marketingHomeAtRoot() ? "/start" : "/";
+
+/** The page a login started from (?returnTo, same-origin path only), so a linked member lands back there. */
+function returnToHere(): string | undefined {
+  if (typeof window === "undefined") return;
+  return loginReturnPath(new URLSearchParams(window.location.search).get("returnTo"));
+}
 
 export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
   const t = useTranslations("onboarding.chrome");
@@ -419,7 +425,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
           if (lookupRes.ok) {
             const lookup = await lookupRes.json();
             if (lookup.found && lookup.memberId) {
-              router.push(`/dashboard/${lookup.memberId}`);
+              router.push(returnToHere() ?? `/dashboard/${lookup.memberId}`);
               return;
             }
           }
@@ -451,7 +457,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
           }),
         });
         if (claimRes.ok) {
-          router.push((await laneLanding()) ?? `/dashboard/${lookup.memberId}`);
+          router.push((await laneLanding()) ?? returnToHere() ?? `/dashboard/${lookup.memberId}`);
           return;
         }
       }
@@ -461,7 +467,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
         const hasPendingClaim = localStorage.getItem(PENDING_CLAIM_KEY) === "1";
         if (!hasPendingClaim) {
           // Auto-login
-          router.push((await laneLanding()) ?? `/dashboard/${lookup.memberId || discordId}`);
+          router.push((await laneLanding()) ?? returnToHere() ?? `/dashboard/${lookup.memberId || discordId}`);
           return;
         }
         // User completed wizard, show review

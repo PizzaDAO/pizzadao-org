@@ -24,3 +24,33 @@ export function loginPageHref(search: string, extra = ""): string {
   const qs = params.toString();
   return qs ? `/login?${qs}` : "/login";
 }
+
+/**
+ * Where a tab should go once it finds itself logged in (e.g. the "check your DMs" tab after the link
+ * was opened in another tab of the same browser). Mirrors the magic-link landing: a linked member
+ * goes to the sanitized return path or their dashboard; anyone else to the wizard with their Discord
+ * identity (which links/claims the row and then honours returnTo).
+ */
+export function loggedInLanding(
+  me: { discordId?: string | null; memberId?: string | null; nick?: string | null; username?: string | null },
+  opts: { returnTo?: unknown; wizardHome: string; resumeSignup?: boolean },
+): string {
+  const returnTo = loginReturnPath(opts.returnTo);
+  if (me.memberId) return returnTo || `/dashboard/${encodeURIComponent(me.memberId)}`;
+  if (!me.discordId) return returnTo || opts.wizardHome;
+  const params = new URLSearchParams();
+  if (opts.resumeSignup) params.set("resumeSignup", "1");
+  params.set("discordId", me.discordId);
+  params.set("discordJoined", "1");
+  const nick = me.nick || me.username;
+  if (nick) params.set("discordNick", nick);
+  if (returnTo) params.set("returnTo", returnTo);
+  return `${opts.wizardHome}?${params.toString()}`;
+}
+
+/** The /login link for a page's "Log in" button: comes back to that page (never to "/" or the wizard). */
+export function loginHrefFrom(path: string | null | undefined): string {
+  const returnTo = loginReturnPath(path ?? undefined);
+  if (!returnTo || returnTo === "/" || /^\/start(\/|\?|#|$)/.test(returnTo)) return "/login";
+  return `/login?returnTo=${encodeURIComponent(returnTo)}`;
+}

@@ -179,6 +179,9 @@ async function finishLogin(
     if (state) redirectUrl.searchParams.set("sessionId", state);
     redirectUrl.searchParams.set("discordJoined", joined ? "1" : "0");
     if (nick) redirectUrl.searchParams.set("discordNick", nick);
+    // The wizard sends a member it links (name-match claim) back to the page they logged in from.
+    const safeNext = loginReturnPath(next);
+    if (safeNext) redirectUrl.searchParams.set("returnTo", safeNext);
   }
 
   // Create response and set session cookie

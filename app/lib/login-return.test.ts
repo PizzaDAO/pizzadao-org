@@ -1,5 +1,32 @@
 import { describe, expect, it } from "vitest";
-import { loginPageHref, loginReturnPath } from "./login-return";
+import { loggedInLanding, loginHrefFrom, loginPageHref, loginReturnPath } from "./login-return";
+
+describe("loginHrefFrom (header / prompt Log in buttons)", () => {
+  it("comes back to the current page", () => {
+    expect(loginHrefFrom("/calls/live")).toBe("/login?returnTo=%2Fcalls%2Flive");
+    expect(loginHrefFrom("/crew/abc?tab=1")).toBe("/login?returnTo=%2Fcrew%2Fabc%3Ftab%3D1");
+  });
+  it("is plain /login for home, the wizard, login itself and junk", () => {
+    for (const p of ["/", "/start", "/login", "/api/me", "//evil.example", "", null, undefined]) expect(loginHrefFrom(p)).toBe("/login");
+  });
+});
+
+describe("loggedInLanding (the tab that asked for a DM link)", () => {
+  it("sends a linked member back to the page the login started from", () => {
+    expect(loggedInLanding({ discordId: "1", memberId: "42" }, { returnTo: "/calls/live", wizardHome: "/start" })).toBe("/calls/live");
+  });
+  it("falls back to the dashboard, never to an outside or api target", () => {
+    for (const bad of [undefined, "https://evil.example", "//evil.example", "/api/logout"]) {
+      expect(loggedInLanding({ discordId: "1", memberId: "42" }, { returnTo: bad, wizardHome: "/start" })).toBe("/dashboard/42");
+    }
+  });
+  it("sends an unlinked member to the wizard with their identity and return path", () => {
+    const href = loggedInLanding({ discordId: "1", nick: "Nick" }, { returnTo: "/calls/live", wizardHome: "/start", resumeSignup: true });
+    const u = new URL(href, "https://x.example");
+    expect(u.pathname).toBe("/start");
+    expect(Object.fromEntries(u.searchParams)).toEqual({ resumeSignup: "1", discordId: "1", discordJoined: "1", discordNick: "Nick", returnTo: "/calls/live" });
+  });
+});
 
 describe("login return path", () => {
   it("preserves local destinations and query strings", () => {

@@ -37,6 +37,8 @@ export const RATE_LIMITS = {
   namegen: { limit: 30, windowSec: 60 },
   "activation": { limit: 30, windowSec: 60 },
   "magic-login": { limit: 5, windowSec: 15 * 60 },
+  // Polled every 3 s by a "check your DMs" tab for up to ~11 min (about 220 calls).
+  "magic-login-status": { limit: 300, windowSec: 15 * 60 },
   "vote-anonymous": { limit: 60, windowSec: 10 * 60 },
   // Per member (keyed by Discord id, not IP): plans/mission-verification.md §6.3.
   // Daily job post verification: per member; each check reads up to ~300 Discord messages.

@@ -8,6 +8,7 @@ import { useTranslations } from "next-intl";
 import { useSession } from "@/app/lib/hooks/use-session";
 import { PizzaDAOLogo } from "./PizzaDAOLogo";
 import { isMarketingPath } from "@/app/lib/marketing-site";
+import { loginHrefFrom } from "@/app/lib/login-return";
 
 type NavItem = { href: string; label: string; proposalsOnly?: boolean; sessionsOnly?: boolean; disavowOnly?: boolean; membersOnly?: boolean; adminOnly?: boolean; analyticsOnly?: boolean; match?: (path: string) => boolean };
 const GROUPS: { key: string; items: NavItem[] }[] = [
@@ -90,7 +91,7 @@ export default function SiteHeader() {
     <Link href={dashboardHref} className="btn-pill min-h-11 bg-foreground text-background no-underline" aria-current={pathname.startsWith("/dashboard/") ? "page" : undefined}>{t("dashboard")}</Link>
   ) : (
     <>
-      <Link href="/login" className={linkClass + " text-foreground"}>{t("logIn")}</Link>
+      <Link href={loginHrefFrom(pathname)} className={linkClass + " text-foreground"}>{t("logIn")}</Link>
       <Link href="/join" className="btn-pill min-h-11 bg-tomato-deep text-cream no-underline">{t("join")}</Link>
     </>
   );

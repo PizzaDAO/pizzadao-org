@@ -5,6 +5,8 @@ import { readLaneCookie } from "@/app/lib/lanes/cookie";
 import { NextResponse } from "next/server";
 import { enforceRateLimit } from "@/app/lib/rate-limit";
 import { requestMagicLogin } from "@/app/lib/magic-login";
+import { getSessionCookieOptions } from "@/app/lib/session";
+import { MAGIC_PENDING_COOKIE, addPendingId, pendingCookieOptions, readRequestCookie } from "@/app/lib/magic-login-pending";
 
 export const runtime = "nodejs";
 
@@ -41,8 +43,17 @@ export async function POST(req: Request) {
 
     if (result.status !== "sent") recordActivation("login_failed", { actor, code: result.status });
     switch (result.status) {
-      case "sent":
-        return NextResponse.json({ status: "sent" });
+      case "sent": {
+        // Remember in this browser which link it asked for, so this tab can tell when the link was
+        // opened (here or elsewhere) and the link's landing can tell whether it is the same browser.
+        const res = NextResponse.json({ status: "sent", sentAt: Date.now() });
+        res.cookies.set(
+          MAGIC_PENDING_COOKIE,
+          addPendingId(readRequestCookie(req, MAGIC_PENDING_COOKIE), result.tokenId),
+          pendingCookieOptions(getSessionCookieOptions(req).secure),
+        );
+        return res;
+      }
       case "not_found":
         return NextResponse.json(
           {

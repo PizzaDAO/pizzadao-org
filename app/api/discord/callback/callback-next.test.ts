@@ -61,4 +61,16 @@ describe("Discord OAuth callback: next", () => {
       expect(u.pathname).toBe("/dashboard/42");
     }
   });
+
+  it("hands a validated next to the wizard as returnTo for a member it still has to link", async () => {
+    mockDecode.mockReturnValue({ sessionId: "", nonce: "n", next: "/calls/live" });
+    mockDiscord();
+    mockFetchMemberByDiscordId.mockResolvedValueOnce(null);
+    const { GET } = await import("./route");
+    const res = await GET(new Request("http://localhost:3000/api/discord/callback?code=c&state=s", { headers: { cookie: "oauth_state=n" } }));
+    const u = new URL(res.headers.get("location")!);
+    expect(u.pathname).toBe("/");
+    expect(u.searchParams.get("discordId")).toBe("d1");
+    expect(u.searchParams.get("returnTo")).toBe("/calls/live");
+  });
 });
