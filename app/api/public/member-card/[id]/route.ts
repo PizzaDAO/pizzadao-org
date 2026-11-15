@@ -10,6 +10,7 @@ import { getUserProgressSummary } from "@/app/lib/missions";
 import { getMafiaRank } from "@/app/lib/mafia-points";
 import { getCrewMappings } from "@/app/lib/crew-mappings";
 import { withoutNonCrewIds } from "@/app/lib/crew-id";
+import { resolveMemberSince, monthPrecisionIso } from "@/app/lib/member-since";
 import { resolvePfpUrlAsync } from "@/app/lib/pfp";
 
 export const runtime = "nodejs";
@@ -23,10 +24,12 @@ export interface MemberCard {
     levelTitle: string;
     mafiaRank: string | null;
     crews: { id: string; label: string; emoji?: string }[];
+    /** ISO date for "member since" (earliest of Discord join, first call, site signup), or null. */
+    memberSince: string | null;
 }
 
 /** Exactly these keys may appear in the response. Asserted in the tests. */
-export const MEMBER_CARD_KEYS = ["memberId", "name", "pfpUrl", "level", "levelTitle", "mafiaRank", "crews"] as const;
+export const MEMBER_CARD_KEYS = ["memberId", "name", "pfpUrl", "level", "levelTitle", "mafiaRank", "crews", "memberSince"] as const;
 
 export const MEMBER_CARD_CACHE_HEADERS = {
     "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
@@ -74,11 +77,19 @@ export async function composeMemberCard(memberId: string): Promise<MemberCard | 
     } catch {
         // outside a request scope (tests): nothing to extend
     }
-    const [pfpUrl, mission, rank, crewMappings] = await Promise.all([
+    // Same pattern as the rank: past the budget the lookup keeps running so its write lands.
+    const sincePromise = resolveMemberSince(memberId, discordId || null);
+    try {
+        after(() => sincePromise.then(() => undefined, () => undefined));
+    } catch {
+        // outside a request scope (tests)
+    }
+    const [pfpUrl, mission, rank, crewMappings, since] = await Promise.all([
         safe(resolvePfpUrlAsync(memberId), null as string | null),
         discordId ? safe(getUserProgressSummary(discordId), null) : Promise.resolve(null),
         withBudget(rankPromise, RANK_BUDGET_MS, null),
         safe(getCrewMappings(), { crews: [], cached: false }),
+        withBudget(sincePromise, RANK_BUDGET_MS, null as Date | null),
     ]);
 
     let level: MemberCard["level"] = null;
@@ -110,6 +121,7 @@ export async function composeMemberCard(memberId: string): Promise<MemberCard | 
         levelTitle,
         mafiaRank: rank?.rank?.name ?? null,
         crews,
+        memberSince: monthPrecisionIso(since),
     };
 }
 

@@ -20,6 +20,8 @@ export interface LevelCardData {
     total: number;
     nextTitle: string | null;
     nextMissions: Array<{ id: number; title: string }>;
+    /** Missions already submitted and waiting for a reviewer. */
+    submitted?: Array<{ id: number; title: string }>;
     awaitingReview: boolean;
 }
 
@@ -56,6 +58,19 @@ export function LevelCard({ card }: { card?: LevelCardData | null }) {
                     </div>
                     <p className="mt-2 text-[13px] text-foreground/70">{t("progress", { done: card.done, total: card.total })}</p>
 
+                    {card.submitted && card.submitted.length > 0 ? (
+                        <div className="mt-3" data-testid="level-card-submitted">
+                            <p className="overline">{t("submitted")}</p>
+                            <ul className="mt-1 grid gap-1 p-0" style={{ listStyle: "none" }}>
+                                {card.submitted.map((m) => (
+                                    <li key={m.id} className="text-sm text-foreground/80">
+                                        {m.title}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    ) : null}
+
                     {card.nextMissions.length > 0 ? (
                         <div className="mt-3">
                             <p className="overline">{t("next")}</p>
@@ -69,7 +84,7 @@ export function LevelCard({ card }: { card?: LevelCardData | null }) {
                                 ))}
                             </ul>
                         </div>
-                    ) : card.awaitingReview ? (
+                    ) : card.awaitingReview && !(card.submitted && card.submitted.length > 0) ? (
                         <p className="mt-3 text-sm text-foreground/80">{t("allSubmitted")}</p>
                     ) : null}
 

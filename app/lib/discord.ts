@@ -48,6 +48,7 @@ export async function fetchGuildMember(userId: string) {
   return await r.json() as {
     nick?: string
     roles: string[]
+    joined_at?: string | null
     user?: { id: string; username: string; global_name?: string }
   }
 }

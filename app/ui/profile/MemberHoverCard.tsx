@@ -14,7 +14,8 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { formatMemberSince } from "@/app/lib/member-since-format";
 import type { MemberCard } from "@/app/api/public/member-card/[id]/route";
 
 const OPEN_DELAY_MS = 300;
@@ -249,6 +250,9 @@ function CardPopover({
 
 function CardBody({ card }: { card: MemberCard }) {
     const t = useTranslations("memberCard");
+    const tSince = useTranslations("memberSince");
+    const locale = useLocale();
+    const sinceText = formatMemberSince(card.memberSince, locale);
     const meta: string[] = [];
     if (card.level !== null) meta.push(t("level", { level: String(card.level) }));
     if (card.mafiaRank) meta.push(card.mafiaRank);
@@ -268,6 +272,11 @@ function CardBody({ card }: { card: MemberCard }) {
                     {meta.length > 0 && <span className="block truncate text-xs text-foreground/65">{meta.join(" · ")}</span>}
                 </span>
             </span>
+            {sinceText && (
+                <span data-testid="member-card-since" className="block text-xs text-foreground/65">
+                    {tSince("label", { date: sinceText })}
+                </span>
+            )}
             {card.crews.length > 0 && (
                 <span className="flex flex-wrap gap-1" aria-label={t("crews")}>
                     {card.crews.slice(0, 4).map((c) => (

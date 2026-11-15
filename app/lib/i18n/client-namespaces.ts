@@ -24,6 +24,8 @@ export const CLIENT_NAMESPACES = [
   "laneCard",
   "language",
   "memberCard",
+  "memberSince",
+  "missionHold",
   "missionLinks",
   "nav",
   "onboarding",

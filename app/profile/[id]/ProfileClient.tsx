@@ -152,6 +152,7 @@ export function ProfileClient({ id, disavowWarning = null, buddyRecognition = nu
                     level={data.hero.level}
                     levelTitle={data.hero.levelTitle}
                     mafiaRank={data.hero.mafiaRank?.tier ?? null}
+                    memberSince={data.hero.memberSince ?? null}
                     mode={mode}
                     viewerId={data.viewerId}
                     suppressOwnerBanner={asVisitor}
