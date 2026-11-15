@@ -185,15 +185,6 @@ export function NameStep({
 }: Props) {
   const t = useTranslations("onboarding.name");
 
-  // Clean on save, not per keystroke: only hint what the cleaned name will be.
-  const displayNameHint = useMemo(() => {
-    const typed = (mafiaName || "").trim().replace(/\s+/g, " ");
-    if (!typed) return null;
-    const cleaned = sanitizeDisplayName(typed);
-    if (!cleaned) return { empty: true as const };
-    return cleaned === typed ? null : { preview: cleaned };
-  }, [mafiaName]);
-
   /* Local-only UI state. Selection lives here because it doesn't need to
      persist past this step — the wizard advances as soon as onPickName fires.
      calzone-65503 — Inline-edit state was removed; users now stay with one
@@ -313,22 +304,6 @@ export function NameStep({
             {t("heroTagline")}
           </p>
         </header>
-      )}
-
-      {!isPublic && !suggestions && !submitting && (
-        <section className="grid gap-3" aria-label={t("displayNameLabel")}>
-          <label htmlFor="onboarding-display-name" className="text-sm font-semibold text-foreground">{t("displayNameLabel")}</label>
-          <input id="onboarding-display-name" type="text" autoComplete="nickname" maxLength={128} value={mafiaName || ""} onChange={event => onChange({ mafiaName: event.target.value })} placeholder={t("displayNamePlaceholder")} className="min-h-12 w-full rounded-xl border border-[hsl(var(--rule-warm)/0.65)] bg-background px-4 text-base text-foreground focus-visible:outline-2 focus-visible:outline-tomato-readable" />
-          <p aria-live="polite" className="min-h-5 text-sm text-foreground/75">
-            {displayNameHint && "empty" in displayNameHint ? (
-              t("displayNameEmpty")
-            ) : displayNameHint ? (
-              t.rich("displayNamePreview", { name: displayNameHint.preview, b: (chunks) => <strong>{chunks}</strong> })
-            ) : null}
-          </p>
-          <button type="button" disabled={!sanitizeDisplayName(mafiaName)} onClick={() => onPickName(sanitizeDisplayName(mafiaName)!)} className="btn-pill min-h-11 justify-self-start bg-foreground text-background">{t("useDisplayName")}</button>
-          <p className="overline mt-5 text-foreground/75">{t("orGenerateName")}</p>
-        </section>
       )}
 
       {/* ─── Input phase — shown until suggestions arrive ────────── */}
@@ -998,11 +973,6 @@ function FilmPicker({
       {matchedFilm && !open && (
         <p className="ui mt-3 text-[13px] uppercase tracking-[0.08em] text-foreground/70">
           {matchedFilm.year} · {matchedFilm.country}
-        </p>
-      )}
-      {!matchedFilm && (
-        <p className="ui mt-3 text-[13px] uppercase tracking-[0.08em] text-foreground/70">
-          {t("filmPickerToneHint")}
         </p>
       )}
 
