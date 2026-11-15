@@ -749,6 +749,7 @@ function MemberCardItem({
                     {new Date(member.lastCallDate).toLocaleDateString("en-US", {
                       month: "short",
                       day: "numeric",
+                      timeZone: "UTC",
                     })}
                   </>
                 )}

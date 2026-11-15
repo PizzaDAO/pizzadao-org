@@ -78,7 +78,8 @@ export function ProfileClient({ id, disavowWarning = null, buddyRecognition = nu
         );
     }
 
-    if (error || !data) {
+    // A failed background refetch must not replace server-rendered data with an error page.
+    if (!data) {
         return (
             <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-5">
                 <div className="paper-soft halftone-soft grid gap-3 rounded-[28px] border p-7 max-w-md w-full"

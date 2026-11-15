@@ -6,7 +6,7 @@
 
 import type { GvizResponse } from "@/app/lib/gviz-parser";
 import { getTaskLinks, getColumnHyperlinks } from "@/app/api/lib/google-sheets";
-import { swrGet } from "@/app/lib/swr-cache";
+import { swrGet, swrInvalidate } from "@/app/lib/swr-cache";
 import { cacheDel, CACHE_TTL } from "@/app/api/lib/cache";
 import { fetchGviz, buildGvizUrl, GvizFetchError } from "@/app/lib/sheets/gviz";
 import { SHEET_IDS, SHEET_TABS } from "@/app/lib/sheets/config";
@@ -501,16 +501,18 @@ const sheetCacheKey = () => `crew-mappings:v7:${SHEET_ID}`;
 
 /** Forget the cached crew list (after an edit on the website). */
 export async function invalidateCrewMappingsCache(): Promise<void> {
-  await Promise.all([cacheDel(DB_CACHE_KEY), cacheDel(sheetCacheKey())]);
+  await Promise.all([swrInvalidate(DB_CACHE_KEY), swrInvalidate(sheetCacheKey())]);
 }
 
 /**
  * Get crew mappings data directly (without HTTP fetch). Source: the Crew Mappings sheet, or the
  * Crew table once `sheets.source.crews` is "db" (plans/sheets-cutover.md).
  * @param forceRefresh - If true, bypass cache
+ * @param opts.staleWhileRevalidate - Page reads only: serve a stale list and refresh behind the response.
+ *   Everything else keeps the blocking 5-minute behavior.
  * @returns Crew mappings data
  */
-export async function getCrewMappings(forceRefresh = false): Promise<{ crews: CrewOption[]; cached: boolean }> {
+export async function getCrewMappings(forceRefresh = false, opts: { staleWhileRevalidate?: boolean } = {}): Promise<{ crews: CrewOption[]; cached: boolean }> {
   const { usesDb } = await import("@/app/lib/sheets-import/source");
   const fromDb = await usesDb("crews");
   const cacheKey = fromDb ? DB_CACHE_KEY : sheetCacheKey();
@@ -524,7 +526,7 @@ export async function getCrewMappings(forceRefresh = false): Promise<{ crews: Cr
       await attachTasks(crews, forceRefresh);
       return { crews };
     },
-    { freshSeconds: CACHE_TTL.CREW_MAPPINGS, keepSeconds: CREW_MAPPINGS_KEEP, forceRefresh },
+    { freshSeconds: CACHE_TTL.CREW_MAPPINGS, keepSeconds: CREW_MAPPINGS_KEEP, forceRefresh, serveStale: opts.staleWhileRevalidate === true },
   );
   return { ...value, cached };
 }

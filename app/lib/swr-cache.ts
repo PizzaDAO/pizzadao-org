@@ -1,5 +1,5 @@
 import { after } from "next/server";
-import { cacheGet, cacheSet, cacheLock, cacheUnlock } from "@/app/api/lib/cache";
+import { cacheGet, cacheSet, cacheDel, cacheLock, cacheUnlock } from "@/app/api/lib/cache";
 
 type Envelope<T> = { value: T; fetchedAt: number };
 
@@ -8,11 +8,21 @@ export type SwrOptions = {
   freshSeconds: number;
   /** Seconds a value is kept at all; stale values inside this window are served while refreshing. */
   keepSeconds: number;
+  /** Serve a stale value while refreshing. When false, a stale value is treated as a miss (blocking load). */
+  serveStale?: boolean;
   /** Bypass the cache and block on a fresh load. */
   forceRefresh?: boolean;
   /** Runs a background task; defaults to Next's after(), falling back to fire-and-forget. */
   schedule?: (task: () => Promise<void>) => void;
 };
+
+const genKey = (key: string) => `${key}:gen`;
+
+/** Drop a cached value and bump its generation so a refresh already in flight cannot write old data back. */
+export async function swrInvalidate(key: string): Promise<void> {
+  await cacheSet(genKey(key), `${Date.now()}-${Math.random().toString(36).slice(2)}`, 60 * 60 * 24 * 7);
+  await cacheDel(key);
+}
 
 function defaultSchedule(task: () => Promise<void>) {
   try {
@@ -36,7 +46,10 @@ export async function swrGet<T>(
   const lockKey = `${key}:refresh-lock`;
 
   const loadAndStore = async (): Promise<T> => {
+    const gen = await cacheGet<string>(genKey(key));
     const value = await load();
+    // Invalidated while loading: hand back what we read but do not store it.
+    if ((await cacheGet<string>(genKey(key))) !== gen) return value;
     await cacheSet<Envelope<T>>(key, { value, fetchedAt: Date.now() }, opts.keepSeconds);
     return value;
   };
@@ -48,16 +61,18 @@ export async function swrGet<T>(
       const hasEnvelope = typeof env.fetchedAt === "number" && "value" in env;
       const value = (hasEnvelope ? env.value : hit) as T;
       const fresh = hasEnvelope && Date.now() - env.fetchedAt < opts.freshSeconds * 1000;
+      if (!fresh && opts.serveStale === false) return { value: await loadAndStore(), cached: false };
       if (!fresh) {
         schedule(async () => {
           // Single flight: only the caller that takes the lock refreshes.
-          if (!(await cacheLock(lockKey, 60))) return;
+          const token = await cacheLock(lockKey, 60);
+          if (!token) return;
           try {
             await loadAndStore();
           } catch {
             // keep serving the stale value
           } finally {
-            await cacheUnlock(lockKey);
+            await cacheUnlock(lockKey, token);
           }
         });
       }
