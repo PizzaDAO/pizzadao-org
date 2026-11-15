@@ -6,7 +6,10 @@ vi.mock("@/app/lib/missions", () => ({ getUserProgressSummary: vi.fn() }));
 vi.mock("@/app/lib/mafia-points", () => ({ getMafiaRank: vi.fn() }));
 vi.mock("@/app/lib/crew-mappings", () => ({ getCrewMappings: vi.fn() }));
 vi.mock("@/app/lib/pfp", () => ({ resolvePfpUrlAsync: vi.fn() }));
-vi.mock("@/app/lib/member-since", () => ({ resolveMemberSince: vi.fn(async () => new Date("2021-03-05T00:00:00Z")) }));
+vi.mock("@/app/lib/member-since", async (orig) => ({
+  ...(await orig<typeof import("@/app/lib/member-since")>()),
+  resolveMemberSince: vi.fn(async () => new Date("2021-03-17T14:22:09Z")),
+}));
 
 import { GET, composeMemberCard, MEMBER_CARD_KEYS } from "./route";
 import { fetchMemberById } from "@/app/lib/sheets/member-repository";
@@ -44,6 +47,8 @@ describe("member card", () => {
   it("returns only the allow-listed public fields", async () => {
     const card = await composeMemberCard("1");
     expect(Object.keys(card!).sort()).toEqual([...MEMBER_CARD_KEYS].sort());
+    // Month precision only: no day or time of the join leaks.
+    expect(card!.memberSince).toBe("2021-03-01T00:00:00.000Z");
     expect(card).toMatchObject({
       memberId: "1",
       name: "Test Maker",

@@ -9,7 +9,7 @@
 // "new member" windows, buddy matching, activation funnels) never reads it.
 
 import { prisma as realPrisma } from "./db"
-import { fetchGuildMember } from "./discord"
+import { lookupGuildMembership } from "./discord"
 
 /** Retry a Discord lookup that found nothing (not in the server, API error) at most this often. */
 export const JOIN_LOOKUP_RETRY_MS = 7 * 24 * 60 * 60 * 1000
@@ -39,31 +39,50 @@ interface ExtrasRow {
 export interface MemberSinceDb {
   memberProfileExtras: {
     findUnique(args: unknown): Promise<ExtrasRow | null>
-    upsert(args: unknown): Promise<unknown>
+    createMany(args: unknown): Promise<unknown>
+    updateMany(args: unknown): Promise<unknown>
   }
   member: { findUnique(args: unknown): Promise<{ createdAt: Date } | null> }
   activationEvent: { findFirst(args: unknown): Promise<{ createdAt: Date } | null> }
   callAttendance: { findFirst(args: unknown): Promise<{ callDate: Date } | null> }
 }
 
+/** Result of one Discord guild lookup. "unknown" = rate limit, 5xx, or Discord not configured. */
+export type JoinLookup = { status: "member"; joinedAt: string | null } | { status: "not_member" } | { status: "unknown" }
+
 export interface MemberSinceDeps {
   db?: MemberSinceDb
-  /** Discord guild member lookup; returns joined_at (ISO) or null. */
-  fetchJoinedAt?: (discordId: string) => Promise<string | null>
+  lookup?: (discordId: string) => Promise<JoinLookup>
   now?: () => Date
 }
 
-async function defaultFetchJoinedAt(discordId: string): Promise<string | null> {
-  const m = await fetchGuildMember(discordId)
-  return m?.joined_at ?? null
+async function defaultLookup(discordId: string): Promise<JoinLookup> {
+  const r = await lookupGuildMembership(discordId)
+  if (r.status === "member") return { status: "member", joinedAt: r.member.joined_at ?? null }
+  return { status: r.status }
 }
 
 function depsOf(deps: MemberSinceDeps) {
   return {
     db: (deps.db ?? (realPrisma as unknown as MemberSinceDb)),
-    fetchJoinedAt: deps.fetchJoinedAt ?? defaultFetchJoinedAt,
+    lookup: deps.lookup ?? defaultLookup,
     now: deps.now ?? (() => new Date()),
   }
+}
+
+/**
+ * Race-safe write: the row is created if missing, then updated only where the stored date is empty
+ * or later than `joined`, so a concurrent backfill or lookup can never be overwritten by null or a
+ * later date. With `joined` null it only stamps the check time (where no date is stored).
+ */
+async function writeJoinedAt(db: MemberSinceDb, memberId: string, joined: Date | null, stamp: Date): Promise<void> {
+  await db.memberProfileExtras.createMany({ data: [{ memberId }], skipDuplicates: true })
+  await db.memberProfileExtras.updateMany({
+    where: joined
+      ? { memberId, OR: [{ discordJoinedAt: null }, { discordJoinedAt: { gt: joined } }] }
+      : { memberId, discordJoinedAt: null },
+    data: joined ? { discordJoinedAt: joined, discordJoinedCheckedAt: stamp } : { discordJoinedCheckedAt: stamp },
+  })
 }
 
 /**
@@ -76,7 +95,7 @@ export async function captureDiscordJoinedAt(
   discordId: string,
   deps: MemberSinceDeps = {},
 ): Promise<Date | null> {
-  const { db, fetchJoinedAt, now } = depsOf(deps)
+  const { db, lookup, now } = depsOf(deps)
   const existing = await db.memberProfileExtras.findUnique({
     where: { memberId },
     select: { discordJoinedAt: true, discordJoinedCheckedAt: true },
@@ -85,19 +104,24 @@ export async function captureDiscordJoinedAt(
   const checked = existing?.discordJoinedCheckedAt
   if (checked && now().getTime() - checked.getTime() < JOIN_LOOKUP_RETRY_MS) return null
 
-  let joined: Date | null = null
+  let result: JoinLookup
   try {
-    joined = toDate(await fetchJoinedAt(discordId))
+    result = await lookup(discordId)
   } catch {
-    joined = null
+    result = { status: "unknown" }
   }
-  const stamp = now()
-  await db.memberProfileExtras.upsert({
-    where: { memberId },
-    create: { memberId, discordJoinedAt: joined, discordJoinedCheckedAt: stamp },
-    update: { discordJoinedAt: joined, discordJoinedCheckedAt: stamp },
-  })
+  // Rate limit, 5xx or unconfigured: record nothing so the next view retries.
+  if (result.status === "unknown") return null
+  const joined = result.status === "member" ? toDate(result.joinedAt) : null
+  // A member with no usable join date and a definitive "not in the server" are both stamped.
+  await writeJoinedAt(db, memberId, joined, now())
   return joined
+}
+
+/** Month precision for public output: first of the month, UTC. The exact join time is never exposed. */
+export function monthPrecisionIso(d: Date | null | undefined): string | null {
+  if (!d || Number.isNaN(d.getTime())) return null
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)).toISOString()
 }
 
 /**
@@ -173,13 +197,7 @@ export async function backfillDiscordJoinedAt(
       continue
     }
     out.updated++
-    if (opts.apply) {
-      await db.memberProfileExtras.upsert({
-        where: { memberId: row.memberId },
-        create: { memberId: row.memberId, discordJoinedAt: joined, discordJoinedCheckedAt: now() },
-        update: { discordJoinedAt: joined, discordJoinedCheckedAt: now() },
-      })
-    }
+    if (opts.apply) await writeJoinedAt(db, row.memberId, joined, now())
   }
   return out
 }

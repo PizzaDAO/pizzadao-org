@@ -84,7 +84,7 @@ export function LevelCard({ card }: { card?: LevelCardData | null }) {
                                 ))}
                             </ul>
                         </div>
-                    ) : card.awaitingReview ? (
+                    ) : card.awaitingReview && !(card.submitted && card.submitted.length > 0) ? (
                         <p className="mt-3 text-sm text-foreground/80">{t("allSubmitted")}</p>
                     ) : null}
 

@@ -64,6 +64,14 @@ describe("<LevelCard /> submitted missions", () => {
         expect(box.textContent).toContain("Get vouched by 5 members");
     });
 
+    it("does not also show the generic all-submitted line", () => {
+        renderWithIntl(<LevelCard card={card({ nextMissions: [], awaitingReview: true, submitted: [{ id: 9, title: "Get vouched by 5 members" }] })} />);
+        expect(screen.queryByText("Everything is submitted. Waiting for review.")).toBeNull();
+        cleanup();
+        renderWithIntl(<LevelCard card={card({ nextMissions: [], awaitingReview: true })} />);
+        expect(screen.getByText("Everything is submitted. Waiting for review.")).toBeInTheDocument();
+    });
+
     it("omits the section when nothing is submitted", () => {
         renderWithIntl(<LevelCard card={card()} />);
         expect(screen.queryByTestId("level-card-submitted")).toBeNull();

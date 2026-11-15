@@ -6,6 +6,7 @@ vi.mock("./discord", () => ({ fetchGuildMember: vi.fn() }))
 import {
   earliestDate,
   captureDiscordJoinedAt,
+  monthPrecisionIso,
   resolveMemberSince,
   backfillDiscordJoinedAt,
   JOIN_LOOKUP_RETRY_MS,
@@ -21,9 +22,10 @@ function fakeDb(over: {
   signup?: Date | null
   call?: Date | null
 } = {}) {
-  const upsert = vi.fn(async () => ({}))
+  const upsert = vi.fn(async (_args?: unknown) => ({}))
+  const createMany = vi.fn(async () => ({}))
   const db: MemberSinceDb = {
-    memberProfileExtras: { findUnique: vi.fn(async () => over.extras ?? null), upsert },
+    memberProfileExtras: { findUnique: vi.fn(async () => over.extras ?? null), createMany, updateMany: upsert },
     member: { findUnique: vi.fn(async () => (over.member ? { createdAt: over.member } : null)) },
     activationEvent: { findFirst: vi.fn(async () => (over.signup ? { createdAt: over.signup } : null)) },
     callAttendance: { findFirst: vi.fn(async () => (over.call ? { callDate: over.call } : null)) },
@@ -43,34 +45,56 @@ describe("earliestDate", () => {
 describe("captureDiscordJoinedAt", () => {
   it("returns the stored date without calling Discord", async () => {
     const { db } = fakeDb({ extras: { discordJoinedAt: new Date("2020-01-01T00:00:00Z"), discordJoinedCheckedAt: null } })
-    const fetchJoinedAt = vi.fn()
-    const d = await captureDiscordJoinedAt("1", "d1", { db, fetchJoinedAt })
+    const lookup = vi.fn()
+    const d = await captureDiscordJoinedAt("1", "d1", { db, lookup })
     expect(d?.toISOString()).toBe("2020-01-01T00:00:00.000Z")
-    expect(fetchJoinedAt).not.toHaveBeenCalled()
+    expect(lookup).not.toHaveBeenCalled()
   })
 
-  it("looks the date up once and persists it", async () => {
+  it("looks the date up once and persists it with a guarded write", async () => {
     const { db, upsert } = fakeDb()
-    const fetchJoinedAt = vi.fn(async () => "2019-06-01T00:00:00.000Z")
-    const d = await captureDiscordJoinedAt("1", "d1", { db, fetchJoinedAt, now: () => NOW })
+    const lookup = vi.fn(async () => ({ status: "member" as const, joinedAt: "2019-06-01T00:00:00.000Z" }))
+    const d = await captureDiscordJoinedAt("1", "d1", { db, lookup, now: () => NOW })
     expect(d?.toISOString()).toBe("2019-06-01T00:00:00.000Z")
-    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({ create: expect.objectContaining({ memberId: "1", discordJoinedAt: d }) }))
+    const arg = upsert.mock.calls[0][0] as { where: { OR: unknown[] } }
+    expect(arg.where.OR).toEqual([{ discordJoinedAt: null }, { discordJoinedAt: { gt: d } }])
   })
 
-  it("does not retry a recent failed lookup, but does after the retry window", async () => {
+  it("stamps a definitive not-a-member, only guarded on an empty date", async () => {
+    const { db, upsert } = fakeDb()
+    await captureDiscordJoinedAt("1", "d1", { db, lookup: async () => ({ status: "not_member" }), now: () => NOW })
+    expect(upsert).toHaveBeenCalledWith({ where: { memberId: "1", discordJoinedAt: null }, data: { discordJoinedCheckedAt: NOW } })
+  })
+
+  it("writes nothing on an unknown result (429, 5xx, unconfigured) so it retries", async () => {
+    const { db, upsert } = fakeDb()
+    const d = await captureDiscordJoinedAt("1", "d1", { db, lookup: async () => ({ status: "unknown" }), now: () => NOW })
+    expect(d).toBeNull()
+    expect(upsert).not.toHaveBeenCalled()
+  })
+
+  it("does not retry a recent not-a-member, but does after the retry window", async () => {
     const recent = new Date(NOW.getTime() - 1000)
     const old = new Date(NOW.getTime() - JOIN_LOOKUP_RETRY_MS - 1000)
-    const fetchJoinedAt = vi.fn(async () => null)
-    await captureDiscordJoinedAt("1", "d1", { db: fakeDb({ extras: { discordJoinedAt: null, discordJoinedCheckedAt: recent } }).db, fetchJoinedAt, now: () => NOW })
-    expect(fetchJoinedAt).not.toHaveBeenCalled()
-    await captureDiscordJoinedAt("1", "d1", { db: fakeDb({ extras: { discordJoinedAt: null, discordJoinedCheckedAt: old } }).db, fetchJoinedAt, now: () => NOW })
-    expect(fetchJoinedAt).toHaveBeenCalledTimes(1)
+    const lookup = vi.fn(async () => ({ status: "not_member" as const }))
+    await captureDiscordJoinedAt("1", "d1", { db: fakeDb({ extras: { discordJoinedAt: null, discordJoinedCheckedAt: recent } }).db, lookup, now: () => NOW })
+    expect(lookup).not.toHaveBeenCalled()
+    await captureDiscordJoinedAt("1", "d1", { db: fakeDb({ extras: { discordJoinedAt: null, discordJoinedCheckedAt: old } }).db, lookup, now: () => NOW })
+    expect(lookup).toHaveBeenCalledTimes(1)
   })
 
-  it("survives a Discord error", async () => {
-    const { db } = fakeDb()
-    const d = await captureDiscordJoinedAt("1", "d1", { db, fetchJoinedAt: async () => { throw new Error("down") }, now: () => NOW })
+  it("survives a Discord error without writing", async () => {
+    const { db, upsert } = fakeDb()
+    const d = await captureDiscordJoinedAt("1", "d1", { db, lookup: async () => { throw new Error("down") }, now: () => NOW })
     expect(d).toBeNull()
+    expect(upsert).not.toHaveBeenCalled()
+  })
+})
+
+describe("monthPrecisionIso", () => {
+  it("drops the day and time", () => {
+    expect(monthPrecisionIso(new Date("2021-03-17T14:22:09Z"))).toBe("2021-03-01T00:00:00.000Z")
+    expect(monthPrecisionIso(null)).toBeNull()
   })
 })
 
@@ -103,9 +127,9 @@ describe("resolveMemberSince", () => {
 
   it("does not touch Discord or calls without a Discord id", async () => {
     const { db } = fakeDb({ member: new Date("2026-10-01T00:00:00Z") })
-    const fetchJoinedAt = vi.fn()
-    await resolveMemberSince("1", null, { db, fetchJoinedAt })
-    expect(fetchJoinedAt).not.toHaveBeenCalled()
+    const lookup = vi.fn()
+    await resolveMemberSince("1", null, { db, lookup })
+    expect(lookup).not.toHaveBeenCalled()
     expect(db.callAttendance.findFirst).not.toHaveBeenCalled()
   })
 })
