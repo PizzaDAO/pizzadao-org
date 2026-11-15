@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import {  } from "react";
 import SiteNav from "@/app/(marketing)/_site/components/SiteNav";
 import Footer from "@/app/(marketing)/_site/components/Footer";
@@ -89,14 +90,12 @@ const About = () => {
       <section className="relative overflow-hidden bg-ink text-cream">
         <figure className="relative">
           <div className="mk-grain relative overflow-hidden bg-ink">
-            <img
+            <Image priority sizes="100vw"
               src={HERO_PHOTO}
               alt="Volunteers carrying pizza boxes through a crowded street gathering"
-              loading="eager"
               decoding="async"
               width={2400}
               height={1500}
-              onError={(e) => { (e.currentTarget as HTMLImageElement).src = party; }}
               style={{ objectPosition: "50% 42%" }}
               className="block h-[88svh] min-h-[560px] w-full object-cover md:h-[100svh] md:min-h-[720px]"
             />
@@ -198,7 +197,7 @@ const About = () => {
               <figure className="relative mt-14 hidden w-full origin-top -rotate-[1.2deg] transition-transform duration-500 hover:rotate-0 hover:scale-[1.02] md:block">
                 <div className="mk-grain relative overflow-hidden bg-cream p-3 pb-10 shadow-[0_14px_36px_-14px_hsl(0_0%_0%/0.38),0_3px_8px_-3px_hsl(0_0%_0%/0.22)]">
                   <div className="aspect-[4/5] overflow-hidden bg-ink">
-                    <img
+                    <Image sizes="(min-width: 768px) 40vw, 80vw" width={1000} height={1250}
                       src={revealPhoto}
                       alt="Late-night gathering of the first PizzaDAO members, huddled around laptops and pizza"
                       loading="lazy"
@@ -288,14 +287,13 @@ const About = () => {
         {/* Full-bleed cinematic photograph */}
         <figure className="relative">
           <div className="mk-grain relative overflow-hidden bg-ink">
-            <img
+            <Image sizes="100vw"
               src={RITUAL_PHOTO}
               alt="Archival reference to a Bitcoin Pizza Day gathering"
               loading="lazy"
               decoding="async"
               width={2400}
               height={1400}
-              onError={(e) => { (e.currentTarget as HTMLImageElement).src = timeline2010; }}
               className="block aspect-[4/5] w-full object-cover opacity-90 sm:aspect-[3/2] md:aspect-[21/9]"
               style={{ objectPosition: "50% 45%" }}
             />
@@ -358,7 +356,7 @@ const About = () => {
                   style={{ animationDelay: `${i * 80}ms` }}
                 >
                   <div className="aspect-[4/5] overflow-hidden">
-                    <img
+                    <Image sizes="(min-width: 768px) 25vw, 50vw" width={800} height={1000}
                       src={p.src}
                       alt={`${p.city}, May 22`}
                       loading="lazy"
@@ -404,7 +402,7 @@ const About = () => {
                 style={{ boxShadow: "0 2px 6px -2px hsl(0 0% 0% / 0.25)" }}
               />
               <div className="relative overflow-hidden bg-ink">
-                <img
+                <Image sizes="(min-width: 768px) 40vw, 90vw" width={1200} height={900}
                   src={volcanoPizza}
                   alt="Pizza cooked on volcanic rock at Pacaya volcano, Guatemala"
                   loading="lazy"
@@ -545,7 +543,7 @@ const About = () => {
               <figure className="relative mx-auto w-[86%] origin-top -rotate-[2deg] transition-transform duration-500 hover:rotate-0 hover:scale-[1.01] md:mx-0 md:ml-auto md:w-full md:max-w-[420px]">
                 <div className="mk-grain relative overflow-hidden bg-cream p-3 pb-10 shadow-[0_18px_44px_-16px_hsl(0_0%_0%/0.38),0_4px_12px_-4px_hsl(0_0%_0%/0.22)]">
                   <div className="aspect-[4/5] overflow-hidden bg-ink">
-                    <img
+                    <Image sizes="(min-width: 768px) 40vw, 80vw" width={1000} height={1250}
                       src={THESIS_PHOTO}
                       alt="PizzaDAO members coordinating across cities - a quiet moment of global organization"
                       loading="lazy"
@@ -669,7 +667,7 @@ const About = () => {
                 aria-label="Watch the VICE Motherboard segment on PizzaDAO"
               >
                 <div className="relative aspect-[4/3] w-full overflow-hidden bg-ink ring-1 ring-cream/10 md:aspect-[5/4]">
-                  <img
+                  <Image sizes="(min-width: 1024px) 60vw, 100vw" width={1600} height={900}
                     src={VICE_STILL}
                     alt="Documentary still - a PizzaDAO gathering captured for VICE Motherboard"
                     loading="lazy"

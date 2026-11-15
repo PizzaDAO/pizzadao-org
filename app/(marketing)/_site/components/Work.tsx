@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 const party = "/marketing/assets/party.jpg";
 const hackathon = "/marketing/assets/hackathon.jpg";
 const pizzeria = "/marketing/assets/pizzeria.jpg";
@@ -131,7 +132,7 @@ const Work = () => {
                     }`}
                   >
                     <div className="mk-grain relative overflow-hidden rounded-2xl" data-benny="true">
-                      <img
+                      <Image sizes="(min-width: 768px) 50vw, 100vw"
                         src={p.img}
                         alt={p.imgAlt}
                         loading="lazy"

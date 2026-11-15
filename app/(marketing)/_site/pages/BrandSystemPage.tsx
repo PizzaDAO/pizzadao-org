@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import {  } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/app/(marketing)/_site/components/ui/tabs";
 import SiteNav from "@/app/(marketing)/_site/components/SiteNav";
@@ -356,7 +357,7 @@ const BrandSystemPage = () => {
               <div className="mt-6 grid grid-cols-12 gap-3 md:gap-4">
                 <figure className="col-span-12 overflow-hidden rounded-2xl border border-ink/15 bg-ink sm:col-span-6 lg:col-span-3">
                   <div className="relative aspect-[4/5]">
-                    <img src={wildPoster} alt="PizzaDAO dark logo on a wheatpasted street poster" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+                    <Image sizes="(min-width: 1024px) 25vw, 50vw" width={1000} height={1000} src={wildPoster} alt="PizzaDAO dark logo on a wheatpasted street poster" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
                   </div>
                   <figcaption className="flex items-center justify-between gap-3 border-t border-cream/15 bg-ink px-4 py-3">
                     <span className="ui text-[11px] font-semibold uppercase tracking-[0.18em] text-cream">Posters</span>
@@ -365,7 +366,7 @@ const BrandSystemPage = () => {
                 </figure>
                 <figure className="col-span-12 overflow-hidden rounded-2xl border border-ink/15 bg-ink sm:col-span-6 lg:col-span-3">
                   <div className="relative aspect-[4/5]">
-                    <img src={wildMerch} alt="PizzaDAO icon on merchandise, t-shirt and stickers" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+                    <Image sizes="(min-width: 1024px) 25vw, 50vw" width={1000} height={1000} src={wildMerch} alt="PizzaDAO icon on merchandise, t-shirt and stickers" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
                   </div>
                   <figcaption className="flex items-center justify-between gap-3 border-t border-cream/15 bg-ink px-4 py-3">
                     <span className="ui text-[11px] font-semibold uppercase tracking-[0.18em] text-cream">Merch</span>
@@ -374,7 +375,7 @@ const BrandSystemPage = () => {
                 </figure>
                 <figure className="col-span-12 overflow-hidden rounded-2xl border border-ink/15 bg-ink sm:col-span-6 lg:col-span-3">
                   <div className="relative aspect-[4/5]">
-                    <img src={wildEvent} alt="PizzaDAO light logo at a community party" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+                    <Image sizes="(min-width: 1024px) 25vw, 50vw" width={1000} height={1000} src={wildEvent} alt="PizzaDAO light logo at a community party" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
                   </div>
                   <figcaption className="flex items-center justify-between gap-3 border-t border-cream/15 bg-ink px-4 py-3">
                     <span className="ui text-[11px] font-semibold uppercase tracking-[0.18em] text-cream">Events</span>
@@ -383,7 +384,7 @@ const BrandSystemPage = () => {
                 </figure>
                 <figure className="col-span-12 overflow-hidden rounded-2xl border border-ink/15 bg-ink sm:col-span-6 lg:col-span-3">
                   <div className="relative aspect-[4/5]">
-                    <img src={wildTaxi} alt="PizzaDAO slice-shaped delivery car topper mounted on a car roof in Brooklyn" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+                    <Image sizes="(min-width: 1024px) 25vw, 50vw" width={1000} height={1000} src={wildTaxi} alt="PizzaDAO slice-shaped delivery car topper mounted on a car roof in Brooklyn" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
                   </div>
                   <figcaption className="flex items-center justify-between gap-3 border-t border-cream/15 bg-ink px-4 py-3">
                     <span className="ui text-[11px] font-semibold uppercase tracking-[0.18em] text-cream">Out in the Wild</span>
@@ -1180,7 +1181,7 @@ dont:  [all caps, corporate jargon]`}
 
             <div className="mt-8 grid grid-cols-12 gap-2 md:mt-10 md:gap-3">
               <figure className="relative col-span-12 overflow-hidden rounded-2xl bg-ink sm:col-span-6 lg:col-span-5 lg:row-span-2">
-                <img
+                <Image sizes="(min-width: 768px) 50vw, 100vw"
                   src={wildProjection}
                   alt="PizzaDAO Mafia characters projected on a giant LED wall above a crowd"
                   width={1920}
@@ -1194,7 +1195,7 @@ dont:  [all caps, corporate jargon]`}
               </figure>
 
               <figure className="relative col-span-12 overflow-hidden rounded-2xl bg-ink sm:col-span-6 lg:col-span-7">
-                <img
+                <Image sizes="(min-width: 768px) 50vw, 100vw"
                   src={wildBitcoin}
                   alt="‘Ten Thousand Bitcoin’ projected across a long event wall in warm orange"
                   width={1920}
@@ -1208,7 +1209,7 @@ dont:  [all caps, corporate jargon]`}
               </figure>
 
               <figure className="relative col-span-6 overflow-hidden rounded-2xl bg-ink lg:col-span-3">
-                <img
+                <Image sizes="(min-width: 768px) 50vw, 100vw"
                   src={wildBoxes}
                   alt="Custom PizzaDAO Global Pizza Party 2025 Los Angeles pizza boxes"
                   width={1200}
@@ -1222,7 +1223,7 @@ dont:  [all caps, corporate jargon]`}
               </figure>
 
               <figure className="tape-corner relative col-span-6 overflow-hidden rounded-2xl bg-ink lg:col-span-4">
-                <img
+                <Image sizes="(min-width: 768px) 50vw, 100vw"
                   src={wildTee}
                   alt="Community member holding a PizzaDAO NYC Bazaar t-shirt"
                   width={1200}
@@ -1236,7 +1237,7 @@ dont:  [all caps, corporate jargon]`}
               </figure>
 
               <figure className="relative col-span-12 overflow-hidden rounded-2xl bg-ink lg:col-span-7">
-                <img
+                <Image sizes="(min-width: 768px) 50vw, 100vw"
                   src={wildArrow}
                   alt="A PizzaDAO ‘Free Pizza!’ giant arrow sign carried across a venue stage"
                   width={1500}
@@ -1287,7 +1288,7 @@ dont:  [all caps, corporate jargon]`}
                 { src: "https://pizzadao.github.io/pizzadao-brand-kit/gifs/gif5.gif", code: "MO.05", span: "col-span-6 md:col-span-6", aspect: "aspect-[4/3]" },
               ].map((g) => (
                 <figure key={g.code} className={`group relative overflow-hidden rounded-3xl border border-cream/15 bg-cream/5 ${g.span}`}>
-                  <img
+                  <Image sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw" width={1200} height={900}
                     src={g.src}
                     alt={`PizzaDAO animated brand asset ${g.code}`}
                     loading="lazy"
@@ -1392,7 +1393,7 @@ dont:  [all caps, corporate jargon]`}
                 ].map((f) => (
                   <figure key={f.title} className="crop-marks relative rounded-3xl bg-cream shadow-sm">
                     <div className="aspect-square overflow-hidden rounded-t-3xl">
-                      <img
+                      <Image sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw" width={1200} height={900}
                         src={f.src}
                         alt={`${f.title}, PizzaDAO party flyer from ${f.city}`}
                         loading="lazy"
@@ -1610,7 +1611,7 @@ dont:  [all caps, corporate jargon]`}
                 </div>
                 <div className="col-span-12 md:col-span-7 space-y-5">
                   <div className="overflow-hidden rounded-2xl border border-ink/15">
-                    <img
+                    <Image sizes="(min-width: 768px) 50vw, 100vw" width={1600} height={1000}
                       src={moltoBennyPrintRun}
                       alt="Box of freshly printed Molto Benny stickers"
                       loading="lazy"
