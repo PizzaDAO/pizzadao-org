@@ -515,7 +515,8 @@ export async function getCrewMappings(forceRefresh = false): Promise<{ crews: Cr
 
   if (!forceRefresh) {
     const cached = await cacheGet<{ crews: CrewOption[] }>(cacheKey);
-    if (cached) {
+    // A cached value in another shape (e.g. written by a preview deployment sharing this cache) is a miss.
+    if (cached && Array.isArray(cached.crews)) {
       return { ...cached, cached: true };
     }
   }
