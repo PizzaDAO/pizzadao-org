@@ -7,6 +7,7 @@ import { prisma } from '@/app/lib/db'
 import { loadSettings } from '@/app/lib/settings'
 import { toggleEnabled } from '@/app/lib/settings/toggles'
 import { payBonusRewards } from '@/app/lib/missions'
+import { clearReviewNotifications } from '@/app/lib/review-notifications'
 
 export type RewardOutcome = 'dry_run' | 'no_mission' | 'mission_unusable' | 'already_done' | 'granted'
 
@@ -47,11 +48,14 @@ export async function rewardBuddy(pair: { pairId: string; buddyDiscordId: string
     reviewNote: 'Buddy completed',
     holdReason: null,
   }
-  await prisma.missionCompletion.upsert({
+  const row = await prisma.missionCompletion.upsert({
     where: { missionId_discordId: { missionId, discordId: pair.buddyDiscordId } },
     create: { missionId, discordId: pair.buddyDiscordId, ...approved },
     update: approved,
+    select: { id: true },
   })
+  // A manual submission that was still PENDING just got approved: settle the reviewers' pings (fail-soft).
+  await clearReviewNotifications(row.id)
   await payBonusRewards(pair.buddyDiscordId)
   await log('reward_granted', { missionId })
   return 'granted'

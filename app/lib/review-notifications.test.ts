@@ -32,6 +32,22 @@ beforeEach(() => {
 })
 
 describe('notifyReviewers metadata', () => {
+  beforeEach(() => {
+    mockFn(prisma.missionCompletion.findUnique).mockResolvedValue({ status: 'PENDING' })
+  })
+
+  it('skips the pings when the completion already left PENDING (verifier won the race)', async () => {
+    mockFn(prisma.missionCompletion.findUnique).mockResolvedValue({ status: 'APPROVED' })
+    await notifyReviewers('sub-1', 'Join Pepperoni Mafia', 3, undefined, { completionId: 42, missionId: 7 })
+    expect(createNotification).not.toHaveBeenCalled()
+  })
+
+  it('skips the pings when the completion is gone', async () => {
+    mockFn(prisma.missionCompletion.findUnique).mockResolvedValue(null)
+    await notifyReviewers('sub-1', 'Join Pepperoni Mafia', 3, undefined, { completionId: 42, missionId: 7 })
+    expect(createNotification).not.toHaveBeenCalled()
+  })
+
   it('carries completionId + missionId and links to the missions page', async () => {
     await notifyReviewers('sub-1', 'Join Pepperoni Mafia', 3, undefined, { completionId: 42, missionId: 7 })
     const calls = mockFn(createNotification).mock.calls.map(([a]) => a)

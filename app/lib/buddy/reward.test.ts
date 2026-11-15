@@ -10,12 +10,14 @@ const m = vi.hoisted(() => ({
   toggle: vi.fn(),
   missionId: { value: 7 },
   pay: vi.fn(),
+  clear: vi.fn(),
 }))
 
 vi.mock('@/app/lib/db', () => ({ prisma: m.prisma }))
 vi.mock('@/app/lib/settings/toggles', () => ({ toggleEnabled: m.toggle }))
 vi.mock('@/app/lib/settings', () => ({ loadSettings: async () => ({ get: () => m.missionId.value }) }))
 vi.mock('@/app/lib/missions', () => ({ payBonusRewards: m.pay }))
+vi.mock('@/app/lib/review-notifications', () => ({ clearReviewNotifications: m.clear }))
 
 import { rewardBuddy } from './reward'
 
@@ -28,6 +30,7 @@ beforeEach(() => {
   m.toggle.mockResolvedValue(true)
   m.prisma.mission.findUnique.mockResolvedValue({ id: 7, isActive: true, bonus: true })
   m.prisma.missionCompletion.findUnique.mockResolvedValue(null)
+  m.prisma.missionCompletion.upsert.mockResolvedValue({ id: 99 })
 })
 
 describe('rewardBuddy', () => {
@@ -42,6 +45,7 @@ describe('rewardBuddy', () => {
     expect(await rewardBuddy(pair)).toBe('granted')
     expect(m.prisma.missionCompletion.upsert.mock.calls[0][0].create).toMatchObject({ missionId: 7, discordId: '222222', status: 'APPROVED' })
     expect(m.pay).toHaveBeenCalledWith('222222')
+    expect(m.clear).toHaveBeenCalledWith(99) // a PENDING manual submission's review pings are settled
     expect(kinds()).toEqual(['reward_granted'])
   })
   it('skips without a usable mission or when already done', async () => {
