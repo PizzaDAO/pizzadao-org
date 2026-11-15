@@ -1771,6 +1771,49 @@ describe('live call view heartbeat', () => {
       }
     })
 
+    it('a lost voice connection (disconnected) also keeps the page live', async () => {
+      const { w, bodies, flush, pass } = setup()
+      await begin(w)
+      await w.rec.stop('disconnected')
+      await flush()
+      await pass(60_000)
+      expect(bodies().some((b) => b.ended)).toBe(false)
+      expect(bodies().at(-1)?.recording).toBe(false)
+      expect(w.rec.liveAfterRecording()).toHaveLength(1)
+    })
+
+    it('ends when the channel is no longer recordable', async () => {
+      const { w, bodies, flush } = setup()
+      const e = ev({ scheduledStartMs: Date.now() })
+      await begin(w, e)
+      await w.rec.stop('max-duration')
+      await flush()
+      ;(w.cfg as unknown as { callChannelId: string }).callChannelId = '999999999999999999' // CHANNEL drops off the allowlist
+      await w.rec.checkSchedule([e])
+      expect(bodies().at(-1)?.ended).toBe(true)
+      expect(w.rec.liveAfterRecording()).toEqual([])
+    })
+
+    it('an occurrence never seen live cannot end it; an edited start time does not end it', async () => {
+      const a = setup()
+      const e = ev({ scheduledStartMs: Date.now() })
+      await begin(a.w, e) // the only check saw it before the session existed
+      await a.w.rec.stop('max-duration')
+      await a.flush()
+      await a.w.rec.checkSchedule([{ ...e, status: EventStatus.Completed }])
+      expect(a.bodies().some((b) => b.ended)).toBe(false)
+      expect(a.w.rec.liveAfterRecording()).toHaveLength(1)
+      const b = setup()
+      await begin(b.w, e)
+      await b.w.rec.checkSchedule([e])
+      await b.w.rec.stop('max-duration')
+      await b.flush()
+      await b.w.rec.checkSchedule([{ ...e, scheduledStartMs: e.scheduledStartMs! + 20 * 60_000 }])
+      await b.w.rec.checkSchedule([{ ...e, status: EventStatus.Scheduled, scheduledStartMs: e.scheduledStartMs! + 2 * 3_600_000 }])
+      expect(b.bodies().some((x) => x.ended)).toBe(false)
+      expect(b.w.rec.liveAfterRecording()).toHaveLength(1)
+    })
+
     it('a new recording in the channel ends it; shutdown ends it', async () => {
       const a = setup()
       await begin(a.w, ev({ name: 'Ops call' })) // not capped: the next call may start in the channel
@@ -1845,6 +1888,58 @@ describe('live call view heartbeat', () => {
         await flush()
         expect(played()).toBe(0)
         await w.rec.checkSchedule([{ ...e, status: EventStatus.Completed }])
+        await vi.waitFor(() => expect(played()).toBe(1))
+      })
+
+      it('rolling on to the next occurrence plays it; canceled or deleted ends the page without a song', async () => {
+        const run = async (next: EventInfo[]) => {
+          const { w, flush, bodies } = setup({}, song)
+          ;(w.cfg as unknown as { pizzaRadio: unknown }).pizzaRadio = radio
+          const e = ev({ scheduledStartMs: Date.now() })
+          await begin(w, e)
+          await w.rec.checkSchedule([e])
+          await w.rec.stop('max-duration')
+          await flush()
+          await w.rec.checkSchedule(next.map((x) => ({ ...e, ...x })))
+          expect(bodies().at(-1)?.ended).toBe(true)
+          await vi.advanceTimersByTimeAsync(0)
+        }
+        await run([{ ...ev(), status: EventStatus.Canceled }])
+        await run([])
+        expect(played()).toBe(0)
+        await run([{ ...ev(), status: EventStatus.Scheduled, scheduledStartMs: Date.now() + 7 * 86_400_000 }])
+        await vi.waitFor(() => expect(played()).toBe(1))
+      })
+
+      it('needs calls.endSongMinHumans people, at the scheduled end and when the event ends', async () => {
+        const few = { ...song, endSong: { ...song.endSong, minHumans: 3 } }
+        const a = setup({}, few)
+        ;(a.w.cfg as unknown as { pizzaRadio: unknown }).pizzaRadio = radio
+        await begin(a.w, ev({ scheduledStartMs: Date.now(), scheduledEndMs: Date.now() + 60 * 60_000 }))
+        await a.w.rec.stop('max-duration')
+        await a.flush()
+        await a.pass(61 * 60_000) // one person here
+        expect(played()).toBe(0)
+        const b = setup({}, few)
+        ;(b.w.cfg as unknown as { pizzaRadio: unknown }).pizzaRadio = radio
+        const e = ev({ scheduledStartMs: Date.now() })
+        await begin(b.w, e)
+        await b.w.rec.checkSchedule([e])
+        await b.w.rec.stop('max-duration')
+        await b.flush()
+        await b.w.rec.checkSchedule([{ ...e, status: EventStatus.Completed }])
+        expect(b.bodies().at(-1)?.ended).toBe(true)
+        await vi.advanceTimersByTimeAsync(0)
+        expect(played()).toBe(0)
+        const c = setup({}, few)
+        ;(c.w.cfg as unknown as { pizzaRadio: unknown }).pizzaRadio = radio
+        const e2 = ev({ scheduledStartMs: Date.now() })
+        await begin(c.w, e2)
+        await c.w.rec.checkSchedule([e2])
+        await c.w.rec.stop('max-duration')
+        await c.flush()
+        withHumans(c.w, 3)
+        await c.w.rec.checkSchedule([{ ...e2, status: EventStatus.Completed }])
         await vi.waitFor(() => expect(played()).toBe(1))
       })
     })

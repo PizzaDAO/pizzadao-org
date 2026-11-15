@@ -39,7 +39,7 @@ import type { SessionMeta } from './types.js'
 import { LiveItems, postLive, type LiveRequest } from './live-items.js'
 import { PlayOutListener, postPlayOut, type PlayOutAnswer } from './play-out.js'
 import { LiveStatePusher, postLiveState, type LiveStateBody, type PostResult } from './live-state.js'
-import { AfterRecordingTracker, liveContinuesAfter, occurrenceLive, type AfterRecordingEnd } from './after-recording.js'
+import { AfterRecordingTracker, liveContinuesAfter, occurrenceLive, occurrenceState, type AfterRecordingEnd } from './after-recording.js'
 
 const TICK_MS = 10_000
 const REMINDER_AFTER_MS = 5 * 60_000
@@ -1147,10 +1147,15 @@ export class CallRecorder {
     const cur = this.current
     if (cur && !cur.stopping && occurrenceLive(liveEvents, cur.meta.eventId, cur.eventStartMs)) cur.eventSeenLive = true
     for (const a of [...this.after.values()]) {
-      if (!this.allowedNow().has(a.channelId)) await this.endAfter(a, 'channel-disallowed')
-      else if (occurrenceLive(liveEvents, a.eventId, a.eventStartMs)) a.eventSeenLive = true
+      if (!this.allowedNow().has(a.channelId)) {
+        await this.endAfter(a, 'channel-disallowed')
+        continue
+      }
+      const state = occurrenceState(liveEvents, a.eventId, a.eventStartMs)
+      if (state === 'live') a.eventSeenLive = true
       // Only an occurrence once seen live can be seen to end (one started from slot memory is already gone).
-      else if (a.eventSeenLive) await this.endAfter(a, 'event-ended')
+      // Completed or rolled on: the call ended (song). Canceled or deleted: the call is off (no song).
+      else if (a.eventSeenLive) await this.endAfter(a, state === 'completed' || state === 'rolled' ? 'event-ended' : 'event-canceled')
     }
   }
 

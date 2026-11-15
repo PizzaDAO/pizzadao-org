@@ -7,8 +7,8 @@
  * It ends (ended=true) when, whichever comes first:
  *   - the channel has had no humans for emptyGraceMs (calls.liveAfterRecordingEmptySeconds)
  *   - capMs since the recording started (calls.liveMaxHours)
- *   - the Discord event occurrence, once seen live, is no longer (completed, canceled, rolled to the next
- *     occurrence, or deleted)
+ *   - the Discord event occurrence, once seen live, is no longer (completed or rolled on to the next
+ *     occurrence: the end song may play; canceled or deleted: no song)
  *   - a new recording starts in that channel, the channel is no longer recordable, or the recorder shuts down
  *
  * Pure: no timers, no Discord.
@@ -27,7 +27,7 @@ export function liveContinuesAfter(reason: StopReason): boolean {
   return (LIVE_CONTINUES_REASONS as readonly string[]).includes(reason)
 }
 
-export type AfterRecordingEnd = 'empty' | 'cap' | 'event-ended' | 'superseded' | 'shutdown' | 'channel-disallowed'
+export type AfterRecordingEnd = 'empty' | 'cap' | 'event-ended' | 'event-canceled' | 'superseded' | 'shutdown' | 'channel-disallowed'
 
 export interface AfterRecordingLimits {
   emptyGraceMs: number
@@ -57,16 +57,32 @@ export class AfterRecordingTracker {
   }
 }
 
+/** Without a known recurrence interval, a start moved later by at least this much is the next occurrence. */
+export const ROLL_ON_MIN_MS = 12 * 3_600_000
+
 /**
- * True while Discord lists the occurrence as scheduled or active (same id and, when known, the same
- * scheduled start: a recurring event that ended rolls on to its next start).
+ * What Discord says about the recorded occurrence now. Matched by event id (Discord gives recurring events no
+ * occurrence id): an edited start time is still the same occurrence; only a jump to a later start of at least
+ * half the recurrence interval (else ROLL_ON_MIN_MS) while SCHEDULED counts as rolling on to the next one.
+ *   live: scheduled or active; completed / rolled: the call ended (the end song may play);
+ *   canceled / gone (deleted): the call is off (no song).
  */
-export function occurrenceLive(events: readonly EventInfo[], eventId: string | null, scheduledStartMs: number | null): boolean {
-  if (!eventId) return false
-  return events.some(
-    (e) =>
-      e.id === eventId &&
-      (scheduledStartMs === null || e.scheduledStartMs === scheduledStartMs) &&
-      (e.status === EventStatus.Scheduled || e.status === EventStatus.Active),
-  )
+export type OccurrenceState = 'live' | 'completed' | 'rolled' | 'canceled' | 'gone'
+
+export function occurrenceState(events: readonly EventInfo[], eventId: string | null, recordedStartMs: number | null): OccurrenceState {
+  const e = eventId ? events.find((x) => x.id === eventId) : undefined
+  if (!e) return 'gone'
+  if (e.status === EventStatus.Completed) return 'completed'
+  if (e.status === EventStatus.Canceled) return 'canceled'
+  if (e.status === EventStatus.Scheduled && recordedStartMs !== null && e.scheduledStartMs !== null) {
+    const interval = e.recurrenceIntervalMs
+    const minJump = interval && interval > 0 ? interval / 2 : ROLL_ON_MIN_MS
+    if (e.scheduledStartMs - recordedStartMs >= minJump) return 'rolled'
+  }
+  return e.status === EventStatus.Scheduled || e.status === EventStatus.Active ? 'live' : 'gone'
+}
+
+/** True while the occurrence is scheduled or active. */
+export function occurrenceLive(events: readonly EventInfo[], eventId: string | null, recordedStartMs: number | null): boolean {
+  return occurrenceState(events, eventId, recordedStartMs) === 'live'
 }

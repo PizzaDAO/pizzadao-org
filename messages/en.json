@@ -1069,7 +1069,7 @@
       "title": "Live call",
       "backToCalls": "Back to calls",
       "noCallTitle": "No call is live right now",
-      "noCallBody": "This page comes alive while a crew call is being recorded. Check the schedule for the next one, or read a past call.",
+      "noCallBody": "This page comes alive while a crew call is live. Check the schedule for the next one, or read a past call.",
       "scheduleLink": "See the call schedule",
       "recordingsLink": "Read past calls",
       "liveBadge": "Live",

@@ -14,7 +14,9 @@ export const MARKER_KEEP_MS = 3 * 86_400_000
 
 /**
  * Stop reasons that mean "the call is over and people may still be here". Not max-duration: that is the
- * recording cap, the call itself may carry on. The other trigger is the scheduled end passing (recorder.ts).
+ * recording cap, the call itself may carry on. No code produces event-ended today (an event's status never
+ * stops a recording). The other triggers are the scheduled end passing, and, after a recording stopped at its
+ * limit, the occurrence completing or rolling on (recorder.ts, after-recording.ts).
  */
 export const END_SONG_STOP_REASONS = ['event-ended'] as const
 

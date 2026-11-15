@@ -1069,7 +1069,7 @@
       "title": "Llamada en vivo",
       "backToCalls": "Volver a las llamadas",
       "noCallTitle": "No hay ninguna llamada en vivo ahora",
-      "noCallBody": "Esta página cobra vida mientras se graba una llamada de crew. Mira el calendario para la próxima, o lee una llamada pasada.",
+      "noCallBody": "Esta página cobra vida mientras una llamada de crew está en vivo. Mira el calendario para la próxima, o lee una llamada pasada.",
       "scheduleLink": "Ver el calendario de llamadas",
       "recordingsLink": "Leer llamadas pasadas",
       "liveBadge": "En vivo",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AfterRecordingTracker, liveContinuesAfter, occurrenceLive } from './after-recording.js'
+import { AfterRecordingTracker, liveContinuesAfter, occurrenceLive, occurrenceState } from './after-recording.js'
 import { EventStatus, type EventInfo } from './event-lifecycle.js'
 
 describe('liveContinuesAfter', () => {
@@ -53,5 +53,24 @@ describe('occurrenceLive', () => {
     expect(occurrenceLive([e({ status: EventStatus.Scheduled, scheduledStartMs: 500 + 7 * 86_400_000 })], '1', 500)).toBe(false)
     expect(occurrenceLive([], '1', 500)).toBe(false)
     expect(occurrenceLive([e()], null, 500)).toBe(false)
+  })
+})
+
+describe('occurrenceState', () => {
+  const e = (over: Partial<EventInfo> = {}): EventInfo => ({ id: '1', name: 'Call', channelId: '2', status: EventStatus.Active, scheduledStartMs: 500, ...over })
+  const DAY = 86_400_000
+  it('completed and rolled on are a real end; canceled and deleted are not', () => {
+    expect(occurrenceState([e({ status: EventStatus.Completed })], '1', 500)).toBe('completed')
+    expect(occurrenceState([e({ status: EventStatus.Scheduled, scheduledStartMs: 500 + 7 * DAY })], '1', 500)).toBe('rolled')
+    expect(occurrenceState([e({ status: EventStatus.Scheduled, scheduledStartMs: 500 + 7 * DAY, recurrenceIntervalMs: 7 * DAY })], '1', 500)).toBe('rolled')
+    expect(occurrenceState([e({ status: EventStatus.Canceled })], '1', 500)).toBe('canceled')
+    expect(occurrenceState([e({ id: '9' })], '1', 500)).toBe('gone')
+  })
+  it('an edited start time is still the same occurrence', () => {
+    expect(occurrenceState([e({ scheduledStartMs: 500 + 30 * 60_000 })], '1', 500)).toBe('live')
+    expect(occurrenceState([e({ status: EventStatus.Active, scheduledStartMs: 500 + 2 * DAY })], '1', 500)).toBe('live')
+    expect(occurrenceState([e({ status: EventStatus.Scheduled, scheduledStartMs: 500 + 3 * 3_600_000 })], '1', 500)).toBe('live')
+    expect(occurrenceState([e({ status: EventStatus.Scheduled, scheduledStartMs: 500 + 2 * DAY, recurrenceIntervalMs: 7 * DAY })], '1', 500)).toBe('live')
+    expect(occurrenceState([e({ status: EventStatus.Scheduled, scheduledStartMs: 500 - 3_600_000 })], '1', 500)).toBe('live')
   })
 })
