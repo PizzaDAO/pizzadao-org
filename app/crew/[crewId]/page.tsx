@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import CrewPageClient from './CrewPageClient'
 import { getCrewMappings } from '@/app/lib/crew-mappings'
+import { loadSwitches } from '@/app/lib/features/service'
 
 type Props = { params: Promise<{ crewId: string }> }
 
@@ -48,8 +49,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
+/** Whether this crew's page links to the public features catalog (features.crewId). Fails closed. */
+async function linksFeatures(crewId: string): Promise<boolean> {
+  try {
+    const s = await loadSwitches()
+    return s.publicEnabled && !!s.crewId && s.crewId.toLowerCase() === crewId.toLowerCase()
+  } catch {
+    return false
+  }
+}
+
 export default async function CrewPage({ params }: Props) {
   // Pass the params Promise straight through; the client component already
   // handles unwrapping via React.use().
-  return <CrewPageClient params={params} />
+  const { crewId } = await params
+  return <CrewPageClient params={params} featuresLink={await linksFeatures(crewId)} />
 }

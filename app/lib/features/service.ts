@@ -19,6 +19,7 @@ export interface CatalogSwitches {
   showOps: boolean
   introText: string
   contributeUrl: string
+  crewId: string
   githubCacheMinutes: number
 }
 
@@ -31,6 +32,7 @@ export async function loadSwitches(): Promise<CatalogSwitches> {
     showOps: resolveToggle('features.showOps', s),
     introText: s.get('features.introText'),
     contributeUrl: s.get('features.contributeUrl'),
+    crewId: s.get('features.crewId'),
     githubCacheMinutes: s.get('features.githubCacheMinutes'),
   }
 }

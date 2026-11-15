@@ -70,6 +70,17 @@ const contributeUrl: SettingDef<string> = {
   input: { type: 'url', maxLength: 300 },
 }
 
+const crewId: SettingDef<string> = {
+  key: 'features.crewId',
+  area: 'features',
+  label: 'Crew page that links to it',
+  help: 'Crew id (for example tech) whose crew page shows a "What we have built" link to /features. Empty: no crew page links to it. Does nothing while the page itself is off.',
+  schema: z.string().trim().max(40),
+  default: '',
+  onReadFailure: { value: '' },
+  input: { type: 'text', maxLength: 40 },
+}
+
 const githubCacheMinutes: SettingDef<number> = {
   key: 'features.githubCacheMinutes',
   area: 'features',
@@ -88,5 +99,6 @@ export const FEATURES_SETTINGS = {
   'features.showOps': showOps,
   'features.introText': introText,
   'features.contributeUrl': contributeUrl,
+  'features.crewId': crewId,
   'features.githubCacheMinutes': githubCacheMinutes,
 } as const satisfies Record<string, SettingDef>
