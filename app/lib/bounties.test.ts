@@ -3,6 +3,7 @@ import { createBounty, claimBounty, completeBounty, cancelBounty } from './bount
 import { prisma } from './db'
 
 vi.mock('./db')
+vi.mock('./action-notifications', () => ({ clearBountySubmittedNotifications: vi.fn().mockResolvedValue(0) }))
 // Real debitInTx / creditInTx (so the tests see the wallet + ledger writes);
 // only the wallet-row bootstrap is mocked.
 vi.mock('./economy', async (importOriginal) => ({

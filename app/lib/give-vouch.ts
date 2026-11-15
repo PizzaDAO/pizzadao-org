@@ -18,6 +18,7 @@ import { addVouch, notifyVouchAdded } from '@/app/lib/vouches'
 import { fetchMemberById } from '@/app/lib/sheets/member-repository'
 import { findMemberByDiscordId } from '@/app/lib/member-utils'
 import { emitMissionEvent } from '@/app/lib/mission-verify/events'
+import { clearVouchRequestNotification } from '@/app/lib/action-notifications'
 import { getSetting } from '@/app/lib/settings'
 
 export const DAY_MS = 24 * 60 * 60 * 1000
@@ -37,6 +38,8 @@ export interface GiveVouchDeps {
   dailyLimit: () => Promise<number>
   create: (followerId: string, followeeId: string) => Promise<unknown>
   emit: (discordId: string, event: 'vouch_created' | 'vouch_received', memberId: string) => Promise<unknown>
+  /** Mark the voucher's own "vouch for me" request from the target read (fail-soft). */
+  clearRequest: (voucherDiscordId: string, targetMemberId: string) => Promise<unknown>
   notify: (targetMemberId: string, voucherName: string, voucherMemberId: string, targetDiscordId: string) => Promise<unknown>
   now: () => Date
 }
@@ -49,6 +52,7 @@ export const defaultGiveVouchDeps: GiveVouchDeps = {
   dailyLimit: () => getSetting('vouches.dailyLimit'),
   create: (followerId, followeeId) => addVouch(followerId, followeeId),
   emit: (discordId, event, memberId) => emitMissionEvent(discordId, event, { memberId }),
+  clearRequest: clearVouchRequestNotification,
   notify: notifyVouchAdded,
   now: () => new Date(),
 }
@@ -86,6 +90,7 @@ export async function giveVouch(
     throw err
   }
 
+  defer(() => deps.clearRequest(input.voucherDiscordId, input.targetMemberId))
   const targetDiscordId = String(target['discordId'] ?? '').trim()
   // L5.2 "Vouch for another member" for the voucher; L4.2 "Get vouched by a member" for the target.
   defer(() => deps.emit(input.voucherDiscordId, 'vouch_created', voucher.memberId))

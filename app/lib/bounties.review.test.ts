@@ -18,6 +18,7 @@ vi.mock('./notifications', () => ({
   notifyBountyRejected: vi.fn().mockResolvedValue(undefined),
   notifyBountyCancelled: vi.fn().mockResolvedValue(undefined),
 }))
+vi.mock('./action-notifications', () => ({ clearBountySubmittedNotifications: vi.fn().mockResolvedValue(1) }))
 vi.mock('./transactions', () => ({ logTransaction: vi.fn().mockResolvedValue({}) }))
 vi.mock('./crew-mappings', () => ({ getCrewMappings: vi.fn() }))
 vi.mock('./crew-sheet', () => ({ CREW_SHEET_REVALIDATE_SECONDS: 60, fetchCrewRoster: vi.fn() }))
@@ -26,6 +27,7 @@ vi.mock('./auth-guards', () => ({ isAdminDiscordId: vi.fn() }))
 
 import { getOrCreateEconomy } from './economy'
 import { logTransaction } from './transactions'
+import { clearBountySubmittedNotifications } from './action-notifications'
 import { getCrewMappings } from './crew-mappings'
 import { fetchCrewRoster } from './crew-sheet'
 import { findMemberIdByDiscordId } from './member-utils'
@@ -158,6 +160,7 @@ describe('rejectBounty', () => {
     expect(prisma.economy.update).not.toHaveBeenCalled()
     expect(prisma.economy.updateMany).not.toHaveBeenCalled()
     expect(logTransaction).not.toHaveBeenCalled()
+    expect(clearBountySubmittedNotifications).toHaveBeenCalledWith(10)
   })
 
   it('the claimer cannot reject their own submission, even as a lead or admin', async () => {
@@ -232,6 +235,14 @@ describe('completeBounty (approve)', () => {
       approvedBy: LEAD,
     })
     expect(notifyBountyCompleted).toHaveBeenCalledWith(CLAIMER, LEAD, 10, 'Fix the bug', 100, 'ops', POSTER)
+    expect(clearBountySubmittedNotifications).toHaveBeenCalledWith(10)
+  })
+
+  it('a lost race clears nothing', async () => {
+    mockFn(prisma.bounty.findUnique).mockResolvedValue(BASE)
+    mockFn(prisma.bounty.updateMany).mockResolvedValue({ count: 0 })
+    await expect(completeBounty(LEAD, 10)).rejects.toThrow()
+    expect(clearBountySubmittedNotifications).not.toHaveBeenCalled()
   })
 
   it('a lead or admin cannot approve a CLAIMED bounty (poster legacy path only); the poster still can', async () => {
@@ -318,6 +329,7 @@ describe('cancelBounty', () => {
     })
     expect(prisma.economy.update).toHaveBeenCalledWith({ where: { id: POSTER }, data: { wallet: { increment: 100 } } })
     expect(notifyBountyCancelled).toHaveBeenCalledWith(CLAIMER, LEAD, 10, 'Fix the bug', 'ops')
+    expect(clearBountySubmittedNotifications).toHaveBeenCalledWith(10)
     expect(logTransaction).toHaveBeenCalledTimes(1)
     expect(logTransaction).toHaveBeenCalledWith(prisma, POSTER, 'BOUNTY_REFUND', 100, expect.any(String), {
       bountyId: 10,
@@ -366,5 +378,13 @@ describe('giveUpBounty', () => {
       },
     })
     expect(res.status).toBe('OPEN')
+    expect(clearBountySubmittedNotifications).toHaveBeenCalledWith(10)
+  })
+
+  it('from CLAIMED there was no submission notification to clear', async () => {
+    mockFn(prisma.bounty.findUnique).mockResolvedValue({ ...BASE, status: 'CLAIMED' })
+    mockFn(prisma.bounty.updateMany).mockResolvedValue({ count: 1 })
+    await giveUpBounty(CLAIMER, 10)
+    expect(clearBountySubmittedNotifications).not.toHaveBeenCalled()
   })
 })

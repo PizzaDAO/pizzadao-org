@@ -9,6 +9,7 @@ import {
   notifyBountyRejected,
   notifyBountyCancelled,
 } from './notifications'
+import { clearBountySubmittedNotifications } from './action-notifications'
 import { canManageBounty } from './crew-leads'
 import { getCrewMappings } from './crew-mappings'
 import { CREW_ID_PATTERN, normalizeCrewId } from './crew-id'
@@ -233,6 +234,7 @@ export async function giveUpBounty(userId: string, bountyId: number) {
   if (released.count !== 1) {
     throw new ConflictError('Bounty is not in claimed status')
   }
+  if (bounty.status === 'SUBMITTED') await clearBountySubmittedNotifications(bountyId)
 
   return { ...bounty, claimedBy: null, status: 'OPEN' as const }
 }
@@ -355,6 +357,7 @@ export async function rejectBounty(reviewerId: string, bountyId: number, note: s
     throw new ConflictError('Bounty has no submission to reject')
   }
 
+  await clearBountySubmittedNotifications(bountyId)
   notifyBountyRejected(claimerId, reviewerId, bountyId, bounty.description, trimmedNote, bounty.crewId).catch(() => {})
 
   return { ...bounty, status: 'CLAIMED' as const, reviewNote: trimmedNote, reviewedBy: reviewerId }
@@ -426,6 +429,7 @@ export async function completeBounty(approverId: string, bountyId: number) {
     })
   })
 
+  await clearBountySubmittedNotifications(bountyId)
   // Notify the claimer (and the poster if someone else approved); fire and forget
   notifyBountyCompleted(
     claimerId, approverId, bountyId, bounty.description, bounty.reward, bounty.crewId, bounty.createdBy
@@ -484,6 +488,7 @@ export async function cancelBounty(actorId: string, bountyId: number) {
     })
   })
 
+  await clearBountySubmittedNotifications(bountyId)
   if (bounty.claimedBy) {
     notifyBountyCancelled(bounty.claimedBy, actorId, bountyId, bounty.description, bounty.crewId).catch(() => {})
   }
