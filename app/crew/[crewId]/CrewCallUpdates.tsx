@@ -15,7 +15,7 @@ const small: CSSProperties = { padding: '6px 12px', fontSize: 13, minHeight: 36 
 const muted: CSSProperties = { fontSize: 13, color: 'hsl(var(--muted-foreground))' }
 const field: CSSProperties = { display: 'grid', gap: 4, fontSize: 12, fontWeight: 600, color: 'hsl(var(--muted-foreground))' }
 
-type EditFields = { label: string; stage: string; priority: string; due: string; leadName: string }
+type EditFields = { label: string; stage: string; priority: string; due: string; leadName: string; crewId: string }
 type Edit = EditFields & { orig: EditFields }
 
 const show = (v: unknown) => (v === null || v === undefined || v === '' ? '' : String(v))
@@ -33,6 +33,24 @@ export function CrewCallUpdates({ crewId, recordingId, showEmpty = false, onAppl
   const [confirmForce, setConfirmForce] = useState<Set<string>>(new Set())
   const [picked, setPicked] = useState<Record<string, string>>({})
   const [retired, setRetired] = useState<ProposalView[]>([])
+  // Real crews (the API leaves out the Community Call), for new tasks routed from a community call.
+  const [crews, setCrews] = useState<Array<{ id: string; label: string }>>([])
+  const needsCrews = !!rows?.some((r) => r.routable || r.fromCrewId)
+
+  useEffect(() => {
+    if (!needsCrews || crews.length > 0) return
+    let alive = true
+    fetch('/api/crew-mappings')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { crews?: Array<{ id: string; label: string }> } | null) => {
+        if (alive && Array.isArray(d?.crews)) setCrews(d.crews.map((c) => ({ id: c.id, label: c.label })))
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [needsCrews, crews.length])
+  const crewName = (id: string | null) => (id ? (crews.find((c) => c.id === id)?.label ?? id) : '')
 
   const load = useCallback(async () => {
     try {
@@ -67,7 +85,7 @@ export function CrewCallUpdates({ crewId, recordingId, showEmpty = false, onAppl
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, ...extra }),
       })
-      const data = (await res.json().catch(() => ({}))) as { error?: string; code?: string }
+      const data = (await res.json().catch(() => ({}))) as { error?: string; code?: string; moved?: boolean; crewId?: string }
       if (res.status === 409 && data.code === 'needs-confirm') {
         setBusy(null)
         if (window.confirm(t('confirmClose'))) await decide(p, action, { ...extra, confirmed: true })
@@ -77,7 +95,12 @@ export function CrewCallUpdates({ crewId, recordingId, showEmpty = false, onAppl
         setConfirmForce((s) => new Set(s).add(p.id))
         setError(t('conflict'))
       } else if (!res.ok) {
-        setError(data.code === 'needs-lead' ? t('pickLeadFirst') : data.error || t('genericError'))
+        setError(data.code === 'needs-lead' ? t('pickLeadFirst') : data.code === 'bad-crew' ? t('badCrew') : data.error || t('genericError'))
+      } else if (data.moved) {
+        // Picked a crew this viewer does not lead: it now waits for that crew's leads.
+        setEditing(null)
+        setNotice(t('moved', { crew: crewName(data.crewId ?? null) }))
+        await load()
       } else {
         setEditing(null)
         await load()
@@ -117,7 +140,7 @@ export function CrewCallUpdates({ crewId, recordingId, showEmpty = false, onAppl
   function startEdit(p: ProposalView) {
     const to = (f: keyof ProposalView['changes']) => show(p.changes[f]?.to)
     setEditing(p.id)
-    const init: EditFields = { label: to('label') || p.taskLabel, stage: to('stage'), priority: to('priority'), due: to('due'), leadName: to('leadName') || (p.leadName ?? '') }
+    const init: EditFields = { label: to('label') || p.taskLabel, stage: to('stage'), priority: to('priority'), due: to('due'), leadName: to('leadName') || (p.leadName ?? ''), crewId: p.crewId }
     setEdit({ ...init, orig: init })
   }
 
@@ -125,6 +148,7 @@ export function CrewCallUpdates({ crewId, recordingId, showEmpty = false, onAppl
   function editsOf(p: ProposalView, e: Edit): Record<string, unknown> {
     const out: Record<string, unknown> = {}
     if (p.kind === 'CREATE' && e.label !== e.orig.label) out.label = e.label
+    if (p.routable && e.crewId && e.crewId !== e.orig.crewId) out.crewId = e.crewId
     if (p.kind !== 'DONE' && p.kind !== 'RETIRE') {
       if (e.stage !== e.orig.stage && e.stage.trim()) out.stage = e.stage
       if (e.priority !== e.orig.priority) out.priority = e.priority.trim() || null
@@ -185,6 +209,13 @@ export function CrewCallUpdates({ crewId, recordingId, showEmpty = false, onAppl
                 </ul>
               )}
               {p.kind === 'RETIRE' && <p style={{ ...muted, margin: 0 }}>{t('retireHint')}</p>}
+              {p.routable && (
+                <p style={{ margin: 0, fontSize: 14 }}>
+                  <strong>{t('crewLine', { crew: crewName(p.crewId) })}</strong>
+                  {p.status === 'PENDING' && p.callCrewId !== p.crewId && <span style={muted}> · {t('routedHint')}</span>}
+                </p>
+              )}
+              {p.fromCrewId && <p style={{ ...muted, margin: 0 }}>{t('movedFrom', { crew: crewName(p.fromCrewId) })}</p>}
               <p style={{ margin: 0, fontSize: 14 }}>{p.reason}</p>
               {p.quote && (
                 <p style={{ ...muted, margin: 0, fontStyle: 'italic', overflowWrap: 'anywhere' }}>
@@ -214,6 +245,19 @@ export function CrewCallUpdates({ crewId, recordingId, showEmpty = false, onAppl
               )}
               {isEditing && (
                 <div style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
+                  {p.routable && (
+                    <label style={{ ...field, gridColumn: '1 / -1' }}>
+                      {t('crewPick')}
+                      <select style={input()} value={edit.crewId} onChange={(e) => setEdit({ ...edit, crewId: e.target.value })}>
+                        {!crews.some((c) => c.id === edit.crewId) && <option value={edit.crewId}>{crewName(edit.crewId)}</option>}
+                        {crews.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
                   {p.kind === 'CREATE' && (
                     <label style={{ ...field, gridColumn: '1 / -1' }}>
                       {t('fields.label')}

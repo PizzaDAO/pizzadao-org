@@ -28,6 +28,7 @@ import { resolveToggle } from "@/app/lib/settings/toggles";
 import { startHereMission, type StartHereMission } from "@/app/dashboard/[id]/lib/start-here";
 import { getNotifications, getUnreadCount } from "@/app/lib/notifications";
 import { getCrewMappings, type CrewOption } from "@/app/lib/crew-mappings";
+import { realCrews } from "@/app/lib/crew-id";
 import { fetchMyTasksForCrewOption } from "@/app/lib/my-tasks";
 import { resolveNextAction, type NextAction } from "@/app/dashboard/[id]/lib/next-action";
 import {
@@ -364,7 +365,7 @@ export async function GET(request: NextRequest) {
         const memberCrewSet = new Set(
             memberCrews.map((c) => c.toLowerCase())
         );
-        const myCrewOptions = crewMappings.crews.filter(
+        const myCrewOptions = realCrews(crewMappings.crews).filter(
             (c) =>
                 memberCrewSet.has(c.id.toLowerCase()) ||
                 memberCrewSet.has(c.label.toLowerCase())

@@ -12,7 +12,7 @@ import {
 import { clearBountySubmittedNotifications } from './action-notifications'
 import { canManageBounty } from './crew-leads'
 import { getCrewMappings } from './crew-mappings'
-import { CREW_ID_PATTERN, normalizeCrewId } from './crew-id'
+import { CREW_ID_PATTERN, isRealCrew, normalizeCrewId } from './crew-id'
 import { discordTextToPlainText } from './discord-markup'
 import { resolveDiscordMentions } from './discord-mention-resolve'
 
@@ -46,7 +46,8 @@ export async function resolveBountyCrewId(raw: unknown): Promise<string | null> 
     throw new ValidationError('Invalid crewId')
   }
   const { crews } = await getCrewMappings()
-  if (!crews.some((c) => c.id === crewId)) {
+  // Only real crews: the Community Call is a call, not a crew a bounty can belong to.
+  if (!crews.some((c) => c.id === crewId && isRealCrew(c))) {
     throw new ValidationError(`Unknown crew: ${crewId}`)
   }
   return crewId

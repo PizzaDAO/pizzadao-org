@@ -24,6 +24,7 @@ import { ProposeTaskUpdates } from "../ProposeTaskUpdates";
 import { CrewCallUpdates } from "@/app/crew/[crewId]/CrewCallUpdates";
 import { crewInAllowlist, loadTaskProposalConfig } from "@/app/lib/call-tasks/config";
 import { prisma } from "@/app/lib/db";
+import { getCrewMappings } from "@/app/lib/crew-mappings";
 import { PERMANENT_TRANSCRIBE_ERRORS, PROGRESS } from "@/app/lib/calls/transcribe";
 import { readEvidence } from "@/app/lib/calls/evidence";
 import { HideLine } from "../HideLine";
@@ -105,7 +106,15 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
     const followUpCount = await prisma.followUp.count({ where: { recordingId: rec.id } }).catch(() => 0);
     const canDraftFollowUps = importedFollowupsOn && (rec.status === "IN_REVIEW" || rec.status === "PUBLISHED") && !!rec.summary?.trim();
     // Proposed crew task updates (plans/post-call-agenda-updates.md): shown when the pass is on for this crew or proposals already exist.
-    const proposalCount = rec.crewId ? await prisma.crewTaskProposal.count({ where: { recordingId: rec.id } }).catch(() => 0) : 0;
+    // A call that is not a crew call (the Community Call) routes its new tasks to other crews: one panel per crew.
+    const proposalCrewIds = rec.crewId
+        ? (await prisma.crewTaskProposal.findMany({ where: { recordingId: rec.id }, select: { crewId: true }, distinct: ["crewId"] }).catch(() => [])).map((r) => r.crewId)
+        : [];
+    const proposalCount = proposalCrewIds.length;
+    const routedCrewIds = proposalCrewIds.filter((c) => c !== rec.crewId).sort();
+    const routedCrewLabels = routedCrewIds.length
+        ? new Map((await getCrewMappings().then((m) => m.crews).catch(() => [])).map((c) => [c.id, c.label] as const))
+        : new Map<string, string>();
     const proposalCfg = await loadTaskProposalConfig();
     const showTaskProposals =
         !!rec.crewId && !imported && (rec.status === "IN_REVIEW" || rec.status === "PUBLISHED") && !!rec.summary?.trim() && ((proposalCfg.enabled && crewInAllowlist(proposalCfg, rec.crewId)) || proposalCount > 0);
@@ -202,7 +211,13 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                         <div className="flex flex-wrap items-center gap-4">
                             <ProposeTaskUpdates recordingId={rec.id} />
                         </div>
-                        <CrewCallUpdates crewId={rec.crewId} recordingId={rec.id} showEmpty />
+                        {(routedCrewIds.length === 0 || proposalCrewIds.includes(rec.crewId)) && <CrewCallUpdates crewId={rec.crewId} recordingId={rec.id} showEmpty />}
+                        {routedCrewIds.map((crewId) => (
+                            <div key={crewId} className="grid gap-2">
+                                <h3 className="text-lg font-bold m-0">{routedCrewLabels.get(crewId) ?? crewId}</h3>
+                                <CrewCallUpdates crewId={crewId} recordingId={rec.id} showEmpty />
+                            </div>
+                        ))}
                     </section>
                 )}
 

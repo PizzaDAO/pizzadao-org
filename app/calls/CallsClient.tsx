@@ -106,7 +106,16 @@ export default function CallsPage({ initialData }: { initialData?: CallsResponse
     }
   }, [page, crewFilter, sort, t]);
 
+  // ?crew=<id>[,<id>] preselects the crew filter (e.g. /crew/community sends visitors to the Community Call).
+  const [filterReady, setFilterReady] = useState(false);
   useEffect(() => {
+    const fromUrl = new URLSearchParams(window.location.search).get("crew");
+    if (fromUrl) setCrewFilter(fromUrl.split(",").map((c) => c.trim()).filter(Boolean).slice(0, 20));
+    setFilterReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!filterReady) return;
     const isDefaultView = page === 1 && crewFilter.length === 0 && sort === "newest";
     if (initialData && !usedInitial.current && isDefaultView) {
       usedInitial.current = true;
@@ -115,7 +124,7 @@ export default function CallsPage({ initialData }: { initialData?: CallsResponse
     usedInitial.current = true;
     fetchCalls();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchCalls]);
+  }, [fetchCalls, filterReady]);
 
   function toggleCrew(id: string) {
     setCrewFilter((prev) =>

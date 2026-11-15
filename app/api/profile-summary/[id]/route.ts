@@ -18,6 +18,7 @@ import { getUserProgressSummary } from "@/app/lib/missions";
 import { getMafiaRank } from "@/app/lib/mafia-points";
 import { getVouchCounts } from "@/app/lib/vouches";
 import { getCrewMappings, type CrewOption } from "@/app/lib/crew-mappings";
+import { realCrews, withoutNonCrewIds } from "@/app/lib/crew-id";
 import { prisma } from "@/app/lib/db";
 import { getMemberTagline } from "@/app/api/profile-extras/[id]/route";
 import { resolvePfpUrlAsync } from "@/app/lib/pfp";
@@ -271,7 +272,8 @@ export async function composeProfileSummary(
     const skills = strField(publicMember, "Specialties", "Skills");
 
     const turtles = parseTurtles(publicMember["Turtles"] ?? publicMember["Roles"] ?? []);
-    const crewIds = parseCrews(publicMember["Crews"]);
+    // The profile lists crews only; the Community Call is not one.
+    const crewIds = withoutNonCrewIds(parseCrews(publicMember["Crews"]), crewMappings.crews);
 
     // Level: only surface when there's actual approved progress, matching the
     // pre-PR3 client-side rule.
@@ -319,7 +321,7 @@ export async function composeProfileSummary(
             xAccount,
         },
         crewIds,
-        crewOptions: crewMappings.crews,
+        crewOptions: realCrews(crewMappings.crews),
         viewerId: viewerMemberId,
         isOwner,
     };

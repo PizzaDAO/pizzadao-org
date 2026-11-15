@@ -2564,7 +2564,13 @@
     "confirmClose": "Cela clôt ou masque la tâche. L'appliquer ?",
     "applyAllHint": "Tout appliquer ignore les changements qui clôturent ou masquent une tâche : appliquez-les un par un.",
     "retiredHeading": "Retirées récemment depuis des appels",
-    "undoRetire": "Annuler (réafficher la tâche)"
+    "undoRetire": "Annuler (réafficher la tâche)",
+    "crewLine": "Crew : {crew}",
+    "crewPick": "Crew",
+    "movedFrom": "Déplacée ici depuis {crew}.",
+    "moved": "Déplacée vers {crew} pour que ses responsables la vérifient.",
+    "badCrew": "Choisissez un crew dont les tâches sont modifiées sur le site.",
+    "routedHint": "Issue de la Community Call : vérifiez le crew avant d'appliquer."
   },
   "collectPep": {
     "title": "Récupérer le PEP du jour",

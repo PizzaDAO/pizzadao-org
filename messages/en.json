@@ -2564,7 +2564,13 @@
     "confirmClose": "This closes or hides the task. Apply it?",
     "applyAllHint": "Apply all skips changes that close or hide a task: apply those one by one.",
     "retiredHeading": "Recently retired from calls",
-    "undoRetire": "Undo (show the task again)"
+    "undoRetire": "Undo (show the task again)",
+    "crewLine": "Crew: {crew}",
+    "crewPick": "Crew",
+    "movedFrom": "Moved here from {crew}.",
+    "moved": "Moved to {crew} for its leads to review.",
+    "badCrew": "Pick a crew whose tasks are edited on the website.",
+    "routedHint": "From the Community Call: check the crew before applying."
   },
   "collectPep": {
     "title": "Collect daily PEP",

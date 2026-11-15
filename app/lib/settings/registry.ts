@@ -12,6 +12,7 @@
  */
 import { z } from 'zod'
 import { explorersTextValid } from '@/app/lib/proposals/explorers'
+import { validCrewHints } from '@/app/lib/call-tasks/routing'
 import { CONTENT_SETTINGS } from './content-settings'
 import { ECONOMY_SETTINGS } from './economy-settings'
 import { isValidSheetId, PAYMENT_SETTINGS } from './payments-settings'
@@ -1723,6 +1724,31 @@ export const SETTINGS = {
     label: 'Nudge the crew channel about waiting proposals',
     help: 'When proposals are waiting after a call, Metalhead posts one short line in the crew\'s Discord channel with a link to the crew page (a count only, never the proposals). Uses the private post filter: excluded crews get no post. The CALL_TASK_PROPOSALS_NUDGE_ENABLED env var set to off always wins; on preview deploys only the env var counts.',
     confirmOn: 'Metalhead will post in the crew channel when task proposals from a call are waiting for review.',
+  }),
+  'calls.taskProposalsDefaultCrew': textSetting({
+    key: 'calls.taskProposalsDefaultCrew',
+    area: 'calls',
+    label: 'Task proposals: default crew for community-call tasks',
+    help: 'A call that is not a crew call (the Community Call) has no crew of its own, so each new task it proposes goes to the crew it fits best. When the model is unsure, or names a crew that is not on the list, the task goes to this crew. Must be a crew whose tasks are edited on the website; empty or unknown keeps unsure tasks on the call itself (only admins see those).',
+    maxLength: 60,
+    default: 'ops',
+    onReadFailure: 'lastKnownGood',
+    placeholder: 'crew-id',
+    check: (v) => v === '' || /^[A-Za-z0-9_\-]+$/.test(v),
+    checkMessage: 'Use one crew id (letters, digits, - and _)',
+  }),
+  'calls.taskProposalsCrewHints': textSetting({
+    key: 'calls.taskProposalsCrewHints',
+    area: 'calls',
+    label: 'Task proposals: what each crew works on',
+    help: 'Helps route new tasks from the Community Call to the right crew. One line per crew: crew_id: what the crew works on (for example "tech: the website, bots and smart contracts"). Crews without a line are still offered, by name and a few of their open tasks.',
+    maxLength: 4000,
+    multiline: true,
+    default: '',
+    onReadFailure: 'lastKnownGood',
+    placeholder: 'crew_id: what the crew works on',
+    check: (v) => validCrewHints(v),
+    checkMessage: 'One "crew_id: text" per line',
   }),
   // Vouching and levels made easier (plans/metalhead-call-features.md, phase C). All off.
   'vouches.dailyLimit': intSetting({

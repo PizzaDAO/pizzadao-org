@@ -22,6 +22,7 @@ import { formatClock } from "@/app/lib/calls/summarize";
 import { displaySpeakerName } from "@/app/lib/calls/speaker-labels";
 import { readEvidence } from "@/app/lib/calls/evidence";
 import { sameActionPerson } from "@/app/lib/calls/recap";
+import { NON_ROSTER_CREW_IDS, normalizeCrewId } from "@/app/lib/crew-id";
 import { EditorialMasthead, EditorialPage, paperCard } from "@/app/ui/shared/Editorial";
 
 export const runtime = "nodejs";
@@ -73,7 +74,8 @@ export default async function PublishedCallPage({ params }: Params) {
                 dek={`${when} · ${t("minutes", { count: Math.max(1, Math.round(rec.durationSec / 60)) })}`}
             />
 
-            {rec.crewId && (
+            {/* The Community Call is not a crew: no crew page link. */}
+            {rec.crewId && !NON_ROSTER_CREW_IDS.has(normalizeCrewId(rec.crewId)) && (
                 <Link href={`/crew/${encodeURIComponent(rec.crewId)}`} className="mb-6 inline-flex min-h-11 items-center text-sm font-semibold text-tomato-readable underline underline-offset-4">
                     {t("crewPage", { crew: rec.crewLabel ?? rec.crewId })}
                 </Link>

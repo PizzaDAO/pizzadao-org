@@ -52,6 +52,8 @@ export type CrewOption = {
   callTime?: string;
   callTimeUrl?: string;
   callLength?: string;
+  /** Registry type: "crew" for crews; other values (e.g. "community") are calls, not crews (isRealCrew in crew-id.ts). */
+  type?: string;
   tasks?: CrewTask[];
   taskCount?: number; // Total active tasks (including hidden ones)
 };
@@ -411,6 +413,11 @@ export function parseCrewMappings(gviz: GvizResponse): { crews: CrewOption[]; ex
   }
 
   const crews = Array.from(byId.values()).sort((a, b) => a.label.localeCompare(b.label));
+  // The type tells crews from calls that are not crews (the Community Call), like the DB path.
+  for (const c of crews) {
+    const type = extras.get(c.id)?.type;
+    if (type) c.type = type;
+  }
   return { crews, extras };
 }
 
@@ -455,6 +462,7 @@ export async function fetchCrewMappingsFromSheet(forceRefresh = false): Promise<
 export function crewRowToOption(r: {
   id: string; label: string; emoji: string | null; turtles: string[]; role: string | null; channel: string | null; event: string | null;
   callTime: string | null; callTimeUrl: string | null; callLength: string | null; legacySheetUrl: string | null;
+  type?: string | null;
 }): CrewOption {
   const opt: CrewOption = { id: r.id, label: r.label, turtles: [...(r.turtles ?? [])], tasks: [] };
   if (r.role) opt.role = r.role;
@@ -465,6 +473,7 @@ export function crewRowToOption(r: {
   if (r.callTime) opt.callTime = r.callTime;
   if (r.callTimeUrl) opt.callTimeUrl = r.callTimeUrl;
   if (r.callLength) opt.callLength = r.callLength;
+  if (r.type) opt.type = r.type;
   return opt;
 }
 
@@ -496,16 +505,18 @@ async function attachTasks(crews: CrewOption[], forceRefresh: boolean): Promise<
 }
 
 const CREW_MAPPINGS_KEEP = 60 * 60 * 24; // stale lists stay servable for a day
-// Previous formats (a bare { crews }) may still be written by older deployments sharing this
-// cache; the SWR envelope lives under separate keys so the two never read each other's values.
-const LEGACY_DB_CACHE_KEY = "crew-mappings:db:v1";
-const legacySheetCacheKey = () => `crew-mappings:v7:${SHEET_ID}`;
-const DB_CACHE_KEY = "crew-mappings:db:v2:swr";
-const sheetCacheKey = () => `crew-mappings:v8:swr:${SHEET_ID}`;
+// Previous formats may still be written by older deployments sharing this cache (previews share KV
+// with production), so every format gets its own key and no key ever holds two formats:
+// db:v1 / v7 (bare { crews }), db:v2 / v8 (bare { crews } with `type`), db:v2:swr / v8:swr (SWR
+// envelope without `type`). Current: the SWR envelope whose entries carry `type`.
+const LEGACY_DB_CACHE_KEYS = ["crew-mappings:db:v1", "crew-mappings:db:v2", "crew-mappings:db:v2:swr"];
+const legacySheetCacheKeys = () => [`crew-mappings:v7:${SHEET_ID}`, `crew-mappings:v8:${SHEET_ID}`, `crew-mappings:v8:swr:${SHEET_ID}`];
+const DB_CACHE_KEY = "crew-mappings:db:v3:swr";
+const sheetCacheKey = () => `crew-mappings:v9:swr:${SHEET_ID}`;
 
 /** Forget the cached crew list (after an edit on the website). */
 export async function invalidateCrewMappingsCache(): Promise<void> {
-  await Promise.all([swrInvalidate(DB_CACHE_KEY, LEGACY_DB_CACHE_KEY), swrInvalidate(sheetCacheKey(), legacySheetCacheKey())]);
+  await Promise.all([swrInvalidate(DB_CACHE_KEY, ...LEGACY_DB_CACHE_KEYS), swrInvalidate(sheetCacheKey(), ...legacySheetCacheKeys())]);
 }
 
 /**

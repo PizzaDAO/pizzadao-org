@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { SITE_URL } from "@/app/lib/site-url";
 import { prisma } from "@/app/lib/db";
 import { getCrewMappings } from "@/app/lib/crew-mappings";
+import { realCrews } from "@/app/lib/crew-id";
 import { HANDBOOK_PAGES } from "@/content/handbook";
 import { MARKETING_SITEMAP_PATHS, marketingIndexable } from "@/app/lib/marketing-site";
 
@@ -77,7 +78,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
 
   if (crews.status === "fulfilled") {
-    for (const c of crews.value.crews ?? []) {
+    for (const c of realCrews(crews.value.crews ?? [])) {
       if (!c.id) continue;
       entries.push({
         url: `${SITE_URL}/crew/${encodeURIComponent(c.id)}`,

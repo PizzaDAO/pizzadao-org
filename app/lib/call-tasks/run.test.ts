@@ -8,6 +8,8 @@ vi.mock('@/app/lib/calls/post-filters', async (orig) => ({ ...(await orig<typeof
 vi.mock('@/app/lib/calls/recap', () => ({ redactionsNewerThanSummary: vi.fn(() => false), resolveRecapChannel: vi.fn(async () => ({ channelId: '555', label: '#crew' })) }))
 vi.mock('./extract', () => ({ proposeTaskUpdates: vi.fn(async () => []) }))
 vi.mock('./config', async (orig) => ({ ...(await orig<typeof import('./config')>()), loadTaskProposalConfig: vi.fn() }))
+const crewsMock = vi.hoisted(() => vi.fn())
+vi.mock('@/app/lib/crew-mappings', async (orig) => ({ ...(await orig<typeof import('@/app/lib/crew-mappings')>()), getCrewMappings: () => crewsMock() }))
 vi.mock('@/app/lib/settings', () => ({ loadSettings: vi.fn(async () => ({ readFailed: false, invalidKeys: [], isSet: () => false, get: () => '' })) }))
 
 import { prisma } from '@/app/lib/db'
@@ -18,7 +20,8 @@ import { proposeTaskUpdates } from './extract'
 import { loadTaskProposalConfig, taskProposalConfigFrom, type TaskProposalConfig } from './config'
 import { SETTINGS, type SettingKey } from '@/app/lib/settings/registry'
 import type { Settings } from '@/app/lib/settings'
-import { expireOldProposals, listNeedingProposals, nudgeCrew, nudgeText, proposeTasksForRecording, storeProposals } from './run'
+import { adminCallReviewUrl, expireOldProposals, listNeedingProposals, loadRouting, movedNudgeText, nudgeCrew, nudgeMoved, nudgeText, proposeTasksForRecording, storeProposals } from './run'
+import { resolveRecapChannel } from '@/app/lib/calls/recap'
 import type { ProposalDraft } from './proposals'
 
 const rec = vi.mocked(prisma.callRecording)
@@ -41,8 +44,15 @@ const draft = (over: Partial<ProposalDraft> = {}): ProposalDraft => ({
   leadName: null, leadMemberId: null, candidates: [], reason: 'It was finished', quote: null, startMs: null, confidence: 'high', actionItemIdx: null, ...over,
 })
 
+const REGISTRY = [
+  { id: 'ops', label: 'Ops', type: 'crew', turtles: [] },
+  { id: 'tech', label: 'Tech', type: 'crew', turtles: [], tasks: [{ label: 'Fix the bot' }] },
+  { id: 'community', label: 'Community', type: 'community', turtles: [] },
+]
+
 beforeEach(() => {
   vi.clearAllMocks()
+  crewsMock.mockResolvedValue({ crews: REGISTRY, cached: true })
   cfgMock.mockResolvedValue(ON)
   vi.mocked(usesDb).mockResolvedValue(true)
   vi.mocked(loadPostFilter).mockResolvedValue(EMPTY_POST_FILTER)
@@ -238,7 +248,7 @@ describe('nudgeCrew', () => {
   beforeEach(() => {
     post.mockClear()
     rec.findUnique.mockResolvedValue({ id: 'rec1', crewId: 'ops', crewLabel: 'Ops', taskProposalsNudgedAt: null } as never)
-    vi.mocked(prisma.crewTaskProposal.count).mockResolvedValue(2)
+    prop.findMany.mockResolvedValue([{ crewId: 'ops' }, { crewId: 'ops' }] as never)
   })
   it('is off by default', async () => {
     expect(await nudgeCrew('rec1', { env, post: post as never })).toBe('disabled')
@@ -261,9 +271,83 @@ describe('nudgeCrew', () => {
     vi.mocked(loadPostFilter).mockResolvedValue({ ...EMPTY_POST_FILTER, excludedCrewIds: ['ops'] })
     expect(await nudgeCrew('rec1', { env, post: post as never })).toBe('excluded')
     vi.mocked(loadPostFilter).mockResolvedValue(EMPTY_POST_FILTER)
-    vi.mocked(prisma.crewTaskProposal.count).mockResolvedValue(0)
+    prop.findMany.mockResolvedValue([] as never)
     expect(await nudgeCrew('rec1', { env, post: post as never })).toBe('none')
     expect(await nudgeCrew('rec1', { env: {}, post: post as never })).toBe('no-token')
     expect(post).not.toHaveBeenCalled()
+  })
+})
+
+describe('routing new tasks from the community call', () => {
+  const settings = (vals: Record<string, string>) => ({ get: (k: string) => vals[k] ?? '' }) as never
+
+  it('is off for a crew call: proposals stay on the crew', async () => {
+    expect(await loadRouting('ops', settings({}), EMPTY_POST_FILTER, { usesDb: async () => true })).toBeUndefined()
+  })
+  it('offers real crews only, minus excluded and sheet crews, with hints and the default crew', async () => {
+    const r = await loadRouting('community', settings({ 'calls.taskProposalsDefaultCrew': 'ops', 'calls.taskProposalsCrewHints': 'tech: the website' }), EMPTY_POST_FILTER, { usesDb: async () => true })
+    expect(r?.crews.map((c) => c.id)).toEqual(['ops', 'tech'])
+    expect(r?.crews.find((c) => c.id === 'tech')).toMatchObject({ hint: 'the website', examples: ['Fix the bot'] })
+    expect(r?.fallback).toBe('ops')
+    const excluded = await loadRouting('community', settings({ 'calls.taskProposalsDefaultCrew': 'ops' }), { ...EMPTY_POST_FILTER, excludedCrewIds: ['ops'] }, { usesDb: async (id) => id !== 'nobody' })
+    expect(excluded?.crews.map((c) => c.id)).toEqual(['tech'])
+    expect(excluded?.fallback).toBeNull() // the default crew is not a target: no fallback
+    expect(await loadRouting('community', settings({}), EMPTY_POST_FILTER, { usesDb: async () => false })).toBeUndefined()
+  })
+  it('a community call passes the routing to the model and stores routed proposals on their crew', async () => {
+    rec.findUnique.mockResolvedValue(recording({ crewId: 'community', crewLabel: 'Community' }) as never)
+    cfgMock.mockResolvedValue({ ...ON, crews: ['community'] })
+    propose.mockResolvedValue([draft({ sourceKey: 'rec1:CREATE:new', kind: 'CREATE', taskId: null, baseUpdatedAt: null, crewId: 'tech', changes: { label: { from: null, to: 'New' } } })])
+    expect(await proposeTasksForRecording('rec1')).toEqual({ result: 'ok', created: 1 })
+    expect(propose.mock.calls[0][0].routing?.crews.map((c) => c.id)).toEqual(['ops', 'tech'])
+    expect(prop.create.mock.calls[0][0]).toMatchObject({ data: { recordingId: 'rec1', crewId: 'tech', kind: 'CREATE' } })
+  })
+  it('a crew call gets no routing', async () => {
+    propose.mockResolvedValue([])
+    await proposeTasksForRecording('rec1')
+    expect(propose.mock.calls[0][0].routing).toBeUndefined()
+  })
+  it('nudges each target crew in its own channel with its own link', async () => {
+    cfgMock.mockResolvedValue({ ...ON, crews: ['community'], nudge: true })
+    rec.findUnique.mockResolvedValue({ id: 'rec1', crewId: 'community', crewLabel: 'Community', taskProposalsNudgedAt: null } as never)
+    prop.findMany.mockResolvedValue([{ crewId: 'tech' }, { crewId: 'ops' }, { crewId: 'tech' }] as never)
+    vi.mocked(resolveRecapChannel).mockImplementation(async (crewId: string | null) => ({ channelId: `ch-${crewId}`, label: crewId }) as never)
+    const post = vi.fn(async () => ({ id: 'm1' }))
+    expect(await nudgeCrew('rec1', { env: { DISCORD_BOT_TOKEN: 'tok' }, post: post as never })).toBe('posted')
+    const sent = post.mock.calls.map((c) => c as unknown as [{ channelId: string }, { content: string }]).map(([t, b]) => [t.channelId, b.content])
+    expect(sent).toEqual([
+      ['ch-tech', nudgeText(2, 'tech')],
+      ['ch-ops', nudgeText(1, 'ops')],
+    ])
+  })
+})
+
+describe('nudges for routed and unrouted community-call proposals', () => {
+  const env = { DISCORD_BOT_TOKEN: 'tok' }
+  beforeEach(() => {
+    cfgMock.mockResolvedValue({ ...ON, crews: ['community'], nudge: true })
+    vi.mocked(resolveRecapChannel).mockImplementation(async (crewId: string | null) => ({ channelId: `ch-${crewId}`, label: String(crewId) }) as never)
+  })
+  it('proposals left on the community call link admins to the admin call page', async () => {
+    rec.findUnique.mockResolvedValue({ id: 'rec1', crewId: 'community', crewLabel: 'Community', taskProposalsNudgedAt: null } as never)
+    prop.findMany.mockResolvedValue([{ crewId: 'community' }] as never)
+    const post = vi.fn(async () => ({ id: 'm1' }))
+    expect(await nudgeCrew('rec1', { env, post: post as never })).toBe('posted')
+    const body = (post.mock.calls[0] as unknown as [unknown, { content: string }])[1]
+    expect(body.content).toContain(adminCallReviewUrl('rec1'))
+    expect(body.content).not.toContain('/crew/community')
+  })
+  it('a moved proposal is announced in the new crew\'s channel, behind the nudge switch', async () => {
+    prop.findUnique.mockResolvedValue({ crewId: 'ops', status: 'PENDING' } as never)
+    const post = vi.fn(async () => ({ id: 'm1' }))
+    expect(await nudgeMoved('p1', 'ops', { env, post: post as never })).toBe('posted')
+    const [target, body] = post.mock.calls[0] as unknown as [{ channelId: string }, { content: string; allowed_mentions: unknown }]
+    expect(target.channelId).toBe('ch-ops')
+    expect(body.content).toBe(movedNudgeText('ops'))
+    expect(body.content).toContain('/crew/ops#call-updates')
+    expect(body.allowed_mentions).toEqual({ parse: [] })
+    cfgMock.mockResolvedValue({ ...ON, nudge: false })
+    expect(await nudgeMoved('p1', 'ops', { env, post: post as never })).toBe('disabled')
+    expect(post).toHaveBeenCalledTimes(1)
   })
 })

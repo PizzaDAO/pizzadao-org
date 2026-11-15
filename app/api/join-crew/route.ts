@@ -11,6 +11,7 @@ import { getSession } from "@/app/lib/session";
 import { TURTLE_ROLE_IDS } from "@/app/ui/constants";
 import { crewIdToLabel, normalizeCrewId } from "@/app/lib/crew-labels";
 import { internalError } from "@/app/lib/errors/error-response";
+import { NON_ROSTER_CREW_IDS } from "@/app/lib/crew-id";
 import { emitMissionEvent } from "@/app/lib/mission-verify/events";
 
 export const runtime = "nodejs";
@@ -182,6 +183,10 @@ export async function POST(req: Request) {
     // Calculate new crews
     let newCrews: string[];
     if (action === "join") {
+      // The Community Call is a call everyone can attend, not a crew to join.
+      if (NON_ROSTER_CREW_IDS.has(normalizeCrewId(crewId))) {
+        return NextResponse.json({ error: "Not a crew" }, { status: 400 });
+      }
       if (currentCrews.includes(normalizeCrewId(crewId))) {
         return NextResponse.json({ error: "Already in this crew" }, { status: 400 });
       }

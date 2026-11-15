@@ -9,7 +9,8 @@ import type { TranscriptSegment } from '@/app/lib/calls/ingest-schema'
 import type { Settings } from '@/app/lib/settings'
 import { buildTranscriptText, isFallbackWorthy, summaryFallbackModel, summaryModel } from '@/app/lib/calls/summarize'
 import { buildSpeakerLabels } from '@/app/lib/followups/extract'
-import { crewVocab, describeTask, parseProposals, PROPOSALS_SYSTEM_PROMPT, proposalsSchema, squashText, type ParseContext, type ProposalDraft, type TaskRef } from './proposals'
+import { crewVocab, describeTask, parseProposals, PROPOSALS_SYSTEM_PROMPT, proposalsSchema, routedProposalsSchema, squashText, type ParseContext, type ProposalDraft, type TaskRef } from './proposals'
+import { ROUTING_SYSTEM_RULE, routingPromptSection, type Routing } from './routing'
 import type { PostFilter } from '@/app/lib/calls/post-filters'
 import type { MemberRef } from '@/app/lib/followups/resolve'
 
@@ -26,6 +27,14 @@ export interface ProposeInput {
   filter: PostFilter
   today: Date
   max: number
+  /** A call that is not a crew call: new tasks are routed to these crews. */
+  routing?: Routing
+}
+
+/** The system prompt; a routed call (not a crew call) gets one extra rule. */
+export function proposalSystemPrompt(routing: Routing | undefined, extra: string): string {
+  const base = routing ? `${PROPOSALS_SYSTEM_PROMPT}\n${ROUTING_SYSTEM_RULE}` : PROPOSALS_SYSTEM_PROMPT
+  return extra ? `${base}\n\n${extra}` : base
 }
 
 export function buildProposalPrompt(input: ProposeInput): { prompt: string; ctx: ParseContext } {
@@ -43,6 +52,7 @@ export function buildProposalPrompt(input: ProposeInput): { prompt: string; ctx:
     `Today is ${input.today.toISOString().slice(0, 10)}.`,
     `Stages this crew uses: ${vocab.stages.join(', ')}. Priorities: ${vocab.priorities.join(', ')}.`,
     `Crew tasks:\n${taskLines || '(none yet)'}`,
+    input.routing ? routingPromptSection(input.routing) : '',
     items ? `Action items recorded for this call (context):\n${items}` : '',
     `Transcript:\n\n${transcript}`,
   ]
@@ -61,6 +71,7 @@ export function buildProposalPrompt(input: ProposeInput): { prompt: string; ctx:
     visibleText: squashText(input.segments.map((s) => s.text).join(' ')),
     actionItems: input.actionItems,
     openLabels: input.tasks.map((t) => t.label),
+    ...(input.routing ? { routing: input.routing } : {}),
   }
   return { prompt, ctx }
 }
@@ -71,13 +82,14 @@ export async function proposeTaskUpdates(input: ProposeInput, settings: Settings
   const env = opts.env ?? process.env
   const { prompt, ctx } = buildProposalPrompt(input)
   const extra = String(settings.get('calls.summaryPromptExtra') ?? '').trim()
-  const system = extra ? `${PROPOSALS_SYSTEM_PROMPT}\n\n${extra}` : PROPOSALS_SYSTEM_PROMPT
+  const system = proposalSystemPrompt(input.routing, extra)
+  const schema = input.routing ? routedProposalsSchema : proposalsSchema
   const deadline = Date.now() + (opts.budgetMs ?? 120_000)
   const run = async (m: LanguageModel | string, timeoutMs: number) => {
     const { output } = await generateText({
       model: m as LanguageModel,
       system,
-      output: Output.object({ schema: proposalsSchema }),
+      output: Output.object({ schema }),
       prompt,
       abortSignal: AbortSignal.timeout(Math.max(1_000, timeoutMs)),
     })

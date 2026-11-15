@@ -9,6 +9,8 @@ export const dynamic = 'force-dynamic'
 
 /**
  * POST /api/crew/<crewId>/proposals/<id>  { action: 'apply' | 'dismiss', edits?, force? }
+ * `edits.crewId` (new tasks routed from the Community Call) picks another crew: applied there when the
+ * decider may manage it, otherwise moved there for that crew's leads (`moved: true`).
  * Decide on one proposed task update. Leads of the crew and guild admins only (re-checked in
  * apply.ts, fails closed). `force` re-confirms an apply after a conflict (the task changed since).
  */
@@ -46,6 +48,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ cre
   switch (r.result) {
     case 'applied':
       return json({ ok: true, taskId: r.taskId })
+    case 'moved':
+      return json({ ok: true, moved: true, crewId: r.crewId })
+    case 'bad-crew':
+      return json({ error: 'Pick a crew whose tasks are edited on the website', code: 'bad-crew' }, 400)
     case 'forbidden':
       return json({ error: 'Only crew leads can decide on this' }, 403)
     case 'not-found':
