@@ -9,6 +9,7 @@
 import { prisma } from "@/app/lib/db";
 import { toggleEnabled } from "@/app/lib/settings/toggles";
 import { PIZZA_TOPPINGS } from "@/app/lib/topping-images";
+import { GENERATOR_FIRST_NAMES, GENERATOR_SURNAMES } from "@/app/lib/namegen-names";
 
 /** Pizza words that count on their own. Generic single words (pie, ham, oven, hot, red...) are left out on purpose. */
 const PIZZA_WORDS = [
@@ -29,6 +30,9 @@ const PIZZA_WORDS = [
   "honey", "walnut", "aubergine", "sourdough", "hotdog", "fries", "supreme", "suprema",
   "quattro", "mexicana", "menta", "jengibre", "ginger", "capparis", "caper", "marinara",
   "vegetable", "veggie", "meat", "pepperone", "chilorio", "chikanda",
+  // more common toppings
+  "ham", "cheddar", "avocado", "cilantro", "broccoli", "fig", "barbecue", "hamburger", "pork",
+  "giardiniera", "nduja", "alfredo", "carbonara", "paprika",
 ];
 
 /** Common misspellings, matched exactly (no fuzzy matching). */
@@ -67,6 +71,23 @@ export function isThemedName(name: string): boolean {
   if (ws.some((w) => stems(w).some((x) => SINGLE_TOKENS.has(x)))) return true;
   const joined = " " + ws.map(singular).join(" ") + " ";
   return PHRASES.some((p) => joined.includes(" " + p.split(" ").map(singular).join(" ") + " "));
+}
+
+const norm = (s: string) => words(s).join(" ");
+const SURNAMES = GENERATOR_SURNAMES.map(norm);
+const FIRST_NAMES = new Set(GENERATOR_FIRST_NAMES.map(norm));
+
+/**
+ * Whether the name has the generator's own shape: "<word> <known mafia surname>" or
+ * "<known first name> <word>". For judging a name a member already has (the admin name
+ * report). Anyone can type this shape, so it never lets a new name past the requireThemed
+ * rule; the signed claim does that.
+ */
+export function looksGenerated(name: string): boolean {
+  const n = norm(name);
+  if (!n.includes(" ")) return false;
+  if (SURNAMES.some((s) => n.length > s.length && n.endsWith(" " + s))) return true;
+  return FIRST_NAMES.has(n.split(" ")[0]);
 }
 
 export const NAME_NOT_THEMED_ERROR =

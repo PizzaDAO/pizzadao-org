@@ -7,10 +7,12 @@ const findFirstReminder = vi.fn()
 const createReminder = vi.fn()
 const updateReminder = vi.fn()
 const nonProd = vi.fn()
+const findClaims = vi.fn()
 
 vi.mock('@/app/lib/db', () => ({
   prisma: {
     member: { findMany: (a: unknown) => findMembers(a) },
+    mafiaNameClaim: { findMany: (a: unknown) => findClaims(a) },
     memberNameReminder: {
       findMany: (a: unknown) => findReminders(a),
       findFirst: (a: unknown) => findFirstReminder(a),
@@ -23,7 +25,10 @@ vi.mock('@/app/lib/settings', () => ({
   getSetting: async (k: string) => (k === 'members.nameReminderCooldownDays' ? 30 : 'claim your name'),
 }))
 vi.mock('@/app/lib/admin-guard', () => ({ isNonProductionDeploy: () => nonProd() }))
-vi.mock('@/app/lib/themed-name', () => ({ isThemedName: (n: string) => /pizza|pepperoni/i.test(n) }))
+vi.mock('@/app/lib/themed-name', () => ({
+  isThemedName: (n: string) => /pizza|pepperoni/i.test(n),
+  looksGenerated: (n: string) => /Liotta$/.test(n),
+}))
 
 import { buildNameReport, sendNameReminders, MAX_PER_REQUEST } from './name-reminders'
 
@@ -38,6 +43,7 @@ beforeEach(() => {
   createReminder.mockResolvedValue({ id: 'c1' })
   updateReminder.mockResolvedValue({})
   findFirstReminder.mockResolvedValue(null)
+  findClaims.mockResolvedValue([])
   findMembers.mockResolvedValue([
     { id: '1', name: 'Pepperoni Pete', discordId: 'd1' },
     { id: '2', name: 'Plain Person', discordId: 'd2' },
@@ -45,6 +51,27 @@ beforeEach(() => {
     { id: '4', name: 'Third Person', discordId: 'd4' },
     { id: '5', name: 'Fifth Person', discordId: 'd5' },
   ])
+})
+
+describe('generated names', () => {
+  it('are not flagged: by shape or by a generator claim', async () => {
+    findMembers.mockResolvedValue([
+      { id: '1', name: 'Ham Liotta', discordId: 'd1' },
+      { id: '2', name: 'Cheddar Odd', discordId: 'd2' },
+      { id: '3', name: 'Eric', discordId: 'd3' },
+    ])
+    findClaims.mockResolvedValue([{ discordId: 'd2', name: 'cheddar odd' }])
+    findReminders.mockResolvedValue([])
+    const r = await buildNameReport(NOW)
+    expect(r.rows.map((x) => x.id)).toEqual(['3'])
+  })
+
+  it('are skipped when sending', async () => {
+    findMembers.mockResolvedValue([{ id: '1', name: 'Ham Liotta', discordId: 'd1' }])
+    const r = await sendNameReminders(['1'], 'admin', NOW, deps)
+    expect(r.skipped).toEqual([{ id: '1', reason: 'Name is themed' }])
+    expect(send).not.toHaveBeenCalled()
+  })
 })
 
 describe('buildNameReport', () => {

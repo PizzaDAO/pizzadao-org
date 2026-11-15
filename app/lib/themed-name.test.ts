@@ -5,7 +5,7 @@ const findFirst = vi.fn();
 vi.mock("@/app/lib/settings/toggles", () => ({ toggleEnabled: (k: string) => getSetting(k) }));
 vi.mock("@/app/lib/db", () => ({ prisma: { mafiaNameClaim: { findFirst: (a: unknown) => findFirst(a) } } }));
 
-import { isThemedName, themedNameAllowed } from "./themed-name";
+import { isThemedName, looksGenerated, themedNameAllowed } from "./themed-name";
 
 beforeEach(() => {
   getSetting.mockReset();
@@ -26,7 +26,7 @@ describe("isThemedName", () => {
     expect(isThemedName("Chili Crisp Charlie")).toBe(true);
   });
   it("rejects generic single words", () => {
-    for (const n of ["Red", "Hot Wheels", "Pie", "Ham", "Oven", "Spicy", "Roasted"]) expect(isThemedName(n)).toBe(false);
+    for (const n of ["Red", "Hot Wheels", "Pie", "Oven", "Spicy", "Roasted"]) expect(isThemedName(n)).toBe(false);
   });
   it("accepts widened topping words, misspellings and emoji names", () => {
     for (const n of ["Steak Hill", "Indi Tandoori Paneer White", "Slevin Di Bufala", "Cherry Zemeckis",
@@ -64,6 +64,24 @@ describe("isThemedName", () => {
   });
 });
 
+describe("more topping words", () => {
+  it("accepts ham, cheddar, avocado and friends", () => {
+    for (const n of ["Ham Liotta", "Cheddar Scorsese", "Avocado De Niro", "Cilantro Carl", "Broccoli Bob", "Fig Fred", "Barbecue Ben", "Hamburger Hal", "Pork Pete", "Giardiniera Gus", "Nduja Nick", "Vegan Cheese Vic"])
+      expect(isThemedName(n)).toBe(true);
+  });
+});
+
+describe("looksGenerated", () => {
+  it("recognises the generator's name shapes", () => {
+    for (const n of ["Gouda Scorsese", "Mango De Niro", "Zesty Corleone", "Vito Mango", "Omar Plum", "Mango Ford Coppola"])
+      expect(looksGenerated(n)).toBe(true);
+  });
+  it("leaves plain names and usernames alone", () => {
+    for (const n of ["Eric", "Jack_21xx", "kooluser", "Jack White", "Eric Hill", "Corleone", "Michael Jordan"])
+      expect(looksGenerated(n)).toBe(false);
+  });
+});
+
 describe("themedNameAllowed", () => {
   it("allows anything while the setting is off", async () => {
     getSetting.mockResolvedValue(false);
@@ -77,6 +95,11 @@ describe("themedNameAllowed", () => {
     getSetting.mockResolvedValue(true);
     findFirst.mockResolvedValue({ id: "x" });
     expect(await themedNameAllowed({ name: "Vito Corleone", discordId: "1" })).toBe(true);
+  });
+  it("does not accept a typed lookalike of a generated name", async () => {
+    getSetting.mockResolvedValue(true);
+    findFirst.mockResolvedValue(null);
+    expect(await themedNameAllowed({ name: "Mango Scorsese", discordId: "1" })).toBe(false);
   });
   it("rejects free text otherwise", async () => {
     getSetting.mockResolvedValue(true);
