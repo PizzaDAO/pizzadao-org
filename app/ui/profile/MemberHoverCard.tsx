@@ -11,7 +11,8 @@
 // press does not also navigate). Data comes from the public /api/public/member-card/[id]
 // endpoint (public fields only), fetched on first open and cached for the session.
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import type { MemberCard } from "@/app/api/public/member-card/[id]/route";
@@ -19,6 +20,9 @@ import type { MemberCard } from "@/app/api/public/member-card/[id]/route";
 const OPEN_DELAY_MS = 300;
 const CLOSE_DELAY_MS = 120;
 const LONG_PRESS_MS = 500;
+const CARD_Z_INDEX = 1100; // above modals (1000), below celebration overlays (1900+)
+const VIEWPORT_MARGIN = 8;
+const CARD_GAP = 8;
 
 type CardState = { status: "loading" } | { status: "error" } | { status: "ok"; card: MemberCard };
 
@@ -64,6 +68,7 @@ export function MemberHoverCard({
     const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const longPressed = useRef(false);
     const rootRef = useRef<HTMLSpanElement | null>(null);
+    const cardRef = useRef<HTMLSpanElement | null>(null);
     const cardId = useId();
 
     const clear = (r: { current: ReturnType<typeof setTimeout> | null }) => {
@@ -98,7 +103,9 @@ export function MemberHoverCard({
         if (!open) return;
         const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
         const onDown = (e: Event) => {
-            if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+            const target = e.target as Node;
+            if (rootRef.current?.contains(target) || cardRef.current?.contains(target)) return;
+            setOpen(false);
         };
         document.addEventListener("keydown", onKey);
         document.addEventListener("pointerdown", onDown);
@@ -143,17 +150,67 @@ export function MemberHoverCard({
             aria-describedby={open ? cardId : undefined}
         >
             {children}
-            {open && <CardPopover id={cardId} memberId={memberId} />}
+            {open && <CardPopover id={cardId} memberId={memberId} anchorRef={rootRef} cardRef={cardRef} onClose={() => setOpen(false)} />}
         </span>
     );
 }
 
-function CardPopover({ id, memberId }: { id: string; memberId: string }) {
+function CardPopover({
+    id,
+    memberId,
+    anchorRef,
+    cardRef,
+    onClose,
+}: {
+    id: string;
+    memberId: string;
+    anchorRef: React.RefObject<HTMLSpanElement | null>;
+    cardRef: React.RefObject<HTMLSpanElement | null>;
+    onClose: () => void;
+}) {
     const t = useTranslations("memberCard");
+    // Rendered in a portal on document.body with fixed coordinates so no ancestor stacking context
+    // or overflow clip (e.g. a later section on the live call page) can cover or cut it off.
+    const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
     const [state, setState] = useState<CardState>(() => {
         const hit = cache.get(memberId);
         return hit ? { status: "ok", card: hit } : { status: "loading" };
     });
+
+    useLayoutEffect(() => {
+        const place = () => {
+            const anchor = anchorRef.current;
+            const card = cardRef.current;
+            if (!anchor || !card) return;
+            const a = anchor.getBoundingClientRect();
+            const w = card.offsetWidth;
+            const h = card.offsetHeight;
+            const vw = window.innerWidth;
+            const vh = window.innerHeight;
+            // Trigger scrolled fully out of view: close rather than pin the card to an edge.
+            if (a.bottom <= 0 || a.top >= vh || a.right <= 0 || a.left >= vw) {
+                onClose();
+                return;
+            }
+            let top = a.bottom + CARD_GAP;
+            // Flip above when it does not fit below and there is room above.
+            if (top + h > vh - VIEWPORT_MARGIN && a.top - CARD_GAP - h >= VIEWPORT_MARGIN) top = a.top - CARD_GAP - h;
+            top = Math.max(VIEWPORT_MARGIN, Math.min(top, vh - VIEWPORT_MARGIN - h));
+            const left = Math.max(VIEWPORT_MARGIN, Math.min(a.left, vw - VIEWPORT_MARGIN - w));
+            setPos((p) => (p && p.top === top && p.left === left ? p : { top, left }));
+        };
+        place();
+        // Re-place when the card's own size changes (loading -> loaded) and on scroll / resize.
+        const ro = typeof ResizeObserver !== "undefined" && cardRef.current ? new ResizeObserver(place) : null;
+        if (ro && cardRef.current) ro.observe(cardRef.current);
+        window.addEventListener("scroll", place, true);
+        window.addEventListener("resize", place);
+        return () => {
+            ro?.disconnect();
+            window.removeEventListener("scroll", place, true);
+            window.removeEventListener("resize", place);
+        };
+    }, [anchorRef, cardRef, onClose]);
 
     useEffect(() => {
         let alive = true;
@@ -165,13 +222,18 @@ function CardPopover({ id, memberId }: { id: string; memberId: string }) {
         };
     }, [memberId]);
 
-    return (
+    return createPortal(
         <span
+            ref={cardRef}
             id={id}
             role="dialog"
             aria-label={t("viewProfile")}
-            className="paper-soft absolute left-0 top-full z-50 mt-2 block w-64 max-w-[80vw] rounded-[16px] border p-3 text-left text-sm font-normal normal-case shadow-lg"
+            className="paper-soft fixed block w-64 max-w-[80vw] rounded-[16px] border p-3 text-left text-sm font-normal normal-case shadow-lg"
             style={{
+                top: pos?.top ?? 0,
+                left: pos?.left ?? 0,
+                visibility: pos ? "visible" : "hidden",
+                zIndex: CARD_Z_INDEX,
                 background: "hsl(var(--card))",
                 color: "hsl(var(--card-foreground))",
                 borderColor: "hsl(var(--rule-warm) / 0.55)",
@@ -180,7 +242,8 @@ function CardPopover({ id, memberId }: { id: string; memberId: string }) {
             {state.status === "loading" && <span className="block text-foreground/60">{t("loading")}</span>}
             {state.status === "error" && <span className="block text-foreground/60">{t("unavailable")}</span>}
             {state.status === "ok" && <CardBody card={state.card} />}
-        </span>
+        </span>,
+        document.body,
     );
 }
 

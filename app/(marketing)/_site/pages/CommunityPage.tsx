@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { HOME_PATH } from "@/app/(marketing)/_site/lib/router";
 import { ArrowUpRight, Sparkles, Pizza, Wrench, Palette, Users, Code2, MapPin } from "lucide-react";
@@ -889,7 +890,7 @@ const CommunityPage = ({ laneLinks = {} }: { laneLinks?: Record<string, string> 
                       <div className="relative md:col-span-7">
                         <div className="relative aspect-[16/10] overflow-hidden bg-ink md:aspect-auto md:h-full md:min-h-[480px]">
                           {featured.img && (
-                            <img
+                            <Image sizes="(min-width: 768px) 50vw, 100vw" width={1600} height={1000}
                               src={featured.img}
                               alt={featured.name}
                               loading="lazy"
@@ -1001,7 +1002,7 @@ const CommunityPage = ({ laneLinks = {} }: { laneLinks?: Record<string, string> 
                         >
                           {b.img ? (
                             <div className="relative aspect-[16/10] overflow-hidden bg-ink">
-                              <img
+                              <Image sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw" width={1200} height={900}
                                 src={b.img}
                                 alt={b.name}
                                 loading="lazy"
@@ -1118,7 +1119,7 @@ const CommunityPage = ({ laneLinks = {} }: { laneLinks?: Record<string, string> 
             <>
               {BUILDS[activeBuild].img && (
                 <div className="aspect-[16/9] overflow-hidden bg-ink">
-                  <img
+                  <Image sizes="(min-width: 768px) 50vw, 100vw" width={1600} height={1000}
                     src={BUILDS[activeBuild].img as string}
                     alt={BUILDS[activeBuild].name}
                     className="h-full w-full object-cover"
@@ -1209,7 +1210,7 @@ const CommunityPage = ({ laneLinks = {} }: { laneLinks?: Record<string, string> 
                         className="relative overflow-hidden rounded-xl bg-ink shadow-[0_14px_36px_-22px_hsl(var(--ink)/0.4)] transition-all duration-500 group-hover:z-10 group-hover:scale-[1.06] group-hover:rotate-0 group-hover:shadow-[0_24px_55px_-20px_hsl(var(--tomato)/0.4)]"
                         style={{ aspectRatio: p.ratio }}
                       >
-                        <img
+                        <Image sizes="(min-width: 768px) 25vw, 50vw" width={800} height={1000}
                           src={p.img}
                           alt={p.cap}
                           loading="lazy"
@@ -1255,7 +1256,7 @@ const CommunityPage = ({ laneLinks = {} }: { laneLinks?: Record<string, string> 
                 </DialogHeader>
                 <div className="relative bg-ink">
                   <div className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-ink">
-                    <img
+                    <Image sizes="100vw" width={1600} height={1000}
                       src={GALLERY[galleryIndex].img}
                       alt={GALLERY[galleryIndex].cap}
                       className="max-h-full max-w-full object-contain"
@@ -1288,7 +1289,7 @@ const CommunityPage = ({ laneLinks = {} }: { laneLinks?: Record<string, string> 
                       }`}
                       aria-label={`Show ${p.cap}`}
                     >
-                      <img src={p.img} alt="" className="h-full w-full object-cover" />
+                      <Image sizes="96px" width={192} height={192} src={p.img} alt="" className="h-full w-full object-cover" />
                     </button>
                   ))}
                 </div>
@@ -1521,7 +1522,7 @@ const Frame = ({
   span: string;
 }) => (
   <figure className={`group relative overflow-hidden rounded-2xl border-2 border-ink bg-ink ${span}`}>
-    <img
+    <Image sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw" width={1200} height={900}
       src={img}
       alt={caption}
       loading="lazy"
@@ -1707,14 +1708,14 @@ const HeroSection = () => {
                       aria-label={t.caption}
                       className="h-full w-full object-cover"
                     />
-                  ) : (
-                    <img
+                  ) : t.img ? (
+                    <Image sizes="(min-width: 768px) 33vw, 50vw" width={1000} height={800}
                       src={t.img}
                       alt={t.caption}
                       loading="lazy"
                       className="h-full w-full object-cover"
                     />
-                  )}
+                  ) : null}
                   <figcaption className="ui absolute bottom-0 left-0 right-0 flex items-center justify-between bg-ink/75 px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-cream backdrop-blur-sm">
                     <span>{t.caption}</span>
                     <span className="text-butter">●</span>

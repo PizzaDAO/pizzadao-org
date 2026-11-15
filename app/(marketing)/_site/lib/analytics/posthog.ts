@@ -3,7 +3,7 @@
 /**
  * Thin typed wrapper around posthog-js. Safe no-op when key is missing.
  */
-import posthog from "posthog-js";
+import type { PostHog } from "posthog-js";
 import {
   HIGH_INTENT_PATHS,
   POSTHOG_DEBUG,
@@ -13,13 +13,28 @@ import {
 } from "./config";
 import type { EventName } from "./events";
 
-let initialized = false;
+// posthog-js is ~120KB gzipped, so it is loaded lazily after first idle (and never when no key is set).
+// Calls made before it has loaded are queued and replayed once it is ready.
+let ph: PostHog | null = null;
+let started = false;
+const MAX_QUEUE = 50;
+const queue: Array<(p: PostHog) => void> = [];
 
 // False while the visitor is on an app page (the provider only mounts under the marketing layout).
 let active = true;
 
 export function isEnabled(): boolean {
-  return initialized && active && Boolean(POSTHOG_KEY);
+  return started && active && Boolean(POSTHOG_KEY);
+}
+
+/** Run now if loaded, else queue (only while enabled and loading). */
+function withPh(fn: (p: PostHog) => void): void {
+  if (!isEnabled()) return;
+  if (ph) {
+    fn(ph);
+  } else if (queue.length < MAX_QUEUE) {
+    queue.push(fn);
+  }
 }
 
 /**
@@ -28,68 +43,113 @@ export function isEnabled(): boolean {
  */
 export function setActive(on: boolean): void {
   active = on;
-  if (!initialized || !POSTHOG_KEY) return;
+  if (!started || !POSTHOG_KEY) return;
+  if (!on) queue.length = 0;
+  if (!ph) return;
   try {
     if (on) {
-      posthog.opt_in_capturing();
+      ph.opt_in_capturing();
     } else {
-      posthog.stopSessionRecording();
-      posthog.opt_out_capturing();
+      ph.stopSessionRecording();
+      ph.opt_out_capturing();
     }
   } catch {
     /* noop */
   }
 }
 
+function whenIdle(cb: () => void): void {
+  const w = window as Window & {
+    requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+  };
+  if (typeof w.requestIdleCallback === "function") {
+    w.requestIdleCallback(cb, { timeout: 4000 });
+  } else {
+    setTimeout(cb, 2000);
+  }
+}
+
 export function initPostHog(): void {
-  if (initialized) return;
+  if (started) return;
   if (typeof window === "undefined") return;
   if (!POSTHOG_KEY) {
     if (POSTHOG_DEBUG) console.warn("[analytics] No PostHog key configured.");
     return;
   }
+  started = true;
+  const key = POSTHOG_KEY;
 
-  // Respect Do Not Track - switch to memory persistence (no cookies).
-  const dnt =
-    typeof navigator !== "undefined" &&
-    (navigator.doNotTrack === "1" ||
-      // @ts-expect-error legacy
-      window.doNotTrack === "1");
+  whenIdle(() => {
+    void import("posthog-js")
+      .then(({ default: posthog }) => {
+        // Respect Do Not Track - switch to memory persistence (no cookies).
+        const dnt =
+          typeof navigator !== "undefined" &&
+          (navigator.doNotTrack === "1" ||
+            // @ts-expect-error legacy
+            window.doNotTrack === "1");
 
-  posthog.init(POSTHOG_KEY, {
-    api_host: POSTHOG_HOST,
-    defaults: "2026-01-30",
-    capture_pageview: false, // we capture manually on SPA route changes
-    capture_pageleave: true,
-    autocapture: true,
-    persistence: dnt ? "memory" : "localStorage+cookie",
-    mask_all_text: false,
-    // PII safety: mask every input by default; we opt-in to plain text via classes.
-    session_recording: {
-      maskAllInputs: true,
-      maskTextSelector: "[data-ph-mask]",
-    },
-    // Sample replays globally; we'll force-record on high-intent routes below.
-    disable_session_recording: false,
-    enable_recording_console_log: true,
-    loaded: (ph) => {
-      if (POSTHOG_DEBUG) ph.debug();
-      // Decide replay sampling per current path.
-      maybeForceReplay(window.location.pathname);
-    },
+        posthog.init(key, {
+          api_host: POSTHOG_HOST,
+          defaults: "2026-01-30",
+          capture_pageview: false, // we capture manually on SPA route changes
+          capture_pageleave: true,
+          autocapture: true,
+          persistence: dnt ? "memory" : "localStorage+cookie",
+          mask_all_text: false,
+          // PII safety: mask every input by default; we opt-in to plain text via classes.
+          session_recording: {
+            maskAllInputs: true,
+            maskTextSelector: "[data-ph-mask]",
+          },
+          // Sample replays globally; we'll force-record on high-intent routes below.
+          disable_session_recording: false,
+          enable_recording_console_log: true,
+          loaded: (p) => {
+            if (POSTHOG_DEBUG) p.debug();
+          },
+        });
+
+        // Default sample rate via cookie property; PostHog reads server-side too.
+        posthog.register({ replay_sample_rate: REPLAY_GLOBAL_SAMPLE });
+
+        ph = posthog;
+        if (!active) {
+          // The visitor left the marketing pages while loading.
+          queue.length = 0;
+          try {
+            posthog.opt_out_capturing();
+          } catch {
+            /* noop */
+          }
+          return;
+        }
+        // A previous visit may have left an opt-out in storage (setActive(false) on leaving marketing).
+        try {
+          posthog.opt_in_capturing();
+        } catch {
+          /* noop */
+        }
+        maybeForceReplay(window.location.pathname);
+        for (const fn of queue.splice(0)) {
+          try {
+            fn(posthog);
+          } catch {
+            /* noop */
+          }
+        }
+      })
+      .catch(() => {
+        /* blocked (ad blocker) or offline: analytics just stays off */
+      });
   });
-
-  // Default sample rate via cookie property; PostHog reads server-side too.
-  posthog.register({ replay_sample_rate: REPLAY_GLOBAL_SAMPLE });
-
-  initialized = true;
 }
 
 function maybeForceReplay(path: string) {
-  if (!isEnabled()) return;
+  if (!ph || !isEnabled()) return;
   if (HIGH_INTENT_PATHS.some((p) => path.startsWith(p))) {
     try {
-      posthog.startSessionRecording();
+      ph.startSessionRecording();
     } catch {
       /* noop */
     }
@@ -97,24 +157,24 @@ function maybeForceReplay(path: string) {
 }
 
 export function trackPageView(path: string, search: string): void {
-  if (!isEnabled()) return;
-  const url = `${window.location.origin}${path}${search}`;
-  posthog.capture("$pageview", {
-    $current_url: url,
-    path,
-    gate_unlocked:
-      typeof sessionStorage !== "undefined" &&
-      sessionStorage.getItem("pd-unlocked") === "1",
+  withPh((p) => {
+    const url = `${window.location.origin}${path}${search}`;
+    p.capture("$pageview", {
+      $current_url: url,
+      path,
+      gate_unlocked:
+        typeof sessionStorage !== "undefined" &&
+        sessionStorage.getItem("pd-unlocked") === "1",
+    });
+    maybeForceReplay(path);
   });
-  maybeForceReplay(path);
 }
 
 export function track(
   event: EventName | string,
   properties: Record<string, unknown> = {},
 ): void {
-  if (!isEnabled()) return;
-  posthog.capture(event, properties);
+  withPh((p) => p.capture(event, properties));
 }
 
 /** Stable, non-PII person id derived from email. */
@@ -135,22 +195,19 @@ export async function identifyByEmail(
   if (!email) return;
   const id = await hashEmail(email);
   // Hashed id only: the raw address is never sent as a person property.
-  posthog.identify(id, { ...properties });
+  withPh((p) => p.identify(id, { ...properties }));
 }
 
 export function registerOnce(props: Record<string, unknown>): void {
-  if (!isEnabled()) return;
-  posthog.register_once(props);
+  withPh((p) => p.register_once(props));
 }
 
 export function register(props: Record<string, unknown>): void {
-  if (!isEnabled()) return;
-  posthog.register(props);
+  withPh((p) => p.register(props));
 }
 
 export function reset(): void {
-  if (!isEnabled()) return;
-  posthog.reset();
+  withPh((p) => p.reset());
 }
 
 /** Capture UTM + referrer on first touch and last-touch each session. */

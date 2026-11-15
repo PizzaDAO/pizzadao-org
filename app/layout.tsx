@@ -3,12 +3,15 @@ import { Suspense } from "react";
 import localFont from "next/font/local";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
+import { SpeedInsights } from "@vercel/speed-insights/next";
+import { pickClientMessages } from "@/app/lib/i18n/client-namespaces";
 import "./globals.css";
 import { Providers } from "./providers";
 import CornerLinks from "@/app/ui/CornerLinks";
 import SiteHeader from "@/app/ui/SiteHeader";
 import { XConnectNotice } from "@/app/ui/XConnectNotice";
 import { GlobalBallotPreparer } from "@/app/proposals/_components/GlobalBallotPreparer";
+import { speedInsightsEnabled } from "@/app/lib/marketing-site";
 import { SITE_URL } from "@/app/lib/site-url";
 
 // Fonts are self-hosted (app/fonts, latin subset; licenses alongside) so the
@@ -40,6 +43,7 @@ const rockSalt = localFont({
   variable: "--font-handwritten-rock-salt",
   src: [{ path: "./fonts/RockSalt-400-latin.woff2", weight: "400", style: "normal" }],
   display: "swap",
+  preload: false, // decorative accent: fetched when first used, not on every page load
 });
 
 // Kept for `font-mono` consumers (app/tech/projects/[slug]/page.tsx).
@@ -47,6 +51,7 @@ const geistMono = localFont({
   variable: "--font-geist-mono",
   src: [{ path: "./fonts/GeistMono-latin-variable.woff2", weight: "100 900", style: "normal" }],
   display: "swap",
+  preload: false, // only the tech project pages use it
 });
 
 export const metadata: Metadata = {
@@ -69,7 +74,8 @@ export default async function RootLayout({
 }>) {
   // Resolved by app/lib/i18n/request.ts (cookie → Accept-Language → default).
   const locale = await getLocale();
-  const messages = await getMessages();
+  // Client components only get the namespaces they use (see client-namespaces.ts); server code reads the full catalog.
+  const messages = pickClientMessages(await getMessages());
 
   return (
     <html lang={locale} suppressHydrationWarning>
@@ -86,6 +92,7 @@ export default async function RootLayout({
         </NextIntlClientProvider>
         {/* Suggestion + GitHub links - Fixed Bottom Right */}
         <CornerLinks />
+        {speedInsightsEnabled() && <SpeedInsights />}
       </body>
     </html>
   );

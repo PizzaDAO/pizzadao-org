@@ -21,6 +21,8 @@ export const REMOTE_IMAGE_PATTERNS: RemotePattern[] = [
   { protocol: "https", hostname: "res.cloudinary.com", pathname: "/alchemyapi/**" },
   // Vercel Blob uploads (article + suggestion images)
   { protocol: "https", hostname: "*.public.blob.vercel-storage.com" },
+  // Public PizzaDAO event photo archive (marketing galleries), this org's repo only
+  { protocol: "https", hostname: "raw.githubusercontent.com", pathname: "/PizzaDAO/**" },
 ];
 
 function hostMatches(pattern: string, host: string): boolean {
