@@ -94,8 +94,8 @@ const About = () => {
               src={HERO_PHOTO}
               alt="Volunteers carrying pizza boxes through a crowded street gathering"
               decoding="async"
-              width={2400}
-              height={1500}
+              width={1280}
+              height={720}
               style={{ objectPosition: "50% 42%" }}
               className="block h-[88svh] min-h-[560px] w-full object-cover md:h-[100svh] md:min-h-[720px]"
             />
