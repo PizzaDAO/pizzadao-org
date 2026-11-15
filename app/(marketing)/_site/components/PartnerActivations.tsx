@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 const img01 = "/marketing/assets/partners/activation-01.png";
 const img02 = "/marketing/assets/partners/activation-02.png";
 const img03 = "/marketing/assets/partners/activation-03.png";
@@ -97,7 +98,7 @@ const PartnerActivations = () => {
                   data-benny="true"
                   className="relative overflow-hidden bg-ink/5 shadow-[0_14px_30px_-18px_hsl(0_0%_0%/0.40),0_2px_5px_-2px_hsl(0_0%_0%/0.18)] ring-1 ring-ink/10"
                 >
-                  <img
+                  <Image sizes="(min-width: 1024px) 25vw, 50vw" width={800} height={1000}
                     src={f.src}
                     alt={f.alt}
                     loading="lazy"

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRef } from "react";
 const t2010 = "/marketing/assets/timeline-2010.jpg";
 const tFounding = "/marketing/assets/timeline-founding.jpg";
@@ -124,7 +125,7 @@ const Timeline = () => {
 
         <div
           ref={trackRef}
-          className="mt-8 flex snap-x snap-mandatory gap-5 overflow-x-auto scroll-smooth px-5 pb-16 [scroll-padding-left:1.25rem] md:gap-8 md:px-10 md:pb-24 md:[scroll-padding-left:2.5rem] lg:px-16"
+          className="mt-8 flex snap-x snap-mandatory gap-5 overflow-x-auto scroll-smooth px-5 pb-16 [scroll-padding-left:1.25rem] md:gap-8 md:px-10 md:pb-24 md:[scroll-padding-left:2.5rem] lg:px-16 lg:[scroll-padding-left:4rem]"
           style={{ scrollbarWidth: "thin" }}
         >
           {CHAPTERS.map((c, i) => (
@@ -135,7 +136,7 @@ const Timeline = () => {
 
               {/* Image */}
               <figure className="mk-grain relative mt-5 overflow-hidden rounded-2xl">
-                <img
+                <Image sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
                   src={c.img}
                   alt={c.alt}
                   loading="lazy"

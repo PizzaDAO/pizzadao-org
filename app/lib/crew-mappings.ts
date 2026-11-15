@@ -6,7 +6,8 @@
 
 import type { GvizResponse } from "@/app/lib/gviz-parser";
 import { getTaskLinks, getColumnHyperlinks } from "@/app/api/lib/google-sheets";
-import { cacheGet, cacheSet, cacheDel, CACHE_TTL } from "@/app/api/lib/cache";
+import { swrGet, swrInvalidate } from "@/app/lib/swr-cache";
+import { cacheDel, CACHE_TTL } from "@/app/api/lib/cache";
 import { fetchGviz, buildGvizUrl, GvizFetchError } from "@/app/lib/sheets/gviz";
 import { SHEET_IDS, SHEET_TABS } from "@/app/lib/sheets/config";
 import { norm as normalizeSpaces } from "@/app/lib/strings";
@@ -494,40 +495,42 @@ async function attachTasks(crews: CrewOption[], forceRefresh: boolean): Promise<
   );
 }
 
-const DB_CACHE_KEY = "crew-mappings:db:v1";
-const sheetCacheKey = () => `crew-mappings:v7:${SHEET_ID}`;
+const CREW_MAPPINGS_KEEP = 60 * 60 * 24; // stale lists stay servable for a day
+// Previous formats (a bare { crews }) may still be written by older deployments sharing this
+// cache; the SWR envelope lives under separate keys so the two never read each other's values.
+const LEGACY_DB_CACHE_KEY = "crew-mappings:db:v1";
+const legacySheetCacheKey = () => `crew-mappings:v7:${SHEET_ID}`;
+const DB_CACHE_KEY = "crew-mappings:db:v2:swr";
+const sheetCacheKey = () => `crew-mappings:v8:swr:${SHEET_ID}`;
 
 /** Forget the cached crew list (after an edit on the website). */
 export async function invalidateCrewMappingsCache(): Promise<void> {
-  await Promise.all([cacheDel(DB_CACHE_KEY), cacheDel(sheetCacheKey())]);
+  await Promise.all([swrInvalidate(DB_CACHE_KEY, LEGACY_DB_CACHE_KEY), swrInvalidate(sheetCacheKey(), legacySheetCacheKey())]);
 }
 
 /**
  * Get crew mappings data directly (without HTTP fetch). Source: the Crew Mappings sheet, or the
  * Crew table once `sheets.source.crews` is "db" (plans/sheets-cutover.md).
  * @param forceRefresh - If true, bypass cache
+ * @param opts.staleWhileRevalidate - Page reads only: serve a stale list and refresh behind the response.
+ *   Everything else keeps the blocking 5-minute behavior.
  * @returns Crew mappings data
  */
-export async function getCrewMappings(forceRefresh = false): Promise<{ crews: CrewOption[]; cached: boolean }> {
+export async function getCrewMappings(forceRefresh = false, opts: { staleWhileRevalidate?: boolean } = {}): Promise<{ crews: CrewOption[]; cached: boolean }> {
   const { usesDb } = await import("@/app/lib/sheets-import/source");
   const fromDb = await usesDb("crews");
   const cacheKey = fromDb ? DB_CACHE_KEY : sheetCacheKey();
 
-  if (!forceRefresh) {
-    const cached = await cacheGet<{ crews: CrewOption[] }>(cacheKey);
-    // A cached value in another shape (e.g. written by a preview deployment sharing this cache) is a miss.
-    if (cached && Array.isArray(cached.crews)) {
-      return { ...cached, cached: true };
-    }
-  }
-
-  const crews = fromDb ? await fetchCrewsFromDb() : (await fetchCrewMappingsFromSheet(forceRefresh)).crews;
-
-  // Parallel fetch tasks for crews that have a sheet
-  await attachTasks(crews, forceRefresh);
-
-  const payload = { crews };
-  await cacheSet(cacheKey, payload, CACHE_TTL.CREW_MAPPINGS);
-
-  return { ...payload, cached: false };
+  // Stale-while-revalidate: serve the last list at once and refresh behind the response; only a
+  // truly empty cache (or a force refresh) waits on the source and the task sheets.
+  const { value, cached } = await swrGet(
+    cacheKey,
+    async () => {
+      const crews = fromDb ? await fetchCrewsFromDb() : (await fetchCrewMappingsFromSheet(forceRefresh)).crews;
+      await attachTasks(crews, forceRefresh);
+      return { crews };
+    },
+    { freshSeconds: CACHE_TTL.CREW_MAPPINGS, keepSeconds: CREW_MAPPINGS_KEEP, forceRefresh, isValid: (v) => Array.isArray(v?.crews), serveStale: opts.staleWhileRevalidate === true },
+  );
+  return { ...value, cached };
 }

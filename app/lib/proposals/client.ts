@@ -11,7 +11,7 @@
  *  - castVote(): sends token + choice with no cookies and no referrer to the unauthenticated vote endpoint;
  *  - the "vote code" is the ballot encoded as text, to vote or change a vote from another browser.
  */
-import { blind, finalize, fromBase64, importPublicKey, prepareMessage, toBase64 } from '@/utils/blindRsa.client'
+import { fromBase64, toBase64 } from '@/utils/base64'
 import { fingerprintOfPem, modulusOk } from './fingerprint'
 
 export type Choice = 'AYE' | 'NAY' | 'ABSTAIN'
@@ -222,6 +222,8 @@ export function prepareBallot(proposalId: string, pageFingerprint?: string | nul
   let p = inFlight.get(proposalId)
   if (!p) {
     p = (async () => {
+      // The RSA library is large: load it only when a ballot is actually being made.
+      const { blind, finalize, importPublicKey, prepareMessage } = await import('@/utils/blindRsa.client')
       const pem = await trustedPublicKey(proposalId, pageFingerprint)
       const publicKey = await importPublicKey(pem)
       const token = `proposal-${proposalId}-${crypto.randomUUID()}`

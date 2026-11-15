@@ -1079,6 +1079,8 @@
       "recordingEnded": "La grabación terminó; la llamada sigue.",
       "headCount": "{count, plural, one {# persona en la llamada} other {# personas en la llamada}}",
       "present": "Quién está aquí",
+      "stoppedBy": "Pasaron antes",
+      "leftAgo": "{count, plural, =0 {se fue ahora mismo} other {se fue hace # min}}",
       "presentSignIn": "Inicia sesión para ver quién está en la llamada, hacer preguntas y leer los action items en vivo.",
       "signIn": "Iniciar sesión",
       "minutes": "{count} min",

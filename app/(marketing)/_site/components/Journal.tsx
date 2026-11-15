@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 const lead = "/marketing/assets/journal-lead.png";
 const jAi = "/marketing/assets/journal-ai-community.png";
@@ -138,7 +139,7 @@ const Journal = () => {
             className="group block"
           >
             <figure className="mk-grain relative overflow-hidden rounded-2xl" data-benny="true">
-              <img
+              <Image sizes="(min-width: 1280px) 1200px, 100vw"
                 src={lead}
                 alt="Pizza party gathering, lit warmly, strangers becoming neighbors"
                 loading="lazy"

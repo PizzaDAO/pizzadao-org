@@ -7,6 +7,7 @@ import { getSession } from "@/app/lib/session";
 import { disavowEnabled } from "@/app/lib/disavow/constants";
 import { disavowViewer, findSubjectDisavowals } from "@/app/lib/disavow/access";
 import { loadDisavowCatalog } from "@/app/lib/disavow/messages";
+import { pickClientMessages } from "@/app/lib/i18n/client-namespaces";
 import type { SupportedLocale } from "@/app/lib/i18n/locales";
 
 // Private area: never cached, never indexed. The route 404s for everyone who
@@ -41,7 +42,7 @@ export default async function DisavowLayout({ children }: { children: ReactNode 
     const locale = await getLocale();
     const [root, disavow] = await Promise.all([getMessages(), loadDisavowCatalog(locale as SupportedLocale)]);
     return (
-        <NextIntlClientProvider locale={locale} messages={{ ...root, disavow } as never}>
+        <NextIntlClientProvider locale={locale} messages={{ ...pickClientMessages(root), disavow } as never}>
             {children}
         </NextIntlClientProvider>
     );

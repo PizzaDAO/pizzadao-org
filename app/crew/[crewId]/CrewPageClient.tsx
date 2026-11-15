@@ -3,6 +3,7 @@
 import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
+import Image from 'next/image'
 import { TURTLES } from '@/app/ui/constants'
 import { useToast } from '@/app/ui/shared/Toast'
 import { LoginPrompt } from '@/app/ui/shared/LoginPrompt'
@@ -732,7 +733,7 @@ export default function CrewPageClient({ params, featuresLink = false }: { param
                           )
                           if (!tDef) return null
                           return (
-                            <img
+                            <Image width={24} height={24}
                               key={j}
                               src={tDef.image}
                               alt={tDef.label}
@@ -1184,7 +1185,7 @@ export default function CrewPageClient({ params, featuresLink = false }: { param
                     )
                     if (!tDef) return null
                     return (
-                      <img
+                      <Image width={28} height={28}
                         key={j}
                         src={tDef.image}
                         alt={tDef.label}

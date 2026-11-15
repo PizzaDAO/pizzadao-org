@@ -69,8 +69,29 @@ export interface LiveItemView {
   createdAt: string
 }
 
+export interface StoppedByView extends PersonRef {
+  /** Minutes they spent in the call. */
+  minutes: number
+  /** Minutes since they left; null when the app did not see them leave. */
+  leftMinutesAgo: number | null
+  pfpUrl: string | null
+}
+
+/** Most "stopped by" people listed. */
+export const MAX_STOPPED_BY = 50
+
+/** People who were in the call but are out now (bots excluded), most recent leaver first; unknown leave times last. */
+export function stoppedByOrder<T extends { discordId: string; presentSec: number; inChannel: boolean; leftAt?: number | null }>(presence: readonly T[], excluded: ReadonlySet<string>): T[] {
+  return presence
+    .filter((p) => !p.inChannel && !excluded.has(p.discordId))
+    .sort((a, b) => (b.leftAt ?? -1) - (a.leftAt ?? -1) || b.presentSec - a.presentSec || a.discordId.localeCompare(b.discordId))
+    .slice(0, MAX_STOPPED_BY)
+}
+
 export interface MemberCall extends PublicLive {
   present: Array<PersonRef & { minutes: number; pfpUrl: string | null }>
+  /** In the call earlier, gone now. */
+  stoppedBy: StoppedByView[]
   items: LiveItemView[]
   /** What the crew is working on (goals, open tasks, leads, link); null for a call with no crew. */
   crew: CrewContext | null
@@ -96,6 +117,7 @@ interface SharedItem extends LiveItemView {
 interface SharedCall {
   items: SharedItem[]
   present: Array<PersonRef & { minutes: number; pfpUrl: string | null }>
+  stopped: Array<PersonRef & { minutes: number; leftAt: number | null; pfpUrl: string | null }>
 }
 
 const sharedCache = new Map<string, { at: number; value: Promise<SharedCall> }>()
@@ -136,8 +158,9 @@ async function buildShared(s: Session, filter: PostFilter | null, excluded: Read
   const stillUnnamed = rows.map((r) => r.speakerIds[0]).filter((id): id is string => !!id && !cleanSuggestedBy(names.get(id) ?? null))
   if (stillUnnamed.length) for (const [id, n] of await resolveMemberNames(stillUnnamed)) names.set(id, n)
   const inChannel = presence.filter((p) => p.inChannel && !excluded.has(p.discordId))
-  const members = await resolveMemberIds([...rows.map((r) => r.speakerIds[0]).filter(Boolean), ...inChannel.map((p) => p.discordId)])
-  const memberIds = [...new Set(inChannel.map((p) => members.get(p.discordId)).filter((m): m is string => !!m))]
+  const gone = stoppedByOrder(presence, excluded)
+  const members = await resolveMemberIds([...rows.map((r) => r.speakerIds[0]).filter(Boolean), ...inChannel.map((p) => p.discordId), ...gone.map((p) => p.discordId)])
+  const memberIds = [...new Set([...inChannel, ...gone].map((p) => members.get(p.discordId)).filter((m): m is string => !!m))]
   const pfps = memberIds.length ? await resolvePfpUrlsAsync(memberIds).catch(() => ({}) as Record<string, string | null>) : {}
   return {
     items: rows.map((r) => {
@@ -153,6 +176,10 @@ async function buildShared(s: Session, filter: PostFilter | null, excluded: Read
         source: r.source,
         createdAt: r.createdAt.toISOString(),
       }
+    }),
+    stopped: gone.map((p) => {
+      const ref = personRef(p.displayName, p.discordId, members)
+      return { ...ref, minutes: Math.floor(p.presentSec / 60), leftAt: p.leftAt ?? null, pfpUrl: (ref.memberId && pfps[ref.memberId]) || null }
     }),
     present: inChannel
       .map((p) => {
@@ -218,6 +245,7 @@ export async function memberLiveView(
       return {
         ...publicFields(s, settings, excluded),
         present: sh.present,
+        stoppedBy: sh.stopped.map(({ leftAt, ...p }) => ({ ...p, leftMinutesAgo: leftAt === null ? null : Math.max(0, Math.floor((now - leftAt) / 60_000)) })),
         crew,
         items: fresh.map((i) => ({ id: i.id, text: i.text, owner: i.owner, suggestedBy: i.suggestedBy, source: i.source, createdAt: i.createdAt })),
         itemsCursor: last ? `${last.ms}~${last.id}` : (cursors.get(s.sessionId) ?? null),

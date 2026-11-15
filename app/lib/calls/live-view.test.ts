@@ -10,7 +10,7 @@ import type { Settings } from '@/app/lib/settings'
 import { SETTINGS, type SettingKey } from '@/app/lib/settings/registry'
 import { EMPTY_POST_FILTER } from './post-filters'
 import { clearQaCache } from './live-qa'
-import { clearLiveViewCache, memberLiveView, parseCursor, publicLiveView } from './live-view'
+import { clearLiveViewCache, memberLiveView, parseCursor, publicLiveView, stoppedByOrder } from './live-view'
 
 function fakeSettings(over: Partial<Record<SettingKey, unknown>> = {}): Settings {
   return { readFailed: false, invalidKeys: [], isSet: (k) => k in over, get: ((k: SettingKey) => (k in over ? over[k] : SETTINGS[k].default)) as Settings['get'] }
@@ -200,5 +200,24 @@ describe('polling cost', () => {
     expect(vi.mocked(prisma.callLiveQuestionVote.findMany).mock.calls[2][0]).toMatchObject({ where: { voterId: 'u3' } })
     await view({ who: 'u4', now: NOW + 3500 })
     expect(prisma.callLiveItem.findMany).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('stopped by', () => {
+  const P = (discordId: string, presentSec: number, inChannel: boolean, leftAt?: number | null) => ({ discordId, presentSec, inChannel, leftAt })
+  it('orders people who left, most recent first, unknown times last, and drops bots and anyone in the call', () => {
+    const out = stoppedByOrder([P('1', 60, false, 100), P('2', 900, false, 300), P('3', 600, false), P('4', 60, true), P('5', 60, false, 500), P('6', 120, false)], new Set(['5']))
+    expect(out.map((p) => p.discordId)).toEqual(['2', '1', '3', '6'])
+  })
+  it('lists the gone people in the member payload with minutes and time since leaving; a rejoiner is only in present', async () => {
+    const out = await view()
+    expect(out.calls[0].stoppedBy.map((p) => p.name)).toEqual(['Cy'])
+    expect(out.calls[0].stoppedBy[0]).toMatchObject({ minutes: 1, leftMinutesAgo: null, memberId: null })
+    const withTime = { ...session, presence: [...session.presence.slice(0, 2), { ...session.presence[2], leftAt: NOW - 125_000 }] }
+    vi.mocked(prisma.callLiveSession.findMany).mockResolvedValue([withTime] as never)
+    clearLiveViewCache()
+    const out2 = await view()
+    expect(out2.calls[0].stoppedBy[0].leftMinutesAgo).toBe(2)
+    expect(out2.calls[0].present.some((p) => p.name === 'Cy')).toBe(false)
   })
 })

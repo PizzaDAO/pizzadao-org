@@ -7,7 +7,7 @@ import Timeline from "@/app/(marketing)/_site/components/Timeline";
 import Mafia from "@/app/(marketing)/_site/components/Mafia";
 import Work from "@/app/(marketing)/_site/components/Work";
 import MomentReel from "@/app/(marketing)/_site/components/MomentReel";
-import Reach from "@/app/(marketing)/_site/components/Reach";
+import Reach from "@/app/(marketing)/_site/components/LazyReach";
 import Sponsorship from "@/app/(marketing)/_site/components/Sponsorship";
 import Journal from "@/app/(marketing)/_site/components/Journal";
 import Join from "@/app/(marketing)/_site/components/Join";

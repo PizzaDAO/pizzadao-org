@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 const joinHero = "/marketing/assets/join-hero.jpg";
 import { ArrowUpRight } from "lucide-react";
 import { Link } from "@/app/(marketing)/_site/lib/router";
@@ -34,7 +35,7 @@ const Join = () => {
       {/* Hero band */}
       <div className="relative">
         <div className="absolute inset-0">
-          <img
+          <Image sizes="100vw" width={1920} height={1080}
             src={joinHero}
             alt=""
             loading="lazy"

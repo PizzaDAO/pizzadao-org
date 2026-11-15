@@ -15,7 +15,7 @@ import type { PollView, QuestionView } from "@/app/lib/calls/live-qa";
 const MAX_QUESTION = 280;
 
 type PublicResponse = { calls: PublicLive[]; pollSeconds: number };
-type CallState = PublicLive & Partial<Pick<MemberCall, "present" | "itemsLocked" | "questions" | "polls" | "crew">>;
+type CallState = PublicLive & Partial<Pick<MemberCall, "present" | "stoppedBy" | "itemsLocked" | "questions" | "polls" | "crew">>;
 
 interface State {
     signedIn: boolean;
@@ -190,7 +190,7 @@ function LiveCall({ live, state, items, onChanged, locale }: { live: CallState; 
             ) : (
                 <>
                     {live.crew && <CrewSection crew={live.crew} />}
-                    <PresentSection present={live.present ?? []} />
+                    <PresentSection present={live.present ?? []} stoppedBy={live.stoppedBy ?? []} />
                     <ItemsSection items={items} locked={live.itemsLocked ?? null} />
                     <PollsSection sessionId={live.sessionId} polls={live.polls ?? []} isHost={state.isHost} onChanged={onChanged} />
                     <QaSection sessionId={live.sessionId} questions={live.questions ?? []} isHost={state.isHost} onChanged={onChanged} />
@@ -373,7 +373,7 @@ function Avatar({ name, url }: { name: string; url: string | null }) {
     );
 }
 
-function PresentSection({ present }: { present: NonNullable<MemberCall["present"]> }) {
+function PresentSection({ present, stoppedBy }: { present: NonNullable<MemberCall["present"]>; stoppedBy: NonNullable<MemberCall["stoppedBy"]> }) {
     const t = useTranslations("callsPage.live");
     return (
         <Section title={t("present")}>
@@ -389,6 +389,22 @@ function PresentSection({ present }: { present: NonNullable<MemberCall["present"
                         </li>
                     ))}
                 </ul>
+            )}
+            {stoppedBy.length > 0 && (
+                <div className="mt-5">
+                    <h3 className="m-0 mb-2 text-sm font-semibold uppercase tracking-wide text-foreground/60">{t("stoppedBy")}</h3>
+                    <ul className="m-0 grid list-none grid-cols-1 gap-x-4 gap-y-2 p-0 opacity-70 sm:grid-cols-2">
+                        {stoppedBy.map((p, i) => (
+                            <li key={`${p.memberId ?? p.name}-${i}`} className="flex min-w-0 items-center gap-3">
+                                <Avatar name={p.name ?? t("memberAsker")} url={p.pfpUrl} />
+                                <PersonLink name={p.name ?? t("memberAsker")} memberId={p.memberId} className="min-w-0 flex-1 break-words" />
+                                <span className="shrink-0 text-sm text-foreground/60">
+                                    {p.leftMinutesAgo === null ? t("minutes", { count: p.minutes }) : t("leftAgo", { count: p.leftMinutesAgo })}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
             )}
         </Section>
     );
