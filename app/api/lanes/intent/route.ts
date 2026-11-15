@@ -6,6 +6,7 @@
 // Returns the lane's public name for the wizard banner. 404 (and no cookie) while the setting is
 // off or the lane is unknown / unpublished. DELETE forgets it.
 import { NextResponse } from 'next/server'
+import { rejectCrossOrigin, rejectUnsafeWrite } from '@/app/lib/admin-guard'
 import { enforceRateLimit } from '@/app/lib/rate-limit'
 import { getPublishedLane, lanesEnabled } from '@/app/lib/lanes'
 import { LANE_COOKIE, laneCookieOptions, normalizeLaneSlug } from '@/app/lib/lanes/cookie'
@@ -14,7 +15,9 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: Request) {
-  const limited = await enforceRateLimit(req, 'referral-search')
+  const unsafe = rejectUnsafeWrite(req)
+  if (unsafe) return unsafe
+  const limited = await enforceRateLimit(req, 'lane-intent')
   if (limited) return limited
   if (!(await lanesEnabled())) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const body = (await req.json().catch(() => null)) as { slug?: unknown } | null
@@ -28,6 +31,8 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const unsafe = rejectCrossOrigin(req)
+  if (unsafe) return unsafe
   const res = NextResponse.json({ ok: true })
   res.cookies.set(LANE_COOKIE, '', laneCookieOptions(req, 0))
   return res

@@ -62,6 +62,9 @@ export type OnboardingWizardProps = {
 };
 
 // Where the wizard itself lives: "/" today, "/start" once the marketing home takes over "/".
+// A lane pick older than the pd_lane cookie is dropped.
+const LANE_PICK_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000;
+
 const WIZARD_HOME = marketingHomeAtRoot() ? "/start" : "/";
 
 export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
@@ -215,15 +218,34 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
   // the setting off nothing changes.
   const [laneCta, setLaneCta] = useState<string | null>(null);
   const [laneInfo, setLaneInfo] = useState<{ slug: string; tag: string; title: string } | null>(null);
+  const laneParamRead = useRef(false);
+  const rejectedLanes = useRef(new Set<string>());
+  // Read ?lane= once and take it out of the address bar, so a rejected slug is never re-applied.
+  useEffect(() => {
+    if (!dataReady || laneParamRead.current) return;
+    laneParamRead.current = true;
+    const url = new URL(window.location.href);
+    const param = url.searchParams.get("lane");
+    if (param === null) return;
+    if (isLaneSlug(param)) setData((p) => ({ ...p, lane: param, laneAt: Date.now() }));
+    url.searchParams.delete("lane");
+    try {
+      window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+    } catch {}
+  }, [dataReady]);
   useEffect(() => {
     if (!dataReady) return;
-    const param = new URLSearchParams(window.location.search).get("lane");
-    if (param && isLaneSlug(param) && param !== data.lane) {
-      setData((p) => ({ ...p, lane: param }));
-      return;
-    }
     const slug = data.lane;
     if (!slug) return;
+    if (data.laneAt && Date.now() - data.laneAt > LANE_PICK_MAX_AGE_MS) {
+      setData((p) => ({ ...p, lane: undefined, laneAt: undefined }));
+      return;
+    }
+    if (!data.laneAt) {
+      setData((p) => (p.lane === slug ? { ...p, laneAt: Date.now() } : p));
+      return;
+    }
+    if (rejectedLanes.current.has(slug)) return;
     let alive = true;
     (async () => {
       try {
@@ -237,28 +259,32 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
         if (!alive) return;
         if (json?.lane?.slug === slug) setLaneInfo({ slug, tag: String(json.lane.tag || ""), title: String(json.lane.title || "") });
         else if (res.status === 404 || res.status === 400) {
+          rejectedLanes.current.add(slug);
           setLaneInfo(null);
-          setData((p) => (p.lane === slug ? { ...p, lane: undefined } : p));
+          setData((p) => (p.lane === slug ? { ...p, lane: undefined, laneAt: undefined } : p));
         }
       } catch {}
     })();
     return () => {
       alive = false;
     };
-  }, [dataReady, data.lane]);
+  }, [dataReady, data.lane, data.laneAt]);
 
   // Where an existing member who just logged in lands: their lane guide when they picked one.
   async function laneLanding(): Promise<string | null> {
-    if (!data.lane) return null;
+    const slug = data.lane;
+    if (!slug || (data.laneAt && Date.now() - data.laneAt > LANE_PICK_MAX_AGE_MS)) return null;
+    // The pick is used once: a later login must not be sent to the guide by a stale value.
+    setData((p) => ({ ...p, lane: undefined, laneAt: undefined }));
     try {
       const res = await fetch("/api/lanes/intent", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug: data.lane }),
+        body: JSON.stringify({ slug }),
       });
       const json = res.ok ? await res.json() : null;
-      return json?.lane?.slug === data.lane ? `/lanes/${data.lane}?pick=1` : null;
+      return json?.lane?.slug === slug ? `/lanes/${slug}?pick=1` : null;
     } catch {
       return null;
     }
@@ -605,12 +631,12 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
       const memberId = result?.sheets?.memberId || result?.sheets?.crewSync?.id || result?.sheets?.id || data.memberId;
       if (!memberId) throw new Error(t("errorSaveProfile"));
       localStorage.removeItem(PENDING_CLAIM_KEY);
-      setData(p => ({ ...p, memberId: String(memberId) }));
+      setData(p => ({ ...p, memberId: String(memberId), lane: undefined, laneAt: undefined }));
       localStorage.removeItem(LS_KEY);
       // Lane cards: the server pinned the picked lane, so the finale leads to its guide.
       const laneHref = typeof result?.lane?.href === "string" && /^\/lanes\/[a-z0-9-]{1,32}$/.test(result.lane.href) ? result.lane.href : null;
       const redirectTo = laneHref ?? (memberId ? `/dashboard/${memberId}` : WIZARD_HOME);
-      if (laneHref && laneInfo) setLaneCta(laneInfo.tag);
+      if (laneHref) setLaneCta(laneInfo?.tag ?? "");
       setFlow({ type: "success", redirectTo });
     } catch (e: unknown) {
       setIsSubmitting(false);
@@ -770,7 +796,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
         mafiaName={data.mafiaName || data.discordNick || "Made"}
         memberId={data.memberId}
         dashboardHref={flow.redirectTo}
-        ctaLabel={laneCta ? t("laneGuideButton", { lane: laneCta }) : undefined}
+        ctaLabel={laneCta === null ? undefined : laneCta ? t("laneGuideButton", { lane: laneCta }) : t("laneGuideGeneric")}
         topping={data.topping || undefined}
         filmId={claimFilm?.id}
         filmTitle={claimFilm?.title ?? (filmTitle || undefined)}

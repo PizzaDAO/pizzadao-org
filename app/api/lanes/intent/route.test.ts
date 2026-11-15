@@ -5,6 +5,9 @@ vi.mock('@/app/lib/rate-limit', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/app/lib/rate-limit')>()),
   enforceRateLimit: vi.fn(async () => null),
 }))
+// admin-guard imports the DPR check, which this suite does not need.
+vi.mock('@/app/lib/mission-review-access', () => ({ isDreadPizzaRoberts: vi.fn() }))
+vi.mock('@/app/lib/auth-guards', () => ({ requireSession: vi.fn() }))
 const lanesEnabled = vi.fn()
 const getPublishedLane = vi.fn()
 vi.mock('@/app/lib/lanes', () => ({
@@ -60,5 +63,16 @@ describe('POST /api/lanes/intent', () => {
   it('DELETE forgets the lane', async () => {
     const res = await DELETE(new Request('https://app.test/api/lanes/intent', { method: 'DELETE' }))
     expect(res.headers.get('set-cookie')).toMatch(/pd_lane=;.*Max-Age=0/i)
+  })
+  it('rejects non-JSON and cross-origin writes (POST and DELETE) before anything else runs', async () => {
+    const noType = new Request('https://app.test/api/lanes/intent', { method: 'POST', body: '{"slug":"host"}' })
+    expect((await POST(noType)).status).toBe(415)
+    const cross = new Request('https://app.test/api/lanes/intent', { method: 'POST', headers: { 'content-type': 'application/json', host: 'app.test', origin: 'https://evil.test' }, body: '{"slug":"host"}' })
+    const res = await POST(cross)
+    expect(res.status).toBe(403)
+    expect(res.headers.get('set-cookie')).toBeNull()
+    expect(lanesEnabled).not.toHaveBeenCalled()
+    const crossDel = new Request('https://app.test/api/lanes/intent', { method: 'DELETE', headers: { host: 'app.test', origin: 'https://evil.test' } })
+    expect((await DELETE(crossDel)).status).toBe(403)
   })
 })
