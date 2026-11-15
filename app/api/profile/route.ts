@@ -26,6 +26,7 @@ import { emitMissionEvent } from "@/app/lib/mission-verify/events";
 import { syncDiscordMember } from "@/app/lib/services/discord-api";
 import { validateProfilePayload, sanitizeDisplayName } from "@/app/lib/profile/validation";
 import { getCrewMappings } from "@/app/lib/crew-mappings";
+import { realCrews } from "@/app/lib/crew-id";
 import { getRegionRoleId, ALL_REGION_ROLE_IDS } from "@/app/lib/region-mapping";
 import { registerWithMemberId } from "@/app/lib/member-registration";
 import { crewIdToLabel } from "@/app/lib/crew-labels";
@@ -56,7 +57,8 @@ async function fetchCrewRoleIds(selectedCrewIds: string[]): Promise<string[]> {
   const { crews } = await getCrewMappings();
 
   const byId = new Map<string, { id: string; role?: string }>();
-  for (const c of crews) {
+  // Crew roles only for real crews (the Community Call is not a crew).
+  for (const c of realCrews(crews)) {
     if (c?.id) byId.set(String(c.id), c);
   }
 

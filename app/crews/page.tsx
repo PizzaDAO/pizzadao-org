@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getCrewMappings } from "@/app/lib/crew-mappings";
+import { realCrews } from "@/app/lib/crew-id";
 import CrewsClient from "./CrewsClient";
 
 export const metadata: Metadata = {
@@ -22,7 +23,8 @@ export const dynamic = "force-dynamic";
 export default async function CrewsPage() {
   let crews = null;
   try {
-    ({ crews } = await getCrewMappings());
+    // Only real crews: the Community Call is a call, not a crew.
+    crews = realCrews((await getCrewMappings()).crews);
   } catch {
     // Sheets unreachable: the client fetches /api/crew-mappings on mount.
   }

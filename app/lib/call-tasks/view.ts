@@ -4,11 +4,29 @@
  * viewer who may read call transcripts (canViewCallTranscript); everyone else gets the reason only.
  */
 import { prisma } from '@/app/lib/db'
+import { NON_ROSTER_CREW_IDS, normalizeCrewId } from '@/app/lib/crew-id'
 import type { ProposalChanges } from './proposals'
+
+/**
+ * A new task from a call that is not a crew call (the Community Call) was routed to a crew: the
+ * review shows that crew and lets a decider pick another one.
+ */
+export function isRoutable(kind: string, crewId: string, callCrewId: string | null): boolean {
+  if (kind !== 'CREATE' || !callCrewId) return false
+  return callCrewId !== crewId || NON_ROSTER_CREW_IDS.has(normalizeCrewId(callCrewId))
+}
 
 export interface ProposalView {
   id: string
   recordingId: string
+  /** The crew the proposal waits on (for a routed new task: the crew it would be created in). */
+  crewId: string
+  /** The call's own crew id (differs from crewId for a task routed from the Community Call). */
+  callCrewId: string | null
+  /** A routed new task: the crew is shown and can be changed before applying. */
+  routable: boolean
+  /** Set when a decider moved it here from another crew. */
+  fromCrewId: string | null
   kind: string
   status: string
   taskId: string | null
@@ -42,6 +60,14 @@ export async function listProposalViews(
   const ids = [...new Set(rows.map((r) => r.taskId).filter((x): x is string => !!x))]
   const tasks = ids.length ? await prisma.crewTask.findMany({ where: { id: { in: ids } }, select: { id: true, label: true, updatedAt: true, archived: true } }) : []
   const byId = new Map(tasks.map((t) => [t.id, t]))
+  const recIds = [...new Set(rows.map((r) => r.recordingId))]
+  let recs: Array<{ id: string; crewId: string | null }> = []
+  try {
+    recs = recIds.length ? ((await prisma.callRecording.findMany({ where: { id: { in: recIds } }, select: { id: true, crewId: true } })) ?? []) : []
+  } catch {
+    recs = [] // only the crew picker depends on it
+  }
+  const callCrew = new Map(recs.map((r) => [r.id, r.crewId]))
   return rows.map((r) => {
     const changes = (r.changes ?? {}) as ProposalChanges
     const t = r.taskId ? byId.get(r.taskId) : undefined
@@ -49,9 +75,15 @@ export async function listProposalViews(
       .filter((c) => typeof c?.memberId === 'string' && typeof c?.name === 'string')
       .map((c) => ({ memberId: c.memberId as string, name: c.name as string }))
     const gone = r.kind !== 'CREATE' && (!t || t.archived)
+    const callCrewId = callCrew.get(r.recordingId) ?? null
+    const edited = (r.edited as Record<string, unknown> | null) ?? null
     return {
       id: r.id,
       recordingId: r.recordingId,
+      crewId: r.crewId,
+      callCrewId,
+      routable: isRoutable(r.kind, r.crewId, callCrewId),
+      fromCrewId: typeof edited?.fromCrewId === 'string' ? edited.fromCrewId : null,
       kind: r.kind,
       status: r.status,
       taskId: r.taskId,

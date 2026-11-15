@@ -6,7 +6,18 @@ vi.mock('@/app/lib/crew-leads', () => ({ canManageCrew: vi.fn() }))
 vi.mock('@/app/lib/sheets-import/source', () => ({ usesDb: vi.fn() }))
 vi.mock('./config', async (orig) => ({ ...(await orig<typeof import('./config')>()), loadTaskProposalConfig: vi.fn() }))
 vi.mock('@/app/lib/calls/post-filters', async (orig) => ({ ...(await orig<typeof import('@/app/lib/calls/post-filters')>()), loadPostFilter: vi.fn() }))
-vi.mock('@/app/lib/crew-mappings', async (orig) => ({ ...(await orig<typeof import('@/app/lib/crew-mappings')>()), invalidateCrewMappingsCache: vi.fn(async () => {}) }))
+vi.mock('@/app/lib/crew-mappings', async (orig) => ({
+  ...(await orig<typeof import('@/app/lib/crew-mappings')>()),
+  invalidateCrewMappingsCache: vi.fn(async () => {}),
+  getCrewMappings: vi.fn(async () => ({
+    cached: true,
+    crews: [
+      { id: 'ops', label: 'Ops', type: 'crew', turtles: [] },
+      { id: 'tech', label: 'Tech', type: 'crew', turtles: [] },
+      { id: 'community', label: 'Community', type: 'community', turtles: [] },
+    ],
+  })),
+}))
 
 import { prisma } from '@/app/lib/db'
 import { canManageCrew } from '@/app/lib/crew-leads'
@@ -272,5 +283,73 @@ describe('undoRetire', () => {
     expect(await undoRetire('p1', 'lead1')).toBe('not-undoable')
     vi.mocked(canManageCrew).mockResolvedValue(false)
     expect(await undoRetire('p1', 'x')).toBe('forbidden')
+  })
+})
+
+describe('new tasks routed from the community call', () => {
+  const routed = (over: Record<string, unknown> = {}) =>
+    row({ kind: 'CREATE', taskId: null, baseUpdatedAt: null, crewId: 'tech', changes: { label: { from: null, to: 'Fix the bot' } }, ...over })
+  beforeEach(() => {
+    vi.mocked(loadTaskProposalConfig).mockResolvedValue({ enabled: true, crews: ['community'], maxPerCall: 15, maxDays: 14, model: '', nudge: false })
+    vi.mocked(prisma.callRecording.findUnique).mockResolvedValue({ crewId: 'community', crewLabel: 'Community' } as never)
+  })
+
+  it('the lead of the target crew may decide (the allowlist is about the call), others may not', async () => {
+    prop.findUnique.mockResolvedValue(routed() as never)
+    vi.mocked(canManageCrew).mockImplementation(async (actor: string, crewId: string | null | undefined) => actor === 'techLead' && crewId === 'tech')
+    expect(await applyProposal('p1', 'opsLead')).toEqual({ result: 'forbidden' })
+    expect(await dismissProposal('p1', 'opsLead')).toBe('forbidden')
+    expect(await applyProposal('p1', 'techLead')).toEqual({ result: 'applied', taskId: 'new1' })
+    expect((task.create.mock.calls[0][0] as { data: Record<string, unknown> }).data).toMatchObject({ crewId: 'tech', label: 'Fix the bot' })
+  })
+
+  it('a routed proposal is off when the call\'s crew is not allowlisted, or the target crew is excluded', async () => {
+    prop.findUnique.mockResolvedValue(routed() as never)
+    vi.mocked(loadTaskProposalConfig).mockResolvedValue({ enabled: true, crews: ['tech'], maxPerCall: 15, maxDays: 14, model: '', nudge: false })
+    expect(await applyProposal('p1', 'admin')).toEqual({ result: 'disabled' })
+    vi.mocked(loadTaskProposalConfig).mockResolvedValue({ enabled: true, crews: ['community'], maxPerCall: 15, maxDays: 14, model: '', nudge: false })
+    vi.mocked(loadPostFilter).mockResolvedValue({ ...EMPTY_POST_FILTER, excludedCrewIds: ['tech'] })
+    expect(await applyProposal('p1', 'admin')).toEqual({ result: 'disabled' })
+    expect(task.create).not.toHaveBeenCalled()
+  })
+
+  it('applies in the crew the decider picked and records where it came from', async () => {
+    prop.findUnique.mockResolvedValue(routed() as never)
+    const r = await applyProposal('p1', 'admin', { edits: { crewId: 'ops' } })
+    expect(r).toEqual({ result: 'applied', taskId: 'new1' })
+    expect((task.create.mock.calls[0][0] as { data: Record<string, unknown> }).data).toMatchObject({ crewId: 'ops', label: 'Fix the bot' })
+    expect(prop.updateMany.mock.calls[0][0]).toMatchObject({ where: { id: 'p1', status: 'PENDING' }, data: { status: 'APPLIED', crewId: 'ops', edited: { crewId: 'ops', fromCrewId: 'tech' } } })
+    expect((event.create.mock.calls[0][0] as { data: { data: Record<string, unknown> } }).data.data).toMatchObject({ via: 'call-proposal', fromCrewId: 'tech', edited: true })
+  })
+
+  it('a decider who does not lead the picked crew moves the proposal there instead of applying', async () => {
+    prop.findUnique.mockResolvedValue(routed() as never)
+    vi.mocked(canManageCrew).mockImplementation(async (_actor: string, crewId: string | null | undefined) => crewId === 'tech')
+    expect(await applyProposal('p1', 'techLead', { edits: { crewId: 'ops', label: 'Fix the Discord bot' } })).toEqual({ result: 'moved', crewId: 'ops' })
+    expect(task.create).not.toHaveBeenCalled()
+    expect(prop.updateMany.mock.calls[0][0]).toMatchObject({
+      where: { id: 'p1', status: 'PENDING', crewId: 'tech' },
+      data: { crewId: 'ops', edited: { crewId: 'ops', fromCrewId: 'tech', label: 'Fix the Discord bot', movedBy: 'techLead' } },
+    })
+  })
+
+  it('only a real crew edited on the website can be picked, and only for new tasks', async () => {
+    prop.findUnique.mockResolvedValue(routed() as never)
+    expect(await applyProposal('p1', 'admin', { edits: { crewId: 'community' } })).toEqual({ result: 'bad-crew' })
+    expect(await applyProposal('p1', 'admin', { edits: { crewId: 'nowhere' } })).toEqual({ result: 'bad-crew' })
+    expect(await applyProposal('p1', 'admin', { edits: { crewId: 'Not An Id!' } })).toEqual({ result: 'bad-crew' })
+    vi.mocked(usesDb).mockImplementation(async (_k: string, crewId?: string | null) => crewId !== 'ops')
+    expect(await applyProposal('p1', 'admin', { edits: { crewId: 'ops' } })).toEqual({ result: 'bad-crew' })
+    vi.mocked(usesDb).mockResolvedValue(true)
+    prop.findUnique.mockResolvedValue(routed({ kind: 'UPDATE', taskId: 't1', baseUpdatedAt: BASE }) as never)
+    expect(await applyProposal('p1', 'admin', { edits: { crewId: 'ops' } })).toEqual({ result: 'bad-edits' })
+    expect(task.create).not.toHaveBeenCalled()
+    expect(prop.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('cleanEdits accepts a crew id and rejects junk', () => {
+    expect(cleanEdits({ crewId: 'Biz Dev' })).toEqual({ crewId: 'biz_dev' })
+    expect(cleanEdits({ crewId: 5 })).toBeNull()
+    expect(cleanEdits({ crewId: '' })).toEqual({})
   })
 })

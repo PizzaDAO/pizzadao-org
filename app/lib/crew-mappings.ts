@@ -51,6 +51,8 @@ export type CrewOption = {
   callTime?: string;
   callTimeUrl?: string;
   callLength?: string;
+  /** Registry type: "crew" for crews; other values (e.g. "community") are calls, not crews (isRealCrew in crew-id.ts). */
+  type?: string;
   tasks?: CrewTask[];
   taskCount?: number; // Total active tasks (including hidden ones)
 };
@@ -410,6 +412,11 @@ export function parseCrewMappings(gviz: GvizResponse): { crews: CrewOption[]; ex
   }
 
   const crews = Array.from(byId.values()).sort((a, b) => a.label.localeCompare(b.label));
+  // The type tells crews from calls that are not crews (the Community Call), like the DB path.
+  for (const c of crews) {
+    const type = extras.get(c.id)?.type;
+    if (type) c.type = type;
+  }
   return { crews, extras };
 }
 
@@ -454,6 +461,7 @@ export async function fetchCrewMappingsFromSheet(forceRefresh = false): Promise<
 export function crewRowToOption(r: {
   id: string; label: string; emoji: string | null; turtles: string[]; role: string | null; channel: string | null; event: string | null;
   callTime: string | null; callTimeUrl: string | null; callLength: string | null; legacySheetUrl: string | null;
+  type?: string | null;
 }): CrewOption {
   const opt: CrewOption = { id: r.id, label: r.label, turtles: [...(r.turtles ?? [])], tasks: [] };
   if (r.role) opt.role = r.role;
@@ -464,6 +472,7 @@ export function crewRowToOption(r: {
   if (r.callTime) opt.callTime = r.callTime;
   if (r.callTimeUrl) opt.callTimeUrl = r.callTimeUrl;
   if (r.callLength) opt.callLength = r.callLength;
+  if (r.type) opt.type = r.type;
   return opt;
 }
 
@@ -494,8 +503,9 @@ async function attachTasks(crews: CrewOption[], forceRefresh: boolean): Promise<
   );
 }
 
-const DB_CACHE_KEY = "crew-mappings:db:v1";
-const sheetCacheKey = () => `crew-mappings:v7:${SHEET_ID}`;
+// v2 / v8: entries carry `type` (crew vs. community call).
+const DB_CACHE_KEY = "crew-mappings:db:v2";
+const sheetCacheKey = () => `crew-mappings:v8:${SHEET_ID}`;
 
 /** Forget the cached crew list (after an edit on the website). */
 export async function invalidateCrewMappingsCache(): Promise<void> {

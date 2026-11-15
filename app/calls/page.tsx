@@ -101,9 +101,17 @@ export default function CallsPage() {
     }
   }, [page, crewFilter, sort, t]);
 
+  // ?crew=<id>[,<id>] preselects the crew filter (e.g. /crew/community sends visitors to the Community Call).
+  const [filterReady, setFilterReady] = useState(false);
   useEffect(() => {
-    fetchCalls();
-  }, [fetchCalls]);
+    const fromUrl = new URLSearchParams(window.location.search).get("crew");
+    if (fromUrl) setCrewFilter(fromUrl.split(",").map((c) => c.trim()).filter(Boolean).slice(0, 20));
+    setFilterReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (filterReady) fetchCalls();
+  }, [fetchCalls, filterReady]);
 
   function toggleCrew(id: string) {
     setCrewFilter((prev) =>

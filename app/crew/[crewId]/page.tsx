@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import CrewPageClient from './CrewPageClient'
 import { getCrewMappings } from '@/app/lib/crew-mappings'
 import { loadSwitches } from '@/app/lib/features/service'
+import { redirect } from 'next/navigation'
+import { COMMUNITY_CALL_ATTENDANCE_ID, isNonCrewId, NON_ROSTER_CREW_IDS, normalizeCrewId } from '@/app/lib/crew-id'
 
 type Props = { params: Promise<{ crewId: string }> }
 
@@ -59,9 +61,27 @@ async function linksFeatures(crewId: string): Promise<boolean> {
   }
 }
 
+/** Where a crew id that is not a crew should go, or null for a real (or unknown) crew. */
+async function nonCrewRedirect(crewId: string): Promise<string | null> {
+  const id = normalizeCrewId(crewId)
+  const communityCall = `/calls?crew=${encodeURIComponent(COMMUNITY_CALL_ATTENDANCE_ID)}`
+  if (NON_ROSTER_CREW_IDS.has(id)) return communityCall
+  try {
+    const { crews } = await getCrewMappings()
+    if (isNonCrewId(id, crews)) return '/calls'
+  } catch {
+    // Best-effort: an unreadable registry renders the crew page as before.
+  }
+  return null
+}
+
 export default async function CrewPage({ params }: Props) {
   // Pass the params Promise straight through; the client component already
   // handles unwrapping via React.use().
   const { crewId } = await params
+  // The Community Call (and any other registry entry that is not a crew) has no crew page: send
+  // visitors to its calls instead.
+  const target = await nonCrewRedirect(crewId)
+  if (target) redirect(target)
   return <CrewPageClient params={params} featuresLink={await linksFeatures(crewId)} />
 }

@@ -9,6 +9,7 @@ import { fetchMemberById } from "@/app/lib/sheets/member-repository";
 import { getUserProgressSummary } from "@/app/lib/missions";
 import { getMafiaRank } from "@/app/lib/mafia-points";
 import { getCrewMappings } from "@/app/lib/crew-mappings";
+import { withoutNonCrewIds } from "@/app/lib/crew-id";
 import { resolvePfpUrlAsync } from "@/app/lib/pfp";
 
 export const runtime = "nodejs";
@@ -88,10 +89,13 @@ export async function composeMemberCard(memberId: string): Promise<MemberCard | 
         levelTitle = mission.levelTitle ?? "";
     }
 
-    const crewIds = text(m["Crews"])
-        .split(",")
-        .map((c) => c.trim())
-        .filter((c) => c && c.toLowerCase() !== "none");
+    const crewIds = withoutNonCrewIds(
+        text(m["Crews"])
+            .split(",")
+            .map((c) => c.trim())
+            .filter((c) => c && c.toLowerCase() !== "none"),
+        crewMappings.crews ?? [],
+    );
     const byId = new Map((crewMappings.crews ?? []).map((c) => [c.id, c] as const));
     const crews = crewIds.map((id) => {
         const c = byId.get(id);

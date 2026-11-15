@@ -192,6 +192,8 @@ describe('settings registry', () => {
       ['calls.taskProposalMaxDays', 14],
       ['calls.taskProposalsModel', ''],
       ['calls.taskProposalsNudgeEnabled', false],
+      ['calls.taskProposalsDefaultCrew', 'ops'],
+      ['calls.taskProposalsCrewHints', ''],
       ['vouches.dailyLimit', 50],
       ['vouches.requestsEnabled', false],
       ['vouches.requestDailyLimit', 5],

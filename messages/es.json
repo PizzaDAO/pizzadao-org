@@ -2561,7 +2561,13 @@
     "confirmClose": "Esto cierra u oculta la tarea. ¿Aplicarlo?",
     "applyAllHint": "Aplicar todo omite los cambios que cierran u ocultan una tarea: aplícalos uno por uno.",
     "retiredHeading": "Retiradas recientemente desde llamadas",
-    "undoRetire": "Deshacer (mostrar la tarea de nuevo)"
+    "undoRetire": "Deshacer (mostrar la tarea de nuevo)",
+    "crewLine": "Crew: {crew}",
+    "crewPick": "Crew",
+    "movedFrom": "Movida aquí desde {crew}.",
+    "moved": "Movida a {crew} para que la revisen sus responsables.",
+    "badCrew": "Elige un crew cuyas tareas se editen en el sitio web.",
+    "routedHint": "De la Community Call: revisa el crew antes de aplicar."
   },
   "collectPep": {
     "title": "Cobra tu PEP diario",

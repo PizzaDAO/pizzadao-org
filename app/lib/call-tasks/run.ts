@@ -8,7 +8,10 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/app/lib/db'
 import { loadSettings } from '@/app/lib/settings'
-import { isClosedStage } from '@/app/lib/crew-mappings'
+import { getCrewMappings, isClosedStage, type CrewOption } from '@/app/lib/crew-mappings'
+import { isNonCrewId, realCrews } from '@/app/lib/crew-id'
+import type { Settings } from '@/app/lib/settings'
+import type { PostFilter } from '@/app/lib/calls/post-filters'
 import { sanitizeSummaryError, visibleSegments } from '@/app/lib/calls/recordings'
 import { DISCORD_ONLY, isImportedSource } from '@/app/lib/calls/imported'
 import { isCrewExcluded, loadPostFilter } from '@/app/lib/calls/post-filters'
@@ -22,6 +25,7 @@ import { usesDb } from '@/app/lib/sheets-import/source'
 import { crewInAllowlist, loadTaskProposalConfig } from './config'
 import { proposeTaskUpdates } from './extract'
 import type { ProposalDraft, TaskRef } from './proposals'
+import { buildRouting, parseCrewHints, type Routing } from './routing'
 
 export type ProposeResult = 'ok' | 'already' | 'disabled' | 'crew-excluded' | 'not-db-crew' | 'not-ready' | 'failed' | 'not-found'
 
@@ -44,6 +48,30 @@ export async function loadTaskRefs(crewId: string, now: Date): Promise<TaskRef[]
   return [...open, ...closed].slice(0, MAX_TASKS_IN_PROMPT).map((t) => ({ id: t.id, label: t.label, stage: t.stage, priority: t.priority, due: t.due, leadName: t.leadName, leadMemberId: t.leadMemberId, updatedAt: t.updatedAt }))
 }
 
+/**
+ * For a call that is not a crew call (the Community Call): the crews its new tasks can go to — real
+ * crews whose tasks are edited on the website and that the private filter does not exclude — plus
+ * the routing hints and the default crew from settings. Undefined for a crew call (proposals stay on
+ * the call's crew, as before) or when no crew qualifies.
+ */
+export async function loadRouting(
+  callCrewId: string,
+  settings: Pick<Settings, 'get'>,
+  filter: PostFilter,
+  deps: { crews?: () => Promise<CrewOption[]>; usesDb?: (crewId: string) => Promise<boolean> } = {},
+): Promise<Routing | undefined> {
+  const all = await (deps.crews ?? (async () => (await getCrewMappings()).crews))()
+  if (!isNonCrewId(callCrewId, all)) return undefined
+  const dbCrew = deps.usesDb ?? ((id: string) => usesDb('crewTasks', id))
+  const targets: CrewOption[] = []
+  for (const c of realCrews(all)) {
+    if (isCrewExcluded({ id: c.id, label: c.label }, filter)) continue
+    if (await dbCrew(c.id)) targets.push(c)
+  }
+  if (targets.length === 0) return undefined
+  return buildRouting(targets, parseCrewHints(settings.get('calls.taskProposalsCrewHints')), String(settings.get('calls.taskProposalsDefaultCrew') ?? ''))
+}
+
 /** Store the new drafts (existing sourceKeys are left alone). Returns the number created. */
 export async function storeProposals(recordingId: string, crewId: string, drafts: ProposalDraft[], startedAt?: Date | null): Promise<number> {
   if (drafts.length === 0) return 0
@@ -53,11 +81,13 @@ export async function storeProposals(recordingId: string, crewId: string, drafts
   let created = 0
   for (const d of drafts) {
     if (existing.has(d.sourceKey)) continue
+    // A routed CREATE (from a call that is not a crew call) belongs to its target crew.
+    const ownCrew = d.crewId || crewId
     try {
       await prisma.crewTaskProposal.create({
         data: {
           recordingId,
-          crewId,
+          crewId: ownCrew,
           sourceKey: d.sourceKey,
           kind: d.kind,
           taskId: d.taskId,
@@ -76,7 +106,7 @@ export async function storeProposals(recordingId: string, crewId: string, drafts
       created++
       // A newer call proposes a change to the same task: older undecided proposals for it are out of date.
       if (d.taskId && olderIds.length > 0) {
-        await prisma.crewTaskProposal.updateMany({ where: { crewId, taskId: d.taskId, status: 'PENDING', recordingId: { in: olderIds } }, data: { status: 'STALE' } })
+        await prisma.crewTaskProposal.updateMany({ where: { crewId: ownCrew, taskId: d.taskId, status: 'PENDING', recordingId: { in: olderIds } }, data: { status: 'STALE' } })
       }
     } catch (e) {
       // A parallel run created the same sourceKey first: that is the idempotency guard working.
@@ -156,6 +186,7 @@ export async function proposeTasksForRecording(
   const segments = visibleSegments(rec.transcript, rec.redactedSpeakerIds, rec.redactedSegmentIds)
   try {
     const settings = await loadSettings()
+    const routing = await loadRouting(crewId, settings, filter)
     // The action items: the summary's own (not when a hidden speaker/line may be in them) plus the live ones, merged with redactions applied.
     const base = Array.isArray(rec.actionItems) ? (rec.actionItems as Array<{ text?: string; owner?: string | null; suggestedBy?: string | null }>).filter((a): a is { text: string; owner: string | null; suggestedBy?: string | null } => typeof a?.text === 'string').map((a) => ({ text: a.text, owner: a.owner ?? null, ...(a.suggestedBy ? { suggestedBy: a.suggestedBy } : {}) })) : []
     const live = await prisma.callLiveItem
@@ -177,6 +208,7 @@ export async function proposeTasksForRecording(
         filter,
         today: now,
         max: cfg.maxPerCall,
+        ...(routing ? { routing } : {}),
       },
       settings,
       { model: cfg.model, budgetMs: opts.budgetMs },
@@ -241,18 +273,34 @@ export async function nudgeCrew(id: string, deps: { post?: typeof postDiscordMes
   if (rec.taskProposalsNudgedAt) return 'already'
   const filter = await loadPostFilter()
   if (isCrewExcluded({ id: rec.crewId, label: rec.crewLabel }, filter)) return 'excluded'
-  const count = await prisma.crewTaskProposal.count({ where: { recordingId: id, status: 'PENDING' } })
-  if (count === 0) return 'none'
-  const channel = await resolveRecapChannel(rec.crewId, { env })
-  if (!channel) return 'no-channel'
+  // Proposals routed from a call that is not a crew call belong to other crews: each crew with
+  // waiting proposals gets its own line in its own channel, linking to its own page.
+  const rows = await prisma.crewTaskProposal.findMany({ where: { recordingId: id, status: 'PENDING' }, select: { crewId: true } })
+  const counts = new Map<string, number>()
+  for (const r of rows) counts.set(r.crewId, (counts.get(r.crewId) ?? 0) + 1)
+  const targets: Array<{ crewId: string; count: number; channelId: string }> = []
+  for (const [crewId, count] of counts) {
+    if (crewId !== rec.crewId && isCrewExcluded({ id: crewId }, filter)) continue
+    const channel = await resolveRecapChannel(crewId, { env })
+    if (channel) targets.push({ crewId, count, channelId: channel.channelId })
+  }
+  if (counts.size === 0) return 'none'
+  if (targets.length === 0) return 'no-channel'
   const claim = await prisma.callRecording.updateMany({ where: { id, taskProposalsNudgedAt: null }, data: { taskProposalsNudgedAt: new Date() } })
   if (claim.count !== 1) return 'already'
-  try {
-    await (deps.post ?? postDiscordMessage)({ kind: 'bot', channelId: channel.channelId, botToken }, { content: nudgeText(count, rec.crewId), allowed_mentions: { parse: [] }, flags: 4 })
-    return 'posted'
-  } catch (err) {
-    console.error('[call-tasks] nudge post failed:', err instanceof Error ? err.message : err)
-    if (err instanceof DiscordPostError && err.status >= 400 && err.status < 500) await prisma.callRecording.updateMany({ where: { id }, data: { taskProposalsNudgedAt: null } })
-    return 'failed'
+  let posted = 0
+  let refused = 0
+  for (const tg of targets) {
+    try {
+      await (deps.post ?? postDiscordMessage)({ kind: 'bot', channelId: tg.channelId, botToken }, { content: nudgeText(tg.count, tg.crewId), allowed_mentions: { parse: [] }, flags: 4 })
+      posted++
+    } catch (err) {
+      console.error('[call-tasks] nudge post failed:', err instanceof Error ? err.message : err)
+      if (err instanceof DiscordPostError && err.status >= 400 && err.status < 500) refused++
+    }
   }
+  if (posted > 0) return 'posted'
+  // Released only when Discord definitely refused every post.
+  if (refused === targets.length) await prisma.callRecording.updateMany({ where: { id }, data: { taskProposalsNudgedAt: null } })
+  return 'failed'
 }

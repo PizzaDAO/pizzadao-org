@@ -11,6 +11,7 @@ import { isSameItem, cleanItemText } from '@/app/lib/calls/live-items'
 import { normalizeLabel } from '@/app/lib/sheets-import/plan'
 import { parseDueDate } from '@/app/lib/followups/extract'
 import { normalizeName, resolveOwner, type Candidate, type MemberRef } from '@/app/lib/followups/resolve'
+import { routeCrew, type Routing } from './routing'
 
 export const PROPOSAL_KINDS = ['CREATE', 'UPDATE', 'DONE', 'RETIRE'] as const
 export type ProposalKind = (typeof PROPOSAL_KINDS)[number]
@@ -37,7 +38,15 @@ export const proposedItemSchema = z.object({
   confidence: z.enum(['high', 'medium', 'low']),
 })
 export const proposalsSchema = z.object({ items: z.array(proposedItemSchema).max(40) })
-export type ProposedItem = z.infer<typeof proposedItemSchema>
+/** For a call that is not a crew call (the Community Call): each CREATE also names its crew. */
+export const routedItemSchema = proposedItemSchema.extend({
+  crew: z.string().max(80).nullable().describe('CREATE only: id of the listed crew the new task belongs to, or null when unsure; null for UPDATE, DONE and RETIRE'),
+})
+export const routedProposalsSchema = z.object({ items: z.array(routedItemSchema).max(40) })
+/** What the parser accepts: `crew` is optional so output from either schema validates. */
+const parsedItemSchema = proposedItemSchema.extend({ crew: z.string().max(80).nullable().optional() })
+const parsedProposalsSchema = z.object({ items: z.array(parsedItemSchema).max(40) })
+export type ProposedItem = z.infer<typeof parsedItemSchema>
 
 /** The slice of a task the pass needs. */
 export interface TaskRef {
@@ -49,11 +58,15 @@ export interface TaskRef {
   leadName: string | null
   leadMemberId: string | null
   updatedAt: Date
+  /** The task's own crew (proposals for an existing task always stay on it). */
+  crewId?: string
 }
 
 export interface ProposalDraft {
   sourceKey: string
   kind: ProposalKind
+  /** The crew the proposal belongs to when it is not the call's own (a routed CREATE, or the task's crew); unset = the call's crew. */
+  crewId?: string
   taskId: string | null
   baseUpdatedAt: Date | null
   changes: ProposalChanges
@@ -119,6 +132,8 @@ export interface ParseContext {
   actionItems: ReadonlyArray<{ text?: string; owner?: string | null }>
   /** Open task labels (CREATE of an existing one is dropped). */
   openLabels: readonly string[]
+  /** Set for a call that is not a crew call: each CREATE is routed to a real crew. */
+  routing?: Routing
 }
 
 const squash = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim()
@@ -145,11 +160,11 @@ function matchActionItem(label: string, items: ParseContext['actionItems']): num
 
 /** Validates the model output and maps it to drafts. Bad items are dropped, never thrown. */
 export function parseProposals(raw: unknown, ctx: ParseContext): ProposalDraft[] {
-  const parsed = proposalsSchema.safeParse(raw)
+  const parsed = parsedProposalsSchema.safeParse(raw)
   const items: ProposedItem[] = parsed.success
     ? parsed.data.items
     : (Array.isArray((raw as { items?: unknown })?.items) ? (raw as { items: unknown[] }).items : []).flatMap((it) => {
-        const r = proposedItemSchema.safeParse(it)
+        const r = parsedItemSchema.safeParse(it)
         return r.success ? [r.data] : []
       })
   const seen = new Set<string>()
@@ -191,7 +206,9 @@ export function parseProposals(raw: unknown, ctx: ParseContext): ProposalDraft[]
       if (due) changes.due = { from: null, to: isoDay(due) }
       if (lead?.name) changes.leadName = { from: null, to: lead.name }
       if (lead?.memberId) changes.leadMemberId = { from: null, to: lead.memberId }
-      out.push({ sourceKey: key, kind: 'CREATE', taskId: null, baseUpdatedAt: null, changes, leadName: lead?.name ?? null, leadMemberId: lead?.memberId ?? null, candidates: lead?.candidates ?? [], actionItemIdx: matchActionItem(label, ctx.actionItems), ...base })
+      // Not a crew call: the new task goes to the crew the model picked (validated), else the default crew.
+      const routed = ctx.routing ? routeCrew(it.crew, ctx.routing) : null
+      out.push({ sourceKey: key, kind: 'CREATE', ...(routed ? { crewId: routed } : {}), taskId: null, baseUpdatedAt: null, changes, leadName: lead?.name ?? null, leadMemberId: lead?.memberId ?? null, candidates: lead?.candidates ?? [], actionItemIdx: matchActionItem(label, ctx.actionItems), ...base })
       continue
     }
 
@@ -226,7 +243,7 @@ export function parseProposals(raw: unknown, ctx: ParseContext): ProposalDraft[]
     touched.add(task.id)
     const leadChanged = !!(changes.leadName || changes.leadMemberId || (lead && lead.candidates.length > 0 && it.kind === 'UPDATE'))
     out.push({
-      sourceKey: key, kind: it.kind, taskId: task.id, baseUpdatedAt: task.updatedAt, changes,
+      sourceKey: key, kind: it.kind, ...(task.crewId ? { crewId: task.crewId } : {}), taskId: task.id, baseUpdatedAt: task.updatedAt, changes,
       leadName: leadChanged ? (lead?.name ?? null) : null, leadMemberId: leadChanged ? (lead?.memberId ?? null) : null, candidates: leadChanged ? (lead?.candidates ?? []) : [],
       actionItemIdx: null, ...base,
     })
