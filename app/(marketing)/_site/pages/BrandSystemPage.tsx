@@ -1290,6 +1290,7 @@ dont:  [all caps, corporate jargon]`}
                 <figure key={g.code} className={`group relative overflow-hidden rounded-3xl border border-cream/15 bg-cream/5 ${g.span}`}>
                   <Image sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw" width={1200} height={900}
                     src={g.src}
+                    unoptimized
                     alt={`PizzaDAO animated brand asset ${g.code}`}
                     loading="lazy"
                     className={`w-full ${g.aspect} object-cover`}

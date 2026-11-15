@@ -23,8 +23,6 @@ export const REMOTE_IMAGE_PATTERNS: RemotePattern[] = [
   { protocol: "https", hostname: "*.public.blob.vercel-storage.com" },
   // Public PizzaDAO event photo archive (marketing galleries), this org's repo only
   { protocol: "https", hostname: "raw.githubusercontent.com", pathname: "/PizzaDAO/**" },
-  // Film poster art resolved through Wikipedia's summary API (onboarding name step)
-  { protocol: "https", hostname: "upload.wikimedia.org", pathname: "/wikipedia/**" },
 ];
 
 function hostMatches(pattern: string, host: string): boolean {

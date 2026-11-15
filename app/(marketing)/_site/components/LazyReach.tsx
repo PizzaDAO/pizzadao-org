@@ -17,7 +17,7 @@ function ReachPlaceholder() {
     <section
       id="reach"
       aria-hidden
-      className="relative min-h-[2560px] bg-cream md:min-h-[1900px]"
+      className="relative min-h-[1920px] bg-cream md:min-h-[1540px]"
     />
   );
 }
@@ -31,8 +31,8 @@ const LazyReach = () => {
     if (!el) return;
     // No IntersectionObserver (very old browsers): just load it.
     if (typeof IntersectionObserver === "undefined") {
-      setNear(true);
-      return;
+      const t = setTimeout(() => setNear(true), 0);
+      return () => clearTimeout(t);
     }
     const io = new IntersectionObserver(
       (entries) => {

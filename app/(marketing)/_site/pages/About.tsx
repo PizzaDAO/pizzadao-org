@@ -90,7 +90,7 @@ const About = () => {
       <section className="relative overflow-hidden bg-ink text-cream">
         <figure className="relative">
           <div className="mk-grain relative overflow-hidden bg-ink">
-            <Image priority sizes="100vw"
+            <Image preload sizes="100vw"
               src={HERO_PHOTO}
               alt="Volunteers carrying pizza boxes through a crowded street gathering"
               decoding="async"
