@@ -12,3 +12,15 @@ export function loginReturnPath(value: unknown): string | undefined {
     return;
   }
 }
+
+/**
+ * The /login page, carrying this page's ?returnTo (re-validated) so a visitor who switches from
+ * /join to log in still lands where they were headed. `search` is a location.search string.
+ */
+export function loginPageHref(search: string, extra = ""): string {
+  const returnTo = loginReturnPath(new URLSearchParams(search).get("returnTo"));
+  const params = new URLSearchParams(extra);
+  if (returnTo) params.set("returnTo", returnTo);
+  const qs = params.toString();
+  return qs ? `/login?${qs}` : "/login";
+}

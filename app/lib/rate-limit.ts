@@ -57,6 +57,9 @@ export const RATE_LIMITS = {
   "referral-search": { limit: 60, windowSec: 60 },
   // /join?lane= remembering a lane card pick (plans/lane-cards-mission-onboarding.md).
   "lane-intent": { limit: 30, windowSec: 60 },
+  // Lane guide writes (pin, tick a step): they sit in front of a member lookup, so keep them cheap to refuse.
+  "lane-pin": { limit: 30, windowSec: 60 },
+  "lane-progress": { limit: 60, windowSec: 60 },
   "vouch-request": { limit: 20, windowSec: 10 * 60 },
   // Disavow list (plans/disavow-list.md). The real nomination cap is the DB check.
   "disavow-nominate": { limit: 5, windowSec: 60 * 60 },

@@ -17,6 +17,7 @@ vi.mock('@/app/lib/lanes', () => ({
   setStepDone: (...a: unknown[]) => setStepDone(...a),
 }))
 
+import { __resetMemoryRateLimits } from '@/app/lib/rate-limit'
 import { POST as pin } from './pin/route'
 import { POST as progress } from './progress/route'
 
@@ -29,6 +30,7 @@ const post = (url: string, body: unknown, headers: Record<string, string> = {}) 
 
 beforeEach(() => {
   vi.clearAllMocks()
+  __resetMemoryRateLimits()
   lanesEnabled.mockResolvedValue(true)
   fetchMemberIdByDiscordId.mockResolvedValue('m1')
   requireSession.mockResolvedValue({ ok: true, session: { discordId: 'd1' } })
@@ -46,6 +48,17 @@ describe.each([
     expect(requireSession).not.toHaveBeenCalled()
     expect(pinLane).not.toHaveBeenCalled()
     expect(setStepDone).not.toHaveBeenCalled()
+  })
+  it('429s a flood from one client before the session or member lookup runs', async () => {
+    const send = () => handler(post(name, body, { 'x-forwarded-for': '203.0.113.9' }))
+    let limited = 0
+    for (let i = 0; i < 80; i++) if ((await send()).status === 429) limited++
+    expect(limited).toBeGreaterThan(0)
+    requireSession.mockClear()
+    fetchMemberIdByDiscordId.mockClear()
+    expect((await send()).status).toBe(429)
+    expect(requireSession).not.toHaveBeenCalled()
+    expect(fetchMemberIdByDiscordId).not.toHaveBeenCalled()
   })
   it('401 without a session', async () => {
     requireSession.mockResolvedValue({ ok: false, response: NextResponse.json({ error: 'no' }, { status: 401 }) })

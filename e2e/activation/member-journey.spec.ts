@@ -97,18 +97,24 @@ test('lane cards: the picked lane rides the signup draft, shows a banner and the
   await context.close();
 });
 
-test('lane cards off: a stale lane pick is dropped after exactly one intent request', async ({ page, context, baseURL }) => {
+test('lane cards off: a stale lane pick is dropped after exactly one intent request and cookie clear', async ({ page, context, baseURL }) => {
   const state: { profile?: Record<string, unknown> } = {};
   await context.addCookies([{ name: 'NEXT_LOCALE', value: 'en', url: baseURL! }]);
   await fixtures(context, state);
   let intents = 0;
-  page.on('request', r => { if (new URL(r.url()).pathname === '/api/lanes/intent') intents++; });
+  let clears = 0;
+  page.on('request', r => {
+    if (new URL(r.url()).pathname !== '/api/lanes/intent') return;
+    if (r.method() === 'DELETE') clears++;
+    else intents++;
+  });
   await page.goto('/join?lane=host');
   await expect(page.getByRole('textbox', { name: en.onboarding.name.filmPickerAriaLabel, exact: true })).toBeVisible();
   const stored = () => page.evaluate(() => JSON.parse(localStorage.getItem(Object.keys(localStorage).find(k => /onboard|wizard/i.test(k)) || '') || '{}').lane ?? null);
   await expect.poll(stored).toBeNull();
   await page.waitForTimeout(1500); // a request loop would keep counting here
   expect(intents).toBe(1);
+  expect(clears).toBe(1); // the rejected pick also clears the pd_lane cookie, once
   expect(new URL(page.url()).searchParams.has('lane')).toBe(false);
   await expect(page.getByText('Throw a party')).toHaveCount(0);
 });
