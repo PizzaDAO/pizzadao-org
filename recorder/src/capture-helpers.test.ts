@@ -121,7 +121,7 @@ describe('loadConfig', () => {
     expect(maxMinutesFor(c, 'Ops Crew 🫡')).toBe(120)
     expect(c.emptyGraceMinutes).toBe(5)
     expect(c.dataDir).toBe('/data')
-    expect(c.appBaseUrl).toBe('https://app.pizzadao.org')
+    expect(c.appBaseUrl).toBe('https://pizzadao.org')
   })
   it('reads and rejects event limits', () => {
     expect(parseEventCaps('a call = 10, b=20.5')).toEqual([{ namePart: 'a call', minutes: 10 }, { namePart: 'b', minutes: 20.5 }])
