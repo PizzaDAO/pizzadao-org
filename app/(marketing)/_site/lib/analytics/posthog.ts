@@ -124,6 +124,12 @@ export function initPostHog(): void {
           }
           return;
         }
+        // A previous visit may have left an opt-out in storage (setActive(false) on leaving marketing).
+        try {
+          posthog.opt_in_capturing();
+        } catch {
+          /* noop */
+        }
         maybeForceReplay(window.location.pathname);
         for (const fn of queue.splice(0)) {
           try {

@@ -88,38 +88,41 @@ const PartnersGlobe = () => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const FRAME_MS = 1000 / 15;
     let raf: number | null = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
     let inView = false;
     let ready = false;
     let elapsed = 0; // animated time in ms, excludes paused periods
     let last: number | null = null;
-    let lastRender = 0;
 
     const shouldRun = () => ready && inView && document.visibilityState === "visible";
+    // Sleep FRAME_MS between frames (then align to a paint with rAF) so it really runs ~15 times/s.
     const tick = (t: number) => {
       raf = null;
       if (!shouldRun()) return;
       if (last !== null) elapsed += t - last;
       last = t;
-      if (t - lastRender >= FRAME_MS) {
-        lastRender = t;
-        setYaw((elapsed / 140000) * 360);
-      }
-      raf = requestAnimationFrame(tick);
+      setYaw((elapsed / 140000) * 360);
+      timer = setTimeout(() => {
+        timer = null;
+        if (shouldRun()) raf = requestAnimationFrame(tick);
+      }, FRAME_MS);
     };
     const sync = () => {
       if (shouldRun()) {
-        if (raf === null) {
+        if (raf === null && timer === null) {
           last = null;
           raf = requestAnimationFrame(tick);
         }
-      } else if (raf !== null) {
-        cancelAnimationFrame(raf);
+      } else {
+        if (raf !== null) cancelAnimationFrame(raf);
+        if (timer !== null) clearTimeout(timer);
         raf = null;
+        timer = null;
       }
     };
 
-    const io = new IntersectionObserver(([entry]) => {
-      inView = entry.isIntersecting;
+    const io = new IntersectionObserver((entries) => {
+      inView = entries[entries.length - 1].isIntersecting;
       sync();
     });
     io.observe(el);
@@ -145,6 +148,7 @@ const PartnersGlobe = () => {
       io.disconnect();
       document.removeEventListener("visibilitychange", sync);
       if (raf !== null) cancelAnimationFrame(raf);
+      if (timer !== null) clearTimeout(timer);
       if (idleId !== undefined) w.cancelIdleCallback?.(idleId);
       if (timeoutId !== undefined) clearTimeout(timeoutId);
     };

@@ -33,8 +33,9 @@ describe("client message namespaces", () => {
       if (!src.includes("useTranslations") && !src.includes("useMessages")) continue;
       const rel = path.relative(ROOT, f);
       if (rel === path.join("app", "lib", "i18n", "client-namespaces.ts")) continue;
+      if (/useTranslations\s+as\s+\w+/.test(src)) problems.push(`${rel}: aliased useTranslations import cannot be checked`);
       if (/useMessages\(/.test(src)) problems.push(`${rel}: useMessages() needs the whole catalog`);
-      for (const m of src.matchAll(/useTranslations\(\s*([^)]*)\)/g)) {
+      for (const m of src.matchAll(/useTranslations\s*(?:<[^>]*>)?\(\s*([^)]*)\)/g)) {
         const arg = m[1].trim();
         const lit = /^(["'`])([A-Za-z0-9_.]+)\1$/.exec(arg);
         if (!lit) {

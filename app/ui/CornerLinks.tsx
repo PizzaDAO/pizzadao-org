@@ -11,7 +11,7 @@ const SuggestionModal = dynamic(() => import("@/app/ui/SuggestionModal"));
 
 export default function CornerLinks() {
   const [open, setOpen] = useState(false);
-  // The modal chunk loads the first time it is opened, then stays mounted so a draft survives closing.
+  // The modal chunk loads the first time it is opened, then stays mounted (it resets its own state each time it opens).
   const [everOpened, setEverOpened] = useState(false);
   const pathname = usePathname();
   // The marketing pages are a separate surface: no suggestion box or GitHub link there.
