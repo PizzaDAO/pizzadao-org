@@ -47,10 +47,11 @@ async function fetchPoster(slug: string): Promise<string | null> {
         // Prefer the API's `thumbnail` (small, direct upload.wikimedia.org URL,
         // no redirect) over `originalimage` (full-size file). Wikimedia only
         // serves standard thumbnail widths (others 429), so use 330px: enough
-        // for a 200px tile at 1.5x.
+        // for a 200px tile at 1.5x. Files without a thumbnail are small, so
+        // their original is fine.
         const upscaled = data?.thumbnail?.source
           ? posterThumbUrl(data.thumbnail.source, data.thumbnail.width)
-          : null;
+          : data?.originalimage?.source ?? null;
         cache.set(slug, upscaled);
         return upscaled;
       },
