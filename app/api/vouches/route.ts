@@ -42,8 +42,11 @@ export async function GET(req: NextRequest) {
       getVouchCounts(memberId),
     ]);
 
+    // fresh=1 (the vouch button's "already vouched?" check) must never be served from the CDN cache,
+    // or a reload right after vouching shows the button again.
+    const fresh = req.nextUrl.searchParams.get("fresh") === "1";
     return NextResponse.json({ vouches, counts }, {
-      headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' }
+      headers: { 'Cache-Control': fresh ? 'private, no-store' : 'public, s-maxage=60, stale-while-revalidate=300' }
     });
   } catch (err: unknown) {
     console.error("Failed to fetch vouches:", err);
