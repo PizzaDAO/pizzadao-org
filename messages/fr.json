@@ -1078,6 +1078,8 @@
       "watchStream": "Regarder le stream",
       "headCount": "{count, plural, one {# personne dans l'appel} other {# personnes dans l'appel}}",
       "present": "Qui est là",
+      "stoppedBy": "Passages plus tôt",
+      "leftAgo": "{count, plural, =0 {départ à l'instant} other {départ il y a # min}}",
       "presentSignIn": "Connectez-vous pour voir qui est dans l'appel, poser des questions et lire les action items en direct.",
       "signIn": "Se connecter",
       "minutes": "{count} min",

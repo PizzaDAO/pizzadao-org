@@ -28,7 +28,24 @@ export const livePresenceSchema = z.object({
   presentSec: z.number().int().min(0).max(86_400),
   inChannel: z.boolean(),
 })
-export type LivePresence = z.infer<typeof livePresenceSchema>
+/** A stored presence entry: the recorder's fields plus `leftAt` (epoch ms, set by the app when it sees someone leave). */
+export type LivePresence = z.infer<typeof livePresenceSchema> & { leftAt?: number | null }
+
+/**
+ * Carry each person's leave time across heartbeats. The recorder already sends everyone seen in the
+ * call (inChannel false once gone); the app stamps `leftAt` the first heartbeat that shows someone out
+ * who was in before, keeps it while they stay out, and clears it when they rejoin. Someone first seen
+ * already out (no earlier entry, or data from before this existed) gets no time.
+ */
+export function mergePresence(prev: readonly LivePresence[], next: ReadonlyArray<Omit<LivePresence, 'leftAt'>>, nowMs: number): LivePresence[] {
+  const before = new Map(prev.map((p) => [p.discordId, p]))
+  return next.map((p) => {
+    if (p.inChannel) return { ...p, leftAt: null }
+    const old = before.get(p.discordId)
+    const leftAt = old ? (old.inChannel ? nowMs : (old.leftAt ?? null)) : null
+    return { ...p, leftAt }
+  })
+}
 
 export const liveStateSchema = z.object({
   sessionId: z.string().min(1).max(120),
@@ -132,12 +149,14 @@ export async function handleLiveState(body: LiveStateBody, deps: LiveStateDeps =
   }
 
   const seen = new Set<string>()
-  const presence = body.present.filter((p) => !seen.has(p.discordId) && !!seen.add(p.discordId)).map((p) => ({
+  const cleaned = body.present.filter((p) => !seen.has(p.discordId) && !!seen.add(p.discordId)).map((p) => ({
     discordId: p.discordId,
     displayName: p.displayName?.replace(/[\u0000-\u001f\u007f-\u009f]+/g, ' ').trim().slice(0, 100) || null,
     presentSec: p.presentSec,
     inChannel: p.inChannel,
   }))
+  const prevPresence = Array.isArray(existing?.presence) ? (existing.presence as unknown as LivePresence[]) : []
+  const presence = mergePresence(prevPresence, cleaned, now.getTime())
   // The first link stays, except that a broadcast link replaces an earlier status link.
   const streamLink = betterStreamLink(existing?.streamLink, normalizeStreamLink(body.streamLink))
   const startedAt = new Date(body.startedAt)
