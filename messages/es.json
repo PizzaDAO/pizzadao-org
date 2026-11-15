@@ -454,7 +454,15 @@
       "openDmsMobile4": "Vuelve a esta página y toca Intentar de nuevo",
       "openDmsAltIntro": "¿Prefieres no cambiarlo? Entra con tu cuenta de Discord. No hace falta MD.",
       "openDmsAltButton": "Entrar con Discord",
-      "dmHintAlt": "¿No te llegan los MD? Entra con Discord"
+      "dmHintAlt": "¿No te llegan los MD? Entra con Discord",
+      "sentOpenHereHint": "Abre el enlace en este navegador. Esta página sigue sola cuando hayas entrado.",
+      "elsewhereHeadline": "Se abrió en otro sitio.",
+      "elsewhereMessage": "Tu enlace se abrió en otro navegador o dentro de la app de Discord, así que entraste allí, no en este navegador.",
+      "elsewhereHowTo": "Para entrar aquí, entra con Discord abajo, o pide un enlace nuevo y cópialo (mantén pulsado en el móvil) en la barra de direcciones de este navegador.",
+      "sendNewLinkButton": "Enviar un enlace nuevo",
+      "landedTitle": "Has entrado en este navegador.",
+      "landedMessage": "¿Pediste el enlace en otro navegador o dispositivo? Esa página sigue sin sesión. Sigue aquí, o abre {site} en tu navegador habitual y entra allí con Discord.",
+      "landedDismiss": "Entendido"
     },
     "claim": {
       "askOverline": "§ ··· Bienvenido de nuevo",

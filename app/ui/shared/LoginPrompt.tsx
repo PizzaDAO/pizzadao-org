@@ -6,6 +6,8 @@
 
 import Link from "next/link";
 import { useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
+import { loginHrefFrom } from "@/app/lib/login-return";
 
 export function LoginPrompt({
   message,
@@ -15,6 +17,7 @@ export function LoginPrompt({
   onDismiss?: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
   useEffect(() => {
     ref.current?.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
   }, [message]);
@@ -38,7 +41,7 @@ export function LoginPrompt({
         {message}
       </span>
       <Link
-        href="/login"
+        href={loginHrefFrom(pathname)}
         className="btn-pill"
         style={{
           background: "hsl(var(--foreground))",

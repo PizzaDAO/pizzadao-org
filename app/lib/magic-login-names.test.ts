@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-const mocks = vi.hoisted(() => ({ create: vi.fn(), count: vi.fn(), delete: vi.fn(), deleteMany: vi.fn(), sendDM: vi.fn(), search: vi.fn() }));
+const mocks = vi.hoisted(() => ({ create: vi.fn(async (..._args: any[]) => ({ id: 'tok1' })), count: vi.fn(), delete: vi.fn(), deleteMany: vi.fn(), sendDM: vi.fn(), search: vi.fn() }));
 vi.mock('./db', () => ({ prisma: { magicLoginToken: mocks } }));
 vi.mock('./discord', () => ({ searchGuildMembers: mocks.search, sendDM: mocks.sendDM }));
 vi.mock('./activation', () => ({ recordActivationLater: vi.fn() }));

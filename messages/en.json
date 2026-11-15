@@ -454,7 +454,15 @@
       "openDmsMobile4": "Come back to this page and tap Try again",
       "openDmsAltIntro": "Prefer not to change this? Log in with your Discord account instead. No DM needed.",
       "openDmsAltButton": "Log in with Discord",
-      "dmHintAlt": "Can't get DMs? Log in with Discord instead"
+      "dmHintAlt": "Can't get DMs? Log in with Discord instead",
+      "sentOpenHereHint": "Open the link in this browser. This page moves on by itself once you're logged in.",
+      "elsewhereHeadline": "Opened somewhere else.",
+      "elsewhereMessage": "Your link was opened in another browser or inside the Discord app, so you're logged in there, not in this browser.",
+      "elsewhereHowTo": "To log in here, log in with Discord below, or send a new link and copy it (long-press on a phone) into this browser's address bar.",
+      "sendNewLinkButton": "Send a new link",
+      "landedTitle": "You're logged in in this browser.",
+      "landedMessage": "Asked for the link in another browser or on another device? That page stays logged out. Keep going here, or open {site} in your usual browser and log in there with Discord.",
+      "landedDismiss": "Got it"
     },
     "claim": {
       "askOverline": "§ ··· Welcome back",
