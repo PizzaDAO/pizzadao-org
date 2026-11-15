@@ -1,5 +1,5 @@
 import { requireDpr, rejectUnsafeWrite, json, isNonProductionDeploy } from '@/app/lib/admin-guard'
-import { listAdminLevels, MissionEditError, updateLevel, updateMission } from '@/app/lib/admin-missions'
+import { createAnytimeMission, listAdminLevels, MissionEditError, updateLevel, updateMission } from '@/app/lib/admin-missions'
 import { listChanges } from '@/app/lib/settings/store'
 
 export const runtime = 'nodejs'
@@ -9,10 +9,11 @@ export const dynamic = 'force-dynamic'
  * GET / PATCH /api/admin/missions
  * Dread Pizza Roberts only. Stricter-only: numeric minimums can be raised, rewards lowered, a
  * mission re-activated (never deactivated); other params are read-only. Also level titles and
- * mission titles/descriptions. No creating or
- * deleting missions, and no changing a mission's verifier. Never cached.
+ * mission titles/descriptions. POST creates an inactive level 0 Anytime mission (manual review);
+ * no deleting missions and no changing a mission's verifier. Never cached.
  *
  *   GET                                         levels + missions + recent changes
+ *   POST  {title, description?, proofKind?, note?}
  *   PATCH {missionId, title?, description?, guideHref?, isActive?, bonus?, bonusReward?, verifierParams?, note?, confirm?}
  *   PATCH {level, reward?, levelTitle?, note?, confirm?}
  */
@@ -21,6 +22,24 @@ export async function GET() {
   if (!auth.ok) return auth.response
   const [levels, changes] = await Promise.all([listAdminLevels(), listChanges({ limit: 100 })])
   return json({ levels, changes: changes.filter((c) => c.key.startsWith('mission:') || c.key.startsWith('missionLevel:')), nonProduction: isNonProductionDeploy() })
+}
+
+/** POST {title, description?, proofKind?: NONE|URL, note?}: create an inactive level 0 Anytime bonus mission (manual review, 0 reward). */
+export async function POST(request: Request) {
+  const auth = await requireDpr()
+  if (!auth.ok) return auth.response
+  const unsafe = rejectUnsafeWrite(request)
+  if (unsafe) return unsafe
+  const b = (await request.json().catch(() => null)) as Record<string, unknown> | null
+  if (!b || typeof b !== 'object' || Array.isArray(b)) return json({ error: 'Invalid body' }, 400)
+  try {
+    const r = await createAnytimeMission({ title: b.title, description: b.description, proofKind: b.proofKind }, auth.session.discordId, b.note)
+    return json({ ok: true, ...r }, 201)
+  } catch (e) {
+    if (e instanceof MissionEditError) return json({ error: e.message }, e.status)
+    console.error('[admin missions] create failed:', e)
+    return json({ error: 'Could not create the mission' }, 500)
+  }
 }
 
 export async function PATCH(request: Request) {

@@ -260,6 +260,7 @@ describe('settings registry', () => {
       ['site.hostRedirectEnabled', false],
       ['site.hostRedirectPermanent', false],
       ['site.sessionBridgeEnabled', false],
+      ['onboarding.laneCardsEnabled', false],
       ['marketing.newsletterEnabled', false],
       ['marketing.contactEnabled', false],
       ['marketing.contactNotifyEmail', ''],

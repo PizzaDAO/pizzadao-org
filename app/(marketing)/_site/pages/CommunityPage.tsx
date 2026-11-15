@@ -20,6 +20,7 @@ const slice = "/marketing/assets/slice.webp";
 const WAYS_IN = [
   {
     icon: Pizza,
+    slug: "host",
     tag: "Host",
     title: "Throw a pizza party",
     one: "Pick a date. Pick a pizzeria. We back it.",
@@ -27,6 +28,7 @@ const WAYS_IN = [
   },
   {
     icon: Wrench,
+    slug: "build",
     tag: "Build",
     title: "Ship tools + projects",
     one: "Open repos, real users, shipped fast.",
@@ -34,6 +36,7 @@ const WAYS_IN = [
   },
   {
     icon: Palette,
+    slug: "create",
     tag: "Create",
     title: "Make the art + culture",
     one: "Posters, zines, mixtapes, films, merch.",
@@ -41,6 +44,7 @@ const WAYS_IN = [
   },
   {
     icon: Users,
+    slug: "gather",
     tag: "Gather",
     title: "Hold the room",
     one: "Long tables, slice clubs, coworking nights.",
@@ -48,6 +52,7 @@ const WAYS_IN = [
   },
   {
     icon: Code2,
+    slug: "experiment",
     tag: "Experiment",
     title: "Run a hackathon",
     one: "Devs, designers and pizzaiolos, one weekend.",
@@ -55,6 +60,7 @@ const WAYS_IN = [
   },
   {
     icon: MapPin,
+    slug: "grow",
     tag: "Grow",
     title: "Open a city",
     one: "Start a chapter where there isn't one yet.",
@@ -225,7 +231,7 @@ const BUILDS: Build[] = [
   },
 ];
 
-const CommunityPage = () => {
+const CommunityPage = ({ laneLinks = {} }: { laneLinks?: Record<string, string> }) => {
   const [activeBuild, setActiveBuild] = useState<number | null>(null);
   const [embedSite, setEmbedSite] = useState<{ name: string; url: string } | null>(null);
   const [galleryOpen, setGalleryOpen] = useState(false);
@@ -415,9 +421,10 @@ const CommunityPage = () => {
               // Subtle scale variance - one is hero-sized
               const scales = ["md:scale-100", "md:scale-[0.97]", "md:scale-[1.04] md:z-10", "md:scale-[0.98]", "md:scale-100", "md:scale-[0.99]"];
 
-              return (
+              const laneHref = laneLinks[w.slug];
+              const card = (
                 <article
-                  key={w.title}
+                  key={laneHref ? undefined : w.title}
                   className={`mk-paper-soft group relative flex flex-col rounded-[10px] ${tones[i % tones.length]} ${rots[i % rots.length]} ${offsets[i % offsets.length]} ${scales[i % scales.length]} p-6 md:p-7 shadow-[0_1px_0_hsl(var(--ink)/0.04),0_2px_4px_-2px_hsl(var(--ink)/0.12),0_22px_36px_-26px_hsl(var(--ink)/0.45)] ring-1 ring-ink/[0.06] transition-all duration-300 hover:-translate-y-0.5 hover:rotate-0 hover:shadow-[0_2px_6px_-2px_hsl(var(--ink)/0.18),0_36px_60px_-26px_hsl(var(--ink)/0.5)]`}
                   style={{
                     // soft paper grain - fibrous noise, very low opacity
@@ -462,6 +469,19 @@ const CommunityPage = () => {
                     {w.more}
                   </div>
                 </article>
+              );
+              return laneHref ? (
+                <a
+                  key={w.title}
+                  href={laneHref}
+                  aria-label={`${w.tag}: ${w.title}`}
+                  onClick={() => track(EVT.COMMUNITY_LANE_CARD_CLICKED, { lane: w.slug })}
+                  className="flex rounded-[10px] outline-none [&>article]:w-full focus-visible:ring-2 focus-visible:ring-tomato focus-visible:ring-offset-2"
+                >
+                  {card}
+                </a>
+              ) : (
+                card
               );
             })}
           </div>

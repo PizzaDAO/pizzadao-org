@@ -47,6 +47,7 @@ import { LevelCard } from "./components/LevelCard";
 import { SessionsCard } from "./components/SessionsCard";
 import { BuddyCard } from "./components/BuddyCard";
 import { StartHere } from "./components/StartHere";
+import { LaneCard } from "./components/LaneCard";
 import { BoxMafiaSuggestion } from "./components/BoxMafiaSuggestion";
 import { RecentActivity } from "./components/RecentActivity";
 import { Discover } from "./components/Discover";
@@ -250,6 +251,8 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         onSendPep={() => setShowSendModal(true)}
                         profileCompletion={summary?.profileCompletion}
                     />
+
+                    <LaneCard lane={summary?.lane} />
 
                     <StartHere
                         enabled={summary?.startHere?.enabled}

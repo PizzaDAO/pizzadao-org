@@ -7,7 +7,7 @@ vi.mock('@/app/lib/mission-cache', () => ({ clearMissionCaches: vi.fn() }))
 import { prisma } from '@/app/lib/db'
 import { clearMissionCaches } from '@/app/lib/mission-cache'
 import { clearSettingsCache } from '@/app/lib/settings'
-import { assertStricterParams, MissionEditError, updateLevel, updateMission, validateVerifierParams } from './admin-missions'
+import { assertStricterParams, createAnytimeMission, MissionEditError, updateLevel, updateMission, validateVerifierParams } from './admin-missions'
 
 const m = (f: unknown) => f as ReturnType<typeof vi.fn>
 const ADMIN = '400000000000000001'
@@ -251,5 +251,45 @@ describe('updateMission: bonus', () => {
     await expect(updateMission(7, { bonus: 'yes' }, ADMIN)).rejects.toMatchObject({ status: 400 })
     m(prisma.mission.findUnique).mockResolvedValue({ ...base, level: 0, bonus: true })
     await expect(updateMission(7, { bonus: false }, ADMIN, { confirm: true })).rejects.toMatchObject({ status: 400, message: expect.stringMatching(/Anytime/) })
+  })
+})
+
+describe('createAnytimeMission', () => {
+  beforeEach(() => {
+    m(prisma.mission.findFirst).mockResolvedValue({ index: 4 })
+    m(prisma.mission.create).mockResolvedValue({ id: 31, index: 5 })
+  })
+
+  it('creates an inactive level 0 bonus mission at the next free index, manual review, 0 reward, with an audit row', async () => {
+    const r = await createAnytimeMission({ title: '  Throw a pizza party ', description: ' d ', proofKind: 'URL' }, ADMIN, 'lane mission')
+    expect(r).toEqual({ id: 31, index: 5 })
+    expect(m(prisma.mission.findFirst).mock.calls[0][0]).toMatchObject({ where: { level: 0 }, orderBy: { index: 'desc' } })
+    expect(m(prisma.mission.create).mock.calls[0][0].data).toEqual({
+      level: 0, index: 5, title: 'Throw a pizza party', description: 'd', reward: 0, isActive: false, bonus: true, bonusReward: 0, verifierKey: 'manual', proofKind: 'URL',
+    })
+    expect(m(prisma.appSettingChange.create).mock.calls[0][0].data).toMatchObject({ key: 'mission:31:created', changedBy: ADMIN, note: 'lane mission' })
+    expect(clearMissionCaches).toHaveBeenCalled()
+  })
+
+  it('starts at index 0 when level 0 is empty', async () => {
+    m(prisma.mission.findFirst).mockResolvedValue(null)
+    await createAnytimeMission({ title: 'X' }, ADMIN)
+    expect(m(prisma.mission.create).mock.calls[0][0].data).toMatchObject({ index: 0, proofKind: 'URL' })
+  })
+
+  it('validates the title, description and proofKind', async () => {
+    await expect(createAnytimeMission({ title: ' ' }, ADMIN)).rejects.toMatchObject({ status: 400 })
+    await expect(createAnytimeMission({ title: 'x'.repeat(121) }, ADMIN)).rejects.toMatchObject({ status: 400 })
+    await expect(createAnytimeMission({ title: 'x', description: 'd'.repeat(1001) }, ADMIN)).rejects.toMatchObject({ status: 400 })
+    await expect(createAnytimeMission({ title: 'x', proofKind: 'UPLOAD' }, ADMIN)).rejects.toMatchObject({ status: 400, message: expect.stringMatching(/NONE or URL/) })
+    expect(prisma.mission.create).not.toHaveBeenCalled()
+  })
+
+  it('retries once on a unique-index conflict with a concurrent create, then gives up', async () => {
+    m(prisma.mission.create).mockRejectedValueOnce(Object.assign(new Error('dup'), { code: 'P2002' })).mockResolvedValueOnce({ id: 32, index: 6 })
+    expect(await createAnytimeMission({ title: 'x' }, ADMIN)).toEqual({ id: 32, index: 6 })
+    m(prisma.mission.create).mockReset()
+    m(prisma.mission.create).mockRejectedValue(Object.assign(new Error('dup'), { code: 'P2002' }))
+    await expect(createAnytimeMission({ title: 'x' }, ADMIN)).rejects.toMatchObject({ code: 'P2002' })
   })
 })

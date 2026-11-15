@@ -71,6 +71,15 @@ export default async function AdminMissionsPage() {
         noHistory: t("noHistory"),
         errorGeneric: t("errorGeneric"),
         loadError: t("loadError"),
+        addTitle: t("addTitle"),
+        addHelp: t("addHelp"),
+        addMissionTitle: t("addMissionTitle"),
+        addMissionDescription: t("addMissionDescription"),
+        addProof: t("addProof"),
+        addProofUrl: t("addProofUrl"),
+        addProofNone: t("addProofNone"),
+        addButton: t("addButton"),
+        added: t("added"),
     };
 
     return (
@@ -82,6 +91,8 @@ export default async function AdminMissionsPage() {
                     <p className="m-0 text-foreground/70">{t("description")}</p>
                     <p className="m-0 text-sm">
                         <Link href="/admin/settings" className="underline">{t("linkSettings")}</Link>
+                        {" · "}
+                        <Link href="/admin/lanes" className="underline">{t("linkLanes")}</Link>
                     </p>
                 </header>
                 <MissionsEditor labels={labels} />
