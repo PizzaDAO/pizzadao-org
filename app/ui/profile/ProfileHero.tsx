@@ -17,6 +17,8 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useLocale, useTranslations } from "next-intl";
+import { formatMemberSince } from "@/app/lib/member-since-format";
 import { isOptimizableImage } from "@/app/lib/image-hosts";
 import { ProfileActions, type ProfileActionsMode } from "./ProfileActions";
 
@@ -31,6 +33,8 @@ interface ProfileHeroProps {
     level?: number | string | null;
     levelTitle?: string | null;
     mafiaRank?: string | null;
+    /** ISO date for "Member since"; omitted or null renders nothing. */
+    memberSince?: string | null;
     mode: ProfileActionsMode;
     viewerId: string | null;
     /** When true, suppress the owner banner (used when ?as=visitor is set). */
@@ -54,10 +58,14 @@ export function ProfileHero({
     level,
     levelTitle,
     mafiaRank,
+    memberSince,
     mode,
     viewerId,
     suppressOwnerBanner,
 }: ProfileHeroProps) {
+    const tSince = useTranslations("memberSince");
+    const locale = useLocale();
+    const sinceText = formatMemberSince(memberSince, locale);
     const isOwner = mode === "owner-readonly" || mode === "owner-edit";
 
     const [bannerVisible, setBannerVisible] = useState(false);
@@ -259,6 +267,11 @@ export function ProfileHero({
                                     </span>
                                 )}
                             </div>
+                        )}
+                        {sinceText && (
+                            <p data-testid="member-since" className="mt-2 mb-0 text-sm text-cream/60">
+                                {tSince("label", { date: sinceText })}
+                            </p>
                         )}
                     </div>
 

@@ -6,6 +6,7 @@ vi.mock("@/app/lib/missions", () => ({ getUserProgressSummary: vi.fn() }));
 vi.mock("@/app/lib/mafia-points", () => ({ getMafiaRank: vi.fn() }));
 vi.mock("@/app/lib/crew-mappings", () => ({ getCrewMappings: vi.fn() }));
 vi.mock("@/app/lib/pfp", () => ({ resolvePfpUrlAsync: vi.fn() }));
+vi.mock("@/app/lib/member-since", () => ({ resolveMemberSince: vi.fn(async () => new Date("2021-03-05T00:00:00Z")) }));
 
 import { GET, composeMemberCard, MEMBER_CARD_KEYS } from "./route";
 import { fetchMemberById } from "@/app/lib/sheets/member-repository";

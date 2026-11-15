@@ -908,7 +908,8 @@
       "allSubmitted": "Tout est envoyé. En attente de relecture.",
       "maxBody": "Tu as atteint tous les niveaux existants.",
       "viewAll": "Toutes les missions",
-      "nextLevel": "Niveau suivant : {title}"
+      "nextLevel": "Niveau suivant : {title}",
+      "submitted": "Envoyées — en attente de relecture"
     },
     "startHere": {
       "overline": "Commence ici",
@@ -2720,5 +2721,17 @@
     "pickTitle": "Choisissez un parcours",
     "pickBody": "Choisissez une porte d'entrée et recevez un guide pas à pas.",
     "pickCta": "Trouvez votre parcours"
+  },
+  "missionHold": {
+    "pill": "Envoyée",
+    "head": "Envoyée — en attente de relecture",
+    "plain": "Ta mission est envoyée. Un relecteur la regardera bientôt.",
+    "NEW_ACCOUNT": "Vérifiée. Les nouveaux comptes Discord passent d’abord par la validation d’un relecteur, elle attend donc l’un d’eux.",
+    "HIGH_LEVEL": "Vérifiée. Un relecteur valide les récompenses à partir du niveau {level}, elle attend donc l’un d’eux. Tu n’as rien d’autre à faire.",
+    "PREVIOUSLY_REJECTED": "Vérifiée maintenant. Un relecteur va la revoir.",
+    "other": "Vérifiée. En attente de la validation d’un relecteur."
+  },
+  "memberSince": {
+    "label": "Membre depuis {date}"
   }
 }

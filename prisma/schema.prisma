@@ -1051,6 +1051,9 @@ model MemberProfileExtras {
   reengageEmailOptIn           Boolean   @default(false) // explicit opt-in to the weekly digest
   // ===== Pizza Passport (plans/pizza-passport.md): who may see this member's stamps =====
   passportVisibility           String    @default("public") @db.VarChar(8) // public | members | private
+  // ===== Member since: the Discord server join date, captured from the guild member =====
+  discordJoinedAt              DateTime? // guild member joined_at; shown as "member since" when it is the earliest known date
+  discordJoinedCheckedAt       DateTime? // last Discord lookup (throttles retries for people not in the server)
   updatedAt                    DateTime  @updatedAt
   createdAt                    DateTime  @default(now())
 }

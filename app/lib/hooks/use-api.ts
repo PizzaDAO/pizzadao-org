@@ -420,6 +420,7 @@ export interface ProfileSummaryData {
     levelTitle: string
     mafiaRank: { rank: number; tier: string } | null
     vouchInCount: number
+    memberSince?: string | null
   }
   about: {
     skills: string

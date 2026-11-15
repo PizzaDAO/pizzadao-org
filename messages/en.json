@@ -908,7 +908,8 @@
       "allSubmitted": "Everything is submitted. Waiting for review.",
       "maxBody": "You have reached every level there is.",
       "viewAll": "All missions",
-      "nextLevel": "Next level: {title}"
+      "nextLevel": "Next level: {title}",
+      "submitted": "Submitted — waiting for review"
     },
     "startHere": {
       "overline": "Start here",
@@ -2720,5 +2721,17 @@
     "pickTitle": "Pick a lane",
     "pickBody": "Choose a way in and get a step-by-step guide.",
     "pickCta": "Find your lane"
+  },
+  "missionHold": {
+    "pill": "Submitted",
+    "head": "Submitted — waiting for review",
+    "plain": "Your completion is in. A reviewer will look at it soon.",
+    "NEW_ACCOUNT": "Verified. New Discord accounts get a reviewer’s release first, so it is waiting for one.",
+    "HIGH_LEVEL": "Verified. A reviewer releases Level {level}+ rewards, so it is waiting for one. You do not need to do anything else.",
+    "PREVIOUSLY_REJECTED": "Verified now. A reviewer will take another look.",
+    "other": "Verified. Waiting for a reviewer’s release."
+  },
+  "memberSince": {
+    "label": "Member since {date}"
   }
 }

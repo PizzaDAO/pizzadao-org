@@ -908,7 +908,8 @@
       "allSubmitted": "Todo está enviado. Esperando revisión.",
       "maxBody": "Has llegado a todos los niveles que existen.",
       "viewAll": "Todas las misiones",
-      "nextLevel": "Siguiente nivel: {title}"
+      "nextLevel": "Siguiente nivel: {title}",
+      "submitted": "Enviada — esperando revisión"
     },
     "startHere": {
       "overline": "Empieza aquí",
@@ -2720,5 +2721,17 @@
     "pickTitle": "Elige un carril",
     "pickBody": "Elige una forma de entrar y recibe una guía paso a paso.",
     "pickCta": "Encuentra tu carril"
+  },
+  "missionHold": {
+    "pill": "Enviada",
+    "head": "Enviada — esperando revisión",
+    "plain": "Tu misión está enviada. Un revisor la verá pronto.",
+    "NEW_ACCOUNT": "Verificada. Las cuentas nuevas de Discord pasan primero por la aprobación de un revisor, así que espera a uno.",
+    "HIGH_LEVEL": "Verificada. Un revisor aprueba las recompensas del nivel {level} en adelante, así que espera a uno. No tienes que hacer nada más.",
+    "PREVIOUSLY_REJECTED": "Verificada ahora. Un revisor le echará otro vistazo.",
+    "other": "Verificada. Esperando la aprobación de un revisor."
+  },
+  "memberSince": {
+    "label": "Miembro desde {date}"
   }
 }

@@ -170,3 +170,15 @@ describe("ProfileHero", () => {
         expect(screen.getByText("Test Member")).toBeTruthy();
     });
 });
+
+describe("ProfileHero member since", () => {
+    it("shows the member since date, localized", () => {
+        render(<ProfileHero {...base} mode="public" viewerId={null} memberSince="2021-03-05T00:00:00Z" />);
+        expect(screen.getByTestId("member-since").textContent).toBe("Member since March 2021");
+    });
+
+    it("shows nothing without a date", () => {
+        render(<ProfileHero {...base} mode="public" viewerId={null} />);
+        expect(screen.queryByTestId("member-since")).toBeNull();
+    });
+});

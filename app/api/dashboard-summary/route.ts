@@ -122,6 +122,8 @@ export interface DashboardSummary {
         total: number;
         nextTitle: string | null;
         nextMissions: Array<{ id: number; title: string }>;
+        /** This level's missions already submitted and waiting for a reviewer (pending, held or not). */
+        submitted: Array<{ id: number; title: string }>;
         awaitingReview: boolean;
     };
     /** jalapeno-34126 — setup checklist backing the hero completion meter. */
@@ -453,6 +455,7 @@ export async function GET(request: NextRequest) {
             nextTitle: levelInfo.nextTitle,
             // Missions still to do (not approved and not already waiting for review), in order.
             nextMissions: levelInfo.missions.filter((m) => m.state === "todo").slice(0, 2).map((m) => ({ id: m.id, title: m.title })),
+            submitted: levelInfo.missions.filter((m) => m.state === "pending").map((m) => ({ id: m.id, title: m.title })),
             awaitingReview,
         };
 

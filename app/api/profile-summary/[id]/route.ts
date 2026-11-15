@@ -22,6 +22,7 @@ import { realCrews, withoutNonCrewIds } from "@/app/lib/crew-id";
 import { prisma } from "@/app/lib/db";
 import { getMemberTagline } from "@/app/api/profile-extras/[id]/route";
 import { resolvePfpUrlAsync } from "@/app/lib/pfp";
+import { resolveMemberSince } from "@/app/lib/member-since";
 import { internalError } from "@/app/lib/errors/error-response";
 
 export const runtime = "nodejs";
@@ -43,6 +44,8 @@ export interface ProfileSummary {
         mafiaRank: { rank: number; tier: string } | null;
         /** Inbound vouches (people who have vouched for this profile). */
         vouchInCount: number;
+        /** ISO date shown as "member since": the earliest of Discord join, first call and site signup. */
+        memberSince: string | null;
     };
     about: {
         skills: string;
@@ -255,6 +258,12 @@ export async function composeProfileSummary(
     ]);
     const member = await memberPromise;
     if (!member) return null;
+    // Display only: the earliest known date. A cold Discord lookup is capped so the profile never waits on it.
+    const sincePromise = light
+        ? Promise.resolve(null as Date | null)
+        : resolveMemberSince(memberId, String(member.discordId || "").trim() || null).catch(() => null as Date | null);
+    const memberSince = (await withDeadline(sincePromise, 800, null)).value;
+    keepAlive(sincePromise);
     const mafia = mafiaResult.value;
     if (mafiaResult.timedOut) keepAlive(mafiaPromise);
 
@@ -313,6 +322,7 @@ export async function composeProfileSummary(
             levelTitle,
             mafiaRank,
             vouchInCount: vouchCounts.followers ?? 0,
+            memberSince: memberSince ? memberSince.toISOString() : null,
         },
         about: {
             skills,

@@ -16,6 +16,7 @@ import { GuideLink } from "./GuideLink";
 import { VouchLink } from "./VouchLink";
 import { XFollowNote, xLinkState } from "./XFollowNote";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { input } from "../shared-styles";
 
 type MissionProgress = {
@@ -66,11 +67,7 @@ type MissionData = {
 
 const DEFAULT_HUMAN_RELEASE_MIN_LEVEL = 6;
 
-const holdCopy = (humanReleaseMinLevel: number): Record<string, string> => ({
-  NEW_ACCOUNT: "Verified. New Discord accounts get a reviewer's release first.",
-  HIGH_LEVEL: `Verified. A reviewer releases Level ${humanReleaseMinLevel}+ rewards.`,
-  PREVIOUSLY_REJECTED: "Verified now. A reviewer will take another look.",
-});
+const HOLD_KEYS = ["NEW_ACCOUNT", "HIGH_LEVEL", "PREVIOUSLY_REJECTED"] as const;
 
 type Props = {
   mission: MissionData;
@@ -150,6 +147,7 @@ function statusPillStyle(variant: StatusVariant) {
 }
 
 export function MissionCard({ mission, levelUnlocked, bonus, onSubmit, check, inviteUrl, profileEditHref, humanReleaseMinLevel, memberId }: Props) {
+  const tHold = useTranslations("missionHold");
   const [expanded, setExpanded] = useState(false);
   const [evidence, setEvidence] = useState("");
   const [notes, setNotes] = useState("");
@@ -172,14 +170,11 @@ export function MissionCard({ mission, levelUnlocked, bonus, onSubmit, check, in
     pillVariant = "approved";
     pillLabel = "Approved";
     pillIcon = "✓";
-  } else if (isPending && mission.progress?.holdReason) {
-    pillVariant = "pending";
-    pillLabel = "Awaiting Release";
-    pillIcon = "🔐";
   } else if (isPending) {
+    // Submitted, held or not: the member's part is done and a reviewer is next.
     pillVariant = "pending";
-    pillLabel = "Pending Review";
-    pillIcon = "⏳";
+    pillLabel = tHold("pill");
+    pillIcon = mission.progress?.holdReason ? "🔐" : "⏳";
   } else if (isRejected) {
     pillVariant = "rejected";
     pillLabel = "Rejected";
@@ -325,15 +320,22 @@ export function MissionCard({ mission, levelUnlocked, bonus, onSubmit, check, in
             </div>
           )}
           {inviteUrl !== undefined && !isCompleted && <InviteLink url={inviteUrl} />}
-          {mission.vouchLink && memberId && !isCompleted && <VouchLink memberId={memberId} have={mission.vouchLink.have} need={mission.vouchLink.need} />}
+          {mission.vouchLink && memberId && !isCompleted && !isPending && <VouchLink memberId={memberId} have={mission.vouchLink.have} need={mission.vouchLink.need} />}
           {mission.bonus && <BonusBadge reward={mission.bonusReward} />}
           {bonus && !mission.bonus && !isCompleted && <BonusNote />}
           {mission.getBoxUrl && !isCompleted && <GetBoxLink url={mission.getBoxUrl} />}
           {mission.xFollow && <XFollowNote state={xLinkState(isCompleted, check?.status)} profileEditHref={profileEditHref} />}
           {mission.guideHref && <GuideLink href={mission.guideHref} muted={isCompleted} />}
-          {isPending && mission.progress?.holdReason && (
-            <div style={{ fontSize: 13, color: "hsl(var(--ink) / 0.75)", marginTop: 8 }}>
-              {holdCopy(humanReleaseMinLevel ?? DEFAULT_HUMAN_RELEASE_MIN_LEVEL)[mission.progress.holdReason] ?? "Verified. Awaiting a reviewer's release."}
+          {isPending && (
+            <div data-testid="mission-submitted" style={{ fontSize: 13, color: "hsl(var(--ink) / 0.75)", marginTop: 8 }}>
+              <strong>{tHold("head")}</strong>
+              <div>
+                {mission.progress?.holdReason
+                  ? (HOLD_KEYS as readonly string[]).includes(mission.progress.holdReason)
+                    ? tHold(mission.progress.holdReason as (typeof HOLD_KEYS)[number], { level: humanReleaseMinLevel ?? DEFAULT_HUMAN_RELEASE_MIN_LEVEL })
+                    : tHold("other")
+                  : tHold("plain")}
+              </div>
             </div>
           )}
           {check && !isCompleted && check.status === "fail" && (check.hint || check.reason) && (
