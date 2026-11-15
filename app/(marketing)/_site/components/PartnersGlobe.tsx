@@ -77,21 +77,76 @@ const GRATICULE = geoGraticule10();
 
 const PartnersGlobe = () => {
   const [yaw, setYaw] = useState(0);
-  const rafRef = useRef<number | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
 
+  // Every update re-projects land, graticule and every city, so it runs only while the globe is on
+  // screen and the tab is visible, at ~15fps (140s per revolution is still smooth), and only after idle
+  // so it never competes with hydration. Reduced motion keeps the static globe.
   useEffect(() => {
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduced) return;
-    let start: number | null = null;
+    const el = rootRef.current;
+    if (!el) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const FRAME_MS = 1000 / 15;
+    let raf: number | null = null;
+    let inView = false;
+    let ready = false;
+    let elapsed = 0; // animated time in ms, excludes paused periods
+    let last: number | null = null;
+    let lastRender = 0;
+
+    const shouldRun = () => ready && inView && document.visibilityState === "visible";
     const tick = (t: number) => {
-      if (start === null) start = t;
-      // ~140s per revolution
-      setYaw(((t - start) / 140000) * 360);
-      rafRef.current = requestAnimationFrame(tick);
+      raf = null;
+      if (!shouldRun()) return;
+      if (last !== null) elapsed += t - last;
+      last = t;
+      if (t - lastRender >= FRAME_MS) {
+        lastRender = t;
+        setYaw((elapsed / 140000) * 360);
+      }
+      raf = requestAnimationFrame(tick);
     };
-    rafRef.current = requestAnimationFrame(tick);
+    const sync = () => {
+      if (shouldRun()) {
+        if (raf === null) {
+          last = null;
+          raf = requestAnimationFrame(tick);
+        }
+      } else if (raf !== null) {
+        cancelAnimationFrame(raf);
+        raf = null;
+      }
+    };
+
+    const io = new IntersectionObserver(([entry]) => {
+      inView = entry.isIntersecting;
+      sync();
+    });
+    io.observe(el);
+    document.addEventListener("visibilitychange", sync);
+
+    const w = window as Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    const start = () => {
+      ready = true;
+      sync();
+    };
+    let idleId: number | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    if (typeof w.requestIdleCallback === "function") {
+      idleId = w.requestIdleCallback(start, { timeout: 2000 });
+    } else {
+      timeoutId = setTimeout(start, 500);
+    }
+
     return () => {
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      io.disconnect();
+      document.removeEventListener("visibilitychange", sync);
+      if (raf !== null) cancelAnimationFrame(raf);
+      if (idleId !== undefined) w.cancelIdleCallback?.(idleId);
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
     };
   }, []);
 
@@ -142,6 +197,7 @@ const PartnersGlobe = () => {
 
   return (
     <div
+      ref={rootRef}
       className="relative mx-auto aspect-square w-full max-w-[520px]"
       aria-hidden="true"
     >

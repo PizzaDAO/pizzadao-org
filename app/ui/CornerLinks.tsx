@@ -3,11 +3,16 @@
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { Pencil } from "lucide-react";
-import SuggestionModal from "@/app/ui/SuggestionModal";
+import dynamic from "next/dynamic";
+
 import { isMarketingPath } from "@/app/lib/marketing-site";
+
+const SuggestionModal = dynamic(() => import("@/app/ui/SuggestionModal"));
 
 export default function CornerLinks() {
   const [open, setOpen] = useState(false);
+  // The modal chunk loads the first time it is opened, then stays mounted so a draft survives closing.
+  const [everOpened, setEverOpened] = useState(false);
   const pathname = usePathname();
   // The marketing pages are a separate surface: no suggestion box or GitHub link there.
   if (isMarketingPath(pathname)) return null;
@@ -18,7 +23,10 @@ export default function CornerLinks() {
         {/* Suggest an improvement */}
         <button
           type="button"
-          onClick={() => setOpen(true)}
+          onClick={() => {
+            setEverOpened(true);
+            setOpen(true);
+          }}
           className="suggestion-link min-w-[44px] min-h-[44px] flex items-center justify-center"
           title="Suggest an improvement"
           aria-label="Suggest an improvement"
@@ -63,7 +71,7 @@ export default function CornerLinks() {
         }
       `}</style>
 
-      <SuggestionModal open={open} onClose={() => setOpen(false)} />
+      {everOpened && <SuggestionModal open={open} onClose={() => setOpen(false)} />}
     </>
   );
 }
