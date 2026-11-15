@@ -7,6 +7,7 @@ import { internalError } from "@/app/lib/errors/error-response";
 import type { NameOrigin } from "@/app/lib/name-origin";
 import { isKnownTopping } from "@/app/lib/topping-images";
 import { signNameOrigin } from "@/app/lib/name-origin-sig";
+import { ICONIC_FAMILIES } from "@/app/lib/namegen-names";
 
 export const runtime = "nodejs";
 
@@ -190,42 +191,6 @@ function seededShuffle<T>(arr: T[], seed: number): T[] {
   }
   return result;
 }
-
-/**
- * Iconic family names from popular mafia/crime shows and movies.
- * These should appear first in suggestions when the title matches.
- */
-const ICONIC_FAMILIES: Record<string, string[]> = {
-  "the sopranos": ["Soprano"],
-  "sopranos": ["Soprano"],
-  "the wire": ["Barksdale", "Bell", "Omar"],
-  "wire": ["Barksdale", "Bell", "Omar"],
-  "the godfather": ["Corleone"],
-  "godfather": ["Corleone"],
-  "the godfather part ii": ["Corleone"],
-  "the godfather part iii": ["Corleone"],
-  "goodfellas": ["Hill", "DeVito"],
-  "scarface": ["Montana"],
-  "boardwalk empire": ["Thompson", "Nucky"],
-  "breaking bad": ["White", "Heisenberg"],
-  "ozark": ["Byrde"],
-  "the departed": ["Costello", "Costigan"],
-  "departed": ["Costello", "Costigan"],
-  "casino": ["Rothstein", "Santoro"],
-  "a bronx tale": ["Calogero", "Sonny"],
-  "bronx tale": ["Calogero", "Sonny"],
-  "donnie brasco": ["Brasco", "Pistone"],
-  "gomorrah": ["Savastano"],
-  "gomorra": ["Savastano"],
-  "peaky blinders": ["Shelby"],
-  "the irishman": ["Sheeran", "Bufalino"],
-  "irishman": ["Sheeran", "Bufalino"],
-  "mob city": ["Cohen"],
-  "power": ["St. Patrick", "Ghost"],
-  "narcos": ["Escobar"],
-  "narcos mexico": ["Gallardo"],
-  "sons of anarchy": ["Teller", "Morrow"],
-};
 
 type CastName = {
   firstName: string;

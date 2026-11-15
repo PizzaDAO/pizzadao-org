@@ -4,7 +4,7 @@
  */
 import { prisma } from '@/app/lib/db'
 import { getSetting } from '@/app/lib/settings'
-import { isThemedName } from '@/app/lib/themed-name'
+import { isThemedName, looksGenerated } from '@/app/lib/themed-name'
 import { deliverDm, type DmOutcome } from '@/app/lib/reminders/deliver'
 import { isNonProductionDeploy } from '@/app/lib/admin-guard'
 
@@ -35,16 +35,35 @@ const TIME_BUDGET_MS = 100_000
 /** Statuses that block another reminder within the cooldown (CLOSED backs off like a sent one). */
 const BLOCKING = ['SENT', 'SENDING', 'CLOSED']
 
+/**
+ * Names the generator offered to these members (signed, public claims), as "discordId|lowercase name".
+ * A generated name counts as themed whatever topping the member typed.
+ */
+async function offeredNames(discordIds: string[]): Promise<Set<string>> {
+  if (!discordIds.length) return new Set()
+  const claims = await prisma.mafiaNameClaim.findMany({
+    where: { discordId: { in: discordIds }, public: true },
+    select: { discordId: true, name: true },
+  })
+  return new Set(claims.map((c) => `${c.discordId}|${c.name.trim().toLowerCase()}`))
+}
+
+/** Themed for the reminder: a topping/pizza word, a name the generator offered this member, or the generator's own shape. */
+const isThemedForReminder = (name: string, discordId: string | null, offered: Set<string>) =>
+  isThemedName(name) || looksGenerated(name) || (!!discordId && offered.has(`${discordId}|${name.toLowerCase()}`))
+
 export async function buildNameReport(now = new Date()): Promise<NameReport> {
   const cooldownDays = await getSetting('members.nameReminderCooldownDays')
   const members = await prisma.member.findMany({
     where: { mergedInto: null },
     select: { id: true, name: true, discordId: true },
   })
-  const bad = members.filter((m) => {
+  const maybe = members.filter((m) => {
     const n = (m.name ?? '').trim()
-    return n !== '' && !isThemedName(n)
+    return n !== '' && !isThemedName(n) && !looksGenerated(n)
   })
+  const offered = await offeredNames(maybe.map((m) => m.discordId).filter((d): d is string => !!d))
+  const bad = maybe.filter((m) => !isThemedForReminder((m.name ?? '').trim(), m.discordId, offered))
   const ids = bad.map((m) => m.discordId).filter((d): d is string => !!d)
   const last = new Map<string, { at: Date; status: string }>()
   if (ids.length) {
@@ -123,7 +142,8 @@ export async function sendNameReminders(
     const m = byId.get(id)
     if (!m) { out.skipped.push({ id, reason: 'Not found' }); continue }
     if (!m.discordId) { out.skipped.push({ id, reason: 'No Discord id' }); continue }
-    if (isThemedName((m.name ?? '').trim())) { out.skipped.push({ id, reason: 'Name is themed' }); continue }
+    const trimmed = (m.name ?? '').trim()
+    if (isThemedForReminder(trimmed, m.discordId, await offeredNames([m.discordId]))) { out.skipped.push({ id, reason: 'Name is themed' }); continue }
     const recent = await prisma.memberNameReminder.findFirst({
       where: { discordId: m.discordId, status: { in: BLOCKING }, createdAt: { gt: new Date(now.getTime() - windowMs) } },
       select: { status: true },
