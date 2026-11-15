@@ -10,6 +10,7 @@
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { withoutNonCrewIds } from "@/app/lib/crew-id";
 
 export type CrewOption = {
     id: string;
@@ -78,8 +79,8 @@ export function YourCrews({
             effectiveDoneCounts[c.id.toLowerCase()] = c.doneCount;
         }
     } else {
-        // Normalize userCrews to IDs where possible
-        const userCrewIds = userCrews.map((name) => {
+        // Normalize userCrews to IDs where possible (the Community Call is not a crew: left out)
+        const userCrewIds = withoutNonCrewIds(userCrews, crewOptions).map((name) => {
             const found = crewOptions.find(
                 (opt) =>
                     opt.label.toLowerCase() === name.toLowerCase() ||

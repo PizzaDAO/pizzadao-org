@@ -15,6 +15,8 @@ import { isCrewExcluded, loadPostFilter, type PostFilter } from '@/app/lib/calls
 import { archiveCrewTask, createCrewTask, unarchiveCrewTask, updateCrewTask, type TaskPatch } from '@/app/lib/crew-tasks-write'
 import { crewInAllowlist, loadTaskProposalConfig } from './config'
 import type { ProposalChanges, ProposalField } from './proposals'
+import { isRoutable } from './view'
+import { nudgeMoved } from './run'
 
 const ISO = /^\d{4}-\d{2}-\d{2}$/
 
@@ -175,7 +177,8 @@ export async function applyProposal(id: string, actor: string, opts: { edits?: u
   // crew (and is not an admin) moves the proposal there for its leads to decide; it is not applied.
   const target = edits.crewId && edits.crewId !== row.crewId ? edits.crewId : null
   if (target) {
-    if (row.kind !== 'CREATE') return { result: 'bad-edits' }
+    // Only a new task routed from a call that is not a crew call may change crew.
+    if (!isRoutable(row.kind, row.crewId, rec?.crewId ?? null)) return { result: 'bad-edits' }
     let ok = false
     try {
       ok = await isValidTargetCrew(target, filter)
@@ -188,7 +191,10 @@ export async function applyProposal(id: string, actor: string, opts: { edits?: u
         where: { id, status: 'PENDING', crewId: row.crewId },
         data: { crewId: target, error: null, edited: { ...((row.edited as Record<string, unknown> | null) ?? {}), ...edits, crewId: target, fromCrewId: row.crewId, movedBy: actor } as never },
       })
-      return moved.count === 1 ? { result: 'moved', crewId: target } : { result: 'not-pending' }
+      if (moved.count !== 1) return { result: 'not-pending' }
+      // Tell the new crew's leads (best effort, same switch and channel as the nudge).
+      await nudgeMoved(id, target).catch((e) => console.warn('[call-tasks] move nudge failed:', e instanceof Error ? e.message : e))
+      return { result: 'moved', crewId: target }
     }
   }
   const taskCrew = target ?? row.crewId
@@ -215,19 +221,21 @@ export async function applyProposal(id: string, actor: string, opts: { edits?: u
   if ((row.kind === 'DONE' || row.kind === 'RETIRE' || closes) && !opts.confirmed) return { result: 'needs-confirm' }
 
   const now = opts.now ?? new Date()
-  const hasEdits = Object.keys(edits).length > 0
-  // The history keeps where a moved task came from.
-  const editedJson = target ? { ...edits, fromCrewId: row.crewId } : edits
+  // Earlier edits (a move, a label edit before it) are kept; the new ones go on top.
+  const prior = (row.edited && typeof row.edited === 'object' && !Array.isArray(row.edited) ? row.edited : {}) as Record<string, unknown>
+  const editedJson: Record<string, unknown> = { ...prior, ...edits, ...(target ? { crewId: target, fromCrewId: row.crewId } : {}) }
+  const hasEdits = Object.keys(edits).length > 0 || Object.keys(prior).length > 0
+  const fromCrewId = target ? row.crewId : typeof prior.fromCrewId === 'string' ? prior.fromCrewId : null
   // Claim first: two clicks (or two leads) can never apply the same proposal twice. (CREATE claims inside its transaction.)
   if (row.kind !== 'CREATE') {
     const claim = await prisma.crewTaskProposal.updateMany({
       where: { id, status: 'PENDING' },
-      data: { status: 'APPLIED', decidedBy: actor, decidedAt: now, error: null, ...(hasEdits ? { edited: edits as never } : {}) },
+      data: { status: 'APPLIED', decidedBy: actor, decidedAt: now, error: null, ...(hasEdits ? { edited: editedJson as never } : {}) },
     })
     if (claim.count !== 1) return { result: 'not-pending' }
   }
   const release = (error: string) => prisma.crewTaskProposal.updateMany({ where: { id }, data: { status: 'PENDING', decidedBy: null, decidedAt: null, error } }).catch(() => {})
-  const eventData = { via: 'call-proposal', proposalId: id, recordingId: row.recordingId, kind: row.kind, edited: hasEdits, ...(target ? { fromCrewId: row.crewId } : {}) }
+  const eventData = { via: 'call-proposal', proposalId: id, recordingId: row.recordingId, kind: row.kind, edited: hasEdits, ...(fromCrewId ? { fromCrewId } : {}) }
   try {
     if (row.kind === 'CREATE') {
       // Claim, task and history in one transaction: a retry can never leave a duplicate task behind.

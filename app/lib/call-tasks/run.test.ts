@@ -20,7 +20,7 @@ import { proposeTaskUpdates } from './extract'
 import { loadTaskProposalConfig, taskProposalConfigFrom, type TaskProposalConfig } from './config'
 import { SETTINGS, type SettingKey } from '@/app/lib/settings/registry'
 import type { Settings } from '@/app/lib/settings'
-import { expireOldProposals, listNeedingProposals, loadRouting, nudgeCrew, nudgeText, proposeTasksForRecording, storeProposals } from './run'
+import { adminCallReviewUrl, expireOldProposals, listNeedingProposals, loadRouting, movedNudgeText, nudgeCrew, nudgeMoved, nudgeText, proposeTasksForRecording, storeProposals } from './run'
 import { resolveRecapChannel } from '@/app/lib/calls/recap'
 import type { ProposalDraft } from './proposals'
 
@@ -319,5 +319,35 @@ describe('routing new tasks from the community call', () => {
       ['ch-tech', nudgeText(2, 'tech')],
       ['ch-ops', nudgeText(1, 'ops')],
     ])
+  })
+})
+
+describe('nudges for routed and unrouted community-call proposals', () => {
+  const env = { DISCORD_BOT_TOKEN: 'tok' }
+  beforeEach(() => {
+    cfgMock.mockResolvedValue({ ...ON, crews: ['community'], nudge: true })
+    vi.mocked(resolveRecapChannel).mockImplementation(async (crewId: string | null) => ({ channelId: `ch-${crewId}`, label: String(crewId) }) as never)
+  })
+  it('proposals left on the community call link admins to the admin call page', async () => {
+    rec.findUnique.mockResolvedValue({ id: 'rec1', crewId: 'community', crewLabel: 'Community', taskProposalsNudgedAt: null } as never)
+    prop.findMany.mockResolvedValue([{ crewId: 'community' }] as never)
+    const post = vi.fn(async () => ({ id: 'm1' }))
+    expect(await nudgeCrew('rec1', { env, post: post as never })).toBe('posted')
+    const body = (post.mock.calls[0] as unknown as [unknown, { content: string }])[1]
+    expect(body.content).toContain(adminCallReviewUrl('rec1'))
+    expect(body.content).not.toContain('/crew/community')
+  })
+  it('a moved proposal is announced in the new crew\'s channel, behind the nudge switch', async () => {
+    prop.findUnique.mockResolvedValue({ crewId: 'ops', status: 'PENDING' } as never)
+    const post = vi.fn(async () => ({ id: 'm1' }))
+    expect(await nudgeMoved('p1', 'ops', { env, post: post as never })).toBe('posted')
+    const [target, body] = post.mock.calls[0] as unknown as [{ channelId: string }, { content: string; allowed_mentions: unknown }]
+    expect(target.channelId).toBe('ch-ops')
+    expect(body.content).toBe(movedNudgeText('ops'))
+    expect(body.content).toContain('/crew/ops#call-updates')
+    expect(body.allowed_mentions).toEqual({ parse: [] })
+    cfgMock.mockResolvedValue({ ...ON, nudge: false })
+    expect(await nudgeMoved('p1', 'ops', { env, post: post as never })).toBe('disabled')
+    expect(post).toHaveBeenCalledTimes(1)
   })
 })

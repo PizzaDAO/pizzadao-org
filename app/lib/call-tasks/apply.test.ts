@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/app/lib/db')
 vi.mock('@/app/lib/crew-leads', () => ({ canManageCrew: vi.fn() }))
+vi.mock('./run', () => ({ nudgeMoved: vi.fn(async () => 'posted') }))
 vi.mock('@/app/lib/sheets-import/source', () => ({ usesDb: vi.fn() }))
 vi.mock('./config', async (orig) => ({ ...(await orig<typeof import('./config')>()), loadTaskProposalConfig: vi.fn() }))
 vi.mock('@/app/lib/calls/post-filters', async (orig) => ({ ...(await orig<typeof import('@/app/lib/calls/post-filters')>()), loadPostFilter: vi.fn() }))
@@ -24,6 +25,7 @@ import { canManageCrew } from '@/app/lib/crew-leads'
 import { usesDb } from '@/app/lib/sheets-import/source'
 import { EMPTY_POST_FILTER, loadPostFilter } from '@/app/lib/calls/post-filters'
 import { loadTaskProposalConfig } from './config'
+import { nudgeMoved } from './run'
 import { applyAll, applyProposal, cleanEdits, dismissProposal, effectiveValues, undoRetire } from './apply'
 
 const prop = vi.mocked(prisma.crewTaskProposal)
@@ -327,6 +329,7 @@ describe('new tasks routed from the community call', () => {
     vi.mocked(canManageCrew).mockImplementation(async (_actor: string, crewId: string | null | undefined) => crewId === 'tech')
     expect(await applyProposal('p1', 'techLead', { edits: { crewId: 'ops', label: 'Fix the Discord bot' } })).toEqual({ result: 'moved', crewId: 'ops' })
     expect(task.create).not.toHaveBeenCalled()
+    expect(nudgeMoved).toHaveBeenCalledWith('p1', 'ops') // the new crew's leads are told
     expect(prop.updateMany.mock.calls[0][0]).toMatchObject({
       where: { id: 'p1', status: 'PENDING', crewId: 'tech' },
       data: { crewId: 'ops', edited: { crewId: 'ops', fromCrewId: 'tech', label: 'Fix the Discord bot', movedBy: 'techLead' } },
@@ -345,6 +348,22 @@ describe('new tasks routed from the community call', () => {
     expect(await applyProposal('p1', 'admin', { edits: { crewId: 'ops' } })).toEqual({ result: 'bad-edits' })
     expect(task.create).not.toHaveBeenCalled()
     expect(prop.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('a crew call\'s new task cannot change crew', async () => {
+    vi.mocked(loadTaskProposalConfig).mockResolvedValue({ enabled: true, crews: ['ops'], maxPerCall: 15, maxDays: 14, model: '', nudge: false })
+    vi.mocked(prisma.callRecording.findUnique).mockResolvedValue({ crewId: 'ops', crewLabel: 'Ops' } as never)
+    prop.findUnique.mockResolvedValue(routed({ crewId: 'ops' }) as never)
+    expect(await applyProposal('p1', 'admin', { edits: { crewId: 'tech' } })).toEqual({ result: 'bad-edits' })
+    expect(task.create).not.toHaveBeenCalled()
+  })
+
+  it('applying after a move keeps the move and earlier edits in the history', async () => {
+    prop.findUnique.mockResolvedValue(routed({ crewId: 'ops', edited: { label: 'Fix the Discord bot', crewId: 'ops', fromCrewId: 'tech', movedBy: 'techLead' } }) as never)
+    expect(await applyProposal('p1', 'opsLead', { edits: { priority: 'High' } })).toEqual({ result: 'applied', taskId: 'new1' })
+    expect((task.create.mock.calls[0][0] as { data: Record<string, unknown> }).data).toMatchObject({ crewId: 'ops', label: 'Fix the Discord bot', priority: 'High' })
+    expect(prop.updateMany.mock.calls[0][0]).toMatchObject({ data: { status: 'APPLIED', edited: { label: 'Fix the Discord bot', crewId: 'ops', fromCrewId: 'tech', movedBy: 'techLead', priority: 'High' } } })
+    expect((event.create.mock.calls[0][0] as { data: { data: Record<string, unknown> } }).data.data).toMatchObject({ fromCrewId: 'tech', edited: true })
   })
 
   it('cleanEdits accepts a crew id and rejects junk', () => {

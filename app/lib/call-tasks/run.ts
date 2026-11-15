@@ -9,7 +9,7 @@ import type { Prisma } from '@prisma/client'
 import { prisma } from '@/app/lib/db'
 import { loadSettings } from '@/app/lib/settings'
 import { getCrewMappings, isClosedStage, type CrewOption } from '@/app/lib/crew-mappings'
-import { isNonCrewId, realCrews } from '@/app/lib/crew-id'
+import { isNonCrewId, NON_ROSTER_CREW_IDS, normalizeCrewId, realCrews } from '@/app/lib/crew-id'
 import type { Settings } from '@/app/lib/settings'
 import type { PostFilter } from '@/app/lib/calls/post-filters'
 import { sanitizeSummaryError, visibleSegments } from '@/app/lib/calls/recordings'
@@ -251,8 +251,46 @@ export async function expireOldProposals(maxDays: number, now = new Date()): Pro
   return res.count
 }
 
-export function nudgeText(count: number, crewId: string, base: string = appUrl()): string {
-  return `📋 ${count === 1 ? '1 task update from today\'s call is' : `${count} task updates from today's call are`} waiting for a crew lead to review: ${base}/crew/${encodeURIComponent(crewId)}#call-updates`
+/** Where a crew's waiting proposals are reviewed: its crew page. */
+export function crewReviewUrl(crewId: string, base: string = appUrl()): string {
+  return `${base}/crew/${encodeURIComponent(crewId)}#call-updates`
+}
+
+/** Proposals left on a call that is not a crew call (no crew fitted, no default crew): only admins review them, on the admin call page. */
+export function adminCallReviewUrl(recordingId: string, base: string = appUrl()): string {
+  return `${base}/admin/calls/${encodeURIComponent(recordingId)}#call-updates`
+}
+
+export function nudgeText(count: number, crewId: string, base: string = appUrl(), url: string = crewReviewUrl(crewId, base)): string {
+  return `📋 ${count === 1 ? '1 task update from today\'s call is' : `${count} task updates from today's call are`} waiting for a crew lead to review: ${url}`
+}
+
+export function movedNudgeText(crewId: string, base: string = appUrl()): string {
+  return `📋 A task update from a call was moved to this crew and is waiting for a crew lead to review: ${crewReviewUrl(crewId, base)}`
+}
+
+/**
+ * A decider moved a proposal to another crew they do not lead: one short line in that crew's
+ * channel (a link, never the proposal). Same switch, token, exclusion and channel as the nudge.
+ */
+export async function nudgeMoved(proposalId: string, crewId: string, deps: { post?: typeof postDiscordMessage; env?: Record<string, string | undefined> } = {}): Promise<NudgeResult> {
+  const env = deps.env ?? process.env
+  const cfg = await loadTaskProposalConfig(env)
+  if (!cfg.nudge) return 'disabled'
+  const botToken = env.DISCORD_BOT_TOKEN?.trim()
+  if (!botToken) return 'no-token'
+  const row = await prisma.crewTaskProposal.findUnique({ where: { id: proposalId }, select: { crewId: true, status: true } })
+  if (!row || row.crewId !== crewId || row.status !== 'PENDING') return 'none'
+  if (isCrewExcluded({ id: crewId }, await loadPostFilter())) return 'excluded'
+  const channel = await resolveRecapChannel(crewId, { env })
+  if (!channel) return 'no-channel'
+  try {
+    await (deps.post ?? postDiscordMessage)({ kind: 'bot', channelId: channel.channelId, botToken }, { content: movedNudgeText(crewId), allowed_mentions: { parse: [] }, flags: 4 })
+    return 'posted'
+  } catch (err) {
+    console.error('[call-tasks] move nudge failed:', err instanceof Error ? err.message : err)
+    return 'failed'
+  }
 }
 
 export type NudgeResult = 'posted' | 'disabled' | 'already' | 'none' | 'no-channel' | 'no-token' | 'excluded' | 'failed'
@@ -278,6 +316,15 @@ export async function nudgeCrew(id: string, deps: { post?: typeof postDiscordMes
   const rows = await prisma.crewTaskProposal.findMany({ where: { recordingId: id, status: 'PENDING' }, select: { crewId: true } })
   const counts = new Map<string, number>()
   for (const r of rows) counts.set(r.crewId, (counts.get(r.crewId) ?? 0) + 1)
+  // Proposals still on a call that is not a crew call have no crew leads: link admins to the call page.
+  let callIsCrew = !NON_ROSTER_CREW_IDS.has(normalizeCrewId(rec.crewId))
+  if (callIsCrew && counts.has(rec.crewId)) {
+    try {
+      callIsCrew = !isNonCrewId(rec.crewId, (await getCrewMappings()).crews)
+    } catch {
+      // registry unreadable: keep the crew link
+    }
+  }
   const targets: Array<{ crewId: string; count: number; channelId: string }> = []
   for (const [crewId, count] of counts) {
     if (crewId !== rec.crewId && isCrewExcluded({ id: crewId }, filter)) continue
@@ -292,7 +339,7 @@ export async function nudgeCrew(id: string, deps: { post?: typeof postDiscordMes
   let refused = 0
   for (const tg of targets) {
     try {
-      await (deps.post ?? postDiscordMessage)({ kind: 'bot', channelId: tg.channelId, botToken }, { content: nudgeText(tg.count, tg.crewId), allowed_mentions: { parse: [] }, flags: 4 })
+      await (deps.post ?? postDiscordMessage)({ kind: 'bot', channelId: tg.channelId, botToken }, { content: nudgeText(tg.count, tg.crewId, appUrl(), tg.crewId === rec.crewId && !callIsCrew ? adminCallReviewUrl(id) : undefined), allowed_mentions: { parse: [] }, flags: 4 })
       posted++
     } catch (err) {
       console.error('[call-tasks] nudge post failed:', err instanceof Error ? err.message : err)

@@ -212,7 +212,7 @@ export function CrewCallUpdates({ crewId, recordingId, showEmpty = false, onAppl
               {p.routable && (
                 <p style={{ margin: 0, fontSize: 14 }}>
                   <strong>{t('crewLine', { crew: crewName(p.crewId) })}</strong>
-                  {p.status === 'PENDING' && <span style={muted}> · {t('routedHint')}</span>}
+                  {p.status === 'PENDING' && p.callCrewId !== p.crewId && <span style={muted}> · {t('routedHint')}</span>}
                 </p>
               )}
               {p.fromCrewId && <p style={{ ...muted, margin: 0 }}>{t('movedFrom', { crew: crewName(p.fromCrewId) })}</p>}
