@@ -1,16 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import SiteNav from "@/app/(marketing)/_site/components/SiteNav";
 import Footer from "@/app/(marketing)/_site/components/Footer";
 import Sponsorship from "@/app/(marketing)/_site/components/Sponsorship";
-import PartnersGlobe from "@/app/(marketing)/_site/components/PartnersGlobe";
 import PartnerActivations from "@/app/(marketing)/_site/components/PartnerActivations";
 import RegistrationMarks from "@/app/(marketing)/_site/components/RegistrationMarks";
 import { track } from "@/app/(marketing)/_site/lib/analytics/posthog";
 import { EVT } from "@/app/(marketing)/_site/lib/analytics/events";
 import { invokeForm, honeypot } from "@/app/(marketing)/_site/lib/forms";
 import Honeypot from "@/app/(marketing)/_site/components/Honeypot";
+
+// d3-geo + world land + cities data: split out of the page bundle.
+const PartnersGlobe = dynamic(() => import("@/app/(marketing)/_site/components/PartnersGlobe"), {
+  loading: () => <div className="mx-auto aspect-square w-full max-w-[520px]" aria-hidden="true" />,
+});
 
 
 

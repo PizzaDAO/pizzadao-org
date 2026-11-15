@@ -77,21 +77,80 @@ const GRATICULE = geoGraticule10();
 
 const PartnersGlobe = () => {
   const [yaw, setYaw] = useState(0);
-  const rafRef = useRef<number | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
 
+  // Every update re-projects land, graticule and every city, so it runs only while the globe is on
+  // screen and the tab is visible, at ~15fps (140s per revolution is still smooth), and only after idle
+  // so it never competes with hydration. Reduced motion keeps the static globe.
   useEffect(() => {
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduced) return;
-    let start: number | null = null;
+    const el = rootRef.current;
+    if (!el) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const FRAME_MS = 1000 / 15;
+    let raf: number | null = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let inView = false;
+    let ready = false;
+    let elapsed = 0; // animated time in ms, excludes paused periods
+    let last: number | null = null;
+
+    const shouldRun = () => ready && inView && document.visibilityState === "visible";
+    // Sleep FRAME_MS between frames (then align to a paint with rAF) so it really runs ~15 times/s.
     const tick = (t: number) => {
-      if (start === null) start = t;
-      // ~140s per revolution
-      setYaw(((t - start) / 140000) * 360);
-      rafRef.current = requestAnimationFrame(tick);
+      raf = null;
+      if (!shouldRun()) return;
+      if (last !== null) elapsed += t - last;
+      last = t;
+      setYaw((elapsed / 140000) * 360);
+      timer = setTimeout(() => {
+        timer = null;
+        if (shouldRun()) raf = requestAnimationFrame(tick);
+      }, FRAME_MS);
     };
-    rafRef.current = requestAnimationFrame(tick);
+    const sync = () => {
+      if (shouldRun()) {
+        if (raf === null && timer === null) {
+          last = null;
+          raf = requestAnimationFrame(tick);
+        }
+      } else {
+        if (raf !== null) cancelAnimationFrame(raf);
+        if (timer !== null) clearTimeout(timer);
+        raf = null;
+        timer = null;
+      }
+    };
+
+    const io = new IntersectionObserver((entries) => {
+      inView = entries[entries.length - 1].isIntersecting;
+      sync();
+    });
+    io.observe(el);
+    document.addEventListener("visibilitychange", sync);
+
+    const w = window as Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    const start = () => {
+      ready = true;
+      sync();
+    };
+    let idleId: number | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    if (typeof w.requestIdleCallback === "function") {
+      idleId = w.requestIdleCallback(start, { timeout: 2000 });
+    } else {
+      timeoutId = setTimeout(start, 500);
+    }
+
     return () => {
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      io.disconnect();
+      document.removeEventListener("visibilitychange", sync);
+      if (raf !== null) cancelAnimationFrame(raf);
+      if (timer !== null) clearTimeout(timer);
+      if (idleId !== undefined) w.cancelIdleCallback?.(idleId);
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
     };
   }, []);
 
@@ -142,6 +201,7 @@ const PartnersGlobe = () => {
 
   return (
     <div
+      ref={rootRef}
       className="relative mx-auto aspect-square w-full max-w-[520px]"
       aria-hidden="true"
     >
