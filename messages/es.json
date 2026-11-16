@@ -2753,5 +2753,27 @@
     "activeMonths": "{count, plural, one {# mes} other {# meses}}",
     "sinceShort": "desde {date}",
     "lastActiveShort": "última actividad {date}"
+  },
+  "buddyCard": {
+    "title": "Compañero",
+    "yourBuddy": "Tu compañero: {name}",
+    "buddying": "Eres compañero de {name}",
+    "allDone": "¡Todo listo! Gracias.",
+    "waiting": "Esperando acceso al canal. Tu presentación se abre cuando ambos puedan ver el canal de compañeros.",
+    "openThread": "Abre tu hilo en Discord",
+    "done": " (hecho)",
+    "notYet": " (pendiente)",
+    "locked": "Los compañeros ayudan a los nuevos miembros a orientarse. Ser compañero se desbloquea en el nivel {level}.",
+    "invite": "Puedes ayudar a un nuevo miembro a orientarse. Sé compañero: un admin te empareja con un aprendiz.",
+    "beBuddy": "Ser compañero",
+    "showTrainee": "Mostrar “Incorporado con ayuda de {name}” en mi perfil público",
+    "showBuddy": "Mostrarme como compañero en mi perfil público y en la página de Mejores compañeros",
+    "isBuddy": "Eres compañero.",
+    "isBuddyPaused": "Eres compañero (en pausa).",
+    "resume": "Reanudar",
+    "pause": "Pausar",
+    "stop": "Dejar de ser compañero",
+    "notLevel": "Aún no tienes el nivel para ser compañero.",
+    "saveFailed": "No se pudo guardar. Inténtalo de nuevo."
   }
 }

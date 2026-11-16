@@ -87,7 +87,8 @@ export interface ScriptSection {
 export const CHAT_LINK_HOSTS = ['pizzadao.org', 'rsv.pizza'] as const
 export const CHAT_POST_MAX_CHARS = 400
 
-const URL_RE = /\bhttps:\/\/[^\s<>|]+/i
+/** Any link-like token (same shape speakable strips): the whole run of non-space characters. */
+const LINK_TOKEN_RE = /(?:https?:\/\/|www\.)\S+/gi
 
 export function isAllowedChatHost(hostname: string): boolean {
   const h = hostname.toLowerCase().replace(/\.$/, '')
@@ -95,29 +96,32 @@ export function isAllowedChatHost(hostname: string): boolean {
 }
 
 /**
- * The chat post for an announcement line that carries one https link (anywhere in the line, or after " | "):
- * "👉 <text without the link> <link>". Null when there is no link or it is not on an allowed host.
+ * The chat post for an announcement line that carries exactly one https link (anywhere in the line, or
+ * after " | "): "👉 <cleaned text without the link> <link>". Null when there is no link, it is not on an
+ * allowed host, or the line holds any other link (plain, www. or a masked "[x](...)" one): then the line
+ * is only spoken. The text goes through the same cleaning as the spoken text and then loses the
+ * characters that could ping or format.
  */
 export function chatPostFor(line: string): string | null {
-  const m = URL_RE.exec(line)
-  if (!m) return null
-  const link = m[0].replace(/[.,;:!?)\]]+$/, '')
+  if (line.includes('](')) return null
+  const tokens = line.match(LINK_TOKEN_RE) ?? []
+  if (tokens.length !== 1) return null
+  const raw = tokens[0].replace(/[.,;:!?)\]>|<]+$/, '')
   let url: URL
   try {
-    url = new URL(link)
+    url = new URL(raw)
   } catch {
     return null
   }
   if (url.protocol !== 'https:' || url.username || url.password || !isAllowedChatHost(url.hostname)) return null
-  const text = line
-    .replace(URL_RE, ' ')
-    .replace(/\s+\|\s*$/, '')
-    .replace(/[\u0000-\u001f\u007f]/g, ' ')
+  const href = url.href
+  const room = CHAT_POST_MAX_CHARS - href.length - 4
+  const text = speakable(line.replace(LINK_TOKEN_RE, ' '), Math.max(0, room))
+    .replace(/[@<>*_~`|\\]/g, '')
     .replace(/\s+/g, ' ')
+    .replace(/\s*[([{]$/, '') // the opening bracket of a "(link)"
     .trim()
-  const room = CHAT_POST_MAX_CHARS - link.length - 4
-  const body = text.length > room ? `${text.slice(0, Math.max(0, room - 1)).trimEnd()}…` : text
-  return `👉 ${body ? `${body} ` : ''}${link}`
+  return `👉 ${text ? `${text} ` : ''}${href}`
 }
 
 export type ScriptResult =

@@ -126,7 +126,8 @@ export async function postChatLink(channelId: string, text: string, env: Record<
   const botToken = env.DISCORD_BOT_TOKEN?.trim()
   if (!botToken || env.VERCEL_ENV !== 'production') return
   try {
-    await postDiscordMessage({ kind: 'bot', channelId, botToken }, { content: text, allowed_mentions: { parse: [] } })
+    // One attempt: no long retry waits, and a 5xx retry cannot double-post.
+    await postDiscordMessage({ kind: 'bot', channelId, botToken }, { content: text, allowed_mentions: { parse: [] } }, { maxAttempts: 1 })
   } catch (err) {
     console.error('[call-updates] chat link failed:', err instanceof Error ? err.message : String(err))
   }
