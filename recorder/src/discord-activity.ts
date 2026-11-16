@@ -131,6 +131,8 @@ export class ActivityCounter {
   private timer: NodeJS.Timeout | null = null
   private flushing = false
   private loggedStart = false
+  /** Last "counting on/off, every Ns" state logged (logged at start and whenever the settings change it). */
+  private loggedState = ''
   private readonly newId: () => string
 
   constructor(private readonly d: ActivityCounterDeps) {
@@ -174,7 +176,13 @@ export class ActivityCounter {
   start(): void {
     if (this.timer) return
     const loop = () => {
-      const secs = Math.min(3600, Math.max(60, this.d.config().flushSeconds))
+      const cfg = this.d.config()
+      const secs = Math.min(3600, Math.max(60, cfg.flushSeconds))
+      const state = `counting ${cfg.enabled ? 'on' : 'off'}, flushing every ${secs}s`
+      if (state !== this.loggedState) {
+        this.loggedState = state
+        this.d.log?.(`discord activity: ${state}`)
+      }
       this.timer = setTimeout(async () => {
         await this.flush()
         if (this.timer) loop()
@@ -222,6 +230,8 @@ export class ActivityCounter {
   private async send(b: { body: ActivityBatchBody; tries: number }): Promise<boolean> {
     b.tries++
     const res = await this.d.post(b.body)
+    const what = res === 'ok' ? 'sent' : res === 'duplicate' ? 'already applied (duplicate)' : res === 'off' ? 'refused: counting is off in the app' : 'failed'
+    this.d.log?.(`discord activity: batch ${b.body.batchId.slice(0, 8)} with ${b.body.users.length} user(s) ${what}${b.tries > 1 ? ` (try ${b.tries})` : ''}`)
     if (res === 'error') {
       if (b.tries >= MAX_SEND_TRIES) {
         this.d.log?.('discord activity: dropping a batch after repeated failures')
