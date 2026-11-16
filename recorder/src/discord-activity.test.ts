@@ -137,4 +137,35 @@ describe('postActivityBatch', () => {
     await postActivityBatch('http://app', 'k', body, vi.fn(), f as unknown as typeof fetch)
     expect(f).toHaveBeenCalledWith('http://app/api/calls/recorder/discord-activity', expect.objectContaining({ method: 'POST', headers: expect.objectContaining({ Authorization: 'Bearer k' }) }))
   })
+
+  it('logs whether counting is on and the flush interval at start, and again when the settings change it', async () => {
+    vi.useFakeTimers()
+    try {
+      const { c, log, cfg } = counter(['ok'], { enabled: true, flushSeconds: 120 })
+      c.start()
+      expect(log).toHaveBeenCalledWith('discord activity: counting on, flushing every 120s')
+      await vi.advanceTimersByTimeAsync(120_000)
+      expect(log.mock.calls.filter((a) => String(a[0]).includes('flushing every'))).toHaveLength(1)
+      cfg.enabled = false
+      await vi.advanceTimersByTimeAsync(120_000)
+      expect(log).toHaveBeenCalledWith('discord activity: counting off, flushing every 120s')
+      c.stop()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('logs one line per batch sent, with its result', async () => {
+    const { c, log } = counter(['error', 'ok'])
+    c.add(ev())
+    c.add(ev({ discordId: '100000000000000002' }))
+    await c.flush()
+    expect(log).toHaveBeenCalledWith('discord activity: batch batch-00 with 2 user(s) failed')
+    await c.flush()
+    expect(log).toHaveBeenCalledWith('discord activity: batch batch-00 with 2 user(s) sent (try 2)')
+    const d = counter(['duplicate'])
+    d.c.add(ev())
+    await d.c.flush()
+    expect(d.log).toHaveBeenCalledWith('discord activity: batch batch-00 with 1 user(s) already applied (duplicate)')
+  })
 })
