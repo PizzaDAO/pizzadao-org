@@ -1,11 +1,12 @@
 // The public view of a member's Discord activity (profile + hover card). Public endpoints, so:
 // - dates are month precision only (first of the month, UTC),
-// - channel names are shown only for channels the @everyone role can see (the stored topChannels
+// - channel names are shown only for channels @everyone (or a configured verified-member role) can see (the stored topChannels
 //   carry names, not ids, so the names are matched against the guild's channels, cached). When the
 //   guild cannot be read, no channel names are shown at all,
 // - the block is hidden when the switch (members.discordActivityShow) is off or there is no row.
 
 import { prisma as realPrisma } from "./db"
+import { getSetting } from "./settings"
 import { toggleEnabled } from "./settings/toggles"
 import { monthPrecisionIso } from "./member-since"
 import { channelKey, readTopChannels } from "./discord-activity"
@@ -34,23 +35,52 @@ interface GuildChannel {
 /** Channel key (see channelKey) -> the live display name, for keys that are public. */
 export type PublicChannels = Map<string, string>
 
+const ADMINISTRATOR = BigInt(1) << BigInt(3)
+
+/** Role ids from members.discordActivityPublicRoleIds: one per line, bad lines skipped. */
+export function parsePublicRoleIds(raw: string): string[] {
+  return [...new Set(raw.split("\n").map((l) => l.trim()).filter((l) => /^\d{15,25}$/.test(l)))]
+}
+
+type Overwrite = { id: string; type: number; allow: string; deny: string }
+
+function applyOverwrite(perms: bigint, ow: Overwrite | undefined): bigint {
+  return ow ? (perms & ~BigInt(ow.deny || "0")) | BigInt(ow.allow || "0") : perms
+}
+
+/** Can a member holding exactly @everyone plus (optionally) one role view the channel? */
+function canView(guildId: string, everyonePerms: bigint, role: { id: string; perms: bigint } | null, overwrites: Overwrite[]): boolean {
+  let perms = everyonePerms | (role?.perms ?? BigInt(0))
+  if (perms & ADMINISTRATOR) return true
+  perms = applyOverwrite(perms, overwrites.find((o) => o.id === guildId && o.type === 0))
+  if (role) perms = applyOverwrite(perms, overwrites.find((o) => o.id === role.id && o.type === 0))
+  return (perms & VIEW_CHANNEL) !== BigInt(0)
+}
+
 /**
- * Channels everyone in the server can see: @everyone's base permission, then the channel's @everyone
- * overwrite (deny, then allow). Keyed by channelKey (the stored names are sanitized); a key is public only
- * when EVERY live channel with that key is public. Keys that match no live channel (e.g. threads and forum
- * posts, which the old crawl stored as channels) are never public.
+ * Channels shown publicly: ones @everyone can see, or that any of the configured roles (the role every
+ * verified member has) can see. For each candidate: base = @everyone perms | the role's perms
+ * (ADMINISTRATOR sees all), then the channel's @everyone overwrite (deny, then allow), then the role's
+ * overwrite (deny, then allow). Channel overwrites are the channel's own, as Discord returns them (a
+ * synced channel carries its category's). Keyed by channelKey (the stored names are sanitized); a key is
+ * public only when EVERY live channel with that key is public. Keys that match no live channel (e.g.
+ * threads and forum posts, which the old crawl stored as channels) are never public.
  */
-export function publicChannelNames(guildId: string, everyonePermissions: string, channels: GuildChannel[]): PublicChannels {
+export function publicChannelNames(
+  guildId: string,
+  everyonePermissions: string,
+  channels: GuildChannel[],
+  roles: Array<{ id: string; permissions?: string }> = [],
+): PublicChannels {
   const base = BigInt(everyonePermissions || "0")
+  const candidates = roles.map((r) => ({ id: r.id, perms: BigInt(r.permissions || "0") }))
   const visible = new Map<string, string>()
   const hidden = new Set<string>()
   for (const ch of channels) {
     if (!ch.name || ch.type === undefined || !NAMED_TYPES.has(ch.type)) continue
-    let perms = base
-    const ow = ch.permission_overwrites?.find((o) => o.id === guildId && o.type === 0)
-    if (ow) perms = (perms & ~BigInt(ow.deny || "0")) | BigInt(ow.allow || "0")
+    const ows = ch.permission_overwrites ?? []
     const key = channelKey(ch.name)
-    if (perms & VIEW_CHANNEL) {
+    if (canView(guildId, base, null, ows) || candidates.some((r) => canView(guildId, base, r, ows))) {
       if (!visible.has(key)) visible.set(key, ch.name)
     } else hidden.add(key)
   }
@@ -98,7 +128,8 @@ export async function getPublicChannelNames(fetchImpl: typeof fetch = fetch): Pr
       if (rolesRes.ok && chRes.ok) {
         const roles = (await rolesRes.json()) as Array<{ id: string; permissions?: string }>
         const everyone = roles.find((r) => r.id === guildId)
-        if (everyone) names = publicChannelNames(guildId, everyone.permissions ?? "0", (await chRes.json()) as GuildChannel[])
+        const wanted = parsePublicRoleIds(await getSetting("members.discordActivityPublicRoleIds").catch(() => ""))
+        if (everyone) names = publicChannelNames(guildId, everyone.permissions ?? "0", (await chRes.json()) as GuildChannel[], roles.filter((r) => wanted.includes(r.id)))
       }
     } catch {
       names = null

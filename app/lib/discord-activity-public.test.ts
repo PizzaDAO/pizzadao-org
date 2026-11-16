@@ -2,10 +2,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 vi.mock("./db", () => ({ prisma: {} }))
+vi.mock("./settings", () => ({ getSetting: vi.fn(async () => "900000000000000002") }))
 vi.mock("./settings/toggles", () => ({ toggleEnabled: vi.fn(async () => true) }))
 
 import { channelKey } from "./discord-activity"
-import { countKeyMatches, clearPublicChannelCache, getPublicChannelNames, getPublicDiscordActivity, publicChannelNames, toPublicActivity } from "./discord-activity-public"
+import { parsePublicRoleIds, countKeyMatches, clearPublicChannelCache, getPublicChannelNames, getPublicDiscordActivity, publicChannelNames, toPublicActivity } from "./discord-activity-public"
 
 const GUILD = "900000000000000001"
 const VIEW = String(1 << 10)
@@ -13,6 +14,37 @@ const ch = (name: string, ow?: { allow?: string; deny?: string }, type = 0) => (
   name,
   type,
   permission_overwrites: ow ? [{ id: GUILD, type: 0, allow: ow.allow ?? "0", deny: ow.deny ?? "0" }] : [],
+})
+
+const ROLE = "900000000000000002"
+const roleCh = (name: string, ows: Array<{ id: string; allow?: string; deny?: string }>) => ({
+  name,
+  type: 0,
+  permission_overwrites: ows.map((o) => ({ id: o.id, type: 0, allow: o.allow ?? "0", deny: o.deny ?? "0" })),
+})
+
+describe("publicChannelNames with roles", () => {
+  const roles = [{ id: ROLE, permissions: "0" }]
+  it("a channel opened to the role (everyone denied) is public only with the role configured", () => {
+    const chs = [roleCh("members", [{ id: GUILD, deny: VIEW }, { id: ROLE, allow: VIEW }]), roleCh("staff", [{ id: GUILD, deny: VIEW }])]
+    expect(publicChannelNames(GUILD, "0", chs).size).toBe(0)
+    expect([...publicChannelNames(GUILD, "0", chs, roles).values()]).toEqual(["members"])
+  })
+  it("role base permission grants view, and a role deny overwrites it", () => {
+    const r = [{ id: ROLE, permissions: VIEW }]
+    const chs = [roleCh("open", []), roleCh("blocked", [{ id: ROLE, deny: VIEW }])]
+    expect([...publicChannelNames(GUILD, "0", chs, r).values()]).toEqual(["open"])
+  })
+  it("the role's allow beats the @everyone deny; administrator sees everything", () => {
+    const chs = [roleCh("x", [{ id: GUILD, deny: VIEW }, { id: ROLE, allow: VIEW }])]
+    expect(publicChannelNames(GUILD, VIEW, chs, roles).size).toBe(1)
+    const admin = [{ id: ROLE, permissions: String(1 << 3) }]
+    expect(publicChannelNames(GUILD, "0", [roleCh("y", [{ id: GUILD, deny: VIEW }])], admin).size).toBe(1)
+  })
+  it("a key shared with a channel nobody configured can see stays hidden", () => {
+    const chs = [roleCh("ops", [{ id: ROLE, allow: VIEW }]), roleCh("ops", [])]
+    expect(publicChannelNames(GUILD, "0", chs, roles).size).toBe(0)
+  })
 })
 
 describe("publicChannelNames", () => {
@@ -102,5 +134,21 @@ describe("getPublicChannelNames", () => {
     clearPublicChannelCache()
     const bad = vi.fn(async () => json({}, false))
     expect(await getPublicChannelNames(bad as unknown as typeof fetch)).toBeNull()
+  })
+})
+
+describe("getPublicChannelNames with the role setting", () => {
+  it("uses the configured role and parses the list", async () => {
+    clearPublicChannelCache()
+    process.env.DISCORD_GUILD_ID = GUILD
+    process.env.DISCORD_BOT_TOKEN = "t"
+    const json = (b: unknown) => ({ ok: true, json: async () => b }) as unknown as Response
+    const f = vi.fn(async (url: string) =>
+      url.endsWith("/roles")
+        ? json([{ id: GUILD, permissions: "0" }, { id: ROLE, permissions: "0" }])
+        : json([roleCh("members", [{ id: GUILD, deny: VIEW }, { id: ROLE, allow: VIEW }])]),
+    )
+    expect([...(await getPublicChannelNames(f as unknown as typeof fetch))!.values()]).toEqual(["members"])
+    expect(parsePublicRoleIds(` ${ROLE}\nabc\n\n${ROLE}`)).toEqual([ROLE])
   })
 })
