@@ -2753,5 +2753,27 @@
     "activeMonths": "{count, plural, one {# mois} other {# mois}}",
     "sinceShort": "depuis {date}",
     "lastActiveShort": "dernière activité {date}"
+  },
+  "buddyCard": {
+    "title": "Parrain",
+    "yourBuddy": "Votre parrain : {name}",
+    "buddying": "Vous parrainez {name}",
+    "allDone": "Terminé. Merci !",
+    "waiting": "En attente d’accès au canal. Votre présentation s’ouvre dès que vous voyez tous les deux le canal des parrains.",
+    "openThread": "Ouvrir votre fil sur Discord",
+    "done": " (fait)",
+    "notYet": " (pas encore)",
+    "locked": "Les parrains aident les nouveaux membres à s’orienter. Devenir parrain se débloque au niveau {level}.",
+    "invite": "Vous pouvez aider un nouveau membre à s’orienter. Devenez parrain : un admin vous associe à un filleul.",
+    "beBuddy": "Devenir parrain",
+    "showTrainee": "Afficher « Intégré avec l’aide de {name} » sur mon profil public",
+    "showBuddy": "Me montrer comme parrain sur mon profil public et sur la page Meilleurs parrains",
+    "isBuddy": "Vous êtes parrain.",
+    "isBuddyPaused": "Vous êtes parrain (en pause).",
+    "resume": "Reprendre",
+    "pause": "Pause",
+    "stop": "Ne plus être parrain",
+    "notLevel": "Vous n’avez pas encore le niveau pour être parrain.",
+    "saveFailed": "Impossible d’enregistrer. Réessayez."
   }
 }

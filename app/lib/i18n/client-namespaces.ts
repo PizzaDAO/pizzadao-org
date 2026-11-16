@@ -8,6 +8,7 @@
 export const CLIENT_NAMESPACES = [
   "adminCalls",
   "bounties",
+  "buddyCard",
   "callsPage",
   "collectPep",
   "collectionStats",

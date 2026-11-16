@@ -28,6 +28,8 @@ export interface PairCard {
 export interface MyBuddyState {
   enabled: boolean
   eligible?: boolean
+  /** Not eligible only because the level is below the minimum (not removed): the card shows when it unlocks. */
+  belowMinLevel?: boolean
   minLevel?: number
   profile?: { active: boolean; paused: boolean; maxActive: number; languages: string[]; hideRecognition: boolean } | null
   /** buddy.publicRecognitionEnabled is on: the card shows the opt-out. */
@@ -149,9 +151,11 @@ export async function getMyBuddyState(discordId: string): Promise<MyBuddyState> 
       checklist: await loadChecklist(row, traineeLevel, cfg.completionLevel, buddyProfile?.memberId ?? null),
     })
   }
+  const eligible = !profile?.removedAt && (isBuddyEligible(level, cfg.minLevel) || !!profile?.addedBy)
   return {
     enabled: true,
-    eligible: !profile?.removedAt && (isBuddyEligible(level, cfg.minLevel) || !!profile?.addedBy),
+    eligible,
+    belowMinLevel: !profile?.removedAt && !eligible,
     minLevel: cfg.minLevel,
     maxActiveCap: cfg.cap,
     recognitionEnabled: recognitionOn,

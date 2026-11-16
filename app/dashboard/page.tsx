@@ -12,7 +12,9 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardIndexPage() {
     const session = await getSession();
-    if (!session?.discordId) redirect("/login");
+    // A #fragment (e.g. #buddy) survives the redirect to the dashboard (browsers carry it over); through
+    // login it is dropped, which is fine: the member lands on their dashboard.
+    if (!session?.discordId) redirect("/login?returnTo=%2Fdashboard");
     let memberId: string | null = null;
     try {
         memberId = (await fetchMemberIdByDiscordId(session.discordId)) ?? null;

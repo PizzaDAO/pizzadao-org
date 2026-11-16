@@ -79,6 +79,49 @@ export interface UpdatesDeps {
 export interface ScriptSection {
   key: UpdateSectionKey | 'intro' | 'outro'
   lines: string[]
+  /** Announcements only: chat messages (text + link) to post in the call's chat, once, when the section plays. */
+  chatPosts?: string[]
+}
+
+/** Hosts an announcement's chat link may point to: our own domains (and their subdomains). */
+export const CHAT_LINK_HOSTS = ['pizzadao.org', 'rsv.pizza'] as const
+export const CHAT_POST_MAX_CHARS = 400
+
+/** Any link-like token (same shape speakable strips): the whole run of non-space characters. */
+const LINK_TOKEN_RE = /(?:https?:\/\/|www\.)\S+/gi
+
+export function isAllowedChatHost(hostname: string): boolean {
+  const h = hostname.toLowerCase().replace(/\.$/, '')
+  return CHAT_LINK_HOSTS.some((d) => h === d || h.endsWith(`.${d}`))
+}
+
+/**
+ * The chat post for an announcement line that carries exactly one https link (anywhere in the line, or
+ * after " | "): "👉 <cleaned text without the link> <link>". Null when there is no link, it is not on an
+ * allowed host, or the line holds any other link (plain, www. or a masked "[x](...)" one): then the line
+ * is only spoken. The text goes through the same cleaning as the spoken text and then loses the
+ * characters that could ping or format.
+ */
+export function chatPostFor(line: string): string | null {
+  if (line.includes('](')) return null
+  const tokens = line.match(LINK_TOKEN_RE) ?? []
+  if (tokens.length !== 1) return null
+  const raw = tokens[0].replace(/[.,;:!?)\]>|<]+$/, '')
+  let url: URL
+  try {
+    url = new URL(raw)
+  } catch {
+    return null
+  }
+  if (url.protocol !== 'https:' || url.username || url.password || !isAllowedChatHost(url.hostname)) return null
+  const href = url.href
+  const room = CHAT_POST_MAX_CHARS - href.length - 4
+  const text = speakable(line.replace(LINK_TOKEN_RE, ' '), Math.max(0, room))
+    .replace(/[@<>*_~`|\\]/g, '')
+    .replace(/\s+/g, ' ')
+    .replace(/\s*[([{]$/, '') // the opening bracket of a "(link)"
+    .trim()
+  return `👉 ${text ? `${text} ` : ''}${href}`
 }
 
 export type ScriptResult =
@@ -189,6 +232,7 @@ export async function buildUpdatesScript(crewId: string, settings: UpdatesSettin
 
     const last = wants('last-call') || wants('task-changes') ? await deps.lastCall(crew.id).catch(() => null) : null
     const sections = new Map<UpdateSectionKey, string[]>()
+    const chatPosts = new Map<UpdateSectionKey, string[]>()
 
     // 1. From last call. Skipped when redactions are newer than the summary.
     if (wants('last-call') && last && !last.redactionsStale) {
@@ -259,13 +303,15 @@ export async function buildUpdatesScript(crewId: string, settings: UpdatesSettin
 
     // 5. Admin announcements.
     if (wants('announcements') && settings.announcements.trim()) {
-      const lines = announcementLines(settings.announcements, crew, crews)
+      const items = announcementLines(settings.announcements, crew, crews)
         .filter((l) => !blocked(l))
-        .map((l) => say(l))
-        .filter(Boolean)
+        .map((l) => ({ spoken: say(l), chat: chatPostFor(l) }))
+        .filter((i) => i.spoken)
         .slice(0, MAX_ANNOUNCEMENTS)
-        .map((l) => (/[.!?…]$/.test(l) ? l : `${l}.`))
+      const lines = items.map((i) => (/[.!?…]$/.test(i.spoken) ? i.spoken : `${i.spoken}.`))
       if (lines.length) sections.set('announcements', lines)
+      const posts = items.map((i) => i.chat).filter((c): c is string => !!c)
+      if (posts.length) chatPosts.set('announcements', posts)
     }
 
     // Intro and outro: a command phrase would let an echo trigger the voice commands, so fall back to the defaults.
@@ -293,15 +339,17 @@ export async function buildUpdatesScript(crewId: string, settings: UpdatesSettin
         { key: 'intro', lines: [intro] },
         ...keys.map((k, i) => {
           const lines = sections.get(k)!
+          const posts = chatPosts.get(k)
+          const extra = posts ? { chatPosts: posts } : {}
           const r = rolls[order.indexOf(k)]
-          if (i === 0 || !pool.length || !r.hit || used >= limit) return { key: k, lines }
+          if (i === 0 || !pool.length || !r.hit || used >= limit) return { key: k, lines, ...extra }
           const choices = pool.filter((l) => l !== prev)
-          if (!choices.length) return { key: k, lines }
+          if (!choices.length) return { key: k, lines, ...extra }
           const lead = choices[Math.min(choices.length - 1, Math.floor(r.pick * choices.length))]
           used++
           usedLeadIns = used
           prev = lead
-          return { key: k, lines: [`${lead} ${lines[0]}`, ...lines.slice(1)] }
+          return { key: k, lines: [`${lead} ${lines[0]}`, ...lines.slice(1)], ...extra }
         }),
         { key: 'outro', lines: [outro] },
       ]

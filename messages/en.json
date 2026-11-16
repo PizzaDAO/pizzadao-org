@@ -2753,5 +2753,27 @@
     "activeMonths": "{count, plural, one {# month} other {# months}}",
     "sinceShort": "since {date}",
     "lastActiveShort": "last active {date}"
+  },
+  "buddyCard": {
+    "title": "Buddy",
+    "yourBuddy": "Your buddy: {name}",
+    "buddying": "You are buddying {name}",
+    "allDone": "All done. Thank you!",
+    "waiting": "Waiting for channel access. Your intro opens once you can both see the buddy channel.",
+    "openThread": "Open your thread on Discord",
+    "done": " (done)",
+    "notYet": " (not yet)",
+    "locked": "Buddies help new members find their feet. Being a buddy unlocks at level {level}.",
+    "invite": "You can help a new member find their feet. Be a buddy: an admin pairs you with a trainee.",
+    "beBuddy": "Be a buddy",
+    "showTrainee": "Show “Onboarded with help from {name}” on my public profile",
+    "showBuddy": "Show me as a buddy on my public profile and on the Top buddies page",
+    "isBuddy": "You are a buddy.",
+    "isBuddyPaused": "You are a buddy (paused).",
+    "resume": "Resume",
+    "pause": "Pause",
+    "stop": "Stop being a buddy",
+    "notLevel": "You are not at the level to be a buddy yet.",
+    "saveFailed": "Could not save. Please try again."
   }
 }

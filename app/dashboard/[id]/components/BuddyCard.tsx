@@ -7,6 +7,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 interface ChecklistItem { key: string; label: string; done: boolean }
 interface PairCard {
@@ -21,6 +22,7 @@ interface PairCard {
 interface BuddyState {
     enabled: boolean;
     eligible?: boolean;
+    belowMinLevel?: boolean;
     minLevel?: number;
     maxActiveCap?: number;
     profile?: { active: boolean; paused: boolean; maxActive: number; hideRecognition?: boolean } | null;
@@ -30,6 +32,7 @@ interface BuddyState {
 }
 
 export function BuddyCard({ initial }: { initial?: BuddyState | null }) {
+    const t = useTranslations("buddyCard");
     const [state, setState] = useState<BuddyState | null>(initial ?? null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
@@ -51,35 +54,46 @@ export function BuddyCard({ initial }: { initial?: BuddyState | null }) {
         setError("");
         try {
             const res = await fetch("/api/buddy/me", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-            if (!res.ok) setError(res.status === 403 ? "You are not at the level to be a buddy yet." : "Could not save. Please try again.");
+            if (!res.ok) setError(res.status === 403 ? t("notLevel") : t("saveFailed"));
             await load();
         } catch {
-            setError("Could not save. Please try again.");
+            setError(t("saveFailed"));
         } finally {
             setBusy(false);
         }
     }
+
+    // The card appears after /api/buddy/me answers, so the browser's own #buddy jump has nothing to land
+    // on yet: scroll to it once it renders.
+    const rendered = !!state?.enabled;
+    useEffect(() => {
+        if (rendered && typeof window !== "undefined" && window.location.hash === "#buddy") {
+            document.getElementById("buddy")?.scrollIntoView({ block: "start" });
+        }
+    }, [rendered]);
 
     if (!state?.enabled) return null;
     const pairs = state.pairs ?? [];
     const profile = state.profile;
     const showOptIn = (state.eligible && !profile?.active) || profile?.active;
     const tr = state.recognitionEnabled ? state.traineeRecognition : null;
-    if (!showOptIn && pairs.length === 0 && !tr) return null;
+    // Below the minimum level: still render a short note so a #buddy link does not land on nothing.
+    const locked = !!state.belowMinLevel && !profile?.active && pairs.length === 0 && !tr && typeof state.minLevel === "number";
+    if (!showOptIn && pairs.length === 0 && !tr && !locked) return null;
 
     return (
-        <section data-testid="buddy-card" className="my-5 rounded-2xl border border-[hsl(var(--rule-warm)/0.55)] p-5" aria-label="Buddy">
-            <p className="overline">Buddy</p>
+        <section id="buddy" data-testid="buddy-card" className="my-5 scroll-mt-24 rounded-2xl border border-[hsl(var(--rule-warm)/0.55)] p-5" aria-label={t("title")}>
+            <p className="overline">{t("title")}</p>
             {pairs.map((p) => (
                 <div key={p.id} className="mt-3">
                     <h2 className="font-display text-xl font-bold">
-                        {p.role === "trainee" ? `Your buddy: ${p.partner.name}` : `You are buddying ${p.partner.name}`}
+                        {p.role === "trainee" ? t("yourBuddy", { name: p.partner.name }) : t("buddying", { name: p.partner.name })}
                     </h2>
-                    {p.status === "COMPLETED" ? <p className="mt-1 text-sm text-foreground/80">All done. Thank you!</p> : null}
-                    {p.waitingForAccess ? <p className="mt-1 text-sm text-foreground/80">Waiting for channel access. Your intro opens once you can both see the buddy channel.</p> : null}
+                    {p.status === "COMPLETED" ? <p className="mt-1 text-sm text-foreground/80">{t("allDone")}</p> : null}
+                    {p.waitingForAccess ? <p className="mt-1 text-sm text-foreground/80">{t("waiting")}</p> : null}
                     {p.threadUrl ? (
                         <a href={p.threadUrl} target="_blank" rel="noreferrer" className="text-sm font-semibold underline-offset-4 hover:underline">
-                            Open your thread on Discord
+                            {t("openThread")}
                         </a>
                     ) : null}
                     <ul className="mt-2 grid gap-1 p-0" style={{ listStyle: "none" }}>
@@ -87,41 +101,42 @@ export function BuddyCard({ initial }: { initial?: BuddyState | null }) {
                             <li key={item.key} className="text-sm">
                                 <span aria-hidden="true">{item.done ? "✓ " : "○ "}</span>
                                 <span className={item.done ? "text-foreground/60 line-through" : ""}>{item.label}</span>
-                                <span className="sr-only">{item.done ? " (done)" : " (not yet)"}</span>
+                                <span className="sr-only">{item.done ? t("done") : t("notYet")}</span>
                             </li>
                         ))}
                     </ul>
                 </div>
             ))}
 
+            {locked ? <p className="mt-3 text-sm text-foreground/80">{t("locked", { level: state.minLevel ?? 0 })}</p> : null}
             {state.eligible && !profile?.active ? (
                 <div className="mt-3">
-                    <p className="text-sm text-foreground/80">You can help a new member find their feet. Be a buddy: an admin pairs you with a trainee.</p>
+                    <p className="text-sm text-foreground/80">{t("invite")}</p>
                     <button type="button" disabled={busy} onClick={() => save({ active: true })} className="mt-2 rounded-full border border-foreground px-4 py-1.5 text-sm font-semibold">
-                        Be a buddy
+                        {t("beBuddy")}
                     </button>
                 </div>
             ) : null}
             {tr ? (
                 <label className="mt-4 flex items-center gap-2 text-sm">
                     <input type="checkbox" disabled={busy} checked={!tr.hidden} onChange={(e) => save({ hideRecognition: !e.target.checked, pairId: tr.pairId })} />
-                    Show &ldquo;Onboarded with help from {tr.buddyName}&rdquo; on my public profile
+                    {t("showTrainee", { name: tr.buddyName })}
                 </label>
             ) : null}
             {state.recognitionEnabled && profile ? (
                 <label className="mt-4 flex items-center gap-2 text-sm">
                     <input type="checkbox" disabled={busy} checked={!profile.hideRecognition} onChange={(e) => save({ hideRecognition: !e.target.checked })} />
-                    Show me as a buddy on my public profile and on the Top buddies page
+                    {t("showBuddy")}
                 </label>
             ) : null}
             {profile?.active ? (
                 <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
-                    <span>{profile.paused ? "You are a buddy (paused)." : "You are a buddy."}</span>
+                    <span>{profile.paused ? t("isBuddyPaused") : t("isBuddy")}</span>
                     <button type="button" disabled={busy} onClick={() => save({ paused: !profile.paused })} className="rounded-full border border-foreground/40 px-3 py-1 font-semibold">
-                        {profile.paused ? "Resume" : "Pause"}
+                        {profile.paused ? t("resume") : t("pause")}
                     </button>
                     <button type="button" disabled={busy} onClick={() => save({ active: false })} className="rounded-full border border-foreground/40 px-3 py-1 font-semibold">
-                        Stop being a buddy
+                        {t("stop")}
                     </button>
                 </div>
             ) : null}
