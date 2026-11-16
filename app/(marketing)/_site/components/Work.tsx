@@ -11,11 +11,20 @@ type Pillar = {
   body: string;
   pull: string;
   img: string;
+  /** Source width / height, used to size the request for the object-cover crop. */
+  imgRatio: number;
   imgAlt: string;
   meta: { k: string; v: string }[];
   href: string;
   cta: string;
   external?: boolean;
+};
+
+// The image sits in a 4/5 box (5/6 from md up, 7 of 12 columns). A source wider than the box is cropped
+// by object-cover, so it renders at box height x source ratio: wider than the box.
+const pillarSizes = (ratio: number) => {
+  const vw = (n: number) => `${Math.round(n)}vw`;
+  return `(min-width: 768px) ${vw(58 * Math.max(1, ratio / (5 / 6)))}, ${vw(100 * Math.max(1, ratio / (4 / 5)))}`;
 };
 
 const PILLARS: Pillar[] = [
@@ -29,6 +38,7 @@ const PILLARS: Pillar[] = [
     pull:
       "One day. Hundreds of cities. A ritual across the whole world.",
     img: party,
+    imgRatio: 1632 / 1932,
     imgAlt: "Global Pizza Party 2026 poster, May 22, in a city near you",
     meta: [
       { k: "Cadence", v: "Annual" },
@@ -49,6 +59,7 @@ const PILLARS: Pillar[] = [
     pull:
       "The party is the headline. The community is the practice.",
     img: hackathon,
+    imgRatio: 1920 / 1440,
     imgAlt: "Community member coding on a laptop beside a stained-glass arcade cabinet at a PizzaDAO gathering",
     meta: [
       { k: "Format", v: "Always-on" },
@@ -68,6 +79,7 @@ const PILLARS: Pillar[] = [
     pull:
       "Independent pizzerias are local infrastructure. We treat them like it.",
     img: pizzeria,
+    imgRatio: 1440 / 1920,
     imgAlt: "Three independent pizzaioli posing together on a red carpet at the International Pizza Challenge",
     meta: [
       { k: "Focus", v: "Independents" },
@@ -132,7 +144,7 @@ const Work = () => {
                     }`}
                   >
                     <div className="mk-grain relative overflow-hidden rounded-2xl" data-benny="true">
-                      <Image sizes="(min-width: 768px) 50vw, 100vw"
+                      <Image sizes={pillarSizes(p.imgRatio)}
                         src={p.img}
                         alt={p.imgAlt}
                         loading="lazy"

@@ -22,11 +22,12 @@ const HERO_PHOTO   = aboutHero;
 const RITUAL_PHOTO = may22Ritual;
 
 // Contact-strip - three faces of one global night, end of the Ritual section.
+// `wide`: landscape source cropped into the 4/5 box, so it renders ~1.9x the box width.
 const RITUAL_STRIP = [
-  { src: findPhoto("Buenos Aires")?.src ?? party,    city: "Buenos Aires", stamp: "22.05 · 23:14" },
-  { src: fieldNairobi,                               city: "Nairobi",      stamp: "22.05 · 19:02" },
-  { src: findPhoto("Detroit")?.src ?? timeline2010,  city: "Detroit",      stamp: "22.05 · 21:47" },
-  { src: fieldSpain,                                 city: "Spain",        stamp: "22.05 · 22:10" },
+  { src: findPhoto("Buenos Aires")?.src ?? party,    city: "Buenos Aires", stamp: "22.05 · 23:14", wide: true },
+  { src: fieldNairobi,                               city: "Nairobi",      stamp: "22.05 · 19:02", wide: true },
+  { src: findPhoto("Detroit")?.src ?? timeline2010,  city: "Detroit",      stamp: "22.05 · 21:47", wide: true },
+  { src: fieldSpain,                                 city: "Spain",        stamp: "22.05 · 22:10", wide: false },
 ];
 
 const THESIS_PHOTO = findPhoto("Rio de Janeiro")?.src ?? findPhoto("Medellín")?.src ?? community;
@@ -90,7 +91,7 @@ const About = () => {
       <section className="relative overflow-hidden bg-ink text-cream">
         <figure className="relative">
           <div className="mk-grain relative overflow-hidden bg-ink">
-            <Image preload sizes="100vw"
+            <Image preload quality={85} sizes="(min-width: 768px) and (orientation: portrait) 240vw, (min-width: 768px) 115vw, 340vw"
               src={HERO_PHOTO}
               alt="Volunteers carrying pizza boxes through a crowded street gathering"
               decoding="async"
@@ -197,7 +198,7 @@ const About = () => {
               <figure className="relative mt-14 hidden w-full origin-top -rotate-[1.2deg] transition-transform duration-500 hover:rotate-0 hover:scale-[1.02] md:block">
                 <div className="mk-grain relative overflow-hidden bg-cream p-3 pb-10 shadow-[0_14px_36px_-14px_hsl(0_0%_0%/0.38),0_3px_8px_-3px_hsl(0_0%_0%/0.22)]">
                   <div className="aspect-[4/5] overflow-hidden bg-ink">
-                    <Image sizes="(min-width: 768px) 40vw, 80vw" width={1000} height={1250}
+                    <Image sizes="(min-width: 768px) 43vw, 86vw" width={1000} height={1250}
                       src={revealPhoto}
                       alt="Late-night gathering of the first PizzaDAO members, huddled around laptops and pizza"
                       loading="lazy"
@@ -287,13 +288,13 @@ const About = () => {
         {/* Full-bleed cinematic photograph */}
         <figure className="relative">
           <div className="mk-grain relative overflow-hidden bg-ink">
-            <Image sizes="100vw"
+            <Image quality={85} sizes="(min-width: 640px) 100vw, 190vw"
               src={RITUAL_PHOTO}
               alt="Archival reference to a Bitcoin Pizza Day gathering"
               loading="lazy"
               decoding="async"
-              width={2400}
-              height={1400}
+              width={1824}
+              height={1216}
               className="block aspect-[4/5] w-full object-cover opacity-90 sm:aspect-[3/2] md:aspect-[21/9]"
               style={{ objectPosition: "50% 45%" }}
             />
@@ -356,7 +357,7 @@ const About = () => {
                   style={{ animationDelay: `${i * 80}ms` }}
                 >
                   <div className="aspect-[4/5] overflow-hidden">
-                    <Image sizes="(min-width: 768px) 25vw, 50vw" width={800} height={1000}
+                    <Image sizes={p.wide ? "(min-width: 768px) 47vw, 94vw" : "(min-width: 768px) 25vw, 50vw"} width={800} height={1000}
                       src={p.src}
                       alt={`${p.city}, May 22`}
                       loading="lazy"
@@ -543,7 +544,7 @@ const About = () => {
               <figure className="relative mx-auto w-[86%] origin-top -rotate-[2deg] transition-transform duration-500 hover:rotate-0 hover:scale-[1.01] md:mx-0 md:ml-auto md:w-full md:max-w-[420px]">
                 <div className="mk-grain relative overflow-hidden bg-cream p-3 pb-10 shadow-[0_18px_44px_-16px_hsl(0_0%_0%/0.38),0_4px_12px_-4px_hsl(0_0%_0%/0.22)]">
                   <div className="aspect-[4/5] overflow-hidden bg-ink">
-                    <Image sizes="(min-width: 768px) 40vw, 80vw" width={1000} height={1250}
+                    <Image sizes="(min-width: 1024px) 750px, (min-width: 768px) 70vw, 135vw" width={1000} height={1250}
                       src={THESIS_PHOTO}
                       alt="PizzaDAO members coordinating across cities - a quiet moment of global organization"
                       loading="lazy"
@@ -667,7 +668,7 @@ const About = () => {
                 aria-label="Watch the VICE Motherboard segment on PizzaDAO"
               >
                 <div className="relative aspect-[4/3] w-full overflow-hidden bg-ink ring-1 ring-cream/10 md:aspect-[5/4]">
-                  <Image sizes="(min-width: 1024px) 60vw, 100vw" width={1600} height={900}
+                  <Image sizes="(min-width: 768px) 72vw, 113vw" width={1600} height={900}
                     src={VICE_STILL}
                     alt="Documentary still - a PizzaDAO gathering captured for VICE Motherboard"
                     loading="lazy"

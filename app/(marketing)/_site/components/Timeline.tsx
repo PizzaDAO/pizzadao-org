@@ -13,8 +13,20 @@ type Chapter = {
   pull: string;
   attribution?: string;
   img: string;
+  /** Source width / height, used to size the request for the object-cover crop. */
+  imgRatio: number;
+  /** Skip the optimizer: the source is already small and old, so recompressing gains little. */
+  unoptimized?: boolean;
   alt: string;
   meta: string;
+};
+
+// Cards are 86% / 70% / 44% / 36% of the track wide, in a 4/5 box. A source wider than the box is cropped
+// by object-cover and renders at box height x source ratio, so size the request for that, not the box width.
+const cardSizes = (ratio: number) => {
+  const k = Math.max(1, ratio / (4 / 5));
+  const vw = (n: number) => `${Math.round(n * k)}vw`;
+  return `(min-width: 1024px) ${vw(36)}, (min-width: 768px) ${vw(44)}, (min-width: 640px) ${vw(70)}, ${vw(86)}`;
 };
 
 const CHAPTERS: Chapter[] = [
@@ -25,6 +37,8 @@ const CHAPTERS: Chapter[] = [
     pull: "I'll pay 10,000 bitcoin for a couple of pizzas… like maybe 2 large ones.",
     attribution: ", Laszlo Hanyecz, BitcoinTalk forum",
     img: t2010,
+    imgRatio: 960 / 765,
+    unoptimized: true,
     alt: "Laszlo Hanyecz at home with his two children and the two large pizzas bought for 10,000 BTC",
     meta: "Bitcoin Pizza Day · Origin",
   },
@@ -34,6 +48,7 @@ const CHAPTERS: Chapter[] = [
     body: "Organizers turned the internet's most famous meal into an annual party.",
     pull: "We didn't invent the holiday. We just decided to throw the party.",
     img: tFounding,
+    imgRatio: 1653 / 1920,
     alt: "Late-night gathering of friends huddled around laptops and pizza",
     meta: "PizzaDAO Founded",
   },
@@ -43,6 +58,7 @@ const CHAPTERS: Chapter[] = [
     body: "From a handful of cities to hundreds, baking together on the same weekend.",
     pull: "One weekend. Hundreds of cities. The same ribbon, in every language.",
     img: tParty,
+    imgRatio: 1600 / 1200,
     alt: "PizzaDAO chapter delivering pizzas to nurses and staff at a hospital's Department of Rehabilitation Medicine",
     meta: "Annual Activation",
   },
@@ -52,6 +68,7 @@ const CHAPTERS: Chapter[] = [
     body: "420+ cities, $1M+ donated, 60+ active chapters. The myth became infrastructure.",
     pull: "Pizza was the invitation. Community is the work.",
     img: tPresent,
+    imgRatio: 1459 / 1824,
     alt: "Mosaic of PizzaDAO chapters worldwide, community gatherings across six continents",
     meta: "Present Day",
   },
@@ -136,7 +153,7 @@ const Timeline = () => {
 
               {/* Image */}
               <figure className="mk-grain relative mt-5 overflow-hidden rounded-2xl">
-                <Image sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
+                <Image sizes={cardSizes(c.imgRatio)} unoptimized={c.unoptimized}
                   src={c.img}
                   alt={c.alt}
                   loading="lazy"
