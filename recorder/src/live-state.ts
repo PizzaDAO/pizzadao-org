@@ -30,6 +30,8 @@ export interface LiveStateBody {
   recording?: boolean
   /** true: the last call welcome handed out could not be posted; the app hands it out again. */
   welcomeFailed?: boolean
+  /** The latest broadcast link posted in the call chat and its author (the app checks the author is a host). */
+  chatBroadcast?: { link: string; by: string } | null
 }
 
 export const MAX_PRESENCE = 300
@@ -182,6 +184,7 @@ export class LiveStatePusher {
   private timer: NodeJS.Timeout | null = null
   private debounce: NodeJS.Timeout | null = null
   private streamLink: string | null = null
+  private chatBroadcast: { link: string; by: string } | null = null
   private pausedUntil = 0
   private stopped = false
   private recording = true
@@ -216,10 +219,17 @@ export class LiveStatePusher {
   }
 
   /** A chat message: the first stream link in the call chat is kept, except that a broadcast link replaces a status link. */
-  onChat(text: string): void {
+  onChat(text: string, authorId?: string): void {
     if (this.stopped) return
     const link = findStreamLink(text)
     if (!link) return
+    if (authorId && isBroadcastLink(link) && this.chatBroadcast?.link !== link) {
+      this.chatBroadcast = { link, by: authorId }
+      if (this.streamLink && !(isBroadcastLink(link) && !isBroadcastLink(this.streamLink))) {
+        void this.push()
+        return
+      }
+    }
     if (this.streamLink && !(isBroadcastLink(link) && !isBroadcastLink(this.streamLink))) return
     this.streamLink = link
     void this.push()
@@ -241,6 +251,7 @@ export class LiveStatePusher {
       ...(ended ? { ended: true } : {}),
       ...(this.recording ? {} : { recording: false }),
       ...(this.welcomeFailed ? { welcomeFailed: true } : {}),
+      ...(this.chatBroadcast ? { chatBroadcast: this.chatBroadcast } : {}),
     }
   }
 

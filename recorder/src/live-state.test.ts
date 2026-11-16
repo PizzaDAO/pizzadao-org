@@ -155,6 +155,23 @@ describe('LiveStatePusher', () => {
   })
 })
 
+describe('LiveStatePusher chat broadcast author', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+  it('sends the author of a broadcast link, also when a status link came first', async () => {
+    const post = vi.fn(async (_b: LiveStateBody) => 'ok' as PostResult)
+    const p = new LiveStatePusher({ sessionId: 's-1', eventId: '1', eventName: 'Call', channelId: '2', startedAtMs: 0, pushSeconds: 20, post })
+    p.start()
+    p.onChat('https://x.com/member/status/9', '111111111111111')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(post.mock.calls.at(-1)?.[0].chatBroadcast).toBeUndefined()
+    p.onChat('live: https://x.com/i/broadcasts/1abc', '222222222222222')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(post.mock.calls.at(-1)?.[0].chatBroadcast).toEqual({ link: 'https://x.com/i/broadcasts/1abc', by: '222222222222222' })
+    p.stop()
+  })
+})
+
 describe('LiveStatePusher call welcome', () => {
   beforeEach(() => vi.useFakeTimers())
   afterEach(() => vi.useRealTimers())

@@ -1305,7 +1305,7 @@ export const SETTINGS = {
     key: 'calls.startWelcomeEnabled',
     area: 'calls',
     label: 'Call welcome message',
-    help: 'Metalhead posts a welcome in the voice channel chat of the calls below, once per call: it waits for the X stream link (set on the live page or with /live), then posts the template below. Needs the live call view (calls.liveViewEnabled) on, because it rides on the recorder heartbeat. Turn off any other bot or script that posts the same welcome first. The CALL_START_WELCOME_ENABLED env var set to off always wins; on preview deploys only the env var counts and nothing is posted.',
+    help: 'Metalhead posts a welcome in the voice channel chat of the calls below, once per call: it waits for a host to set the X stream link (on the live page, with /live, or by posting an x.com broadcast link in the call chat; a link from a member does not count), then posts the template below. Needs the live call view (calls.liveViewEnabled) on, because it rides on the recorder heartbeat. Turn off any other bot or script that posts the same welcome first. The CALL_START_WELCOME_ENABLED env var set to off always wins; on preview deploys only the env var counts and nothing is posted.',
     confirmOn: 'Metalhead will post a welcome in the voice channel chat at the start of the selected calls.',
   }),
   'calls.startWelcomeCrews': {
@@ -1331,7 +1331,7 @@ export const SETTINGS = {
     key: 'calls.startWelcomeWaitMinutes',
     area: 'calls',
     label: 'Call welcome: wait for the stream link',
-    help: 'How long after the call starts to wait for an X stream link before posting the welcome without it (or not at all, see below).',
+    help: 'How long after the call starts to wait for an X stream link before posting the welcome without it (or not at all, see below). The standing links in calls.liveStreamLinks never start the welcome; they only fill {stream} in this after-wait case.',
     min: 0,
     max: 120,
     default: 20,

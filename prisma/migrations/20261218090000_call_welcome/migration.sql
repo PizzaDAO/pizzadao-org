@@ -6,3 +6,6 @@ CREATE TABLE IF NOT EXISTS "CallWelcome" (
 
     CONSTRAINT "CallWelcome_pkey" PRIMARY KEY ("occurrenceKey")
 );
+
+-- Additive: the host-verified broadcast link from the call chat (starts the call welcome).
+ALTER TABLE "CallLiveSession" ADD COLUMN IF NOT EXISTS "welcomeStreamLink" TEXT;

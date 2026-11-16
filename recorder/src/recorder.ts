@@ -974,7 +974,7 @@ export class CallRecorder {
       this.capturedChat.set(msg.id, s.dir)
       const atMs = Math.max(0, msg.createdTimestamp - s.meta.startedAtMs)
       appendRecord(s.dir, { t: 'chat', messageId: msg.id, userId: msg.author.id, displayName, text, atMs })
-      s.liveState?.onChat(text)
+      s.liveState?.onChat(text, msg.author.id)
       s.live?.onChat({ discordId: msg.author.id, displayName: displayName || null, messageId: msg.id, text, atMs })
     } catch (err) {
       this.log(`chat capture failed: ${err instanceof Error ? err.message : String(err)}`)
@@ -1185,6 +1185,6 @@ export class CallRecorder {
     const a = this.after.get(msg.channelId)
     if (!a || msg.author?.bot || msg.system) return
     const text = this.chatText(msg)
-    if (text) a.liveState.onChat(text)
+    if (text) a.liveState.onChat(text, msg.author?.id)
   }
 }

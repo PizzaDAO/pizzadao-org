@@ -7,7 +7,7 @@ vi.mock('@/app/lib/crew-mappings', () => ({ getCrewMappings: vi.fn() }))
 vi.mock('@/app/lib/settings', async (orig) => ({ ...(await orig<typeof import('@/app/lib/settings')>()), loadSettings: vi.fn(async () => ({})) }))
 vi.mock('@/app/lib/telegram/city-posts', () => ({ enqueueMirror: vi.fn(), processOutbox: vi.fn(), targetCityKeys: vi.fn() }))
 
-import { releaseWelcomeForSession, renderWelcome, safeHttpsUrl, welcomeDate, welcomeOrderForSession, type WelcomeSession, type WelcomeStore } from './welcome'
+import { AGENDA_TIMEOUT_MS, releaseWelcomeForSession, renderWelcome, safeHttpsUrl, welcomeDate, welcomeOrderForSession, type WelcomeSession, type WelcomeStore } from './welcome'
 
 const PROD = { VERCEL_ENV: 'production', ANNOUNCE_TIMEZONE: 'UTC' }
 const START = new Date('2026-11-15T20:00:00Z')
@@ -45,6 +45,7 @@ function harness(over: Record<string, unknown> = {}, minutesIn = 1, env: Record<
   const store: WelcomeStore = {
     claim: async (k) => (claimed.has(k) ? false : (claimed.add(k), true)),
     release: async (k) => void claimed.delete(k),
+    exists: async (k) => claimed.has(k),
   }
   const deps = { store, settings: settings(over), env, now: () => new Date(START.getTime() + minutesIn * 60_000), agendaFor: async () => AGENDA }
   return { deps, claimed }
@@ -89,16 +90,52 @@ describe('welcomeOrderForSession', () => {
     expect(out?.content).toContain('Welcome to the November 15, 2026 Community Call!')
   })
 
-  it('uses a link found in the call chat too', async () => {
-    const out = await welcomeOrderForSession(session({ streamLink: STREAM }), harness().deps)
-    expect(out?.content).toContain(STREAM)
+  it('a member link in the chat (or the standing crew link) is no stream yet; a host broadcast link starts the welcome', async () => {
+    const h = harness({ 'calls.liveStreamLinks': 'community_call = https://x.com/i/broadcasts/standing' })
+    // a member's status link, seen by the page but not verified as a host's
+    expect(await welcomeOrderForSession(session({ streamLink: 'https://x.com/member/status/1' }), h.deps)).toBeNull()
+    expect(await welcomeOrderForSession(session({ streamLink: STREAM }), h.deps)).toBeNull()
+    // a host's broadcast link, checked by the app
+    const out = await welcomeOrderForSession(session({ streamLink: 'https://x.com/member/status/1', welcomeStreamLink: STREAM }), h.deps)
+    expect(out?.content).toContain(`streaming on X: ${STREAM}`)
+  })
+
+  it('the standing crew link only fills {stream} in the after-wait fallback', async () => {
+    const h = harness({ 'calls.liveStreamLinks': 'community_call = https://x.com/i/broadcasts/standing' }, 25)
+    const out = await welcomeOrderForSession(session(), h.deps)
+    expect(out?.content).toContain('https://x.com/i/broadcasts/standing')
+  })
+
+  it('skips the slow lookups once the occurrence is claimed, and survives a slow agenda lookup', async () => {
+    const h = harness()
+    const agendaFor = vi.fn(async () => AGENDA)
+    expect(await welcomeOrderForSession(session({ streamLinkOverride: STREAM }), { ...h.deps, agendaFor })).not.toBeNull()
+    expect(await welcomeOrderForSession(session({ streamLinkOverride: STREAM }), { ...h.deps, agendaFor })).toBeNull()
+    expect(agendaFor).toHaveBeenCalledTimes(1)
+    vi.useFakeTimers()
+    try {
+      const h2 = harness()
+      const p = welcomeOrderForSession(session({ streamLinkOverride: STREAM }), { ...h2.deps, agendaFor: () => new Promise<string>(() => undefined) })
+      await vi.advanceTimersByTimeAsync(AGENDA_TIMEOUT_MS + 10)
+      expect((await p)?.content).toBe(`Welcome to the November 15, 2026 Community Call! We're also streaming on X: ${STREAM}`)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('takes the date from the event start, not the session start', async () => {
+    const h = harness()
+    const resolveEvent = async () => ({ id: '777', startsAt: new Date('2026-11-15T23:30:00Z') })
+    const late = session({ streamLinkOverride: STREAM, startedAt: new Date('2026-11-16T00:10:00Z') })
+    const out = await welcomeOrderForSession(late, { ...h.deps, resolveEvent, now: () => new Date('2026-11-16T00:12:00Z'), env: { VERCEL_ENV: 'production', ANNOUNCE_TIMEZONE: 'America/New_York' } })
+    expect(out?.content).toContain('November 15, 2026')
   })
 
   it('posts exactly once per occurrence, also for a restarted recorder (new session, same event and day)', async () => {
     const h = harness()
-    expect(await welcomeOrderForSession(session({ streamLink: STREAM }), h.deps)).not.toBeNull()
-    expect(await welcomeOrderForSession(session({ streamLink: STREAM }), h.deps)).toBeNull()
-    expect(await welcomeOrderForSession(session({ sessionId: 's2', streamLink: STREAM }), h.deps)).toBeNull()
+    expect(await welcomeOrderForSession(session({ streamLinkOverride: STREAM }), h.deps)).not.toBeNull()
+    expect(await welcomeOrderForSession(session({ streamLinkOverride: STREAM }), h.deps)).toBeNull()
+    expect(await welcomeOrderForSession(session({ sessionId: 's2', streamLinkOverride: STREAM }), h.deps)).toBeNull()
   })
 
   it('falls back to a welcome without the X sentence after the wait', async () => {
@@ -112,25 +149,25 @@ describe('welcomeOrderForSession', () => {
 
   it('omits the agenda sentence when the call has no agenda link', async () => {
     const h = harness()
-    const out = await welcomeOrderForSession(session({ streamLink: STREAM }), { ...h.deps, agendaFor: async () => '' })
+    const out = await welcomeOrderForSession(session({ streamLinkOverride: STREAM }), { ...h.deps, agendaFor: async () => '' })
     expect(out?.content).toBe(`Welcome to the November 15, 2026 Community Call! We're also streaming on X: ${STREAM}`)
   })
 
   it('is off unless switched on, for other calls, previews, hidden and ended sessions, and stale ones', async () => {
-    const s = session({ streamLink: STREAM })
+    const s = session({ streamLinkOverride: STREAM })
     expect(await welcomeOrderForSession(s, harness({ 'calls.startWelcomeEnabled': false }).deps)).toBeNull()
-    expect(await welcomeOrderForSession(session({ streamLink: STREAM, crewId: 'tech' }), harness().deps)).toBeNull()
-    expect(await welcomeOrderForSession(session({ streamLink: STREAM, crewId: 'tech' }), harness({ 'calls.startWelcomeCrews': ['tech'] }).deps)).not.toBeNull()
+    expect(await welcomeOrderForSession(session({ streamLinkOverride: STREAM, crewId: 'tech' }), harness().deps)).toBeNull()
+    expect(await welcomeOrderForSession(session({ streamLinkOverride: STREAM, crewId: 'tech' }), harness({ 'calls.startWelcomeCrews': ['tech'] }).deps)).not.toBeNull()
     expect(await welcomeOrderForSession(s, harness({}, 1, { ANNOUNCE_TIMEZONE: 'UTC' }).deps)).toBeNull()
-    expect(await welcomeOrderForSession(session({ streamLink: STREAM, hidden: true }), harness().deps)).toBeNull()
-    expect(await welcomeOrderForSession(session({ streamLink: STREAM, endedAt: START }), harness().deps)).toBeNull()
+    expect(await welcomeOrderForSession(session({ streamLinkOverride: STREAM, hidden: true }), harness().deps)).toBeNull()
+    expect(await welcomeOrderForSession(session({ streamLinkOverride: STREAM, endedAt: START }), harness().deps)).toBeNull()
     expect(await welcomeOrderForSession(s, harness({}, 4 * 60).deps)).toBeNull()
     expect(await welcomeOrderForSession(null, harness().deps)).toBeNull()
   })
 
   it('a failed post is released and handed out again', async () => {
     const h = harness()
-    const s = session({ streamLink: STREAM })
+    const s = session({ streamLinkOverride: STREAM })
     expect(await welcomeOrderForSession(s, h.deps)).not.toBeNull()
     await releaseWelcomeForSession(s, h.deps)
     expect(await welcomeOrderForSession(s, h.deps)).not.toBeNull()
@@ -138,7 +175,7 @@ describe('welcomeOrderForSession', () => {
 
   it('never throws', async () => {
     const h = harness()
-    const store: WelcomeStore = { claim: async () => { throw new Error('db down') }, release: async () => undefined }
-    expect(await welcomeOrderForSession(session({ streamLink: STREAM }), { ...h.deps, store })).toBeNull()
+    const store: WelcomeStore = { claim: async () => { throw new Error('db down') }, release: async () => undefined, exists: async () => false }
+    expect(await welcomeOrderForSession(session({ streamLinkOverride: STREAM }), { ...h.deps, store })).toBeNull()
   })
 })
