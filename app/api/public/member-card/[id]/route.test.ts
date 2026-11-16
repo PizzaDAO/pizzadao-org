@@ -11,6 +11,10 @@ vi.mock("@/app/lib/member-since", async (orig) => ({
   resolveMemberSince: vi.fn(async () => new Date("2021-03-17T14:22:09Z")),
 }));
 
+vi.mock("@/app/lib/discord-activity-public", () => ({
+  getPublicDiscordActivity: vi.fn(async () => ({ messages: 757, since: "2021-03-01T00:00:00.000Z", lastActive: "2026-05-01T00:00:00.000Z", activeMonths: 20, topChannels: ["general"] })),
+}));
+
 import { GET, composeMemberCard, MEMBER_CARD_KEYS } from "./route";
 import { fetchMemberById } from "@/app/lib/sheets/member-repository";
 import { getUserProgressSummary } from "@/app/lib/missions";
@@ -49,6 +53,7 @@ describe("member card", () => {
     expect(Object.keys(card!).sort()).toEqual([...MEMBER_CARD_KEYS].sort());
     // Month precision only: no day or time of the join leaks.
     expect(card!.memberSince).toBe("2021-03-01T00:00:00.000Z");
+    expect(card!.discordActivity).toEqual({ messages: 757, since: "2021-03-01T00:00:00.000Z", lastActive: "2026-05-01T00:00:00.000Z", activeMonths: 20, topChannels: ["general"] });
     expect(card).toMatchObject({
       memberId: "1",
       name: "Test Maker",

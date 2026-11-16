@@ -428,6 +428,13 @@ export interface ProfileSummaryData {
     turtles: string[]
     xAccount: { connected: boolean; username?: string } | null
   }
+  discordActivity?: {
+    messages: number
+    since: string | null
+    lastActive: string | null
+    activeMonths: number
+    topChannels: string[]
+  } | null
   crewIds: string[]
   crewOptions: unknown[]
   viewerId: string | null

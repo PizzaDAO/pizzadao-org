@@ -23,6 +23,7 @@ import { prisma } from "@/app/lib/db";
 import { getMemberTagline } from "@/app/api/profile-extras/[id]/route";
 import { resolvePfpUrlAsync } from "@/app/lib/pfp";
 import { resolveMemberSince, monthPrecisionIso } from "@/app/lib/member-since";
+import { getPublicDiscordActivity, type PublicDiscordActivity } from "@/app/lib/discord-activity-public";
 import { internalError } from "@/app/lib/errors/error-response";
 
 export const runtime = "nodejs";
@@ -53,6 +54,8 @@ export interface ProfileSummary {
         turtles: string[];
         xAccount: { connected: boolean; username?: string } | null;
     };
+    /** Public Discord activity (month-precision dates, public channels only); null when off or no data. */
+    discordActivity: PublicDiscordActivity | null;
     crewIds: string[];
     crewOptions: CrewOption[];
     viewerId: string | null;
@@ -223,6 +226,9 @@ export async function composeProfileSummary(
         : memberPromise.then((m) =>
             m ? resolveMemberSince(memberId, String(m.discordId || "").trim() || null) : null,
         ).catch(() => null);
+    const activityPromise: Promise<PublicDiscordActivity | null> = light
+        ? Promise.resolve(null)
+        : memberPromise.then((m) => (m ? getPublicDiscordActivity(String(m.discordId || "").trim() || null) : null)).catch(() => null);
     const sinceDeadline = withDeadline(sincePromise, 800, null as Date | null);
     const mafiaPromise = light
         ? Promise.resolve(null)
@@ -264,7 +270,7 @@ export async function composeProfileSummary(
         // sheet read below when present.
         safe(getMemberTagline(memberId), null as string | null),
     ]);
-    const [member, sinceResult] = await Promise.all([memberPromise, sinceDeadline]);
+    const [member, sinceResult, discordActivity] = await Promise.all([memberPromise, sinceDeadline, activityPromise]);
     if (!member) return null;
     const memberSince = sinceResult.value;
     if (sinceResult.timedOut) keepAlive(sincePromise);
@@ -334,6 +340,7 @@ export async function composeProfileSummary(
             turtles,
             xAccount,
         },
+        discordActivity,
         crewIds,
         crewOptions: realCrews(crewMappings.crews),
         viewerId: viewerMemberId,
