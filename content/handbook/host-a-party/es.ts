@@ -41,7 +41,7 @@ No pidas todo de una vez. Pide por tandas, más o menos cada 45 minutos, para qu
 
 ## Crea un POAP {#poaps}
 
-Un POAP es una insignia coleccionable que los invitados pueden reclamar para demostrar que estuvieron. Crear uno para tu fiesta es un lindo detalle y además es una de las misiones. Los pasos están en [crear un POAP](/handbook/make-a-poap).
+Un POAP es una insignia coleccionable que los invitados pueden reclamar para demostrar que estuvieron. Crear uno para tu fiesta es un lindo detalle. Los pasos están en [crear un POAP](/handbook/make-a-poap).
 
 ## Anuncia tu fiesta {#announce}
 

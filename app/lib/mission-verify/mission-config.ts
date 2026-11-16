@@ -10,7 +10,7 @@
  *
  * Automatic verifiers: x_linked, attendance_count, discord_message,
  * referral (Phase 4: real referral capture), discord_role; manual for L8.
- * Phase 4 adds the semi-automatic ones (L2.1 social_post, L4.1 poap_drop,
+ * Phase 4 adds the semi-automatic ones (L2.1 social_post, L4.1 poap_drop (since replaced),
  * L5.1 media_proof, L6.1 gpp_host): the member submits a proof link, the
  * verifier pre-checks it on submit (MissionCompletion.checkResult) and a
  * reviewer approves with one click. They never approve on their own.
@@ -141,13 +141,13 @@ export const MISSION_VERIFIER_CONFIG: readonly MissionVerifierConfig[] = [
   {
     level: 4,
     index: 1, // prod: the original index-0 row was deleted; this mission sits at index 1
-    seedTitle: 'Make a POAP for a community call',
-    description:
-      'Create a POAP for one of the community calls, then submit the POAP drop link (poap.gallery or collectors.poap.xyz) or the drop ID. A reviewer confirms you made it.',
-    verifierKey: 'poap_drop', // drop info from POAP Compass; a reviewer confirms authorship
-    verifierParams: {},
-    proofKind: 'URL',
-    guideHref: '/handbook/make-a-poap',
+    seedTitle: 'Make a POAP for a community call', // replaced; earlier completions keep their credit
+    title: 'Join three community calls',
+    description: 'Attend three Community Calls. Checked automatically from call attendance.',
+    verifierKey: 'attendance_count',
+    verifierParams: { min: 3, crewId: 'community_call' },
+    proofKind: 'NONE',
+    guideHref: '/calls/how-to-attend',
   },
   {
     level: 4,
