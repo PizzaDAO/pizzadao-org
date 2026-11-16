@@ -156,6 +156,18 @@ export const CONTENT_SETTINGS = {
     key: 'calls.recapBulletChars', area: 'calls', label: 'Recap: characters per bullet', help: 'Longer bullets and action items are cut here.',
     min: 80, max: 400, default: 220, unit: 'chars',
   }),
+  'calls.recapRefreshDelayMinutes': num({
+    key: 'calls.recapRefreshDelayMinutes', area: 'calls', label: 'Recap: minutes before an automatic edit', help: 'After an action item changes status the posted recap is edited once this long later (several changes close together make one edit), and one message is edited at most this often. The follow-ups job runs every 10 minutes, so the edit can land up to 10 minutes after this.',
+    min: 1, max: 120, default: 10, unit: 'minutes',
+  }),
+  'calls.recapRefreshMaxDays': num({
+    key: 'calls.recapRefreshMaxDays', area: 'calls', label: 'Recap: days to keep it current', help: 'Recaps published longer ago than this are no longer edited automatically (the Update recap button still works).',
+    min: 1, max: 365, default: 60, unit: 'days',
+  }),
+  'calls.recapMinBullets': num({
+    key: 'calls.recapMinBullets', area: 'calls', label: 'Recap: bullets kept when it is too long', help: 'With live status on, a recap that does not fit in Discord\'s length limit first loses summary bullets from the end, down to this many, then links, then whole action items.',
+    min: 0, max: 10, default: 3,
+  }),
   // ---- Call summary ----
   'calls.summaryModel': summaryModel,
   'calls.summaryPromptExtra': summaryPromptExtra,

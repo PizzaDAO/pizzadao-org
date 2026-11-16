@@ -21,7 +21,9 @@ import { getSession } from "@/app/lib/session";
 import { formatClock } from "@/app/lib/calls/summarize";
 import { displaySpeakerName } from "@/app/lib/calls/speaker-labels";
 import { readEvidence } from "@/app/lib/calls/evidence";
-import { sameActionPerson } from "@/app/lib/calls/recap";
+import { recapLiveStatusEnabled, sameActionPerson } from "@/app/lib/calls/recap";
+import { loadActionViews } from "@/app/lib/calls/action-status";
+import { loadPostFilter } from "@/app/lib/calls/post-filters";
 import { NON_ROSTER_CREW_IDS, normalizeCrewId } from "@/app/lib/crew-id";
 import { EditorialMasthead, EditorialPage, paperCard } from "@/app/ui/shared/Editorial";
 
@@ -59,6 +61,10 @@ export default async function PublishedCallPage({ params }: Params) {
     const attendees = await loadCallAttendees(rec, speakerText);
     const segments = showTranscript ? asSegments(rec.transcript) : [];
     const actionItems = (!showActionItems ? [] : Array.isArray(rec.actionItems) ? rec.actionItems : []) as Array<{ text?: string; owner?: string; suggestedBy?: string; done?: boolean; evidence?: unknown }>;
+    // Live status (calls.recapLiveStatusEnabled): follow-up answers and finished-work links next to each item; off, only what the reviewers marked.
+    const views = actionItems.length > 0 && (await recapLiveStatusEnabled().catch(() => false)) ? await loadActionViews(rec, await loadPostFilter().catch(() => null)) : null;
+    const stateOf = (item: { done?: boolean }, i: number) => (views ? (views[i]?.state ?? null) : item.done ? "done" : null);
+    const marked = actionItems.some((a, i) => stateOf(a, i) !== null);
     // Live Q&A and poll results of the call: gated like the action items (anonymous askers are never named).
     const qa = showActionItems ? await publishedQaForRecording(id) : null;
     const chapters = (!showChapters ? [] : Array.isArray(rec.chapters) ? rec.chapters : []) as Array<{ startMs?: number; title?: string }>;
@@ -108,22 +114,23 @@ export default async function PublishedCallPage({ params }: Params) {
                 {actionItems.length > 0 && (
                     <section className="grid gap-2">
                         <h2 className="font-display text-xl font-black m-0">{t("actionItems")}</h2>
-                        <ul className={`m-0 grid gap-1 ${actionItems.some((a) => a.done) ? "list-none pl-0" : "pl-5"}`}>
+                        <ul className={`m-0 grid gap-1 ${marked ? "list-none pl-0" : "pl-5"}`}>
                             {actionItems.map((item, i) => (
-                                <li key={i} className={actionItems.some((a) => a.done) && !item.done ? "pl-5" : undefined}>
-                                    {item.done ? <span role="img" aria-label={t("actionDone")}>{"\u2705"} </span> : null}
+                                <li key={i} className={marked && stateOf(item, i) === null ? "pl-5" : undefined}>
+                                    {stateOf(item, i) === "done" ? <span role="img" aria-label={t("actionDone")}>{"\u2705"} </span> : null}
+                                    {stateOf(item, i) === "in_progress" ? <span role="img" aria-label={t("actionInProgress")}>{"\u{1F504}"} </span> : null}
                                     {item.text}
-                                    {item.done ? readEvidence(item.evidence).map((e) => (
-                                        <a key={e.url} href={e.url} target="_blank" rel="noopener noreferrer" className="ml-2 text-xs underline">{e.label}</a>
-                                    )) : null}
+                                    {(views ? (views[i]?.links ?? []) : item.done ? readEvidence(item.evidence) : []).map((e) => (
+                                        <a key={e.url} href={e.url} target="_blank" rel="nofollow noopener noreferrer ugc" className="ml-2 text-xs underline">{e.label}</a>
+                                    ))}
                                     {item.owner && item.suggestedBy && sameActionPerson(item.owner, item.suggestedBy) ? (
-                                        <span className="text-foreground/60"> {"\u2014"} {t("suggestedAndOwns", { name: item.owner })}</span>
-                                    ) : (
-                                        <>
-                                            {item.owner ? <span className="text-foreground/60"> ({item.owner})</span> : null}
-                                            {item.suggestedBy ? <span className="text-foreground/60"> {"\u2014"} {t("suggestedBy", { name: item.suggestedBy })}</span> : null}
-                                        </>
-                                    )}
+                                        <span className="text-foreground/60"> ({t("suggestedAndOwns", { name: item.owner })})</span>
+                                    ) : item.owner || item.suggestedBy ? (
+                                        <span className="text-foreground/60">
+                                            {" "}
+                                            ({[item.owner ? t("ownerIs", { name: item.owner }) : "", item.suggestedBy ? t("suggestedBy", { name: item.suggestedBy }) : ""].filter(Boolean).join(", ")})
+                                        </span>
+                                    ) : null}
                                 </li>
                             ))}
                         </ul>

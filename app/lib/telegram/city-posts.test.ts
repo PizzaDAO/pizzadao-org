@@ -51,7 +51,7 @@ describe('toPlainPost', () => {
   })
 
   it('turns masked evidence links into a plain (label)', () => {
-    expect(toPlainPost('\u2705 Shipped (Ann) \u2014 [PR #308](<https://github.com/a/b/pull/308>), [docs.x.org](<https://docs.x.org/p>)\n\nFull: https://example.org/calls/1')).toBe('\u2705 Shipped (Ann) \u2014 (PR #308), (docs.x.org)\n\nFull: https://example.org/calls/1')
+    expect(toPlainPost('\u2705 Shipped (owner: Ann): [PR #308](<https://github.com/a/b/pull/308>), [docs.x.org](<https://docs.x.org/p>)\n\nFull: https://example.org/calls/1')).toBe('\u2705 Shipped (owner: Ann): (PR #308), (docs.x.org)\n\nFull: https://example.org/calls/1')
   })
 
   it('adds the app link when the text has none, and caps the length', () => {

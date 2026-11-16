@@ -11,6 +11,9 @@ import { chatOnlyAuthors, mergeChat, publicChatText, segmentKey } from './chat'
 import { buildSpeakerNames, DEFAULT_SUMMARY_BUDGET_MS, generateCallSummary } from './summarize'
 import { mergeLiveActionItems } from './live-items'
 import { resolveMemberNames } from './live-members'
+import { assignActionKeys } from './action-keys'
+import { readEvidence } from './evidence'
+import { requestRecapRefresh } from './recap-refresh'
 
 /**
  * Crew list for event -> crew mapping. A sheet outage must not lose a
@@ -348,7 +351,7 @@ export async function generateAndStoreSummaryResult(id: string, opts: SummaryOpt
     const data = {
       title: out.title,
       summary: out.summary,
-      actionItems: carryDone(rec.actionItems, await withLiveItems(out.actionItems, rec.sessionId, segments, rec.redactedSpeakerIds, buildSpeakerNames(rec.speakers, segments))) as unknown as Prisma.InputJsonValue,
+      actionItems: assignActionKeys(rec.actionItems, carryDone(rec.actionItems, await withLiveItems(out.actionItems, rec.sessionId, segments, rec.redactedSpeakerIds, buildSpeakerNames(rec.speakers, segments)))) as unknown as Prisma.InputJsonValue,
       chapters: out.chapters as unknown as Prisma.InputJsonValue,
       status: 'IN_REVIEW' as const,
       publishedAt: null,
@@ -469,7 +472,7 @@ export async function unpublishRecording(id: string, reviewerDiscordId: string, 
 export interface RecordingTextEdit {
   title?: string | null
   summary?: string | null
-  actionItems?: Array<{ text: string; owner?: string; suggestedBy?: string; done?: boolean; evidence?: Array<{ url: string; label?: string }> }>
+  actionItems?: Array<{ text: string; owner?: string; suggestedBy?: string; done?: boolean; evidence?: Array<{ url: string; label?: string }>; key?: string }>
   chapters?: Array<{ startMs: number; title: string }>
 }
 
@@ -480,15 +483,31 @@ export type EditResult = 'ok' | 'not-found' | 'invalid'
  * call; a PUBLISHED call may not lose its title or summary.
  */
 export async function updateRecordingText(id: string, edit: RecordingTextEdit): Promise<EditResult> {
-  const rec = await prisma.callRecording.findUnique({ where: { id }, select: { id: true, status: true, summary: true, actionItems: true, chapters: true } })
-  if (!rec || rec.status === 'REJECTED') return 'not-found'
-  if (rec.status === 'PROCESSING') return 'invalid'
-  if (rec.status === 'PUBLISHED' && (edit.title === null || edit.summary === null)) return 'invalid'
+  // Action items carry keys that ensureActionKeys may be handing out: serialize with it on the same per-call lock.
+  const out =
+    edit.actionItems !== undefined
+      ? await prisma.$transaction(async (tx) => {
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'action-keys:' + id}))`
+          return updateRecordingTextIn(tx as unknown as typeof prisma, id, edit)
+        })
+      : await updateRecordingTextIn(prisma, id, edit)
+  // Only done / links changed on a published call: the posted recap follows by itself (live status on). Text edits keep using the "Update recap" button.
+  if (out.refresh) await requestRecapRefresh(id, 'review-status')
+  return out.result
+}
+
+async function updateRecordingTextIn(db: typeof prisma, id: string, edit: RecordingTextEdit): Promise<{ result: EditResult; refresh: boolean }> {
+  const rec = await db.callRecording.findUnique({ where: { id }, select: { id: true, status: true, title: true, summary: true, actionItems: true, chapters: true } })
+  if (!rec || rec.status === 'REJECTED') return { result: 'not-found', refresh: false }
+  if (rec.status === 'PROCESSING') return { result: 'invalid', refresh: false }
+  if (rec.status === 'PUBLISHED' && (edit.title === null || edit.summary === null)) return { result: 'invalid', refresh: false }
   const data: Prisma.CallRecordingUpdateInput = {}
   // A reviewer's words: automatic transcription/summary runs must never overwrite them.
   // Only a real change of the summary / action items / chapters text counts (a title-only or no-op save does not).
   // `done` and its evidence links are status, not reviewer text: toggling it alone does not freeze the summary against automatic reruns.
-  const stripDone = (v: unknown) => (Array.isArray(v) ? v.map((x) => { if (!x || typeof x !== 'object') return x; const { done: _d, evidence: _e, ...rest } = x as Record<string, unknown>; return rest }) : v)
+  // The item `key` (action-keys.ts) is bookkeeping too: key churn never counts as a text edit.
+  const stripDone = (v: unknown) => (Array.isArray(v) ? v.map((x) => { if (!x || typeof x !== 'object') return x; const { done: _d, evidence: _e, key: _k, ...rest } = x as Record<string, unknown>; return rest }) : v)
+  const statusOf = (v: unknown) => (Array.isArray(v) ? v.map((x) => { const o = (x && typeof x === 'object' ? x : {}) as { done?: unknown; evidence?: unknown }; return [o.done === true, readEvidence(o.evidence).map((e) => e.url)] }) : v)
   const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
   const textChanged =
     (edit.summary !== undefined && !same(rec.summary, edit.summary)) ||
@@ -497,11 +516,13 @@ export async function updateRecordingText(id: string, edit: RecordingTextEdit): 
   if (textChanged) data.summaryEditedAt = new Date()
   if (edit.title !== undefined) data.title = edit.title
   if (edit.summary !== undefined) data.summary = edit.summary
-  if (edit.actionItems !== undefined) data.actionItems = edit.actionItems as unknown as Prisma.InputJsonValue
+  // The server decides the keys: a key from the client is kept only when this call already had it.
+  if (edit.actionItems !== undefined) data.actionItems = assignActionKeys(rec.actionItems, edit.actionItems) as unknown as Prisma.InputJsonValue
   if (edit.chapters !== undefined) data.chapters = edit.chapters as unknown as Prisma.InputJsonValue
-  if (Object.keys(data).length === 0) return 'ok'
-  await prisma.callRecording.update({ where: { id }, data })
-  return 'ok'
+  if (Object.keys(data).length === 0) return { result: 'ok', refresh: false }
+  await db.callRecording.update({ where: { id }, data })
+  const textOnlyEdit = textChanged || (edit.title !== undefined && edit.title !== rec.title)
+  return { result: 'ok', refresh: rec.status === 'PUBLISHED' && edit.actionItems !== undefined && !textOnlyEdit && !same(statusOf(rec.actionItems ?? []), statusOf(edit.actionItems)) }
 }
 
 /**

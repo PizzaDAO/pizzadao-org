@@ -18,7 +18,9 @@ export function safeEvidenceUrl(raw: unknown): string | null {
   try {
     const u = new URL(s)
     if ((u.protocol !== 'http:' && u.protocol !== 'https:') || !u.hostname) return null
-    return u.toString()
+    // Normalizing can lengthen a URL (punycode, percent-encoding): the limit applies to what is stored.
+    const out = u.toString()
+    return out.length > MAX_EVIDENCE_URL ? null : out
   } catch {
     return null
   }

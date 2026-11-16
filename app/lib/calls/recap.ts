@@ -23,6 +23,8 @@ import { loadSettings, type Settings } from '@/app/lib/settings'
 import { settingInt } from '@/app/lib/settings/numbers'
 import { importedAllowed, isImportedSource } from '@/app/lib/calls/imported'
 import { readEvidence } from '@/app/lib/calls/evidence'
+import { loadActionViews, type ActionView } from '@/app/lib/calls/action-status'
+import { createHash } from 'node:crypto'
 import { enqueueMirror } from '@/app/lib/telegram/city-posts'
 
 export const COMMUNITY_CALL_CREW_ID = 'community_call'
@@ -32,6 +34,8 @@ export interface RecapLimits {
   bullets: number
   actions: number
   chars: number
+  /** Live-status mode only (calls.recapMinBullets): bullets kept before links, then whole items, are dropped. */
+  minBullets?: number
 }
 
 export const DEFAULT_RECAP_LIMITS: RecapLimits = { bullets: 5, actions: 10, chars: 220 }
@@ -60,6 +64,12 @@ export interface RecapInput {
   summary: string | null
   actionItems: unknown
   chapters?: unknown
+  /**
+   * Live status per stored action item (same order as actionItems; see action-status.ts). Present only
+   * while calls.recapLiveStatusEnabled is on: it switches the recap to status markers, one link per
+   * item and the bullets-then-links-then-items fitter. Absent: the recap is exactly what it always was.
+   */
+  actionViews?: ActionView[]
 }
 
 const oneLine = (s: string) => s.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g, " ").replace(/\s+/g, " ").trim()
@@ -327,38 +337,86 @@ export function recapHeading(rec: { crewId?: string | null; crewLabel?: string |
   return label ? `${label} Crew Recap` : 'Call Recap'
 }
 
+interface ActionLine { done: boolean; state: ActionView['state']; link: string; line: string; ev: string }
+
+export const DEFAULT_MIN_BULLETS = 3
+
+/**
+ * Live-status fitter. One action line per item, led by its status marker (a check, a cycle arrow, or
+ * a dash) and followed by its first link. When the message is over Discord's limit it gives up, in
+ * this order: summary bullets from the end (down to `minBullets`), then links from the last item
+ * upward (the marker always stays), then whole items from the end ("+N more on the call page").
+ */
+function fitStatusRecap(head: string, bullets: string[], actions: ActionLine[], tail: string[], minBullets: number): string[] {
+  const marker = (a: ActionLine) => (a.state === 'done' ? '✅' : a.state === 'in_progress' ? '🔄' : '-')
+  const compose = (nb: number, linkN: number, kept: number): string[] => {
+    const out = [head]
+    if (nb > 0) out.push('', ...bullets.slice(0, nb).map((b) => `- ${b}`))
+    if (actions.length > 0) {
+      out.push('', '**Action items**', ...actions.slice(0, kept).map((a, i) => `${marker(a)} ${a.line}${i < linkN && a.link ? `: ${a.link}` : ''}`))
+    }
+    // Even when no item fits, say how many there are.
+    if (kept < actions.length) out.push(`+${actions.length - kept} more on the call page`)
+    return [...out, ...tail]
+  }
+  const fits = (ls: string[]) => ls.join('\n').length <= DISCORD_MESSAGE_LIMIT
+  const all = actions.length
+  const floor = Math.min(Math.max(minBullets, 0), bullets.length)
+  for (let nb = bullets.length; nb >= floor; nb--) {
+    const c = compose(nb, all, all)
+    if (fits(c)) return c
+  }
+  for (let linkN = all - 1; linkN >= 0; linkN--) {
+    const c = compose(floor, linkN, all)
+    if (fits(c)) return c
+  }
+  for (let kept = all - 1; kept >= 1; kept--) {
+    const c = compose(floor, 0, kept)
+    if (fits(c)) return c
+  }
+  return compose(floor, 0, 0)
+}
+
 /** The recap text plus which mentions it contains. `mention: false` gives plain names (Telegram). Always within Discord's 2000-character limit. */
 export function buildRecapParts(input: RecapInput, base: string = SITE_URL, filter: PostFilter = EMPTY_POST_FILTER, limits: RecapLimits = DEFAULT_RECAP_LIMITS, people?: RecapPeople, mention = true): RecapParts {
   const rec = cleanRecapInput(input, people)
   const who = mention ? people : undefined
   const found: RecapMentions = new Map()
+  const statusMode = Array.isArray(rec.actionViews)
   const title = clip(oneLine(rec.title ?? rec.eventName ?? rec.crewLabel ?? 'Call recap'), 120)
   const bullets = recapBullets(rec.summary, rec.chapters, filter, limits).map((b) => mentionInBullet(b, who, found))
   const actions = (Array.isArray(rec.actionItems) ? rec.actionItems : [])
-    .map((a) => {
+    .map((a, idx) => {
       const o = a as { text?: unknown; owner?: unknown; suggestedBy?: unknown; done?: unknown; evidence?: unknown }
-      const done = o?.done === true
+      const view = statusMode ? rec.actionViews?.[idx] : undefined
+      const done = statusMode ? view?.state === 'done' : o?.done === true
+      const state: ActionView['state'] = statusMode ? (view?.state ?? null) : done ? 'done' : null
+      // Status mode: the first link of the item only (the call page lists them all), masked, URLs over 200 characters left out.
+      const first = view?.links.find((l) => l.url.length <= 200)
+      const link = first ? `[${first.label.replace(/[\[\]()<>*_`~|\\]/g, '') || 'link'}](<${first.url}>)` : ''
       // Masked links with <> around the URL (no embeds); only on done items. Long URLs are left out to keep the line short.
       const proof = done ? readEvidence(o.evidence).filter((e) => e.url.length <= 200).map((e) => `[${e.label.replace(/[\[\]()<>*_`~|\\]/g, '') || 'link'}](<${e.url}>)`) : []
-      const ev = proof.length ? ` — ${proof.join(', ')}` : ''
+      const ev = proof.length ? `: ${proof.join(', ')}` : ''
       const text = typeof o?.text === 'string' ? oneLine(o.text) : ''
       const owner = typeof o?.owner === 'string' ? oneLine(o.owner) : ''
       const by = typeof o?.suggestedBy === 'string' ? oneLine(o.suggestedBy) : ''
       if (!text || mentionsBlockedTerm(text, filter) || mentionsBlockedTerm(owner, filter) || mentionsBlockedTerm(by, filter)) return null
       // One person who both suggested and owns it: say so once instead of "(Ann) — suggested by Ann".
-      if (owner && by && sameActionPerson(owner, by, who)) return { done, line: `${clip(text, limits.chars)} — ${mentionNames(clip(owner, 40), who, found)} (suggested, owner)`, ev }
-      return { done, line: `${clip(text, limits.chars)}${owner ? ` (${mentionNames(clip(owner, 40), who, found)})` : ''}${by ? ` — suggested by ${mentionNames(clip(by, 40), who, found)}` : ''}`, ev }
+      if (owner && by && sameActionPerson(owner, by, who)) return { done, state, link, line: `${clip(text, limits.chars)} (suggested and owned by ${mentionNames(clip(owner, 40), who, found)})`, ev }
+      return { done, state, link, line: `${clip(text, limits.chars)}${owner || by ? ` (${[owner ? `owner: ${mentionNames(clip(owner, 40), who, found)}` : '', by ? `suggested by ${mentionNames(clip(by, 40), who, found)}` : ''].filter(Boolean).join(', ')})` : ''}`, ev }
     })
-    .filter((x): x is { done: boolean; line: string; ev: string } => !!x)
+    .filter((x): x is ActionLine => !!x)
     .slice(0, limits.actions)
   let withEv = true
-  const actionLine = (a: { done: boolean; line: string; ev: string }) => `${a.done ? '✅' : '-'} ${a.line}${withEv ? a.ev : ''}`
+  const actionLine = (a: ActionLine) => `${a.done ? '✅' : '-'} ${a.line}${withEv ? a.ev : ''}`
   const url = recapUrl(rec.id, base)
   const heading = recapHeading(rec)
-  const lines = [`**${heading}: ${title}**`]
+  let lines = [`**${heading}: ${title}**`]
   if (bullets.length) lines.push('', ...bullets.map((b) => `- ${b}`))
   const tail = ['', `Full summary and transcript: ${url}`]
-  if (actions.length) {
+  if (statusMode) {
+    lines = fitStatusRecap(`**${heading}: ${title}**`, bullets, actions, tail, limits.minBullets ?? DEFAULT_MIN_BULLETS)
+  } else if (actions.length) {
     // As many whole action lines as fit under Discord's limit (the "+N more" note and the link line are reserved).
     const head = [...lines, '', '**Action items**']
     const len = (ls: string[]) => ls.join('\n').length
@@ -377,7 +435,7 @@ export function buildRecapParts(input: RecapInput, base: string = SITE_URL, filt
       if (kept < actions.length) lines.push(moreLine(actions.length - kept))
     }
   }
-  lines.push(...tail)
+  if (!statusMode) lines.push(...tail)
   let text = lines.join('\n')
   // Safety net: drop trailing bullets until it fits (the link line must survive).
   while (text.length > DISCORD_MESSAGE_LIMIT && lines.length > 3) {
@@ -477,6 +535,17 @@ export function redactionsNewerThanSummary(rec: { redactionsUpdatedAt?: Date | n
   return rec.redactionsUpdatedAt.getTime() > fresh
 }
 
+/** Whether the live status of action items (follow-up answers, member links, automatic edits) is on. */
+export function recapLiveStatusEnabled(env: Record<string, string | undefined> = process.env): Promise<boolean> {
+  return toggleEnabled('calls.recapLiveStatusEnabled', env)
+}
+
+/** The per-item status views, or undefined when live status is off (the recap is then built the old way). */
+export async function recapActionViews(rec: { id: string; actionItems: unknown }, filter: PostFilter, env: Record<string, string | undefined> = process.env): Promise<ActionView[] | undefined> {
+  if (!(await recapLiveStatusEnabled(env))) return undefined
+  return loadActionViews(rec, filter)
+}
+
 export type RecapResult = 'posted' | 'disabled' | 'already-posted' | 'not-published' | 'excluded' | 'stale-redactions' | 'no-channel' | 'no-token' | 'imported' | 'failed'
 
 export interface PostRecapDeps extends RecapDeps {
@@ -502,25 +571,37 @@ const RECAP_SELECT = {
   redactionsUpdatedAt: true,
   summaryGeneratedAt: true,
   summaryEditedAt: true,
+  recapRenderedHash: true,
+  recapEditedAt: true,
 } as const
 
 /**
  * The recap as Discord text (with mentions of the call's speakers / named members), the plain-name
  * text for the Telegram mirror (no <@id>), and the allowed_mentions to send with the Discord text.
  */
-async function renderRecap(rec: RecapInput & { source?: string | null; redactedSpeakerIds?: readonly string[] | null }, filter: PostFilter, deps: PostRecapDeps): Promise<{ content: string; plain: string; allowedMentions: { parse: []; users?: string[] } }> {
+async function renderRecap(input: RecapInput & { source?: string | null; redactedSpeakerIds?: readonly string[] | null }, filter: PostFilter, deps: PostRecapDeps): Promise<{ content: string; plain: string; allowedMentions: { parse: []; users?: string[] }; hash: string }> {
   const env = deps.env ?? process.env
-  const limits = recapLimits(await loadSettings())
+  const settings = await loadSettings()
+  const actionViews = await recapActionViews(input, filter, env)
+  const rec = actionViews ? { ...input, actionViews } : input
+  const limits = actionViews ? { ...recapLimits(settings), minBullets: settingInt('calls.recapMinBullets', settings) } : recapLimits(settings)
   const people = await loadRecapPeople(rec)
   const parts = buildRecapParts(rec, deps.base, filter, limits, people)
   const plain = buildRecapParts(rec, deps.base, filter, limits, people, false).text
   const ping = await recapMentionPing(env)
-  return { content: parts.text, plain, allowedMentions: recapAllowedMentions([...parts.mentions.keys()], ping) }
+  const allowedMentions = recapAllowedMentions([...parts.mentions.keys()], ping)
+  return { content: parts.text, plain, allowedMentions, hash: recapHash(parts.text, allowedMentions) }
 }
 
-const EDIT_ERROR_PREFIX = 'edit failed: '
+/** sha256 of what would be sent (text and allowed mentions): equal hashes mean an edit would change nothing. */
+export const recapHash = (content: string, allowedMentions: unknown): string => createHash('sha256').update(JSON.stringify([content, allowedMentions])).digest('hex')
 
-export type RepostResult = RecapResult | 'updated' | 'no-message'
+const EDIT_ERROR_PREFIX = 'edit failed: '
+/** The note of an edit that can never work (message deleted / no access): recap-refresh.ts schedules nothing for such a call. */
+export const EDIT_GONE_PREFIX = `${EDIT_ERROR_PREFIX}gone: `
+
+/** 'unchanged': the render equals the last one sent (ifChanged); 'gone': Discord says the message or channel is gone. */
+export type RepostResult = RecapResult | 'updated' | 'no-message' | 'unchanged' | 'gone'
 
 /**
  * Re-render the recap of a published call and EDIT the Discord message already posted (the stored
@@ -528,7 +609,7 @@ export type RepostResult = RecapResult | 'updated' | 'no-message'
  * Never posts a new message and never re-mirrors to Telegram. Without { edit: true } it is the
  * ordinary once-only post.
  */
-export async function repostRecap(recordingId: string, opts: { edit?: boolean } = {}, deps: PostRecapDeps & { edit?: typeof editDiscordMessage } = {}): Promise<RepostResult> {
+export async function repostRecap(recordingId: string, opts: { edit?: boolean; ifChanged?: boolean } = {}, deps: PostRecapDeps & { edit?: typeof editDiscordMessage } = {}): Promise<RepostResult> {
   if (!opts.edit) return postCallRecap(recordingId, deps)
   const env = deps.env ?? process.env
   if (!(await recapPostingEnabled(env))) return 'disabled'
@@ -549,13 +630,21 @@ export async function repostRecap(recordingId: string, opts: { edit?: boolean } 
   if (!rec.recapPostedAt || !rec.recapChannelId || !rec.recapMessageId) return 'no-message'
   try {
     const r = await renderRecap(rec, filter, deps)
+    if (opts.ifChanged && rec.recapRenderedHash === r.hash) return 'unchanged'
     await (deps.edit ?? editDiscordMessage)(
       { channelId: rec.recapChannelId, messageId: rec.recapMessageId, botToken },
       { content: r.content, allowed_mentions: r.allowedMentions, flags: 4 /* SUPPRESS_EMBEDS */ },
     )
+    // Bookkeeping only: the edit is done, so trouble here must not look like a failed edit.
+    await prisma.callRecording.updateMany({ where: { id: recordingId }, data: { recapRenderedHash: r.hash, recapEditedAt: new Date() } }).catch(() => {})
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     console.error('[calls/recap] edit failed:', msg)
+    // The message was deleted or the bot lost access: retrying cannot help.
+    if (err instanceof DiscordPostError && (err.status === 404 || err.status === 403)) {
+      await prisma.callRecording.updateMany({ where: { id: recordingId, OR: [{ recapError: null }, { recapError: { startsWith: EDIT_ERROR_PREFIX } }] }, data: { recapError: `${EDIT_GONE_PREFIX}${msg}`.slice(0, 300) } })
+      return 'gone'
+    }
     // Keep an earlier note (e.g. the original post's error); only an edit note is replaced.
     await prisma.callRecording.updateMany({ where: { id: recordingId, OR: [{ recapError: null }, { recapError: { startsWith: EDIT_ERROR_PREFIX } }] }, data: { recapError: `${EDIT_ERROR_PREFIX}${msg}`.slice(0, 300) } })
     return 'failed'
@@ -597,10 +686,12 @@ export async function postCallRecap(id: string, deps: PostRecapDeps = {}): Promi
   let messageId: string | null
   let content: string | undefined
   let plain: string | undefined
+  let hash: string | undefined
   try {
     const r = await renderRecap(rec, filter, deps)
     content = r.content
     plain = r.plain
+    hash = r.hash
     const sent = await (deps.post ?? postDiscordMessage)(
       { kind: 'bot', channelId: channel.channelId, botToken },
       { content, allowed_mentions: r.allowedMentions, flags: 4 /* SUPPRESS_EMBEDS */ },
@@ -622,6 +713,6 @@ export async function postCallRecap(id: string, deps: PostRecapDeps = {}): Promi
   // Mirror to the mapped city Telegram groups (queued only when switched on; never affects Discord).
   await enqueueMirror({ kind: 'recap', sourceId: rec.id, crewId: rec.crewId, crewLabel: rec.crewLabel, text: plain ?? content }, env)
   // The post succeeded; bookkeeping trouble must never release the claim or look like a failed post.
-  if (messageId) await prisma.callRecording.update({ where: { id }, data: { recapMessageId: messageId } }).catch((e) => console.error('[calls/recap] could not store message id:', e instanceof Error ? e.message : e))
+  if (messageId) await prisma.callRecording.update({ where: { id }, data: { recapMessageId: messageId, ...(hash ? { recapRenderedHash: hash } : {}) } }).catch((e) => console.error('[calls/recap] could not store message id:', e instanceof Error ? e.message : e))
   return 'posted'
 }

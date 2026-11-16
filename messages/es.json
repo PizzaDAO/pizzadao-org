@@ -1054,7 +1054,7 @@
       "summaryRestricted": "El resumen está disponible para los miembros de nivel {level} o superior.",
       "actionItemsRestricted": "Las tareas pendientes están disponibles para los miembros de nivel {level} o superior.",
       "suggestedBy": "sugerido por {name}",
-      "suggestedAndOwns": "{name} · lo sugirió y se encarga",
+      "suggestedAndOwns": "sugerido y a cargo de {name}",
       "actionDone": "Hecho",
       "chaptersRestricted": "Los capítulos están disponibles para los miembros de nivel {level} o superior.",
       "chatLine": "Escrito en el chat de la llamada",
@@ -1070,7 +1070,9 @@
       "qaBy": "Pregunta de {name}",
       "pollsTitle": "Resultados de encuestas",
       "pollTotal": "{count, plural, one {# voto} other {# votos}}",
-      "crewPage": "Abrir la página de la crew {crew}"
+      "crewPage": "Abrir la página de la crew {crew}",
+      "actionInProgress": "En curso",
+      "ownerIs": "responsable: {name}"
     },
     "readRecordings": "Lee resúmenes y transcripciones de llamadas anteriores.",
     "live": {
@@ -1517,7 +1519,16 @@
     "proposeTasks": "Proponer cambios de tareas",
     "proposingTasks": "Trabajando...",
     "tasksProposed": "{count, plural, =0 {No se encontraron propuestas nuevas} one {# propuesta nueva} other {# propuestas nuevas}}",
-    "proposeTasksError": "No se pudieron proponer cambios de tareas (¿está activado para este crew?)."
+    "proposeTasksError": "No se pudieron proponer cambios de tareas (¿está activado para este crew?).",
+    "followUpLinksHeading": "Seguimientos y acciones",
+    "followUpLinksHelp": "Vincula cada seguimiento con la acción de la que trata. Los seguimientos vinculados marcan la acción como en curso o hecha en el resumen. Desvincula uno cuando el estado de un miembro sea incorrecto; borra un enlace que no deba mostrarse.",
+    "followUpLinkItem": "Acción",
+    "followUpLinkNone": "Sin vincular",
+    "followUpLinkUrl": "Enlace al trabajo terminado (se muestra públicamente)",
+    "followUpLinkSave": "Guardar",
+    "followUpLinkClear": "Borrar enlace",
+    "followUpStateInProgress": "Seguimiento: en curso",
+    "followUpStateDone": "Seguimiento: hecho"
   },
   "crewDrafts": {
     "title": "Borradores",
@@ -2450,7 +2461,13 @@
         "done": "Listo. No recibirás más estos mensajes."
       }
     },
-    "title": "Seguimiento"
+    "title": "Seguimiento",
+    "linkLabel": "Enlace al trabajo terminado (opcional)",
+    "linkHelp": "Este enlace se mostrará públicamente junto al resumen de la llamada.",
+    "linkSaved": "Gracias, el enlace se añadió.",
+    "badUrl": "No parece un enlace web válido (http o https). Revísalo e inténtalo de nuevo.",
+    "addLinkTitle": "Añadir un enlace",
+    "saveLink": "Guardar enlace"
   },
   "adminTelegram": {
     "title": "Grupos de Telegram por ciudad",

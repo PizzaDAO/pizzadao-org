@@ -1503,6 +1503,10 @@ model CallRecording {
   recapChannelId          String?
   recapMessageId          String?
   recapError              String?
+  // Live recap status (plans/recap-action-status.md): when an edit of the posted message is due, the last edit, and the hash of the content last rendered.
+  recapRefreshAt          DateTime?
+  recapEditedAt           DateTime?
+  recapRenderedHash       String?             @db.VarChar(64)
   // Speakers whose transcript lines are hidden from everything public and from the summary model.
   // Non-destructive: the stored transcript is complete; this only filters.
   redactedSpeakerIds      String[]            @default([])
@@ -1533,6 +1537,7 @@ model CallRecording {
   @@index([crewId, startedAt])
   @@index([createdAt])
   @@index([source, startedAt])
+  @@index([recapRefreshAt])
 }
 
 // Live action items (plans/post-call-agenda-updates.md, options A and C). Keyed by the recorder
@@ -2057,6 +2062,10 @@ model FollowUp {
   telegramFallback   String?          @db.VarChar(32) // why Telegram was skipped or failed (no-link, not-started, blocked, off, bad-request)
   lastReply          String?
   lastReplyAt        DateTime?
+  actionKey          String?          @db.VarChar(16) // CallRecording.actionItems[].key this follow-up is about (same recordingId)
+  doneUrl            String?          @db.VarChar(500) // link to the finished work, shown publicly with the call recap
+  doneUrlAt          DateTime?
+  doneUrlBy          String?
   approvedBy         String?
   approvedAt         DateTime?
   sentAt             DateTime?
@@ -2069,6 +2078,7 @@ model FollowUp {
   @@index([status, sendAfter])
   @@index([ownerDiscordId, sentAt])
   @@index([recordingId])
+  @@index([recordingId, actionKey])
   @@index([telegramChatId, telegramMessageId])
 }
 

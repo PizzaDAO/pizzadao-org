@@ -68,7 +68,8 @@ import { reviewCardsEnabled, syncReviewCard } from "@/app/lib/mission-verify/rev
 import { postEphemeralFollowup, runReviewDecision, type ReviewDecisionJob } from "@/app/lib/mission-verify/review-decision";
 import type { MissionReviewDeps } from "@/app/lib/discord-interactions/mission-review";
 import type { FollowUpInteractionDeps } from "@/app/lib/discord-interactions/followups";
-import { applyMemberAction } from "@/app/lib/followups/actions";
+import { applyMemberAction, setDoneUrl } from "@/app/lib/followups/actions";
+import { linkOffered } from "@/app/lib/followups/done-url";
 import { notifyApprovers } from "@/app/lib/followups/notify";
 import type { ReminderInteractionDeps } from "@/app/lib/discord-interactions/reminders";
 import { stopCallReminders, stopProposalReminders } from "@/app/lib/reminders/prefs";
@@ -229,6 +230,11 @@ const missionReview: MissionReviewDeps = {
 
 const followups: FollowUpInteractionDeps = {
   respond: (a) => applyMemberAction({ ...a, actorId: a.discordId }),
+  addLink: (a) => setDoneUrl({ ...a, actorId: a.discordId }),
+  canLink: async (id, discordId) => {
+    const row = await prisma.followUp.findUnique({ where: { id }, select: { ownerDiscordId: true, actionKey: true } });
+    return !!row && row.ownerDiscordId === discordId && (await linkOffered(row));
+  },
   notify: (text) => after(() => notifyApprovers(text).then(() => undefined, () => undefined)),
   owns: async (id, discordId) => {
     const row = await prisma.followUp.findUnique({ where: { id }, select: { ownerDiscordId: true } });

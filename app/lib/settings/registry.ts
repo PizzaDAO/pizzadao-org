@@ -1010,6 +1010,20 @@ export const SETTINGS = {
     help: 'On: members named in a call recap (speakers, action-item owners) are @mentioned and notified. Off: they show as clickable names without a notification. The CALL_RECAP_MENTION_PING_ENABLED env var set to off always wins.',
     default: true,
   }),
+  'calls.recapLiveStatusEnabled': boolSetting({
+    key: 'calls.recapLiveStatusEnabled',
+    area: 'calls',
+    label: 'Live status in call recaps',
+    help: 'On: action items show in-progress (a cycle arrow) and done (a check) from members\' follow-up answers, finished-work links show next to done items, and the posted Discord recap is edited in place (never re-posted) a few minutes after a status changes. The Telegram copy is not edited. Off: the recap shows only what the reviewers marked, as before. The CALL_RECAP_LIVE_STATUS_ENABLED env var set to off always wins.',
+    confirmOn: 'Posted call recaps will be edited in place as action items move along.',
+  }),
+  'calls.recapMemberLinksEnabled': boolSetting({
+    key: 'calls.recapMemberLinksEnabled',
+    area: 'calls',
+    label: 'Show members\' finished-work links in recaps',
+    help: 'On: the link a member adds when marking a follow-up done is shown publicly next to the action item (in the recap and on the call page). Only used while live status is on. Reviewers can clear a link on the call\'s admin page. The CALL_RECAP_MEMBER_LINKS_ENABLED env var set to off always wins.',
+    default: true,
+  }),
   'education.sessionAnnounceEnabled': boolSetting({
     key: 'education.sessionAnnounceEnabled',
     area: 'discord',

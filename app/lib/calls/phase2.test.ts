@@ -9,6 +9,7 @@ import { NextRequest } from 'next/server'
 vi.mock('@/app/lib/db')
 vi.mock('@/app/lib/crew-mappings', () => ({ getCrewMappings: vi.fn(async () => ({ cached: true, crews: [] })) }))
 vi.mock('@/app/lib/session', () => ({ getSession: vi.fn() }))
+vi.mock('./recap-refresh', () => ({ requestRecapRefresh: vi.fn(async () => true) }))
 vi.mock('@/app/lib/mission-review-access', () => ({ isDreadPizzaRoberts: vi.fn() }))
 vi.mock('ai', () => ({
   generateText: vi.fn(),
@@ -21,6 +22,7 @@ import { after } from 'next/server'
 import { prisma } from '@/app/lib/db'
 import { getSession } from '@/app/lib/session'
 import { isDreadPizzaRoberts } from '@/app/lib/mission-review-access'
+import { requestRecapRefresh } from './recap-refresh'
 import { parseIngestPayload } from './ingest-schema'
 import { buildSpeakerNames, buildTranscriptText, DEFAULT_SUMMARY_FALLBACK_MODEL, DEFAULT_SUMMARY_MODEL, summaryFallbackModel, generateCallSummary, isFallbackWorthy, summaryModel, SUMMARY_SYSTEM_PROMPT, spellingsHint } from './summarize'
 import { normalizeKeyterms } from './keyterms'
@@ -75,6 +77,8 @@ beforeEach(() => {
   savedModel = process.env.CALL_SUMMARY_MODEL
   process.env.RECORDER_API_KEY = 'rec-key'
   delete process.env.CALL_SUMMARY_MODEL
+  // Action-item saves run in a transaction under the per-call key lock; the mock runs it against the same mocked client.
+  ;(prisma.$transaction as unknown as ReturnType<typeof vi.fn>).mockImplementation(async (fn: (t: unknown) => unknown) => fn(prisma))
 })
 afterEach(() => {
   if (savedKey === undefined) delete process.env.RECORDER_API_KEY
@@ -250,7 +254,7 @@ describe('summary generation', () => {
     ])
     expect(await generateAndStoreSummary('rec1')).toBe(true)
     expect(db.callLiveItem.findMany.mock.calls[0][0].where).toEqual({ sessionId: SESSION })
-    expect(writes()[0][0].data.actionItems).toEqual([...good.actionItems, { text: 'Order the banner stickers', owner: 'Ann', suggestedBy: 'Ann' }])
+    expect(writes()[0][0].data.actionItems).toEqual([...good.actionItems, { text: 'Order the banner stickers', owner: 'Ann', suggestedBy: 'Ann' }].map((a) => ({ ...a, key: expect.any(String) })))
   })
 
   it('a reject that lands during generation stays rejected (the write matches nothing)', async () => {
@@ -586,7 +590,7 @@ describe('reviewer edits', () => {
     asReviewer()
     db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'IN_REVIEW' })
     expect((await patch({ actionItems: [{ text: 'A', suggestedBy: ' Bob ' }, { text: 'B', suggestedBy: null }, { text: 'C', owner: 'Ann', suggestedBy: '  ' }] })).status).toBe(200)
-    expect(db.callRecording.update.mock.calls[0][0].data.actionItems).toEqual([{ text: 'A', suggestedBy: 'Bob' }, { text: 'B' }, { text: 'C', owner: 'Ann' }])
+    expect(db.callRecording.update.mock.calls[0][0].data.actionItems).toEqual([{ key: expect.any(String), text: 'A', suggestedBy: 'Bob' }, { key: expect.any(String), text: 'B' }, { key: expect.any(String), text: 'C', owner: 'Ann' }])
     expect((await patch({ actionItems: [{ text: 'A', suggestedBy: 'x'.repeat(101) }] })).status).toBe(400)
     expect((await patch({ actionItems: [{ text: 'A', suggestedBy: 5 }] })).status).toBe(400)
   })
@@ -596,7 +600,7 @@ describe('reviewer edits', () => {
     db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'IN_REVIEW' })
     const ok = [{ url: 'https://github.com/o/r/pull/5' }, { url: 'http://example.org/x', label: 'ignored' }]
     expect((await patch({ actionItems: [{ text: 'A', done: true, evidence: ok }, { text: 'B', evidence: [] }] })).status).toBe(200)
-    expect(db.callRecording.update.mock.calls[0][0].data.actionItems).toEqual([{ text: 'A', done: true, evidence: [{ url: 'https://github.com/o/r/pull/5' }, { url: 'http://example.org/x' }] }, { text: 'B' }])
+    expect(db.callRecording.update.mock.calls[0][0].data.actionItems).toEqual([{ key: expect.any(String), text: 'A', done: true, evidence: [{ url: 'https://github.com/o/r/pull/5' }, { url: 'http://example.org/x' }] }, { key: expect.any(String), text: 'B' }])
     for (const evidence of [
       [{ url: 'javascript:alert(1)' }],
       [{ url: 'ftp://example.org/x' }],
@@ -613,14 +617,14 @@ describe('reviewer edits', () => {
     asReviewer()
     db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'IN_REVIEW' })
     expect((await patch({ actionItems: [{ text: 'A', done: true }, { text: 'B', done: false }, { text: 'C', owner: 'Ann', done: 'yes' }, { text: 'D' }] })).status).toBe(200)
-    expect(db.callRecording.update.mock.calls[0][0].data.actionItems).toEqual([{ text: 'A', done: true }, { text: 'B' }, { text: 'C', owner: 'Ann' }, { text: 'D' }])
+    expect(db.callRecording.update.mock.calls[0][0].data.actionItems).toEqual([{ key: expect.any(String), text: 'A', done: true }, { key: expect.any(String), text: 'B' }, { key: expect.any(String), text: 'C', owner: 'Ann' }, { key: expect.any(String), text: 'D' }])
   })
 
   it('toggling only done does not stamp summaryEditedAt, but still saves done', async () => {
     asReviewer()
     db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'IN_REVIEW', actionItems: [{ text: 'A', owner: 'Ann' }] })
     await patch({ actionItems: [{ text: 'A', owner: 'Ann', done: true }] })
-    expect(db.callRecording.update.mock.calls[0][0].data).toEqual({ actionItems: [{ text: 'A', owner: 'Ann', done: true }] })
+    expect(db.callRecording.update.mock.calls[0][0].data).toEqual({ actionItems: [{ key: expect.any(String), text: 'A', owner: 'Ann', done: true }] })
     db.callRecording.update.mockClear()
     await patch({ actionItems: [{ text: 'A changed', owner: 'Ann', done: true }] })
     expect(db.callRecording.update.mock.calls[0][0].data.summaryEditedAt).toBeInstanceOf(Date)
@@ -631,10 +635,65 @@ describe('reviewer edits', () => {
     db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'IN_REVIEW' })
     await patch({ actionItems: [{ text: ' Do it ', owner: 'Ann' }, { text: '  ' }], chapters: [{ startMs: 65_000, title: 'Intro' }, { startMs: 1, title: '' }] })
     expect(db.callRecording.update.mock.calls[0][0].data).toEqual({
-      actionItems: [{ text: 'Do it', owner: 'Ann' }],
+      actionItems: [{ key: expect.any(String), text: 'Do it', owner: 'Ann' }],
       chapters: [{ startMs: 65_000, title: 'Intro' }],
       summaryEditedAt: expect.any(Date),
     })
+  })
+
+  it('keeps a key the call already had, ignores one it never had, and key churn is not a text edit', async () => {
+    asReviewer()
+    db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'IN_REVIEW', actionItems: [{ text: 'A', key: 'aaaaaaaa' }, { text: 'B', key: 'bbbbbbbb' }] })
+    await patch({ actionItems: [{ text: 'B', key: 'bbbbbbbb' }, { text: 'A', key: 'zzzzzzzz' }] })
+    const stored = db.callRecording.update.mock.calls[0][0].data.actionItems as Array<{ text: string; key: string }>
+    expect(stored[0]).toEqual({ text: 'B', key: 'bbbbbbbb' })
+    expect(stored[1].text).toBe('A')
+    expect(stored[1].key).not.toBe('zzzzzzzz')
+    // Same list, different keys: no summaryEditedAt.
+    db.callRecording.update.mockClear()
+    await patch({ actionItems: [{ text: 'A', key: 'bbbbbbbb' }, { text: 'B', key: 'aaaaaaaa' }] })
+    expect(db.callRecording.update.mock.calls[0][0].data.summaryEditedAt).toBeUndefined()
+    // A malformed key from the client is dropped before it gets anywhere.
+    db.callRecording.update.mockClear()
+    await patch({ actionItems: [{ text: 'A', key: 'BAD KEY!' }] })
+    expect(db.callRecording.update.mock.calls[0][0].data.actionItems[0].key).toMatch(/^[a-z0-9]{8}$/)
+  })
+
+  it('saving action items takes the per-call key lock; a save without them does not', async () => {
+    asReviewer()
+    db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'IN_REVIEW', actionItems: [] })
+    const raw = (prisma as unknown as { $executeRaw: ReturnType<typeof vi.fn> }).$executeRaw
+    raw.mockClear()
+    await patch({ actionItems: [{ text: 'A' }] })
+    expect(raw).toHaveBeenCalledTimes(1)
+    raw.mockClear()
+    await patch({ title: 'Only title' })
+    expect(raw).not.toHaveBeenCalled()
+  })
+
+  it('asks the posted recap to follow when only done / links changed on a published call', async () => {
+    asReviewer()
+    const was = { id: 'rec1', status: 'PUBLISHED', title: 'T', actionItems: [{ text: 'A', owner: 'Ann', key: 'aaaaaaaa' }] }
+    db.callRecording.findUnique.mockResolvedValue(was)
+    await patch({ title: 'T', actionItems: [{ text: 'A', owner: 'Ann', done: true, key: 'aaaaaaaa' }] })
+    expect(requestRecapRefresh).toHaveBeenCalledWith('rec1', 'review-status')
+    vi.mocked(requestRecapRefresh).mockClear()
+    // New link on a done item counts too.
+    db.callRecording.findUnique.mockResolvedValue({ ...was, actionItems: [{ ...was.actionItems[0], done: true }] })
+    await patch({ actionItems: [{ text: 'A', owner: 'Ann', done: true, evidence: [{ url: 'https://example.org/x' }], key: 'aaaaaaaa' }] })
+    expect(requestRecapRefresh).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not ask for a refresh for text edits (the Update recap button stays), no-ops, or calls that are not published', async () => {
+    asReviewer()
+    const was = { id: 'rec1', status: 'PUBLISHED', title: 'T', summary: 'S', actionItems: [{ text: 'A', key: 'aaaaaaaa' }] }
+    db.callRecording.findUnique.mockResolvedValue(was)
+    await patch({ actionItems: [{ text: 'A changed', done: true, key: 'aaaaaaaa' }] })
+    await patch({ title: 'New title', actionItems: [{ text: 'A', done: true, key: 'aaaaaaaa' }] })
+    await patch({ actionItems: [{ text: 'A', key: 'aaaaaaaa' }] })
+    db.callRecording.findUnique.mockResolvedValue({ ...was, status: 'IN_REVIEW' })
+    await patch({ actionItems: [{ text: 'A', done: true, key: 'aaaaaaaa' }] })
+    expect(requestRecapRefresh).not.toHaveBeenCalled()
   })
 
   it('400 for bad chapter times and oversized lists', async () => {

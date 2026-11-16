@@ -98,8 +98,8 @@ describe('buildRecapText with mentions', () => {
   it('puts mentions in bullets and action items; the plain text has names', () => {
     const t = buildRecapText(rec, base, undefined, undefined, people)
     expect(t).toContain(`- <@${ENZO}> reviewed the launch plan.`)
-    expect(t).toContain(`- Send the deck (<@${ENZO}>) — suggested by <@${MEM}>`)
-    expect(t).toContain('- Ask the AI (Claude)')
+    expect(t).toContain(`- Send the deck (owner: <@${ENZO}>, suggested by <@${MEM}>)`)
+    expect(t).toContain('- Ask the AI (owner: Claude)')
     expect(buildRecapText(rec, base)).not.toContain('<@')
   })
   it('keeps the 2000 character limit with mentions', () => {
@@ -247,8 +247,8 @@ describe('wrong-person matching', () => {
 describe('owner who is also the suggester', () => {
   it('mentions once and pings the id once when both names resolve to the same person', () => {
     const { text, mentions } = buildRecapParts({ id: 'r1', title: 'T', crewLabel: 'C', summary: null, actionItems: [{ text: 'Do it', owner: 'Enzo Pepperoni', suggestedBy: 'Enzo' }, { text: 'Other', owner: 'Enzo Pepperoni', suggestedBy: 'Lou Olive' }] }, base, undefined, undefined, people)
-    expect(text).toContain(`- Do it \u2014 <@${ENZO}> (suggested, owner)`)
-    expect(text).toContain(`- Other (<@${ENZO}>) \u2014 suggested by <@${MEM}>`)
+    expect(text).toContain(`- Do it (suggested and owned by <@${ENZO}>)`)
+    expect(text).toContain(`- Other (owner: <@${ENZO}>, suggested by <@${MEM}>)`)
     expect([...mentions.keys()].sort()).toEqual([ENZO, MEM].sort())
   })
 })

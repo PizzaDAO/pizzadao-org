@@ -53,3 +53,12 @@ describe('parseEvidenceInput', () => {
     expect(parseEvidenceInput(maps, false)).toEqual([{ url: maps }])
   })
 })
+
+describe('length is enforced after normalization', () => {
+  it('a URL that is short as typed but longer once normalized (punycode, percent-encoding) is refused', () => {
+    const typed = `https://exämple.org/${'ü'.repeat(200)}`
+    expect(typed.length).toBeLessThan(500)
+    expect(safeEvidenceUrl(typed)).toBeNull()
+    expect(safeEvidenceUrl('https://exämple.org/ü')).toBe('https://xn--exmple-cua.org/%C3%BC')
+  })
+})

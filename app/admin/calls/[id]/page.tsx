@@ -12,7 +12,7 @@ import { canReviewCalls } from "@/app/lib/calls/access";
 import { asSegments, getRecording } from "@/app/lib/calls/recordings";
 import { loadPostFilter } from "@/app/lib/calls/post-filters";
 import { loadSettings } from "@/app/lib/settings";
-import { buildRecapParts, loadRecapPeople, recapCrewExcluded, recapLimits, recapFilteredCount, recapPostingEnabled, redactionsNewerThanSummary, resolveRecapChannel } from "@/app/lib/calls/recap";
+import { buildRecapParts, loadRecapPeople, recapActionViews, recapCrewExcluded, recapLimits, recapFilteredCount, recapPostingEnabled, redactionsNewerThanSummary, resolveRecapChannel } from "@/app/lib/calls/recap";
 import { formatClock } from "@/app/lib/calls/summarize";
 import { CallAudioPlayer } from "../CallAudioPlayer";
 import { RemoveRecording } from "../RemoveRecording";
@@ -33,6 +33,8 @@ import { displaySpeakerName, importedSpeakerNumber } from "@/app/lib/calls/speak
 import { importedAllowed } from "@/app/lib/calls/imported";
 import { SpeakerLabel } from "../SpeakerLabel";
 import { UpdateRecap } from "../UpdateRecap";
+import { CallFollowUpLinks } from "../CallFollowUpLinks";
+import { settingInt } from "@/app/lib/settings/numbers";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -73,7 +75,7 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
     const labelsNewerThanSummary =
         imported && !!rec.speakerLabelsUpdatedAt && !!rec.summary && rec.speakerLabelsUpdatedAt.getTime() > Math.max(rec.summaryGeneratedAt?.getTime() ?? 0, rec.summaryEditedAt?.getTime() ?? 0);
     const canLabel = imported && rec.status !== "REJECTED" && rec.status !== "PROCESSING";
-    const actionItems = (Array.isArray(rec.actionItems) ? rec.actionItems : []) as Array<{ text?: string; owner?: string; suggestedBy?: string; done?: boolean; evidence?: Array<{ url: string; label?: string }> }>;
+    const actionItems = (Array.isArray(rec.actionItems) ? rec.actionItems : []) as Array<{ text?: string; owner?: string; suggestedBy?: string; done?: boolean; evidence?: Array<{ url: string; label?: string }>; key?: string }>;
     const chapters = (Array.isArray(rec.chapters) ? rec.chapters : []) as Array<{ startMs?: number; title?: string }>;
     // Preview of the Discord recap that publishing triggers (text from the saved title/summary/action items).
     const postFilter = await loadPostFilter().catch(() => null);
@@ -81,13 +83,16 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
     const [importedRecapOn, importedFollowupsOn] = imported
         ? await Promise.all([importedAllowed("calls.importedRecapPostEnabled"), importedAllowed("calls.importedFollowupsEnabled")])
         : [true, true];
+    // Live status (calls.recapLiveStatusEnabled): the preview shows what the recap will show; undefined while it is off.
+    const actionViews = postFilter ? await recapActionViews(rec, postFilter).catch(() => undefined) : undefined;
+    const settings = await loadSettings();
     const recapParts =
         postFilter && importedRecapOn && (rec.status === "IN_REVIEW" || rec.status === "PUBLISHED") && rec.summary?.trim()
             ? buildRecapParts(
-                  { id: rec.id, title: rec.title, eventName: rec.eventName, crewLabel: rec.crewLabel, summary: rec.summary, actionItems: rec.actionItems, chapters: rec.chapters },
+                  { id: rec.id, title: rec.title, eventName: rec.eventName, crewLabel: rec.crewLabel, summary: rec.summary, actionItems: rec.actionItems, chapters: rec.chapters, ...(actionViews ? { actionViews } : {}) },
                   undefined,
                   postFilter,
-                  recapLimits(await loadSettings()),
+                  actionViews ? { ...recapLimits(settings), minBullets: settingInt("calls.recapMinBullets", settings) } : recapLimits(settings),
                   await loadRecapPeople({ id: rec.id, source: rec.source, actionItems: rec.actionItems, redactedSpeakerIds: rec.redactedSpeakerIds }),
               )
             : null;
@@ -104,6 +109,20 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
             ? ((rec.transcribeStats as { _progress?: { lastError?: unknown } } | null)?._progress?.lastError as string | undefined) ?? null
             : null;
     const followUpCount = await prisma.followUp.count({ where: { recordingId: rec.id } }).catch(() => 0);
+    const followUpRows = followUpCount > 0 ? await prisma.followUp.findMany({ where: { recordingId: rec.id }, orderBy: { createdAt: "asc" }, select: { id: true, ownerName: true, ask: true, status: true, actionKey: true, doneUrl: true } }).catch(() => []) : [];
+    const tFollowUps = await getTranslations("adminFollowups");
+    // The keyed items, labelled A1.. the way the drafting model saw them; the follow-up state beside each item (live status on only).
+    const keyedItems = actionItems.flatMap((a) => (a.text && a.key ? [{ key: a.key, text: a.text }] : []));
+    // Items without a key yet are offered as "#N" (their A-label number): the server hands out the keys when a link is saved, so this page never writes.
+    const linkItems = actionItems.filter((a) => a.text).map((a, i) => ({ key: a.key ?? `#${i + 1}`, label: `A${i + 1}`, text: a.text as string }));
+    const followUpStates: Record<string, "in_progress" | "done"> = {};
+    if (actionViews) {
+        for (const it of keyedItems) {
+            const mine = followUpRows.filter((f) => f.actionKey === it.key);
+            if (mine.some((f) => f.status === "IN_PROGRESS" || f.status === "NEEDS_HELP")) followUpStates[it.key] = "in_progress";
+            else if (mine.some((f) => f.status === "DONE")) followUpStates[it.key] = "done";
+        }
+    }
     const canDraftFollowUps = importedFollowupsOn && (rec.status === "IN_REVIEW" || rec.status === "PUBLISHED") && !!rec.summary?.trim();
     // Proposed crew task updates (plans/post-call-agenda-updates.md): shown when the pass is on for this crew or proposals already exist.
     // A call that is not a crew call (the Community Call) routes its new tasks to other crews: one panel per crew.
@@ -204,6 +223,18 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                     </section>
                 )}
 
+                {followUpRows.length > 0 && (
+                    <section className="grid gap-2">
+                        <h2 className="text-xl font-bold m-0">{t("followUpLinksHeading")}</h2>
+                        <p className="m-0 text-foreground/70 text-sm">{t("followUpLinksHelp")}</p>
+                        <CallFollowUpLinks
+                            rows={followUpRows.map((f) => ({ id: f.id, owner: f.ownerName, ask: f.ask, status: tFollowUps(`status.${f.status}`), actionKey: f.actionKey, doneUrl: f.doneUrl }))}
+                            items={linkItems}
+                            labels={{ actionItem: t("followUpLinkItem"), none: t("followUpLinkNone"), doneUrl: t("followUpLinkUrl"), save: t("followUpLinkSave"), clear: t("followUpLinkClear"), working: t("working"), error: t("reviewError"), saved: t("saved") }}
+                        />
+                    </section>
+                )}
+
                 {showTaskProposals && rec.crewId && (
                     <section className="grid gap-2">
                         <h2 className="text-xl font-bold m-0">{t("taskProposalsHeading")}</h2>
@@ -296,9 +327,12 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                                 status={rec.status}
                                 initialTitle={rec.title ?? ""}
                                 initialSummary={rec.summary ?? ""}
-                                initialActionItems={actionItems.filter((i): i is { text: string; owner?: string; suggestedBy?: string; done?: boolean; evidence?: Array<{ url: string; label?: string }> } => !!i.text)}
+                                initialActionItems={actionItems.filter((i): i is { text: string; owner?: string; suggestedBy?: string; done?: boolean; evidence?: Array<{ url: string; label?: string }>; key?: string } => !!i.text)}
                                 initialChapters={chapters.filter((c): c is { startMs: number; title: string } => !!c.title && typeof c.startMs === "number")}
+                                followUpStates={followUpStates}
                                 labels={{
+                                    followUpInProgress: t("followUpStateInProgress"),
+                                    followUpDone: t("followUpStateDone"),
                                     title: t("fieldTitle"),
                                     actionItems: t("actionItemsHeading"),
                                     actionItemsHint: t("actionItemsHint"),

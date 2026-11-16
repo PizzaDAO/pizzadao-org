@@ -119,6 +119,8 @@ describe('settings registry', () => {
       ['missions.reviewCardsEnabled', false],
       ['calls.recapPostEnabled', false],
       ['calls.recapMentionPing', true],
+      ['calls.recapLiveStatusEnabled', false],
+      ['calls.recapMemberLinksEnabled', true],
       ['education.sessionAnnounceEnabled', false],
       ['calls.agendaPostEnabled', false],
       ['calls.agendaLinks', ''],

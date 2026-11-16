@@ -8,6 +8,7 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/app/lib/db'
 import { sanitizeSummaryError, visibleSegments } from '@/app/lib/calls/recordings'
+import { ensureActionKeys } from '@/app/lib/calls/action-keys'
 import { fetchAllMembers } from '@/app/lib/sheets/members-list'
 import { loadFollowUpConfig } from './config'
 import { extractFollowUps, type FollowUpDraft } from './extract'
@@ -51,6 +52,7 @@ export async function storeDrafts(recordingId: string, drafts: FollowUpDraft[], 
           message: d.message,
           quote: d.quote,
           startMs: d.startMs,
+          actionKey: d.actionKey ?? null,
           dueAt: d.dueAt,
           dueText: d.dueText,
           events: { create: [{ type: 'drafted', actorId, data: { resolution: r.status, matchedBy: r.matchedBy } }] },
@@ -111,11 +113,17 @@ export async function draftFollowUpsForRecording(
 
   const segments = visibleSegments(rec.transcript, rec.redactedSpeakerIds, rec.redactedSegmentIds)
   try {
+    // Calls summarized before action items had keys get them now, so a drafted follow-up can point at its item. Without them drafting still works, unlinked.
+    const keyed =
+      (await ensureActionKeys(id).catch((e) => {
+        console.warn('[followups] action keys unavailable:', e instanceof Error ? e.message.slice(0, 120) : 'error')
+        return []
+      })) ?? []
     const drafts = await extractFollowUps(
       {
         segments,
         speakers: rec.speakers.filter((s) => !rec.redactedSpeakerIds.includes(s.discordId)),
-        actionItems: Array.isArray(rec.actionItems) ? (rec.actionItems as Array<{ text?: string; owner?: string | null }>) : [],
+        actionItems: keyed.length ? keyed : Array.isArray(rec.actionItems) ? (rec.actionItems as Array<{ text?: string; owner?: string | null }>) : [],
         today: now,
         recordingId: id,
       },

@@ -11,6 +11,8 @@ const fu = (): FollowUpInteractionDeps & { notified: string[] } => {
     respond: vi.fn(async () => ({ ok: true as const, kind: 'status' as const, status: 'DONE' as const })),
     notify: (t: string) => void notified.push(t),
     owns: vi.fn(async () => true),
+    canLink: vi.fn(async () => true),
+    addLink: vi.fn(async () => ({ ok: true as const, kind: 'link' as const, status: 'DONE' as const })),
   }
 }
 
@@ -53,6 +55,54 @@ describe('follow-up buttons in direct messages', () => {
     expect(f.respond).toHaveBeenCalledWith({ followUpId: FU, discordId: 'u1', action: 'reply', text: 'on it' })
     expect(f.notified).toEqual(['Reply from Member A'])
     expect(res.data?.content).toMatch(/passed it on/i)
+  })
+  it('Done stays one tap and the answer offers an optional "Add a link" button (in the user\'s language)', async () => {
+    const f = fu()
+    const en = await handleInteraction(dm(`fu:done:${FU}`), deps(f))
+    expect(JSON.stringify(en.data?.components)).toContain(`fu:link:${FU}`)
+    const fr = await handleInteraction({ ...dm(`fu:done:${FU}`), locale: 'fr' }, deps(f))
+    expect(JSON.stringify(fr.data?.components)).toContain('Ajouter un lien')
+    // On it / Need help carry no link button.
+    const wip = await handleInteraction(dm(`fu:wip:${FU}`), deps(f))
+    expect(wip.data?.components).toBeUndefined()
+  })
+  it('with links off (or no action item) Done answers exactly as before: no button, and the link paths are closed', async () => {
+    const f = fu()
+    vi.mocked(f.canLink).mockResolvedValue(false)
+    const done = await handleInteraction(dm(`fu:done:${FU}`), deps(f))
+    expect(done.data?.components).toBeUndefined()
+    expect(done.data?.content).toBe('Marked as done. Thanks!')
+    const open = await handleInteraction(dm(`fu:link:${FU}`), deps(f))
+    expect(open.type).toBe(4)
+    expect(open.data?.content).toMatch(/closed/i)
+  })
+  it('Add a link opens a one-field modal when the follow-up is theirs, and refuses otherwise', async () => {
+    const f = fu()
+    const res = await handleInteraction(dm(`fu:link:${FU}`), deps(f))
+    expect(res.type).toBe(9)
+    expect(res.data?.custom_id).toBe(`fu:linkmodal:${FU}`)
+    expect(JSON.stringify(res.data?.components)).toContain('fu:link-input')
+    vi.mocked(f.owns).mockResolvedValue(false)
+    const no = await handleInteraction(dm(`fu:link:${FU}`), deps(f))
+    expect(no.type).toBe(4)
+    expect(no.data?.content).toMatch(/not yours/i)
+  })
+  it('the link modal submit stores the link and tells the approvers', async () => {
+    const f = fu()
+    vi.mocked(f.addLink).mockResolvedValue({ ok: true, kind: 'link', status: 'DONE', notify: 'Member A added a link' })
+    const submit = dm(`fu:linkmodal:${FU}`, 5, { components: [{ type: 1, components: [{ type: 4, custom_id: 'fu:link-input', value: 'https://example.org/work' }] }] })
+    const res = await handleInteraction(submit, deps(f))
+    expect(f.addLink).toHaveBeenCalledWith({ followUpId: FU, discordId: 'u1', url: 'https://example.org/work' })
+    expect(f.notified).toEqual(['Member A added a link'])
+    expect(res.data?.content).toBe('Thanks, the link was added.')
+    expect(res.data?.flags).toBe(64)
+  })
+  it('a bad link is answered with a plain message', async () => {
+    const f = fu()
+    vi.mocked(f.addLink).mockResolvedValue({ ok: false, reason: 'bad-url' })
+    const res = await handleInteraction(dm(`fu:linkmodal:${FU}`, 5, { components: [{ type: 1, components: [{ type: 4, custom_id: 'fu:link-input', value: 'javascript:alert(1)' }] }] }), deps(f))
+    expect(res.data?.content).toMatch(/valid web link/i)
+    expect(f.notified).toEqual([])
   })
   it('Stop is acknowledged', async () => {
     const f = fu()

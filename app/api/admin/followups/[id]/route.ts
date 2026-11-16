@@ -1,7 +1,7 @@
 import { after } from 'next/server'
 import { requireCallReviewer } from '@/app/lib/calls/access'
 import { json, rejectUnsafeWrite } from '@/app/lib/admin-guard'
-import { approveFollowUp, dismissFollowUp, editFollowUp, FollowUpError, reresolveFollowUp, type FollowUpPatch } from '@/app/lib/followups/admin'
+import { approveFollowUp, dismissFollowUp, editFollowUp, FollowUpError, linkFollowUp, reresolveFollowUp, type FollowUpLinkPatch, type FollowUpPatch } from '@/app/lib/followups/admin'
 import { sendFollowUp } from '@/app/lib/followups/send'
 
 export const runtime = 'nodejs'
@@ -21,7 +21,10 @@ function fail(e: unknown) {
   return json({ error: 'Something went wrong' }, 500)
 }
 
-/** PATCH { message?, dueAt?, channel?, ownerMemberId? }: edit a draft (logged with a diff). */
+/**
+ * PATCH { message?, dueAt?, channel?, ownerMemberId? }: edit a draft (logged with a diff).
+ * PATCH { actionKey?, doneUrl? }: link the follow-up to an action item / set or clear its finished-work link (any status).
+ */
 export async function PATCH(request: Request, ctx: Ctx) {
   const auth = await requireCallReviewer()
   if (!auth.ok) return auth.response
@@ -34,8 +37,16 @@ export async function PATCH(request: Request, ctx: Ctx) {
   if (b.dueAt === null || typeof b.dueAt === 'string') patch.dueAt = b.dueAt as string | null
   if (b.channel === null || typeof b.channel === 'string') patch.channel = b.channel as FollowUpPatch['channel']
   if (typeof b.ownerMemberId === 'string') patch.ownerMemberId = b.ownerMemberId
+  const link: FollowUpLinkPatch = {}
+  if (b.actionKey === null || typeof b.actionKey === 'string') link.actionKey = b.actionKey as string | null
+  if (b.doneUrl === null || typeof b.doneUrl === 'string') link.doneUrl = b.doneUrl as string | null
   try {
-    const r = await editFollowUp((await ctx.params).id, auth.session.discordId, patch)
+    const { id } = await ctx.params
+    if (link.actionKey !== undefined || link.doneUrl !== undefined) {
+      await linkFollowUp(id, auth.session.discordId, link)
+      if (Object.keys(patch).length === 0) return json({ ok: true })
+    }
+    const r = await editFollowUp(id, auth.session.discordId, patch)
     return json({ ok: true, updatedAt: r.updatedAt })
   } catch (e) {
     return fail(e)

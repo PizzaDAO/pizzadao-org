@@ -8,6 +8,7 @@ import { expireOldProposals, listNeedingProposals, proposeTasksForRecording } fr
 import { processDue } from '@/app/lib/followups/send'
 import { sweepOldReplies } from '@/app/lib/followups/store'
 import { runHostMatch } from '@/app/lib/telegram/host-match'
+import { refreshDueRecaps } from '@/app/lib/calls/recap-refresh'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -15,6 +16,7 @@ export const maxDuration = 300
 
 /**
  * GET /api/cron/followups — every 10 minutes (Vercel Cron, Bearer CRON_SECRET).
+ *  0. Edits posted call recaps whose action-item status changed (calls.recapLiveStatusEnabled; at most 5 per run; edits only, never a new post)
  *  1. Drafts follow-ups for summarized calls that have not had their one pass yet (one call per run).
  *  2. Sends APPROVED follow-ups that are due (quiet hours, daily cap and the send switch applied;
  *     at most 20 per run). Nothing is ever sent for a row that has not been approved.
@@ -27,6 +29,8 @@ export async function GET(request: NextRequest) {
   }
   try {
     const started = Date.now()
+    // Posted recaps follow action-item status (off unless switched on); a failure here never affects follow-ups.
+    const recaps = await refreshDueRecaps().catch((e) => ({ error: e instanceof Error ? e.message.slice(0, 120) : 'failed' }))
     const cfg = await loadFollowUpConfig()
     const drafted: Array<{ id: string; result: string; created: number }> = []
     if (cfg.draftEnabled) {
@@ -54,8 +58,8 @@ export async function GET(request: NextRequest) {
     const hostMatch = Date.now() - started < 120_000 ? await runHostMatch().catch((e) => ({ error: e instanceof Error ? e.message.slice(0, 120) : 'failed' })) : { skipped: 'time' }
     // Retention for reply text (followups.replyRetentionDays); never affects the rest of the run.
     const erased = await sweepOldReplies(cfg.replyRetentionDays).catch(() => -1)
-    console.log('[cron/followups]', JSON.stringify({ drafted, proposed, expired, sent, hostMatch, erased }))
-    return NextResponse.json({ drafted, proposed, expired, sent, hostMatch, erased })
+    console.log('[cron/followups]', JSON.stringify({ recaps, drafted, proposed, expired, sent, hostMatch, erased }))
+    return NextResponse.json({ recaps, drafted, proposed, expired, sent, hostMatch, erased })
   } catch (err) {
     return internalError(err, 'cron/followups', 'Follow-ups cron failed')
   }

@@ -32,21 +32,21 @@ beforeEach(() => {
 describe('recap text', () => {
   it('shows who suggested an item, and nothing when null', () => {
     const t = buildRecapText({ ...rec, actionItems: [{ text: 'Send the deck', owner: 'Ann', suggestedBy: 'Bob' }, { text: 'Book the venue', suggestedBy: null }] }, base)
-    expect(t).toContain('- Send the deck (Ann) \u2014 suggested by Bob')
+    expect(t).toContain('- Send the deck (owner: Ann, suggested by Bob)')
     expect(t).toContain('- Book the venue\n')
     expect(t).not.toContain('suggested by null')
   })
 
   it('marks done items with a check and keeps open ones as bullets, in stored order', () => {
     const t = buildRecapText({ ...rec, actionItems: [{ text: 'Open one' }, { text: 'Finished', owner: 'Ann', done: true }, { text: 'Solo', owner: 'Ann', suggestedBy: 'Ann', done: true }, { text: 'Explicit open', done: false }] }, base)
-    expect(t).toContain('- Open one\n\u2705 Finished (Ann)\n\u2705 Solo \u2014 Ann (suggested, owner)\n- Explicit open')
+    expect(t).toContain('- Open one\n\u2705 Finished (owner: Ann)\n\u2705 Solo (suggested and owned by Ann)\n- Explicit open')
     expect(t).not.toContain('- Finished')
   })
 
   it('appends masked evidence links (no embeds) after done items only', () => {
     const ev = [{ url: 'https://github.com/org/repo/pull/308' }, { url: 'https://docs.example.org/plan' }]
     const t = buildRecapText({ ...rec, actionItems: [{ text: 'Shipped', owner: 'Ann', done: true, evidence: ev }, { text: 'Open', evidence: ev }, { text: 'Bad', done: true, evidence: [{ url: 'javascript:alert(1)' }] }] }, base)
-    expect(t).toContain('\u2705 Shipped (Ann) \u2014 [PR #308](<https://github.com/org/repo/pull/308>), [docs.example.org](<https://docs.example.org/plan>)')
+    expect(t).toContain('\u2705 Shipped (owner: Ann): [PR #308](<https://github.com/org/repo/pull/308>), [docs.example.org](<https://docs.example.org/plan>)')
     expect(t).toContain('- Open\n')
     expect(t).toContain('\u2705 Bad\n')
     expect(t).not.toContain('javascript:')
@@ -72,9 +72,9 @@ describe('recap text', () => {
 
   it('renders an item once when the owner is also the suggester', () => {
     const t = buildRecapText({ ...rec, actionItems: [{ text: 'Send the deck', owner: 'Ann', suggestedBy: 'ann' }, { text: 'Book it', owner: 'Ann', suggestedBy: 'Bob' }] }, base)
-    expect(t).toContain('- Send the deck \u2014 Ann (suggested, owner)')
+    expect(t).toContain('- Send the deck (suggested and owned by Ann)')
     expect(t).not.toContain('suggested by ann')
-    expect(t).toContain('- Book it (Ann) \u2014 suggested by Bob')
+    expect(t).toContain('- Book it (owner: Ann, suggested by Bob)')
   })
 
   it('fits as many action items as Discord allows and notes the rest', () => {
@@ -95,7 +95,7 @@ describe('recap text', () => {
     const t = buildRecapText(rec, base)
     expect(t).toContain('**Ops Crew Recap: Ops sync**')
     expect(t).toContain('- We reviewed the launch plan.')
-    expect(t).toContain('- Send the deck (Ann)')
+    expect(t).toContain('- Send the deck (owner: Ann)')
     expect(t).toContain('- Book the venue')
     expect(t).toContain('https://example.org/calls/abc123')
   })
@@ -176,7 +176,7 @@ describe('postCallRecap', () => {
     expect(target).toMatchObject({ kind: 'bot', channelId: '812143244149915679' })
     expect(body.allowed_mentions).toEqual({ parse: [] })
     expect(body.content).toContain('https://example.org/calls/abc123')
-    expect(db.callRecording.update).toHaveBeenCalledWith({ where: { id: 'abc123' }, data: { recapMessageId: 'm1' } })
+    expect(db.callRecording.update).toHaveBeenCalledWith({ where: { id: 'abc123' }, data: { recapMessageId: 'm1', recapRenderedHash: expect.stringMatching(/^[0-9a-f]{64}$/) } })
   })
   it('mirrors the same text to Telegram after the claim, and a Telegram problem never changes the Discord result', async () => {
     db.callRecording.findUnique.mockResolvedValue(published)
@@ -278,7 +278,7 @@ describe('post filters', () => {
     const t = buildRecapText(marked, base, filter)
     expect(t.toLowerCase()).not.toContain('zeta')
     expect(t).toContain('- We reviewed the launch plan.')
-    expect(t).toContain('- Send the deck (Ann)')
+    expect(t).toContain('- Send the deck (owner: Ann)')
     expect(marked.summary).toContain('ZETA') // stored summary untouched
     expect(recapFilteredCount(marked, filter)).toBe(3)
     expect(recapFilteredCount(rec, filter)).toBe(0)
