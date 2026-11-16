@@ -62,15 +62,15 @@ function applyPlan(rows: MissionDbRow[], plan: VerifierMigrationPlan): MissionDb
 const at = (level: number, index: number) => (r: { level: number; index: number }) => r.level === level && r.index === index
 
 describe('planVerifierMigration', () => {
-  it('maps every seeded mission by (level, index); 12 automatic, 4 semi (proof link), 1 manual', () => {
+  it('maps every seeded mission by (level, index); 13 automatic, 3 semi (proof link), 1 manual', () => {
     const plan = planVerifierMigration(seedRows())
     expect(plan.errors).toEqual([])
     expect(plan.updates).toHaveLength(12)
     expect(plan.inserts.map((i) => `L${i.level}.${i.index}`)).toEqual(['L4.2', 'L5.2', 'L5.3', 'L6.2', 'L8.1'])
     const auto = MISSION_VERIFIER_CONFIG.filter((c) => c.verifierKey && VERIFIERS[c.verifierKey]?.mode === 'auto')
-    expect(auto.map((c) => `L${c.level}.${c.index}`)).toEqual(['L1.1', 'L2.0', 'L3.0', 'L3.1', 'L4.2', 'L5.0', 'L5.2', 'L5.3', 'L6.0', 'L6.2', 'L7.0', 'L8.1'])
+    expect(auto.map((c) => `L${c.level}.${c.index}`)).toEqual(['L1.1', 'L2.0', 'L3.0', 'L3.1', 'L4.1', 'L4.2', 'L5.0', 'L5.2', 'L5.3', 'L6.0', 'L6.2', 'L7.0', 'L8.1'])
     const semi = MISSION_VERIFIER_CONFIG.filter((c) => c.verifierKey && VERIFIERS[c.verifierKey]?.mode === 'semi')
-    expect(semi.map((c) => `L${c.level}.${c.index}:${c.verifierKey}`)).toEqual(['L2.1:social_post', 'L4.1:poap_drop', 'L5.1:media_proof', 'L6.1:gpp_host'])
+    expect(semi.map((c) => `L${c.level}.${c.index}:${c.verifierKey}`)).toEqual(['L2.1:social_post', 'L5.1:media_proof', 'L6.1:gpp_host'])
     expect(semi.every((c) => c.proofKind === 'URL')).toBe(true)
     expect(MISSION_VERIFIER_CONFIG.filter((c) => !c.verifierKey)).toEqual([])
     expect(MISSION_VERIFIER_CONFIG.filter((c) => c.verifierKey === 'manual').map((c) => `L${c.level}.${c.index}`)).toEqual(['L8.0'])
@@ -89,7 +89,7 @@ describe('planVerifierMigration', () => {
   })
 
   it('Phase 4: a database already on the Phase 1 config only gets the new semi verifiers (and descriptions)', () => {
-    // Prod after Phase 1: L2.1 / L4.1 / L5.1 / L6.1 had verifierKey null, proofKind URL.
+    // Prod after Phase 1: L2.1 / L5.1 / L6.1 had verifierKey null, proofKind URL (L4.1 has since become automatic).
     const rows = seedRows()
     for (const c of MISSION_VERIFIER_CONFIG) {
       const r = rows.find(at(c.level, c.index))
@@ -100,7 +100,7 @@ describe('planVerifierMigration', () => {
     }
     const plan = planVerifierMigration(rows, MISSION_VERIFIER_CONFIG, {}, { force: true }) // level titles: covered below
     expect(plan.errors).toEqual([])
-    expect(plan.updates.map((u) => `L${u.level}.${u.index}`)).toEqual(['L2.1', 'L3.1', 'L4.1', 'L5.1', 'L6.1'])
+    expect(plan.updates.map((u) => `L${u.level}.${u.index}`)).toEqual(['L2.1', 'L3.1', 'L5.1', 'L6.1'])
     expect(plan.updates.find((u) => u.level === 2)!.changes).toContain('verifierKey null -> social_post')
     expect(plan.updates.find((u) => u.level === 3)!.changes).toEqual(['description'])
     expect(plan.updates.find((u) => u.level === 3)!.data).toEqual({ description: expect.any(String) }) // only what changes
