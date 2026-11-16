@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 
 const toggleEnabled = vi.fn(async () => true)
 const loadSettings = vi.fn(async () => ({ get: () => 60 }))
-const listCallPrefs = vi.fn(async () => [])
+const listCallPrefs = vi.fn(async (): Promise<unknown[]> => [])
 const fetchUpcomingEvents = vi.fn(async () => [])
 vi.mock('@/app/lib/settings/toggles', () => ({ toggleEnabled: () => toggleEnabled() }))
 vi.mock('@/app/lib/settings', () => ({ loadSettings: () => loadSettings() }))
@@ -34,8 +34,15 @@ describe('runCallRemindersNow when off', () => {
     expect(listCallPrefs).not.toHaveBeenCalled()
   })
   it('dryRun runs the counting path on demand, still a dry run even when the switch is on', async () => {
+    listCallPrefs.mockResolvedValueOnce([{ discordId: 'm1', calls: 'COMMUNITY', crewIds: [] }])
     const r = await runCallRemindersNow(new Date(), PROD, { dryRun: true })
     expect(r).toMatchObject({ dryRun: true, occurrences: 0, sent: 0 })
     expect(fetchUpcomingEvents).toHaveBeenCalled()
+  })
+  it('with the switch on but nobody opted in, Discord is not asked for events (it runs every minute)', async () => {
+    const r = await runCallRemindersNow(new Date(), PROD)
+    expect(r).toMatchObject({ occurrences: 0, sent: 0 })
+    expect(listCallPrefs).toHaveBeenCalled()
+    expect(fetchUpcomingEvents).not.toHaveBeenCalled()
   })
 })

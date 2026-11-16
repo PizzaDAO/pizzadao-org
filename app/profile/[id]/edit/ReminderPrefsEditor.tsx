@@ -1,13 +1,22 @@
 "use client";
 
-// Call reminders by Discord DM on the profile edit page: off, the Community Call, or the Community Call
-// plus the member's crews. Opt-in only (no row means no reminders). Reads/writes /api/reminder-prefs
+// Call reminders by DM on the profile edit page: off, the Community Call, or the Community Call plus the
+// member's crews and Discord events they marked Interested; how early (5 to 60 minutes) and where (Discord,
+// Telegram or both). Opt-in only (no row means no reminders). Reads/writes /api/reminder-prefs
 // (session-scoped; the server resolves the member).
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 
 type Choice = "NONE" | "COMMUNITY" | "MY_CREWS";
-type Prefs = { calls: Choice; proposals?: boolean; dmClosed: boolean };
+type Where = "DISCORD" | "TELEGRAM" | "BOTH";
+type Prefs = { calls: Choice; leadMinutes?: number | null; channel?: Where; telegramLinked?: boolean; proposals?: boolean; dmClosed: boolean };
+
+const LEADS = [5, 10, 15, 30, 60];
+const WHERES: Array<{ value: Where; key: "channelDiscord" | "channelTelegram" | "channelBoth" }> = [
+    { value: "DISCORD", key: "channelDiscord" },
+    { value: "TELEGRAM", key: "channelTelegram" },
+    { value: "BOTH", key: "channelBoth" },
+];
 
 const CHOICES: Array<{ value: Choice; key: "none" | "community" | "myCrews" }> = [
     { value: "NONE", key: "none" },
@@ -78,6 +87,42 @@ export function ReminderPrefsEditor() {
                     {t(c.key)}
                 </label>
             ))}
+            <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15, marginTop: 6 }}>
+                {t("leadLegend")}
+                <select
+                    value={prefs?.leadMinutes ?? ""}
+                    disabled={busy || !loaded}
+                    onChange={(e) => void submit({ leadMinutes: e.target.value === "" ? null : Number(e.target.value) })}
+                    style={{ fontSize: 15 }}
+                >
+                    <option value="">{t("leadDefault")}</option>
+                    {LEADS.map((m) => (
+                        <option key={m} value={m}>
+                            {t("leadOption", { minutes: m })}
+                        </option>
+                    ))}
+                </select>
+            </label>
+            <div role="radiogroup" aria-label={t("channelLegend")} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 14, fontSize: 15 }}>
+                <span>{t("channelLegend")}</span>
+                {WHERES.map((w) => {
+                    const needsLink = w.value !== "DISCORD" && !prefs?.telegramLinked;
+                    return (
+                        <label key={w.value} style={{ display: "flex", alignItems: "center", gap: 6, opacity: needsLink ? 0.5 : 1 }}>
+                            <input
+                                type="radio"
+                                name="call-reminder-channel"
+                                value={w.value}
+                                checked={(prefs?.channel ?? "DISCORD") === w.value}
+                                disabled={busy || !loaded || needsLink}
+                                onChange={() => void submit({ channel: w.value })}
+                            />
+                            {t(w.key)}
+                        </label>
+                    );
+                })}
+            </div>
+            {loaded && !prefs?.telegramLinked ? <div style={{ fontSize: 13, opacity: 0.7 }}>{t("telegramNeedsLink")}</div> : null}
             <label style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 15, marginTop: 6 }}>
                 <input
                     type="checkbox"

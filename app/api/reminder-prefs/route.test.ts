@@ -47,8 +47,20 @@ describe('/api/reminder-prefs', () => {
     expect((await POST(post({ proposals: 'yes' }))).status).toBe(400)
     expect(savePrefs).toHaveBeenCalledTimes(1)
   })
+  it('POST accepts a lead (5, 10, 15, 30, 60 or null) and a channel (Discord, Telegram, both)', async () => {
+    for (const body of [{ leadMinutes: 5 }, { leadMinutes: 60 }, { leadMinutes: null }, { channel: 'TELEGRAM' }, { channel: 'BOTH' }, { channel: 'DISCORD', leadMinutes: 15 }]) {
+      expect((await POST(post(body))).status).toBe(200)
+      expect(savePrefs).toHaveBeenLastCalledWith('u1', body)
+    }
+  })
+  it('rejects other leads and channels', async () => {
+    for (const body of [{ leadMinutes: 3 }, { leadMinutes: 45 }, { leadMinutes: 120 }, { leadMinutes: '10' }, { channel: 'AUTO' }, { channel: 'SMS' }]) {
+      expect((await POST(post(body))).status).toBe(400)
+    }
+    expect(savePrefs).not.toHaveBeenCalled()
+  })
   it('rejects values B1 does not offer, unknown fields and empty bodies', async () => {
-    for (const body of [{ calls: 'SELECTED' }, { calls: 'COMMUNITY', discordId: 'u2' }, {}, { channel: 'TELEGRAM' }, 'not json']) {
+    for (const body of [{ calls: 'SELECTED' }, { calls: 'COMMUNITY', discordId: 'u2' }, {}, 'not json']) {
       expect((await POST(post(body))).status).toBe(400)
     }
     expect(savePrefs).not.toHaveBeenCalled()

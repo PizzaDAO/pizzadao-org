@@ -15,12 +15,16 @@ const ev = (id: string, min: number, status = 1, name = ''): RawEvent => ({ id, 
 const due = (events: RawEvent[]) => dueOccurrences({ events, crews, filter, now, leadMs: LEAD })
 
 describe('isDue window', () => {
-  it('is due only when more than 5 and at most 60 minutes away', () => {
+  it('is due only when more than 2 and at most 60 minutes away', () => {
     expect(isDue(at(60), now, LEAD)).toBe(true)
     expect(isDue(at(55), now, LEAD)).toBe(true)
     expect(isDue(at(61), now, LEAD)).toBe(false)
-    expect(isDue(at(5.01), now, LEAD)).toBe(true)
-    expect(isDue(at(5), now, LEAD)).toBe(false)
+    expect(isDue(at(5), now, LEAD)).toBe(true)
+    expect(isDue(at(2.01), now, LEAD)).toBe(true)
+    expect(isDue(at(2), now, LEAD)).toBe(false)
+    expect(isDue(at(1), now, 5 * 60_000)).toBe(false)
+    expect(isDue(at(5), now, 5 * 60_000)).toBe(true)
+    expect(isDue(at(6), now, 5 * 60_000)).toBe(false)
     expect(isDue(at(0), now, LEAD)).toBe(false)
     expect(isDue(at(-3), now, LEAD)).toBe(false)
   })
@@ -39,7 +43,7 @@ describe('dueOccurrences', () => {
     expect(due([ev('999999999999999999', 50, 1, 'Random hangout'), ev('333333333333333333', 50)])).toEqual([])
   })
   it('skips events outside the window', () => {
-    expect(due([ev('111111111111111111', 4), ev('111111111111111111', 90)])).toEqual([])
+    expect(due([ev('111111111111111111', 1), ev('111111111111111111', 90)])).toEqual([])
   })
   it('a moved occurrence gets a new refKey; an unmoved one keeps its key', () => {
     const a = due([ev('111111111111111111', 50)])[0].refKey

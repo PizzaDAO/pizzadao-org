@@ -1,6 +1,7 @@
 /**
- * The whole reminders run for the cron route: calls first (time-critical), then proposals with whatever is
- * left of the shared per-run budget, then the sweep of reminder rows for proposals that are no longer open.
+ * The whole reminders run for the cron route (every minute): calls first (time-critical), then proposals with
+ * whatever is left of the shared per-run budget, then the sweep of reminder rows for proposals that are no
+ * longer open. Proposals and the sweep keep their old 5-minute cadence (minute % 5 === 0).
  * Each part has its own switch (reminders.callsEnabled, reminders.proposalsEnabled; env off always wins) and
  * previews never send. Counts only.
  */
@@ -17,6 +18,9 @@ import { runProposalReminders, type ProposalRunResult } from './proposals'
 import { loadDmReach, recordDmClosed, recordDmOk } from './reach'
 import { runCallRemindersNow, type RunResult } from './run'
 import { prismaStore } from './store'
+
+/** Proposals ran every 5 minutes before the cron went to every minute; they still only run on those minutes. */
+export const PROPOSALS_EVERY_MINUTES = 5
 
 export type Skipped = { skipped: string }
 export interface RemindersRunResult {
@@ -68,8 +72,12 @@ export async function runRemindersNow(
 ): Promise<RemindersRunResult> {
   const calls = await runCallRemindersNow(now, env, opts)
   let proposals: ProposalRunResult | Skipped
+  // An on-demand dry run always counts; otherwise proposals wait for their 5-minute slot.
+  const proposalsSlot = !!opts.dryRun || now.getUTCMinutes() % PROPOSALS_EVERY_MINUTES === 0
   const callsSent = 'sent' in calls ? calls.sent : 0
-  if ('stoppedEarly' in calls && calls.stoppedEarly) {
+  if (!proposalsSlot) {
+    proposals = { skipped: 'cadence' }
+  } else if ('stoppedEarly' in calls && calls.stoppedEarly) {
     // The budget is spent or Discord is rate limiting: proposals wait for the next run.
     proposals = { skipped: 'calls_first' }
   } else {
@@ -77,6 +85,6 @@ export async function runRemindersNow(
   }
   // Privacy sweep: no per-member proposal reminder row outlives its proposal being open. Runs even with the
   // switches off, so rows from an earlier run are still removed. Best effort.
-  if (reminderSendAllowed(env)) await clearSettledProposalReminders().catch(() => 0)
+  if (proposalsSlot && reminderSendAllowed(env)) await clearSettledProposalReminders().catch(() => 0)
   return { calls, proposals }
 }

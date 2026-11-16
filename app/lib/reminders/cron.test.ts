@@ -21,6 +21,9 @@ vi.mock('./store', () => ({ prismaStore: {}, MAX_ATTEMPTS: 3 }))
 import { runRemindersNow } from './cron'
 
 const PROD = { VERCEL_ENV: 'production', DISCORD_BOT_TOKEN: 'x' }
+// A 5-minute slot (proposals run) and an ordinary minute (calls only).
+const SLOT = new Date('2026-11-10T12:05:00Z')
+const OFF_SLOT = new Date('2026-11-10T12:06:00Z')
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -29,7 +32,7 @@ beforeEach(() => {
 
 describe('runRemindersNow', () => {
   it('a preview does nothing: no settings, no proposal reads, no sweep', async () => {
-    const r = await runRemindersNow(new Date(), { VERCEL_ENV: 'preview', DISCORD_BOT_TOKEN: 'x' })
+    const r = await runRemindersNow(SLOT, { VERCEL_ENV: 'preview', DISCORD_BOT_TOKEN: 'x' })
     expect(r.proposals).toEqual({ skipped: 'disabled' })
     expect(loadSettings).not.toHaveBeenCalled()
     expect(listProposalPrefs).not.toHaveBeenCalled()
@@ -37,7 +40,7 @@ describe('runRemindersNow', () => {
   })
 
   it('proposals switch off: skipped without reads, but the privacy sweep still runs in production', async () => {
-    const r = await runRemindersNow(new Date(), PROD)
+    const r = await runRemindersNow(SLOT, PROD)
     expect(r.proposals).toEqual({ skipped: 'disabled' })
     expect(listProposalPrefs).not.toHaveBeenCalled()
     expect(clearSettled).toHaveBeenCalledTimes(1)
@@ -54,7 +57,7 @@ describe('runRemindersNow', () => {
       order.push('proposals')
       return []
     })
-    const r = await runRemindersNow(new Date(), PROD)
+    const r = await runRemindersNow(SLOT, PROD)
     expect(order).toEqual(['calls', 'proposals'])
     expect(r.proposals).toMatchObject({ dryRun: false, sent: 0 })
   })
@@ -62,9 +65,23 @@ describe('runRemindersNow', () => {
   it('shares the per-run cap: nothing left after calls means proposals wait', async () => {
     toggles['reminders.proposalsEnabled'] = true
     runCalls.mockResolvedValue({ dryRun: false, sent: 40, stoppedEarly: false })
-    expect((await runRemindersNow(new Date(), PROD)).proposals).toEqual({ skipped: 'budget' })
+    expect((await runRemindersNow(SLOT, PROD)).proposals).toEqual({ skipped: 'budget' })
     runCalls.mockResolvedValue({ dryRun: false, sent: 5, stoppedEarly: true })
-    expect((await runRemindersNow(new Date(), PROD)).proposals).toEqual({ skipped: 'calls_first' })
+    expect((await runRemindersNow(SLOT, PROD)).proposals).toEqual({ skipped: 'calls_first' })
     expect(listProposalPrefs).not.toHaveBeenCalled()
+  })
+
+  it('calls run every minute, but proposals and their sweep keep the 5-minute cadence', async () => {
+    toggles['reminders.proposalsEnabled'] = true
+    runCalls.mockResolvedValue({ dryRun: false, sent: 0, stoppedEarly: false })
+    const r = await runRemindersNow(OFF_SLOT, PROD)
+    expect(runCalls).toHaveBeenCalledTimes(1)
+    expect(r.proposals).toEqual({ skipped: 'cadence' })
+    expect(listProposalPrefs).not.toHaveBeenCalled()
+    expect(loadSettings).not.toHaveBeenCalled()
+    expect(clearSettled).not.toHaveBeenCalled()
+    // An on-demand dry run still counts proposals.
+    const dry = await runRemindersNow(OFF_SLOT, PROD, { dryRun: true })
+    expect(dry.proposals).not.toEqual({ skipped: 'cadence' })
   })
 })
