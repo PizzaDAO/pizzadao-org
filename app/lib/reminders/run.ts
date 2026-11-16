@@ -98,6 +98,8 @@ export interface RunDeps {
 }
 
 const PACE_MS = 250
+/** All Interested lookups of one run together may take this long; later events fall back to crews. */
+const INTERESTED_BUDGET_MS = 10_000
 const DEFAULT_RECHECK: RecheckCfg = { dmRecheckDays: 7, dmRecheckMaxDays: 60 }
 
 const bump = (m: Record<string, number>, k: string) => {
@@ -124,181 +126,233 @@ export async function runCallReminders(d: RunDeps): Promise<RunResult> {
     if (!p) crewMemo.set(id, (p = d.memberCrewIds(id).catch(() => [])))
     return p
   }
-  // Interested lists are fetched only for an occurrence that a MY_CREWS member is due for and would not otherwise get.
-  const interestedMemo = new Map<string, Promise<Set<string>>>()
-  const interestedOf = (eventId: string) => {
-    let p = interestedMemo.get(eventId)
-    if (!p) {
-      interestedMemo.set(
-        eventId,
-        (p = d.interestedIds(eventId).catch(() => {
-          res.interestedFailed++
-          return new Set<string>()
-        })),
-      )
-    }
-    return p
-  }
-  const pairs: Array<{ pref: PrefLite; occ: CallOccurrence }> = []
+  type Pair = { pref: PrefLite; occ: CallOccurrence }
+  // Crew-matched pairs send first. A MY_CREWS member due for a call that is not their crew is only a candidate:
+  // the Interested lookup (Discord) happens after the crew sends, and only for pairs not already handled.
+  const matched: Pair[] = []
+  const candidates: Pair[] = []
   for (const occ of occurrences) {
     for (const pref of prefs) {
       if (!isDue(occ.startsAt, now, leadMsFor(pref, config.leadMinutes))) continue
       const mine = pref.calls === 'MY_CREWS' ? await crewsOf(pref.discordId) : []
-      if (wantsCrew(pref, occ.crewId, mine)) {
-        pairs.push({ pref, occ })
-      } else if (pref.calls === 'MY_CREWS' && (await interestedOf(occ.eventId)).has(pref.discordId)) {
-        pairs.push({ pref, occ })
-        res.viaInterested++
-      }
+      if (wantsCrew(pref, occ.crewId, mine)) matched.push({ pref, occ })
+      else if (pref.calls === 'MY_CREWS') candidates.push({ pref, occ })
     }
   }
-  res.due = pairs.length
-  if (dryRun || !pairs.length) return res
+  const everyone = [...matched, ...candidates]
+  if (!everyone.length) return res
 
-  const memberIds = [...new Set(pairs.map((p) => p.pref.discordId))]
-  // Pairs a previous run already dealt with: skipped without further reads (this run happens every minute).
-  const handled = await d.store.handledCalls(memberIds, [...new Set(pairs.map((p) => p.occ.refKey))])
+  const memberIds = [...new Set(everyone.map((p) => p.pref.discordId))]
+  // Pairs a previous run already dealt with are dropped before anything else (this run happens every minute):
+  // not counted, no reach reads, no Interested lookup.
+  const handled = await d.store.handledCalls(memberIds, [...new Set(everyone.map((p) => p.occ.refKey))])
+  const open = (list: Pair[]) => list.filter((p) => !handled.has(`${p.pref.discordId}|${p.occ.refKey}`))
+  const pending = open(matched)
+  const pendingCandidates = open(candidates)
+  res.due = pending.length
+
+  // Interested lookups: one per event, sequential, bounded (see interested.ts) and by a total budget for the run.
+  const deadline = Date.now() + INTERESTED_BUDGET_MS
+  const interestedPairs = async (): Promise<Pair[]> => {
+    const byEvent = new Map<string, Pair[]>()
+    for (const c of pendingCandidates) byEvent.set(c.occ.eventId, [...(byEvent.get(c.occ.eventId) ?? []), c])
+    const out: Pair[] = []
+    for (const [eventId, list] of byEvent) {
+      let ids: Set<string>
+      if (Date.now() > deadline) {
+        res.interestedFailed++
+        continue
+      }
+      try {
+        ids = await d.interestedIds(eventId)
+      } catch {
+        res.interestedFailed++
+        continue
+      }
+      out.push(...list.filter((c) => ids.has(c.pref.discordId)))
+    }
+    res.due += out.length
+    res.viaInterested += out.length
+    return out
+  }
+
+  if (dryRun) {
+    if (pendingCandidates.length) await interestedPairs()
+    return res
+  }
+
   const sentToday = await d.store.sentSince(memberIds, new Date(now.getTime() - DAY_MS))
   const sameEvent = await d.store.sentForEventsSince(
     memberIds,
-    [...new Set(pairs.map((p) => p.occ.eventId))],
+    [...new Set(everyone.map((p) => p.occ.eventId))],
     new Date(now.getTime() - SAME_EVENT_WINDOW_MS),
   )
   const recheck = config.telegramRecheck ?? DEFAULT_RECHECK
   let first = true
 
-  for (const { pref, occ } of pairs) {
-    if (res.sent >= config.maxSendsPerRun) {
-      res.stoppedEarly = true
-      break
-    }
-    const id = pref.discordId
-    if (handled.has(`${id}|${occ.refKey}`)) {
-      bump(res.skipped, 'already')
-      continue
-    }
-    const want = channelsOf(pref)
-
-    // Discord: closed DMs get one attempt, then quiet until the backoff passes.
-    const reach = want.discord ? await d.getReach(id) : null
-    const discordOk = want.discord && canTryDm(reach, now)
-    if (want.discord && !discordOk) bump(res.skipped, 'dm_closed')
-    // Telegram: needs a linked account the bot can reach, and the sender configured.
-    let tg: { telegramId: string } | null = null
-    if (want.telegram) {
-      if (!telegramSendAllowed(d.env)) bump(res.skipped, 'telegram_off')
-      else {
-        const acct = await d.getTelegram(id).catch(() => null)
-        if (!acct) bump(res.skipped, 'telegram_no_link')
-        else if (!canTryTelegram(acct.reach, now)) bump(res.skipped, 'telegram_unreachable')
-        else tg = acct
+  /** Send one batch of pairs. True when the run must stop (Discord rate limit). */
+  const sendPairs = async (list: Pair[]): Promise<boolean> => {
+    for (const { pref, occ } of list) {
+      if (res.sent >= config.maxSendsPerRun) {
+        res.stoppedEarly = true
+        return false
       }
-    }
-    if (!discordOk && !tg) continue
-    // Daily cap, all reminder kinds together.
-    const cap = capDecision(sentToday.get(id) ?? [], now, config.maxPerMemberPerDay)
-    if (!cap.ok) {
-      bump(res.skipped, 'cap')
-      continue
-    }
-    // A moved call already reminded for: one DM per event until the "time changed" correction exists.
-    if (sameEvent.has(`${id}|${occ.eventId}`)) {
-      bump(res.skipped, 'same_event')
-      continue
-    }
-    const claim = await d.store.claimCall(id, occ.refKey)
-    if (!claim.claimed) {
-      bump(res.skipped, 'already')
-      continue
-    }
+      const id = pref.discordId
+      const want = channelsOf(pref)
 
-    if (!first) await d.sleep(PACE_MS)
-    first = false
-
-    const settingsUrl = await d.settingsUrl(id).catch(() => null)
-    const sentVia: string[] = []
-    let discordClosed = false
-    let retry: { code: string; countAttempt: boolean } | null = null
-    let failCode: string | null = null
-
-    if (discordOk) {
-      const text = callReminderText({ crewLabel: occ.crewLabel, startsAt: occ.startsAt, guildId: d.guildId, eventId: occ.eventId })
-      const outcome = await deliverDm({ discordId: id, text, components: callReminderComponents(settingsUrl), send: d.send })
-      switch (outcome.kind) {
-        case 'sent':
-          sentVia.push('discord')
-          await d.setOk(id, now).catch(() => undefined)
-          break
-        case 'closed':
-          discordClosed = true
-          await d.setClosed(id, reach, now).catch(() => undefined)
-          break
-        case 'rate_limited':
-          // Nothing was posted (Discord goes first): put it back for the next run and stop this one.
-          await d.store.release(id, occ.refKey, 'rate_limited', claim.attempts, false)
-          res.stoppedEarly = true
-          return res
-        case 'retry':
-          retry = { code: outcome.code, countAttempt: true }
-          break
-        case 'failed':
-          failCode = outcome.code
-          break
+      // Discord: closed DMs get one attempt, then quiet until the backoff passes.
+      const reach = want.discord ? await d.getReach(id) : null
+      let discordOk = want.discord && canTryDm(reach, now)
+      // Telegram: needs a linked account the bot can reach, and the sender configured.
+      let tg: { telegramId: string } | null = null
+      let tgSkip: string | null = null
+      if (want.telegram) {
+        if (!telegramSendAllowed(d.env)) tgSkip = 'telegram_off'
+        else {
+          const acct = await d.getTelegram(id).catch(() => null)
+          if (!acct) tgSkip = 'telegram_no_link'
+          else if (!canTryTelegram(acct.reach, now)) tgSkip = 'telegram_unreachable'
+          else tg = acct
+        }
       }
-    }
-
-    let telegramUnreachable = false
-    if (tg) {
-      const outcome = await deliverTelegram({
-        telegramUserId: tg.telegramId,
-        text: callReminderTelegramText({ crewLabel: occ.crewLabel, startsAt: occ.startsAt, now, guildId: d.guildId, eventId: occ.eventId }),
-        buttons: callReminderTelegramButtons(settingsUrl),
-        idempotencyKey: telegramKeyFor(occ.refKey, id),
-        send: d.sendTelegram,
-      })
-      switch (outcome.kind) {
-        case 'sent':
-          sentVia.push('telegram')
-          // A replayed answer is old news: never let it overwrite fresher reach information.
-          if (!outcome.replay) await d.recordTelegramReach(tg.telegramId, 'ok', recheck, now).catch(() => undefined)
-          break
-        case 'unreachable':
-          telegramUnreachable = true
-          if (!outcome.replay) await d.recordTelegramReach(tg.telegramId, outcome.code, recheck, now).catch(() => undefined)
-          break
-        case 'retry':
-          retry = { code: outcome.code, countAttempt: (retry?.countAttempt ?? false) || outcome.countAttempt }
-          break
-        case 'failed':
-          failCode = failCode ?? outcome.code
-          break
+      if (!discordOk && !tg) {
+        // Neither channel can be tried: count why (one reason per channel asked for).
+        if (want.discord) bump(res.skipped, 'dm_closed')
+        if (tgSkip) bump(res.skipped, tgSkip)
+        continue
       }
-    }
+      // Daily cap, all reminder kinds together.
+      const cap = capDecision(sentToday.get(id) ?? [], now, config.maxPerMemberPerDay)
+      if (!cap.ok) {
+        bump(res.skipped, 'cap')
+        continue
+      }
+      // A moved call already reminded for: one DM per event until the "time changed" correction exists.
+      if (sameEvent.has(`${id}|${occ.eventId}`)) {
+        bump(res.skipped, 'same_event')
+        continue
+      }
+      const claim = await d.store.claimCall(id, occ.refKey)
+      if (!claim.claimed) {
+        bump(res.skipped, 'already')
+        continue
+      }
+      // Discord already delivered on an earlier run and only Telegram is left (same idempotency key).
+      const telegramOnly = claim.telegramOnly === true
+      if (telegramOnly) discordOk = false
+      if (telegramOnly && !tg) {
+        // Telegram is not tryable now: put it back as it was and look again next run.
+        await d.store.markPartial(id, occ.refKey, 'discord', 'telegram_unavailable')
+        continue
+      }
 
-    if (sentVia.length) {
-      // Any channel delivering is a send: a partial success is never retried (it could double-post).
-      await d.store.markSent(id, occ.refKey, 'CALL', sentVia.join(','))
-      sentToday.set(id, [...(sentToday.get(id) ?? []), now])
-      res.sent++
-      if (sentVia.includes('telegram')) res.sentTelegram++
-    } else if (retry) {
-      if (retry.countAttempt && claim.attempts + 1 >= MAX_ATTEMPTS) {
-        await d.store.markFailed(id, occ.refKey, retry.code)
+      if (!first) await d.sleep(PACE_MS)
+      first = false
+
+      const settingsUrl = await d.settingsUrl(id).catch(() => null)
+      const sentVia: string[] = telegramOnly ? ['discord'] : []
+      let discordClosed = false
+      let retry: { code: string; countAttempt: boolean } | null = null
+      let telegramRetry = false
+      let failCode: string | null = null
+
+      if (discordOk) {
+        const text = callReminderText({ crewLabel: occ.crewLabel, startsAt: occ.startsAt, guildId: d.guildId, eventId: occ.eventId })
+        const outcome = await deliverDm({ discordId: id, text, components: callReminderComponents(settingsUrl), send: d.send })
+        switch (outcome.kind) {
+          case 'sent':
+            sentVia.push('discord')
+            await d.setOk(id, now).catch(() => undefined)
+            break
+          case 'closed':
+            discordClosed = true
+            await d.setClosed(id, reach, now).catch(() => undefined)
+            break
+          case 'rate_limited':
+            // Nothing was posted (Discord goes first): put it back for the next run and stop this one.
+            await d.store.release(id, occ.refKey, 'rate_limited', claim.attempts, false)
+            res.stoppedEarly = true
+            return true
+          case 'retry':
+            retry = { code: outcome.code, countAttempt: true }
+            break
+          case 'failed':
+            failCode = outcome.code
+            break
+        }
+      }
+
+      let telegramUnreachable = false
+      if (tg) {
+        const outcome = await deliverTelegram({
+          telegramUserId: tg.telegramId,
+          text: callReminderTelegramText({ crewLabel: occ.crewLabel, startsAt: occ.startsAt, now, guildId: d.guildId, eventId: occ.eventId }),
+          buttons: callReminderTelegramButtons(settingsUrl),
+          idempotencyKey: telegramKeyFor(occ.refKey, id),
+          send: d.sendTelegram,
+        })
+        switch (outcome.kind) {
+          case 'sent':
+            sentVia.push('telegram')
+            // A replayed answer is old news: never let it overwrite fresher reach information.
+            if (!outcome.replay) await d.recordTelegramReach(tg.telegramId, 'ok', recheck, now).catch(() => undefined)
+            break
+          case 'unreachable':
+            telegramUnreachable = true
+            if (!outcome.replay) await d.recordTelegramReach(tg.telegramId, outcome.code, recheck, now).catch(() => undefined)
+            break
+          case 'retry':
+            // Telegram definitely sent nothing (rate limited or the proxy was unavailable): safe to try again.
+            telegramRetry = true
+            retry = retry ?? { code: outcome.code, countAttempt: false }
+            break
+          case 'failed':
+            failCode = failCode ?? outcome.code
+            break
+        }
+      }
+
+      const delivered = sentVia.length > 0
+      if (delivered && telegramRetry) {
+        // Discord delivered, Telegram has to wait: keep the pair open for a Telegram-only retry on a later run.
+        await d.store.markPartial(id, occ.refKey, sentVia.join(','), retry!.code)
+        if (!telegramOnly) {
+          sentToday.set(id, [...(sentToday.get(id) ?? []), now])
+          res.sent++
+        }
+        res.retried++
+      } else if (delivered) {
+        // Any channel delivering is a send: a partial success is never retried (it could double-post).
+        await d.store.markSent(id, occ.refKey, 'CALL', sentVia.join(','))
+        if (!telegramOnly) {
+          sentToday.set(id, [...(sentToday.get(id) ?? []), now])
+          res.sent++
+        }
+        if (sentVia.includes('telegram')) res.sentTelegram++
+      } else if (retry) {
+        if (retry.countAttempt && claim.attempts + 1 >= MAX_ATTEMPTS) {
+          await d.store.markFailed(id, occ.refKey, retry.code)
+          res.failed++
+        } else {
+          await d.store.release(id, occ.refKey, retry.code, claim.attempts, retry.countAttempt)
+          res.retried++
+        }
+      } else if (failCode) {
+        await d.store.markFailed(id, occ.refKey, failCode)
         res.failed++
       } else {
-        await d.store.release(id, occ.refKey, retry.code, claim.attempts, retry.countAttempt)
-        res.retried++
+        // Every chosen channel answered "cannot reach": quiet until its backoff passes.
+        const code = discordClosed ? 'dm_closed' : telegramUnreachable ? 'telegram_unreachable' : 'unreachable'
+        await d.store.markSkipped(id, occ.refKey, code)
+        bump(res.skipped, code)
       }
-    } else if (failCode) {
-      await d.store.markFailed(id, occ.refKey, failCode)
-      res.failed++
-    } else {
-      // Every chosen channel answered "cannot reach": quiet until its backoff passes.
-      const code = discordClosed ? 'dm_closed' : telegramUnreachable ? 'telegram_unreachable' : 'unreachable'
-      await d.store.markSkipped(id, occ.refKey, code)
-      bump(res.skipped, code)
     }
+    return false
   }
+
+  if (await sendPairs(pending)) return res
+  if (res.stoppedEarly || !pendingCandidates.length) return res
+  await sendPairs(await interestedPairs())
   return res
 }
 

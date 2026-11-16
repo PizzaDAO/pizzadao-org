@@ -60,7 +60,18 @@ export async function loadPrefsView(discordId: string): Promise<PrefsView> {
   return { calls, leadMinutes, channel, telegramLinked: !!tg, proposals: !!row && (row.proposalOpened || row.proposalClosing), dmClosed: reach?.state === 'CLOSED' }
 }
 
+/** A request the member cannot have: `telegram_not_linked` (Telegram chosen without a linked account). */
+export class PrefsError extends Error {
+  constructor(readonly code: 'telegram_not_linked') {
+    super(code)
+  }
+}
+
 export async function savePrefs(discordId: string, body: z.infer<typeof prefsBody>): Promise<PrefsView> {
+  if (body.channel === 'TELEGRAM' || body.channel === 'BOTH') {
+    const tg = await prisma.telegramAccount.findUnique({ where: { discordId }, select: { id: true } })
+    if (!tg) throw new PrefsError('telegram_not_linked')
+  }
   if (body.calls !== undefined) {
     await prisma.reminderPref.upsert({
       where: { discordId },

@@ -53,7 +53,7 @@ export type TelegramSender = (a: { telegramUserId: string; text: string; buttons
 export type TelegramOutcome =
   | { kind: 'sent'; replay: boolean }
   | { kind: 'unreachable'; code: 'not_started' | 'blocked'; replay: boolean }
-  | { kind: 'retry'; code: string; countAttempt: boolean }
+  | { kind: 'retry'; code: string }
   | { kind: 'failed'; code: string }
 
 /** The Telegram idempotency key of one call reminder: hashed, so no member id appears in the proxy's logs. */
@@ -61,13 +61,13 @@ export const telegramKeyFor = (refKey: string, discordId: string): string =>
   `rm:${createHash('sha256').update(`reminder:call:${refKey}:${discordId}`).digest('hex').slice(0, 40)}`
 
 /**
- * One Telegram DM and what its outcome means. The idempotency key makes a retry after an uncertain answer a replay,
- * never a second message.
+ * One Telegram DM and what its outcome means. The proxy remembers the idempotency key and replays its answer
+ * (including `uncertain`) for it, so an uncertain answer is final for Telegram: retrying the same key would only
+ * repeat it. Only answers that definitely sent nothing are retried.
  *
  *   not_started / blocked          -> 'unreachable' (record the reach; not retried now)
- *   rate_limited / unavailable     -> 'retry' without using an attempt (nothing was sent)
- *   uncertain                      -> 'retry' (the replay answers if it was delivered)
- *   bad_request / not_configured   -> 'failed'
+ *   rate_limited / unavailable     -> 'retry' (nothing was sent; the same key is still free)
+ *   uncertain / bad_request / not_configured -> 'failed'
  */
 export async function deliverTelegram(o: { telegramUserId: string; text: string; buttons?: TelegramButton[][]; idempotencyKey: string; send?: TelegramSender }): Promise<TelegramOutcome> {
   const send = o.send ?? sendDm
@@ -75,7 +75,7 @@ export async function deliverTelegram(o: { telegramUserId: string; text: string;
   try {
     r = await send({ telegramUserId: o.telegramUserId, text: o.text, buttons: o.buttons, idempotencyKey: o.idempotencyKey })
   } catch {
-    return { kind: 'retry', code: 'uncertain', countAttempt: true }
+    return { kind: 'failed', code: 'uncertain' }
   }
   if (r.ok) return { kind: 'sent', replay: !!r.replay }
   const code: DmFailureCode = r.code
@@ -85,9 +85,7 @@ export async function deliverTelegram(o: { telegramUserId: string; text: string;
       return { kind: 'unreachable', code, replay: !!r.replay }
     case 'rate_limited':
     case 'unavailable':
-      return { kind: 'retry', code, countAttempt: false }
-    case 'uncertain':
-      return { kind: 'retry', code, countAttempt: true }
+      return { kind: 'retry', code }
     default:
       return { kind: 'failed', code }
   }

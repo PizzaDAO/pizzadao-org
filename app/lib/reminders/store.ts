@@ -21,9 +21,11 @@ export interface ReminderStore {
   /** One query: the "<discordId>|<refKey>" call pairs that cannot be claimed now (sent, claimed, skipped, failed, out of attempts), so a per-minute run skips them without further reads. */
   handledCalls(discordIds: readonly string[], refKeys: readonly string[]): Promise<Set<string>>
   /** Claim (member, kind, refKey) before sending. False when it already exists (sent, claimed, skipped, failed) and is not due a retry. */
-  claimCall(discordId: string, refKey: string, kind?: SendKind): Promise<{ claimed: boolean; attempts: number }>
+  claimCall(discordId: string, refKey: string, kind?: SendKind): Promise<{ claimed: boolean; attempts: number; /** Discord already delivered; only Telegram is left. */ telegramOnly?: boolean }>
   /** `channel` records which channels delivered ("discord", "telegram" or "discord,telegram"). */
   markSent(discordId: string, refKey: string, kind?: SendKind, channel?: string): Promise<void>
+  /** Discord delivered but Telegram has to be retried (rate limited or unavailable): status RETRY_TG, claimed again by a later run for Telegram only. */
+  markPartial(discordId: string, refKey: string, channel: string, code: string): Promise<void>
   markSkipped(discordId: string, refKey: string, code: string, kind?: SendKind): Promise<void>
   /** Release the claim for the next run. `countAttempt` false keeps the attempt count (a rate limit is not the message's fault). */
   release(discordId: string, refKey: string, code: string, attempts: number, countAttempt: boolean, kind?: SendKind): Promise<void>
@@ -43,7 +45,7 @@ export const prismaStore: ReminderStore = {
       where: { discordId: { in: [...discordIds] }, kind: 'CALL', refKey: { in: [...refKeys] } },
       select: { discordId: true, refKey: true, status: true, attempts: true },
     })
-    for (const r of rows) if (r.status !== 'RETRY' || r.attempts >= MAX_ATTEMPTS) out.add(`${r.discordId}|${r.refKey}`)
+    for (const r of rows) if (r.status !== 'RETRY_TG' && (r.status !== 'RETRY' || r.attempts >= MAX_ATTEMPTS)) out.add(`${r.discordId}|${r.refKey}`)
     return out
   },
 
@@ -87,13 +89,21 @@ export const prismaStore: ReminderStore = {
       where: { discordId, kind, refKey, status: 'RETRY', attempts: { lt: MAX_ATTEMPTS } },
       data: { status: 'CLAIMED' },
     })
-    if (won.count !== 1) return { claimed: false, attempts: 0 }
+    if (won.count !== 1) {
+      // A Discord-delivered row waiting on Telegram: exactly one run takes it, for Telegram only.
+      const tg = await prisma.reminderSend.updateMany({ where: { discordId, kind, refKey, status: 'RETRY_TG' }, data: { status: 'CLAIMED' } })
+      return tg.count === 1 ? { claimed: true, attempts: 0, telegramOnly: true } : { claimed: false, attempts: 0 }
+    }
     const row = await prisma.reminderSend.findUnique({ where: { discordId_kind_refKey: { discordId, kind, refKey } }, select: { attempts: true } })
     return { claimed: true, attempts: row?.attempts ?? 0 }
   },
 
   async markSent(discordId, refKey, kind = 'CALL', channel) {
     await prisma.reminderSend.updateMany({ where: { discordId, kind, refKey }, data: { status: 'SENT', code: null, ...(channel ? { channel } : {}) } })
+  },
+
+  async markPartial(discordId, refKey, channel, code) {
+    await prisma.reminderSend.updateMany({ where: { discordId, kind: 'CALL', refKey }, data: { status: 'RETRY_TG', channel, code } })
   },
 
   async markSkipped(discordId, refKey, code, kind = 'CALL') {

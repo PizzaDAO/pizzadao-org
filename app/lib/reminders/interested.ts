@@ -5,8 +5,8 @@
  */
 const API = 'https://discord.com/api/v10'
 const PAGE = 100
-/** A guild event with this many interested members is far beyond ours; stop paging there. */
-const MAX_PAGES = 20
+/** Bounded so a slow Discord cannot stall a run that sends every minute: 3 pages of 100, 3s each. Beyond that, crews only. */
+const MAX_PAGES = 3
 
 export async function fetchInterestedUserIds(
   eventId: string,
@@ -22,7 +22,7 @@ export async function fetchInterestedUserIds(
     const qs: string = `limit=${PAGE}${after ? `&after=${after}` : ''}`
     const res: Response = await (o.fetchImpl ?? fetch)(`${API}/guilds/${guild}/scheduled-events/${encodeURIComponent(eventId)}/users?${qs}`, {
       headers: { Authorization: `Bot ${token}` },
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(3000),
     })
     if (!res.ok) throw new Error(`Discord event users HTTP ${res.status}`)
     const rows = (await res.json()) as Array<{ user?: { id?: string } }>

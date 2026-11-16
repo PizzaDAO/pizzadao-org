@@ -45,7 +45,7 @@ function fakeStore(prefs: PrefLite[]) {
       const out = new Set<string>()
       for (const [k, v] of rows) {
         const [d, ...rest] = k.split('|')
-        if (ids.includes(d) && refs.includes(rest.join('|')) && (v.status !== 'RETRY' || v.attempts >= MAX_ATTEMPTS)) out.add(k)
+        if (ids.includes(d) && refs.includes(rest.join('|')) && v.status !== 'RETRY_TG' && (v.status !== 'RETRY' || v.attempts >= MAX_ATTEMPTS)) out.add(k)
       }
       return out
     },
@@ -59,9 +59,14 @@ function fakeStore(prefs: PrefLite[]) {
         row.status = 'CLAIMED'
         return { claimed: true, attempts: row.attempts }
       }
+      if (row.status === 'RETRY_TG') {
+        row.status = 'CLAIMED'
+        return { claimed: true, attempts: 0, telegramOnly: true }
+      }
       return { claimed: false, attempts: 0 }
     },
     markSent: async (d, r, _k, channel) => void Object.assign(rows.get(key(d, r))!, { status: 'SENT', at: now, channel }),
+    markPartial: async (d, r, channel, code) => void Object.assign(rows.get(key(d, r))!, { status: 'RETRY_TG', channel, code }),
     markSkipped: async (d, r, code) => void Object.assign(rows.get(key(d, r))!, { status: 'SKIPPED', code }),
     release: async (d, r, code, attempts, count) => void Object.assign(rows.get(key(d, r))!, { status: 'RETRY', code, attempts: count ? attempts + 1 : attempts }),
     markFailed: async (d, r, code) => void Object.assign(rows.get(key(d, r))!, { status: 'FAILED', code }),
@@ -299,6 +304,33 @@ describe('calls I am attending (Interested)', () => {
     expect(r.sent).toBe(3)
   })
 
+  it('handled pairs are not counted and not looked up; crew sends do not wait for the lookup', async () => {
+    const order: string[] = []
+    const interestedIds = vi.fn(async () => {
+      order.push('lookup')
+      return new Set(['m3'])
+    })
+    const send = vi.fn(async (to: string) => {
+      order.push(`send:${to}`)
+      return { channelId: 'c', messageId: 'm' }
+    })
+    const store = fakeStore([my('m1'), my('m2'), my('m3')])
+    // m1 already got the event e2 on an earlier run.
+    await store.claimCall('m1', occ('e2', 'ops').refKey)
+    await store.markSent('m1', occ('e2', 'ops').refKey)
+    const { d } = deps({ store, occs: [occ('e2', 'ops'), occ()], interestedIds, send, memberCrewIds: async () => [] })
+    const r = await runCallReminders(d)
+    expect(interestedIds).toHaveBeenCalledTimes(1)
+    expect(r.viaInterested).toBe(1)
+    // Community call to all three (m1 handled for e2 only), then the Interested send to m3 last.
+    expect(order[order.length - 1]).toBe('send:m3')
+    expect(order.indexOf('lookup')).toBeGreaterThan(order.indexOf('send:m1'))
+    // A second run: every handled pair is dropped before counting (only m2, not interested, is looked up again).
+    const r2 = await runCallReminders({ ...d, now: new Date(now.getTime() + 60_000) })
+    expect(r2).toMatchObject({ due: 0, viaInterested: 0, sent: 0 })
+    expect(r2.skipped.already).toBeUndefined()
+  })
+
   it('does not ask Discord when nobody is MY_CREWS, or when the call is already theirs by crew', async () => {
     const interestedIds = vi.fn(async () => new Set<string>())
     await runCallReminders(deps({ prefs: [pref('m1', 'COMMUNITY')], occs: [occ('e2', 'ops')], interestedIds }).d)
@@ -398,15 +430,42 @@ describe('Telegram delivery', () => {
     expect([...ns.store.rows.values()][0]).toMatchObject({ status: 'SKIPPED', code: 'telegram_unreachable' })
   })
 
-  it('an uncertain Telegram answer with nothing delivered is retried under the same key, then given up', async () => {
+  it('an uncertain Telegram answer is final for Telegram (the proxy replays it for that key): failed, no retries', async () => {
     const sendTelegram = vi.fn(async (): Promise<DmResult> => ({ ok: false, code: 'uncertain' }))
     const { d, store } = deps({ prefs: [tgPref('m1', 'TELEGRAM')], env: PROD_TG, linked: { m1: null }, sendTelegram })
-    expect((await runCallReminders(d)).retried).toBe(1)
-    expect((await runCallReminders(d)).retried).toBe(1)
     expect((await runCallReminders(d)).failed).toBe(1)
-    expect([...store.rows.values()][0].status).toBe('FAILED')
+    expect([...store.rows.values()][0]).toMatchObject({ status: 'FAILED', code: 'uncertain' })
+    await runCallReminders({ ...d, now: new Date(now.getTime() + 60_000) })
+    expect(sendTelegram).toHaveBeenCalledTimes(1)
+  })
+
+  it('Discord delivered but Telegram rate limited: only Telegram is retried later, with the same key', async () => {
+    let tgAnswer: DmResult = { ok: false, code: 'rate_limited', retryAfter: 5 }
+    const sendTelegram = vi.fn(async (): Promise<DmResult> => tgAnswer)
+    const { d, store } = deps({ prefs: [tgPref('m1', 'BOTH')], env: PROD_TG, linked: { m1: null }, sendTelegram })
+    const r1 = await runCallReminders(d)
+    expect(r1).toMatchObject({ sent: 1, retried: 1 })
+    expect([...store.rows.values()][0]).toMatchObject({ status: 'RETRY_TG', channel: 'discord' })
+    tgAnswer = { ok: true, messageId: 2 }
+    const r2 = await runCallReminders({ ...d, now: new Date(now.getTime() + 60_000) })
+    expect(d.send).toHaveBeenCalledTimes(1)
+    expect(sendTelegram).toHaveBeenCalledTimes(2)
     const keys = sendTelegram.mock.calls.map((c) => (c as unknown as [{ idempotencyKey: string }])[0].idempotencyKey)
     expect(new Set(keys).size).toBe(1)
+    expect(r2).toMatchObject({ sent: 0, sentTelegram: 1 })
+    expect([...store.rows.values()][0]).toMatchObject({ status: 'SENT', channel: 'discord,telegram' })
+    // Done: later minutes do nothing.
+    await runCallReminders({ ...d, now: new Date(now.getTime() + 120_000) })
+    expect(sendTelegram).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not count dm_closed when Telegram then delivers', async () => {
+    const send = vi.fn(async () => {
+      throw new DiscordPostError('Cannot send messages to this user', 403)
+    })
+    const { d } = deps({ prefs: [tgPref('m1', 'BOTH')], env: PROD_TG, linked: { m1: null }, send })
+    const r = await runCallReminders(d)
+    expect(r.skipped.dm_closed).toBeUndefined()
   })
 
   it('a Telegram rate limit does not use up an attempt or stop the run', async () => {

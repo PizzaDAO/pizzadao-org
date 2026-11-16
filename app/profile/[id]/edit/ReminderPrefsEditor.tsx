@@ -34,18 +34,26 @@ export function ReminderPrefsEditor() {
 
     useEffect(() => {
         let alive = true;
-        fetch("/api/reminder-prefs")
-            .then((r) => (r.ok ? r.json() : null))
-            .then((j) => {
-                if (!alive) return;
-                if (j && typeof j.calls === "string") setPrefs(j);
-                else setLoadError(true);
-            })
-            .catch(() => {
-                if (alive) setLoadError(true);
-            });
+        const load = () =>
+            fetch("/api/reminder-prefs")
+                .then((r) => (r.ok ? r.json() : null))
+                .then((j) => {
+                    if (!alive) return;
+                    if (j && typeof j.calls === "string") {
+                        setPrefs(j);
+                        setLoadError(false);
+                    } else setLoadError(true);
+                })
+                .catch(() => {
+                    if (alive) setLoadError(true);
+                });
+        void load();
+        // Linking Telegram happens elsewhere on this page (or in another tab): pick up telegramLinked on return.
+        const onFocus = () => void load();
+        window.addEventListener("focus", onFocus);
         return () => {
             alive = false;
+            window.removeEventListener("focus", onFocus);
         };
     }, []);
 

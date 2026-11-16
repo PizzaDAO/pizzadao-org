@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireSession } from '@/app/lib/auth-guards'
 import { rejectUnsafeWrite } from '@/app/lib/admin-guard'
 import { internalError } from '@/app/lib/errors/error-response'
-import { loadPrefsView, prefsBody, savePrefs } from '@/app/lib/reminders/prefs'
+import { loadPrefsView, PrefsError, prefsBody, savePrefs } from '@/app/lib/reminders/prefs'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -34,6 +34,7 @@ export async function POST(req: NextRequest) {
   try {
     return NextResponse.json(await savePrefs(auth.session.discordId, parsed.data))
   } catch (err) {
+    if (err instanceof PrefsError) return NextResponse.json({ error: 'Link your Telegram account first', code: err.code }, { status: 400 })
     return internalError(err, 'reminder-prefs POST', "Couldn't save reminder settings")
   }
 }
