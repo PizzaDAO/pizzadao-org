@@ -1181,7 +1181,7 @@ dont:  [all caps, corporate jargon]`}
 
             <div className="mt-8 grid grid-cols-12 gap-2 md:mt-10 md:gap-3">
               <figure className="relative col-span-12 overflow-hidden rounded-2xl bg-ink sm:col-span-6 lg:col-span-5 lg:row-span-2">
-                <Image sizes="(min-width: 768px) 50vw, 100vw"
+                <Image sizes="(min-width: 1024px) 83vw, (min-width: 640px) 94vw, 187vw"
                   src={wildProjection}
                   alt="PizzaDAO Mafia characters projected on a giant LED wall above a crowd"
                   width={1920}

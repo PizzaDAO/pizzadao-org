@@ -43,6 +43,17 @@ const SLOTS: Slot[] = [
   { col: "md:col-start-10", span: "md:col-span-3",  row: "md:row-span-2", aspect: "aspect-[3/4]",   drift: 0.06, tone: "mono",    offset: 50, z: 2, tilt: 0.5 },
 ];
 
+// The archive photos are remote (about 3:2 landscape). object-cover in a taller slot renders them wider
+// than the slot, so size the request for the cover-scaled width, not the slot width.
+const ASSUMED_PHOTO_RATIO = 3 / 2;
+const slotSizes = (slot: Slot) => {
+  const span = Number(slot.span.match(/col-span-(\d+)/)?.[1] ?? 12);
+  const [w, h] = slot.aspect.match(/\[(\d+)\/(\d+)\]/)?.slice(1).map(Number) ?? [3, 2];
+  const k = Math.max(1, ASSUMED_PHOTO_RATIO / (w / h));
+  const vw = (n: number) => `${Math.round(n * k)}vw`;
+  return `(min-width: 768px) ${vw((span / 12) * 100)}, ${vw(100)}`;
+};
+
 const toneClass = (t?: Slot["tone"]) => {
   switch (t) {
     case "warm":
@@ -218,7 +229,7 @@ const ArchivalFrame = ({ photo, slot, index, onOpen }: FrameProps) => {
         className={`relative overflow-hidden bg-ink ${slot.aspect}`}
       >
 
-        <Image sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw" width={1600} height={1200}
+        <Image sizes={slotSizes(slot)} width={1600} height={1200}
           key={current.src}
           src={current.src}
           alt={`${current.city}, ${current.country} - PizzaDAO gathering`}
@@ -228,7 +239,7 @@ const ArchivalFrame = ({ photo, slot, index, onOpen }: FrameProps) => {
           className={`absolute inset-0 h-full w-full object-cover transition-transform duration-[1600ms] ease-out group-hover:scale-[1.025] ${filter}`}
         />
         {incoming && (
-          <Image sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw" width={1600} height={1200}
+          <Image sizes={slotSizes(slot)} width={1600} height={1200}
             key={incoming.src}
             src={incoming.src}
             alt=""

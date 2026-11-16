@@ -11,6 +11,8 @@ const img07 = "/marketing/assets/partners/activation-07.png";
 type Frame = {
   src: string;
   alt: string;
+  /** Source width / height, used to size the request for the object-cover crop. */
+  ratio: number;
   city: string;
   year: string;
   type: string;
@@ -21,14 +23,22 @@ type Frame = {
   yOffset: number;
 };
 
+// Frames are 64% / 42% / one-seventh of the strip wide, in a 4/5 box. A landscape source is cropped by
+// object-cover and renders at box height x source ratio, so size the request for that, not the box width.
+const frameSizes = (ratio: number) => {
+  const k = Math.max(1, ratio / (4 / 5));
+  const vw = (n: number) => `${Math.round(n * k)}vw`;
+  return `(min-width: 768px) ${vw(16)}, (min-width: 640px) ${vw(42)}, ${vw(64)}`;
+};
+
 const FRAMES: Frame[] = [
-  { src: img03, alt: "Stand With Crypto activation night crowd in pixel pizza glasses.", city: "New York",   year: "'24", type: "Brand activation", ref: "PL.03", rotate: "-rotate-[0.8deg]",  yOffset: 0  },
-  { src: img04, alt: "Guests sharing pizza at a pink-themed brand activation.",          city: "Miami",      year: "'24", type: "Brand activation", ref: "PL.04", rotate: "rotate-[0.6deg]",   yOffset: 14 },
-  { src: img02, alt: "Pixel-glasses portrait, slice in hand, night light.",              city: "Berlin",     year: "'23", type: "Chapter night",    ref: "PL.02", rotate: "-rotate-[0.5deg]",  yOffset: 6  },
-  { src: img01, alt: "Chapter holding decorated pies in front of a red storefront.",     city: "Buenos Aires", year: "'24", type: "Chapter meet",   ref: "PL.01", rotate: "rotate-[0.7deg]",   yOffset: 22 },
-  { src: img06, alt: "Pizzaiolo holding a fresh margherita by a tiled oven.",            city: "San Francisco", year: "'23", type: "Partner moment",   ref: "PL.06", rotate: "-rotate-[0.6deg]",  yOffset: 8  },
-  { src: img05, alt: "Four people backstage holding slices, smiling.",                   city: "Los Angeles", year: "'24", type: "Brand activation",ref: "PL.05", rotate: "rotate-[0.5deg]",   yOffset: 18 },
-  { src: img07, alt: "Team posing on a red carpet at the World Pizza Games.",            city: "Las Vegas",  year: "'24", type: "Partner moment",   ref: "PL.07", rotate: "-rotate-[0.4deg]",  yOffset: 2  },
+  { src: img03, ratio: 3 / 2, alt: "Stand With Crypto activation night crowd in pixel pizza glasses.", city: "New York",   year: "'24", type: "Brand activation", ref: "PL.03", rotate: "-rotate-[0.8deg]",  yOffset: 0  },
+  { src: img04, ratio: 3 / 2, alt: "Guests sharing pizza at a pink-themed brand activation.",          city: "Miami",      year: "'24", type: "Brand activation", ref: "PL.04", rotate: "rotate-[0.6deg]",   yOffset: 14 },
+  { src: img02, ratio: 3 / 2, alt: "Pixel-glasses portrait, slice in hand, night light.",              city: "Berlin",     year: "'23", type: "Chapter night",    ref: "PL.02", rotate: "-rotate-[0.5deg]",  yOffset: 6  },
+  { src: img01, ratio: 3 / 2, alt: "Chapter holding decorated pies in front of a red storefront.",     city: "Buenos Aires", year: "'24", type: "Chapter meet",   ref: "PL.01", rotate: "rotate-[0.7deg]",   yOffset: 22 },
+  { src: img06, ratio: 1080 / 1267, alt: "Pizzaiolo holding a fresh margherita by a tiled oven.",            city: "San Francisco", year: "'23", type: "Partner moment",   ref: "PL.06", rotate: "-rotate-[0.6deg]",  yOffset: 8  },
+  { src: img05, ratio: 16 / 9, alt: "Four people backstage holding slices, smiling.",                   city: "Los Angeles", year: "'24", type: "Brand activation",ref: "PL.05", rotate: "rotate-[0.5deg]",   yOffset: 18 },
+  { src: img07, ratio: 4 / 3, alt: "Team posing on a red carpet at the World Pizza Games.",            city: "Las Vegas",  year: "'24", type: "Partner moment",   ref: "PL.07", rotate: "-rotate-[0.4deg]",  yOffset: 2  },
 ];
 
 // Consistent warm/monochrome-ish grade applied to every frame
@@ -98,7 +108,7 @@ const PartnerActivations = () => {
                   data-benny="true"
                   className="relative overflow-hidden bg-ink/5 shadow-[0_14px_30px_-18px_hsl(0_0%_0%/0.40),0_2px_5px_-2px_hsl(0_0%_0%/0.18)] ring-1 ring-ink/10"
                 >
-                  <Image sizes="(min-width: 1024px) 25vw, 50vw" width={800} height={1000}
+                  <Image sizes={frameSizes(f.ratio)} width={800} height={1000}
                     src={f.src}
                     alt={f.alt}
                     loading="lazy"

@@ -57,7 +57,7 @@ const Hero = () => {
         {/* Contained hero image */}
         <figure className="mt-12 md:mt-16">
           <div className="relative overflow-hidden rounded-2xl" data-benny="true">
-            <Image sizes="(min-width: 1280px) 1200px, 100vw" preload
+            <Image sizes="(min-width: 1280px) 1334px, (min-width: 768px) 112vw, 240vw" quality={85} preload
               src={heroCrowd}
               alt="A packed Bitcoin Pizza Day crowd glowing under amber stage lights at a global PizzaDAO event"
               className="block aspect-[3/4] w-full object-cover md:aspect-[16/10]"

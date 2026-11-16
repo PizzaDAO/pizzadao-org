@@ -95,6 +95,8 @@ const nextConfig: NextConfig = {
     // Phone-first widths: most visitors are on mobile, so keep the small steps dense.
     deviceSizes: [360, 480, 640, 768, 1024, 1280, 1536, 1920],
     imageSizes: [32, 48, 64, 96, 128, 192, 256, 384],
+    // 75 is the default; 85 is for the full-bleed heroes and the ritual photo, where the crop magnifies the image.
+    qualities: [75, 85],
     // Optimized variants rarely change; cache them for 30 days at the edge/browser.
     minimumCacheTTL: 60 * 60 * 24 * 30,
   },
