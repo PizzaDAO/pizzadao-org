@@ -27,6 +27,7 @@ import { ContributionsBlock } from "../../ui/profile/ContributionsBlock";
 import { PassportBlock } from "../../ui/profile/PassportBlock";
 import { CollectionsLazy } from "../../ui/profile/CollectionsLazy";
 import { AttendanceCard } from "../../ui/attendance-card";
+import { useSession } from "../../lib/hooks/use-session";
 import { useProfileSummary, type ProfileSummaryData } from "../../lib/hooks/use-api";
 import { norm } from "../../lib/strings";
 import { DisavowChip } from "../../disavow/_components/DisavowChip";
@@ -53,7 +54,19 @@ export function ProfileClient({ id, disavowWarning = null, buddyRecognition = nu
     const searchParams = useSearchParams();
     const asVisitor = searchParams?.get("as") === "visitor";
 
-    const { data, isLoading, error } = useProfileSummary(id, initialSummary);
+    const { data, isLoading, error, dataUpdatedAt } = useProfileSummary(id, initialSummary);
+    // The server-prefilled summary carries no viewer. Resolve who is looking from the session (fired
+    // on mount in parallel with the summary, shared with the nav) or from the refetched summary,
+    // whichever lands first. undefined = still unknown: never show the signed-out CTA for that.
+    const { data: session } = useSession();
+    const summaryHasViewer = dataUpdatedAt > 0;
+    const viewerId: string | null | undefined = session
+        ? session.authenticated
+            ? session.memberId
+            : null
+        : summaryHasViewer
+          ? (data?.viewerId ?? null)
+          : undefined;
 
     if (isLoading) {
         return (
@@ -116,7 +129,7 @@ export function ProfileClient({ id, disavowWarning = null, buddyRecognition = nu
         );
     }
 
-    const mode = data.isOwner && !asVisitor ? "owner-readonly" : "public";
+    const mode = !!viewerId && viewerId === id && !asVisitor ? "owner-readonly" : "public";
     const isOwner = mode === "owner-readonly";
 
     const crewOptions: CrewOption[] = (data.crewOptions as unknown[]).map((c) => {
@@ -155,7 +168,7 @@ export function ProfileClient({ id, disavowWarning = null, buddyRecognition = nu
                     mafiaRank={data.hero.mafiaRank?.tier ?? null}
                     memberSince={data.hero.memberSince ?? null}
                     mode={mode}
-                    viewerId={data.viewerId}
+                    viewerId={viewerId}
                     suppressOwnerBanner={asVisitor}
                 />
 
