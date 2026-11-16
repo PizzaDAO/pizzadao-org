@@ -79,6 +79,45 @@ export interface UpdatesDeps {
 export interface ScriptSection {
   key: UpdateSectionKey | 'intro' | 'outro'
   lines: string[]
+  /** Announcements only: chat messages (text + link) to post in the call's chat, once, when the section plays. */
+  chatPosts?: string[]
+}
+
+/** Hosts an announcement's chat link may point to: our own domains (and their subdomains). */
+export const CHAT_LINK_HOSTS = ['pizzadao.org', 'rsv.pizza'] as const
+export const CHAT_POST_MAX_CHARS = 400
+
+const URL_RE = /\bhttps:\/\/[^\s<>|]+/i
+
+export function isAllowedChatHost(hostname: string): boolean {
+  const h = hostname.toLowerCase().replace(/\.$/, '')
+  return CHAT_LINK_HOSTS.some((d) => h === d || h.endsWith(`.${d}`))
+}
+
+/**
+ * The chat post for an announcement line that carries one https link (anywhere in the line, or after " | "):
+ * "👉 <text without the link> <link>". Null when there is no link or it is not on an allowed host.
+ */
+export function chatPostFor(line: string): string | null {
+  const m = URL_RE.exec(line)
+  if (!m) return null
+  const link = m[0].replace(/[.,;:!?)\]]+$/, '')
+  let url: URL
+  try {
+    url = new URL(link)
+  } catch {
+    return null
+  }
+  if (url.protocol !== 'https:' || url.username || url.password || !isAllowedChatHost(url.hostname)) return null
+  const text = line
+    .replace(URL_RE, ' ')
+    .replace(/\s+\|\s*$/, '')
+    .replace(/[\u0000-\u001f\u007f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const room = CHAT_POST_MAX_CHARS - link.length - 4
+  const body = text.length > room ? `${text.slice(0, Math.max(0, room - 1)).trimEnd()}…` : text
+  return `👉 ${body ? `${body} ` : ''}${link}`
 }
 
 export type ScriptResult =
@@ -189,6 +228,7 @@ export async function buildUpdatesScript(crewId: string, settings: UpdatesSettin
 
     const last = wants('last-call') || wants('task-changes') ? await deps.lastCall(crew.id).catch(() => null) : null
     const sections = new Map<UpdateSectionKey, string[]>()
+    const chatPosts = new Map<UpdateSectionKey, string[]>()
 
     // 1. From last call. Skipped when redactions are newer than the summary.
     if (wants('last-call') && last && !last.redactionsStale) {
@@ -259,13 +299,15 @@ export async function buildUpdatesScript(crewId: string, settings: UpdatesSettin
 
     // 5. Admin announcements.
     if (wants('announcements') && settings.announcements.trim()) {
-      const lines = announcementLines(settings.announcements, crew, crews)
+      const items = announcementLines(settings.announcements, crew, crews)
         .filter((l) => !blocked(l))
-        .map((l) => say(l))
-        .filter(Boolean)
+        .map((l) => ({ spoken: say(l), chat: chatPostFor(l) }))
+        .filter((i) => i.spoken)
         .slice(0, MAX_ANNOUNCEMENTS)
-        .map((l) => (/[.!?…]$/.test(l) ? l : `${l}.`))
+      const lines = items.map((i) => (/[.!?…]$/.test(i.spoken) ? i.spoken : `${i.spoken}.`))
       if (lines.length) sections.set('announcements', lines)
+      const posts = items.map((i) => i.chat).filter((c): c is string => !!c)
+      if (posts.length) chatPosts.set('announcements', posts)
     }
 
     // Intro and outro: a command phrase would let an echo trigger the voice commands, so fall back to the defaults.
@@ -293,15 +335,17 @@ export async function buildUpdatesScript(crewId: string, settings: UpdatesSettin
         { key: 'intro', lines: [intro] },
         ...keys.map((k, i) => {
           const lines = sections.get(k)!
+          const posts = chatPosts.get(k)
+          const extra = posts ? { chatPosts: posts } : {}
           const r = rolls[order.indexOf(k)]
-          if (i === 0 || !pool.length || !r.hit || used >= limit) return { key: k, lines }
+          if (i === 0 || !pool.length || !r.hit || used >= limit) return { key: k, lines, ...extra }
           const choices = pool.filter((l) => l !== prev)
-          if (!choices.length) return { key: k, lines }
+          if (!choices.length) return { key: k, lines, ...extra }
           const lead = choices[Math.min(choices.length - 1, Math.floor(r.pick * choices.length))]
           used++
           usedLeadIns = used
           prev = lead
-          return { key: k, lines: [`${lead} ${lines[0]}`, ...lines.slice(1)] }
+          return { key: k, lines: [`${lead} ${lines[0]}`, ...lines.slice(1)], ...extra }
         }),
         { key: 'outro', lines: [outro] },
       ]

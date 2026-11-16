@@ -137,7 +137,7 @@ export const CALL_UPDATES_SETTINGS = {
   'calls.updatesAnnouncements': text({
     key: 'calls.updatesAnnouncements',
     label: 'Updates: announcements',
-    help: 'One announcement per line, read near the end (at most 3 per call). Start a line with "Crew name: " to read it only on that crew\'s call. Plain text: links, emoji and mentions are removed. Keep private matters out of this list: it is spoken in the voice channel.',
+    help: 'One announcement per line, read near the end (at most 3 per call). Start a line with "Crew name: " to read it only on that crew\'s call. Spoken text is plain: links, emoji and mentions are removed. To also post a sign-up link in the call chat, put one https link in the line (anywhere, or after " | "), e.g. "Buddy system is back, pair up with another member | https://pizzadao.org/dashboard#buddy": the link is not read aloud, and Metalhead posts "👉 <the text> <link>" in the call chat when the updates start (first run of a call only). Only pizzadao.org (and its subdomains) and rsv.pizza links are posted. Keep private matters out of this list: it is spoken in the voice channel.',
     maxLength: 1000,
     multiline: true,
     default: '',

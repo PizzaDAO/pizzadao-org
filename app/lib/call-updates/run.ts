@@ -83,6 +83,8 @@ export interface RunDeps {
   store: RunStore
   /** One line in the voice channel's chat. Must not throw. */
   announce: (channelId: string, text: string) => Promise<void>
+  /** A link post (announcement). Must not throw. Optional so older fakes keep working. */
+  chatLink?: (channelId: string, text: string) => Promise<void>
 }
 
 const isUniqueViolation = (err: unknown) => typeof err === 'object' && err !== null && (err as { code?: string }).code === 'P2002'
@@ -119,6 +121,17 @@ export async function announceInChannel(channelId: string, text: string, env: Re
   }
 }
 
+/** A link post in the call's chat (no length clip: the link must survive). Never pings; failures are logged only. */
+export async function postChatLink(channelId: string, text: string, env: Record<string, string | undefined> = process.env): Promise<void> {
+  const botToken = env.DISCORD_BOT_TOKEN?.trim()
+  if (!botToken || env.VERCEL_ENV !== 'production') return
+  try {
+    await postDiscordMessage({ kind: 'bot', channelId, botToken }, { content: text, allowed_mentions: { parse: [] } })
+  } catch (err) {
+    console.error('[call-updates] chat link failed:', err instanceof Error ? err.message : String(err))
+  }
+}
+
 export function defaultRunDeps(env: Record<string, string | undefined> = process.env): RunDeps {
   return {
     settings: loadSettings,
@@ -128,6 +141,7 @@ export function defaultRunDeps(env: Record<string, string | undefined> = process
     speaker: defaultSpeaker(env),
     store: prismaRunStore,
     announce: (channelId, text) => announceInChannel(channelId, text, env),
+    chatLink: (channelId, text) => postChatLink(channelId, text, env),
   }
 }
 
@@ -177,6 +191,13 @@ export async function startUpdates(call: CallRef, o: { trigger: 'command' | 'aut
   try {
     const r = await deps.speaker.play({ channelId: call.channelId, clips, ifBusy: 'queue', pauseMaxMs: settings.get('calls.updatesPauseMaxMinutes') * 60_000 })
     await finish(r.status === 'skipped' ? 'skipped' : r.status, r.reason)
+    // Announcement links go to the call's chat once: only on the first run of the call (seq 0, so a
+    // replay does not repeat them), only when playback was accepted, and a failed post is silent.
+    if (r.status !== 'skipped' && claimed.seq === 0 && deps.chatLink) {
+      for (const text of script.sections.flatMap((s) => s.chatPosts ?? [])) {
+        await deps.chatLink(call.channelId, text).catch(() => undefined)
+      }
+    }
     // Log the hash and counts only, never the text.
     console.log(`[call-updates] ${r.status} crew=${call.crewId} hash=${script.hash} sections=${script.sections.length} est=${script.estSeconds}s dropped=${script.dropped.length}`)
     return { status: r.status, ...(r.reason ? { reason: r.reason } : {}), estSeconds: script.estSeconds, sections: script.sections.length }

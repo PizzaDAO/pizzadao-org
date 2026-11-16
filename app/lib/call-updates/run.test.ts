@@ -98,6 +98,22 @@ describe('startUpdates', () => {
     expect(JSON.stringify(d.store.rows)).not.toContain('Automated call updates')
   })
 
+  it('posts announcement links once, on the first run only, and a failed post is silent', async () => {
+    const withLink: ScriptResult = { ...SCRIPT, sections: [...SCRIPT.sections.slice(0, 2), { key: 'announcements', lines: ['Buddy.'], chatPosts: ['👉 Buddy https://pizzadao.org/dashboard#buddy'] }] }
+    const chatLink = vi.fn(async () => {
+      throw new Error('boom')
+    })
+    const d = deps({ build: vi.fn(async () => withLink), chatLink })
+    expect((await startUpdates(CALL, START, d)).status).toBe('playing')
+    expect(chatLink).toHaveBeenCalledTimes(1)
+    expect(chatLink).toHaveBeenCalledWith(CALL.channelId, '👉 Buddy https://pizzadao.org/dashboard#buddy')
+    await startUpdates(CALL, START, d) // a replay
+    expect(chatLink).toHaveBeenCalledTimes(1)
+    const skipped = deps({ build: vi.fn(async () => withLink), chatLink, speaker: speaker({ play: vi.fn(async () => ({ status: 'skipped' as const })) }) })
+    await startUpdates(CALL, START, skipped)
+    expect(chatLink).toHaveBeenCalledTimes(1)
+  })
+
   it('refuses while the switch is off (and never builds or renders)', async () => {
     const d = deps({ settings: async () => settings({ 'calls.updatesEnabled': false }) })
     expect(await startUpdates(CALL, START, d)).toEqual({ status: 'skipped', reason: 'disabled' })

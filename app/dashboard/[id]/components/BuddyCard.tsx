@@ -60,15 +60,26 @@ export function BuddyCard({ initial }: { initial?: BuddyState | null }) {
         }
     }
 
+    // The card appears after /api/buddy/me answers, so the browser's own #buddy jump has nothing to land
+    // on yet: scroll to it once it renders.
+    const rendered = !!state?.enabled;
+    useEffect(() => {
+        if (rendered && typeof window !== "undefined" && window.location.hash === "#buddy") {
+            document.getElementById("buddy")?.scrollIntoView({ block: "start" });
+        }
+    }, [rendered]);
+
     if (!state?.enabled) return null;
     const pairs = state.pairs ?? [];
     const profile = state.profile;
     const showOptIn = (state.eligible && !profile?.active) || profile?.active;
     const tr = state.recognitionEnabled ? state.traineeRecognition : null;
-    if (!showOptIn && pairs.length === 0 && !tr) return null;
+    // Below the minimum level: still render a short note so a #buddy link does not land on nothing.
+    const locked = !state.eligible && !profile?.active && pairs.length === 0 && !tr && typeof state.minLevel === "number";
+    if (!showOptIn && pairs.length === 0 && !tr && !locked) return null;
 
     return (
-        <section data-testid="buddy-card" className="my-5 rounded-2xl border border-[hsl(var(--rule-warm)/0.55)] p-5" aria-label="Buddy">
+        <section id="buddy" data-testid="buddy-card" className="my-5 scroll-mt-24 rounded-2xl border border-[hsl(var(--rule-warm)/0.55)] p-5" aria-label="Buddy">
             <p className="overline">Buddy</p>
             {pairs.map((p) => (
                 <div key={p.id} className="mt-3">
@@ -94,6 +105,7 @@ export function BuddyCard({ initial }: { initial?: BuddyState | null }) {
                 </div>
             ))}
 
+            {locked ? <p className="mt-3 text-sm text-foreground/80">Buddies help new members find their feet. Being a buddy unlocks at level {state.minLevel}.</p> : null}
             {state.eligible && !profile?.active ? (
                 <div className="mt-3">
                     <p className="text-sm text-foreground/80">You can help a new member find their feet. Be a buddy: an admin pairs you with a trainee.</p>

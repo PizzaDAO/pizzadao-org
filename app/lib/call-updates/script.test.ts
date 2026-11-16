@@ -4,6 +4,7 @@ import { EMPTY_POST_FILTER, type PostFilter } from '@/app/lib/calls/post-filters
 import {
   announcementLines,
   buildUpdatesScript,
+  chatPostFor,
   estimateSeconds,
   parseLeadIns,
   parseSections,
@@ -303,5 +304,27 @@ describe('parseLeadIns', () => {
   it('drops empty, long, command and duplicate lines; caps at 20 lines', () => {
     expect(parseLeadIns('Cowabunga!\n\nMetalhead, stop\n' + 'x'.repeat(41) + '\nCowabunga!\nMolto bene!')).toEqual(['Cowabunga!', 'Molto bene!'])
     expect(parseLeadIns(Array.from({ length: 30 }, (_, i) => `Dude ${i}`).join('\n'))).toHaveLength(20)
+  })
+})
+
+describe('announcement chat links', () => {
+  it('chatPostFor: link anywhere or after a pipe, own domains only', () => {
+    expect(chatPostFor('Buddy system is back | https://pizzadao.org/dashboard#buddy')).toBe('👉 Buddy system is back https://pizzadao.org/dashboard#buddy')
+    expect(chatPostFor('Sign up at https://rsv.pizza/x now')).toBe('👉 Sign up at now https://rsv.pizza/x')
+    expect(chatPostFor('Join https://app.pizzadao.org/y.')).toBe('👉 Join https://app.pizzadao.org/y')
+    expect(chatPostFor('No link here')).toBeNull()
+    expect(chatPostFor('Bad https://evil.example/x')).toBeNull()
+    expect(chatPostFor('Bad https://pizzadao.org.evil.example/x')).toBeNull()
+    expect(chatPostFor('Bad http://pizzadao.org/x')).toBeNull()
+    expect(chatPostFor('Bad https://user@pizzadao.org/x')).toBeNull()
+  })
+
+  it('speaks the text without the link and carries the chat post (crew prefix removed)', async () => {
+    const r = await buildUpdatesScript('ops', { ...baseSettings, announcements: 'Ops Crew: Buddy system is back | https://pizzadao.org/dashboard#buddy\nElsewhere https://evil.example/z' }, deps())
+    if (r.kind !== 'script') throw new Error('no script')
+    const ann = r.sections.find((s) => s.key === 'announcements')!
+    expect(ann.lines.join(' ')).not.toMatch(/https|pizzadao\.org/)
+    expect(ann.lines[0]).toBe('Buddy system is back.')
+    expect(ann.chatPosts).toEqual(['👉 Buddy system is back https://pizzadao.org/dashboard#buddy'])
   })
 })
