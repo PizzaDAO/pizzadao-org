@@ -36,6 +36,7 @@ import {
   channelsOf,
   crewIdsFromCell,
   dueOccurrences,
+  eventIdOf,
   isDue,
   leadMsFor,
   wantsCrew,
@@ -152,8 +153,8 @@ export async function runCallReminders(d: RunDeps): Promise<RunResult> {
   res.due = pending.length
 
   // Interested lookups: one per event, sequential, bounded (see interested.ts) and by a total budget for the run.
-  const deadline = Date.now() + INTERESTED_BUDGET_MS
   const interestedPairs = async (): Promise<Pair[]> => {
+    const deadline = Date.now() + INTERESTED_BUDGET_MS
     const byEvent = new Map<string, Pair[]>()
     for (const c of pendingCandidates) byEvent.set(c.occ.eventId, [...(byEvent.get(c.occ.eventId) ?? []), c])
     const out: Pair[] = []
@@ -187,6 +188,13 @@ export async function runCallReminders(d: RunDeps): Promise<RunResult> {
     [...new Set(everyone.map((p) => p.occ.eventId))],
     new Date(now.getTime() - SAME_EVENT_WINDOW_MS),
   )
+  const sameEventEarlier = (id: string, occ: CallOccurrence) => {
+    for (const k of sameEvent) {
+      const [d, ref] = [k.slice(0, k.indexOf('|')), k.slice(k.indexOf('|') + 1)]
+      if (d === id && eventIdOf(ref) === occ.eventId && ref !== occ.refKey) return true
+    }
+    return false
+  }
   const recheck = config.telegramRecheck ?? DEFAULT_RECHECK
   let first = true
 
@@ -227,8 +235,9 @@ export async function runCallReminders(d: RunDeps): Promise<RunResult> {
         bump(res.skipped, 'cap')
         continue
       }
-      // A moved call already reminded for: one DM per event until the "time changed" correction exists.
-      if (sameEvent.has(`${id}|${occ.eventId}`)) {
+      // A moved call already reminded for: one DM per event until the "time changed" correction exists. The same
+      // occurrence (a Telegram-only retry) is not a moved call.
+      if (sameEventEarlier(id, occ)) {
         bump(res.skipped, 'same_event')
         continue
       }

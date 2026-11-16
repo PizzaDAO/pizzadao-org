@@ -28,7 +28,7 @@ function fakeStore(prefs: PrefLite[]) {
       const out = new Map<string, Date[]>()
       for (const [k, v] of rows) {
         const d = k.split('|')[0]
-        if (v.status === 'SENT' && ids.includes(d) && v.at >= since) out.set(d, [...(out.get(d) ?? []), v.at])
+        if ((v.status === 'SENT' || v.status === 'RETRY_TG') && ids.includes(d) && v.at >= since) out.set(d, [...(out.get(d) ?? []), v.at])
       }
       return out
     },
@@ -37,7 +37,7 @@ function fakeStore(prefs: PrefLite[]) {
       for (const [k, v] of rows) {
         const [d, ref] = k.split('|')
         const e = ref.split(':')[0]
-        if (v.status === 'SENT' && ids.includes(d) && eventIds.includes(e) && v.at >= since) out.add(`${d}|${e}`)
+        if ((v.status === 'SENT' || v.status === 'RETRY_TG') && ids.includes(d) && eventIds.includes(e) && v.at >= since) out.add(`${d}|${ref}`)
       }
       return out
     },
@@ -131,9 +131,10 @@ describe('runCallReminders', () => {
   it('a moved call that was already reminded for does not DM again', async () => {
     const { d } = deps()
     await runCallReminders(d)
-    const moved = occ('e1', 'community_call', new Date(start.getTime() + 15 * 60_000))
-    await runCallReminders({ ...d, loadOccurrences: async () => [moved] })
+    const moved = occ('e1', 'community_call', new Date(start.getTime() + 5 * 60_000))
+    const r = await runCallReminders({ ...d, loadOccurrences: async () => [moved] })
     expect(d.send).toHaveBeenCalledTimes(1)
+    expect(r.skipped.same_event).toBe(1)
   })
 
   it('does nothing for members who did not opt in or do not want that crew', async () => {
@@ -457,6 +458,17 @@ describe('Telegram delivery', () => {
     // Done: later minutes do nothing.
     await runCallReminders({ ...d, now: new Date(now.getTime() + 120_000) })
     expect(sendTelegram).toHaveBeenCalledTimes(2)
+  })
+
+  it('a moved call does not DM Discord again while the earlier one waits on a Telegram retry', async () => {
+    const sendTelegram = vi.fn(async (): Promise<DmResult> => ({ ok: false, code: 'rate_limited', retryAfter: 5 }))
+    const { d, store } = deps({ prefs: [tgPref('m1', 'BOTH')], env: PROD_TG, linked: { m1: null }, sendTelegram })
+    await runCallReminders(d)
+    expect([...store.rows.values()][0]).toMatchObject({ status: 'RETRY_TG' })
+    const moved = occ('e1', 'community_call', new Date(start.getTime() + 5 * 60_000))
+    const r = await runCallReminders({ ...d, loadOccurrences: async () => [moved] })
+    expect(d.send).toHaveBeenCalledTimes(1)
+    expect(r.skipped.same_event).toBe(1)
   })
 
   it('does not count dm_closed when Telegram then delivers', async () => {

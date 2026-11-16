@@ -16,7 +16,7 @@ export interface ReminderStore {
   listCallPrefs(): Promise<PrefLite[]>
   /** Sends in the last 24 hours that count against the daily cap, per member (one entry per DM). */
   sentSince(discordIds: readonly string[], since: Date): Promise<Map<string, Date[]>>
-  /** One query: the "<discordId>|<eventId>" pairs already sent a call reminder (any start time) since `since`. */
+  /** One query: the "<discordId>|<refKey>" call reminders already delivered (SENT, or RETRY_TG: Discord went out) for these events since `since`. */
   sentForEventsSince(discordIds: readonly string[], eventIds: readonly string[], since: Date): Promise<Set<string>>
   /** One query: the "<discordId>|<refKey>" call pairs that cannot be claimed now (sent, claimed, skipped, failed, out of attempts), so a per-minute run skips them without further reads. */
   handledCalls(discordIds: readonly string[], refKeys: readonly string[]): Promise<Set<string>>
@@ -53,7 +53,8 @@ export const prismaStore: ReminderStore = {
     const out = new Map<string, Date[]>()
     if (!discordIds.length) return out
     const rows = await prisma.reminderSend.findMany({
-      where: { discordId: { in: [...discordIds] }, status: 'SENT', createdAt: { gte: since } },
+      // RETRY_TG: Discord did deliver, only Telegram is pending.
+      where: { discordId: { in: [...discordIds] }, status: { in: ['SENT', 'RETRY_TG'] }, createdAt: { gte: since } },
       select: { discordId: true, updatedAt: true },
     })
     for (const r of rows) out.set(r.discordId, [...(out.get(r.discordId) ?? []), r.updatedAt])
@@ -67,13 +68,13 @@ export const prismaStore: ReminderStore = {
       where: {
         discordId: { in: [...discordIds] },
         kind: 'CALL',
-        status: 'SENT',
+        status: { in: ['SENT', 'RETRY_TG'] }, // RETRY_TG: Discord did deliver
         updatedAt: { gte: since },
         OR: eventIds.map((e) => ({ refKey: { startsWith: `${e}:` } })),
       },
       select: { discordId: true, refKey: true },
     })
-    for (const r of rows) out.add(`${r.discordId}|${r.refKey.split(':')[0]}`)
+    for (const r of rows) out.add(`${r.discordId}|${r.refKey}`)
     return out
   },
 
