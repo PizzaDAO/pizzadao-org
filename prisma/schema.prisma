@@ -1585,6 +1585,15 @@ model CallLiveSession {
   @@index([endedAt, lastSeenAt])
 }
 
+// One call welcome per call occurrence, posted by the recorder in the voice channel chat. The row is the
+// claim (primary key = the occurrence key): it survives recorder restarts so the welcome is never posted
+// twice. Deleted only when the recorder reports the post failed. See app/lib/calls/welcome.ts.
+model CallWelcome {
+  occurrenceKey String   @id
+  sessionId     String?
+  createdAt     DateTime @default(now())
+}
+
 // One "we're live" announcement per call occurrence (the claim row: a second /live or the automatic
 // post finds it and does not post again). See app/lib/calls/live-announce.ts.
 model CallLiveAnnounce {

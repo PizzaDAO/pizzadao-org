@@ -63,6 +63,8 @@ export const liveStateSchema = z.object({
    * Absent (an older recorder) means recording. Once false it stays so for the session.
    */
   recording: z.boolean().optional(),
+  /** true: the recorder could not post the call welcome it was handed; the app frees the claim so it is handed out again. */
+  welcomeFailed: z.boolean().optional(),
 })
 export type LiveStateBody = z.infer<typeof liveStateSchema>
 
