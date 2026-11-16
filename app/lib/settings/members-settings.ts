@@ -34,7 +34,7 @@ const discordActivityShow: SettingDef<boolean> = {
   key: 'members.discordActivityShow',
   area: 'members',
   label: 'Show Discord activity on profiles',
-  help: 'Shows a "Discord activity" block (message count, active since, last active, active months and the most-used public channels) on member profiles and the hover card. Dates are shown to the month only; channels only if everyone in the server can see them. Off hides the block everywhere.',
+  help: 'Shows a "Discord activity" block (message count, active since, last active, active months and the most-used public channels) on member profiles and the hover card. Dates are shown to the month only; channels only if they are public (see the public-channel roles setting). Off hides the block everywhere.',
   schema: z.boolean(),
   default: true,
   onReadFailure: { value: true },
@@ -52,6 +52,17 @@ const discordActivityCount: SettingDef<boolean> = {
   input: { type: 'bool' },
 }
 
+const discordActivityPublicRoleIds: SettingDef<string> = {
+  key: 'members.discordActivityPublicRoleIds',
+  area: 'members',
+  label: 'Discord activity: public-channel roles',
+  help: 'One Discord role id per line: the role every verified member has. A channel counts as public (its name can show in a profile\'s top channels) if @everyone OR any of these roles can view it. Needed when @everyone cannot see channels and a base verified-member role is granted access instead. Empty means only channels @everyone can see. Takes effect within an hour.',
+  schema: z.string().max(500).refine((v) => v.split('\n').every((l) => l.trim() === '' || /^\d{15,25}$/.test(l.trim())), 'Use one numeric role id per line'),
+  default: '',
+  onReadFailure: { value: '' },
+  input: { type: 'text', multiline: true, maxLength: 500, placeholder: '123456789012345678' },
+}
+
 const discordActivityFlushSeconds: SettingDef<number> = {
   key: 'members.discordActivityFlushSeconds',
   area: 'members',
@@ -66,6 +77,7 @@ const discordActivityFlushSeconds: SettingDef<number> = {
 export const MEMBERS_SETTINGS = {
   'members.discordActivityShow': discordActivityShow,
   'members.discordActivityCount': discordActivityCount,
+  'members.discordActivityPublicRoleIds': discordActivityPublicRoleIds,
   'members.discordActivityFlushSeconds': discordActivityFlushSeconds,
   'members.nameReminderText': nameReminderText,
   'members.nameReminderCooldownDays': nameReminderCooldownDays,
