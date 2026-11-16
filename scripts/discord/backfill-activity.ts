@@ -17,6 +17,9 @@
  *            double count or miss messages.
  *   --until  the first live-counted message time from the recorder log. Messages before it are counted here.
  *
+ * Active days: each distinct day found counts as a new active day, except the --from day and the --until day (already
+ * counted by the old crawl and the live counter). The member's stored name is never replaced.
+ *
  * Needs DISCORD_BOT_TOKEN, DISCORD_GUILD_ID (and DATABASE_URL for --apply). The bot needs View Channel and
  * Read Message History; channels it cannot read are skipped. One request at a time with the rate-limit headers
  * and 429s honoured: about 100 messages per request. Run with Node 24. Do not run twice for the same window
@@ -47,10 +50,12 @@ async function main() {
 
   let aggregate: Agg
   let prefix: string
+  let countedDays: string[]
   if (inFile) {
-    const saved = JSON.parse(readFileSync(inFile, 'utf8')) as { prefix: string; users: Array<[string, unknown]> }
+    const saved = JSON.parse(readFileSync(inFile, 'utf8')) as { prefix: string; users: Array<[string, unknown]>; countedDays: string[] }
     aggregate = new Map(saved.users) as Agg
     prefix = saved.prefix
+    countedDays = saved.countedDays
     console.log(`loaded ${aggregate.size} members from ${inFile}`)
   } else {
     const fromMs = Date.parse(from!)
@@ -59,6 +64,8 @@ async function main() {
       console.error('--from and --until must be ISO times, from before until')
       process.exit(2)
     }
+    // Days the other two sources already counted as active: the old crawl's last day and the live counter's first day.
+    countedDays = [...new Set([new Date(fromMs).toISOString().slice(0, 10), new Date(untilMs).toISOString().slice(0, 10)])]
     const token = process.env.DISCORD_BOT_TOKEN
     const guildId = process.env.DISCORD_GUILD_ID
     if (!token || !guildId) {
@@ -70,7 +77,7 @@ async function main() {
     aggregate = out.aggregate
     prefix = `backfill-${new Date(fromMs).toISOString().replace(/\D/g, '').slice(0, 14)}-${new Date(untilMs).toISOString().replace(/\D/g, '').slice(0, 14)}`
     console.log(JSON.stringify({ mode: apply ? 'apply' : 'dry-run', members: aggregate.size, ...out.stats, seconds: Math.round((Date.now() - started) / 1000) }, null, 2))
-    if (outFile) writeFileSync(outFile, JSON.stringify({ prefix, users: [...aggregate.entries()] }))
+    if (outFile) writeFileSync(outFile, JSON.stringify({ prefix, countedDays, users: [...aggregate.entries()] }))
   }
 
   const batches = toBatches(aggregate, prefix)
@@ -88,7 +95,7 @@ async function main() {
     let applied = 0
     let duplicate = 0
     for (const b of batches) {
-      const r = await applyActivityBatch(b)
+      const r = await applyActivityBatch(b, { backfill: true, countedDays })
       if (r.status === 'applied') applied++
       else duplicate++
       console.log(`batch ${b.batchId}: ${r.status}`)

@@ -78,6 +78,22 @@ describe("mergeActivity", () => {
     expect(readMonthly(d.monthlyBreakdown).asArray).toBe(false)
   })
 
+  it("merges live names onto sanitized stored keys (one entry, no extra channelsActive)", () => {
+    const d = mergeActivity(row({ topChannels: [{ name: "pizza_talk", count: 10 }, { name: "__-pizza", count: 4 }] }), user({ channels: { "pizza talk": 2, "\u{1F355}-pizza": 1 } }), NOW)
+    expect(d.topChannels).toEqual([{ name: "pizza_talk", count: 12 }, { name: "__-pizza", count: 5 }])
+    expect(d.channelsActive).toBe(3)
+  })
+
+  it("backfill: every batch day is new except the already-counted ones; the name is not replaced", () => {
+    const u = user({ days: { "2026-04-20": 1, "2026-05-01": 2, "2026-05-02": 1, "2026-11-16": 1 } })
+    const d = mergeActivity(row({ lastSeen: new Date("2026-04-20T08:00:00Z") }), u, NOW, { backfill: true, countedDays: ["2026-04-20", "2026-11-16"] })
+    expect(d.activeDays).toBe(42)
+    expect(d.authorName).toBe("old")
+    // Out-of-order backfill into a row whose lastSeen is later still counts its days.
+    const later = mergeActivity(row({ lastSeen: new Date("2026-11-20T00:00:00Z") }), user({ days: { "2026-05-01": 1 } }), NOW, { backfill: true })
+    expect(later.activeDays).toBe(41)
+  })
+
   it("keeps only the top ten channels", () => {
     const channels = Object.fromEntries(Array.from({ length: 15 }, (_, i) => [`c${i}`, i + 1]))
     expect(mergeActivity(null, user({ channels }), NOW).topChannels).toHaveLength(10)
@@ -99,6 +115,7 @@ function fakeDb() {
   const rows = new Map<string, ActivityRow>()
   const batches = new Set<string>()
   const tx = {
+    $queryRaw: async () => [],
     discordActivity: {
       findMany: async (a: unknown) => {
         const ids = (a as { where: { discordId: { in: string[] } } }).where.discordId.in

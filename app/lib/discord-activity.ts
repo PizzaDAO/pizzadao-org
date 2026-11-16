@@ -62,6 +62,20 @@ export interface ActivityRow {
 
 export type ActivityData = Omit<ActivityRow, "discordId"> & { lastSyncedAt: Date }
 
+/**
+ * The key a channel is stored under in topChannels. The one-off history crawl sanitized names with
+ * /[^a-zA-Z0-9_-]/g -> "_" (no u flag: each UTF-16 unit of an emoji became one "_", spaces became "_").
+ * Everything (stored entries, live counts, backfill) is merged on this key so there is one entry per channel.
+ */
+export const channelKey = (name: string): string => name.replace(/[^a-zA-Z0-9_-]/g, "_")
+
+export interface MergeOptions {
+  /** Backfill: each distinct day counts as new except those in countedDays; the author name is never replaced. */
+  backfill?: boolean
+  /** UTC days (YYYY-MM-DD) already counted elsewhere (the old crawl's last day, the live counter's first day). */
+  countedDays?: readonly string[]
+}
+
 const isoDay = (d: Date) => d.toISOString().slice(0, 10)
 
 /** Monthly counts as a map, from either stored shape ([{month,count}] or {month: count}). */
@@ -101,7 +115,7 @@ export function readTopChannels(raw: unknown): Array<{ name: string; count: numb
  * - topChannels: counts are added by name and the top ten kept. A channel outside the stored top ten starts
  *   again from the live count, so the list is approximate for a quiet channel; the total is exact.
  */
-export function mergeActivity(existing: ActivityRow | null, u: ActivityUserBatch, now: Date): ActivityData {
+export function mergeActivity(existing: ActivityRow | null, u: ActivityUserBatch, now: Date, opts: MergeOptions = {}): ActivityData {
   const dayEntries = Object.entries(u.days).sort(([a], [b]) => (a < b ? -1 : 1))
   const added = dayEntries.reduce((n, [, c]) => n + c, 0)
   const firstAt = new Date(u.firstAt)
@@ -116,14 +130,21 @@ export function mergeActivity(existing: ActivityRow | null, u: ActivityUserBatch
   }
 
   const lastDay = existing ? isoDay(existing.lastSeen) : null
-  const newDays = dayEntries.filter(([d]) => lastDay === null || d > lastDay).length
+  const counted = new Set(opts.countedDays ?? [])
+  const newDays = opts.backfill
+    ? dayEntries.filter(([d]) => !counted.has(d)).length
+    : dayEntries.filter(([d]) => lastDay === null || d > lastDay).length
 
+  // One entry per channel key: stored names are re-keyed (idempotent), live names are keyed the same way.
   const top = readTopChannels(existing?.topChannels)
-  const byName = new Map(top.map((c) => [c.name, c.count]))
+  const byName = new Map<string, number>()
+  for (const c of top) byName.set(channelKey(c.name), (byName.get(channelKey(c.name)) ?? 0) + c.count)
+  const storedKeys = byName.size
   let newChannels = 0
   for (const [name, c] of Object.entries(u.channels)) {
-    if (!byName.has(name) && (!existing || top.length < TOP_CHANNELS_KEPT)) newChannels++
-    byName.set(name, (byName.get(name) ?? 0) + c)
+    const k = channelKey(name)
+    if (!byName.has(k) && (!existing || storedKeys < TOP_CHANNELS_KEPT)) newChannels++
+    byName.set(k, (byName.get(k) ?? 0) + c)
   }
   const topChannels = [...byName.entries()]
     .map(([name, count]) => ({ name, count }))
@@ -131,7 +152,7 @@ export function mergeActivity(existing: ActivityRow | null, u: ActivityUserBatch
     .slice(0, TOP_CHANNELS_KEPT)
 
   return {
-    authorName: u.authorName ?? existing?.authorName ?? null,
+    authorName: opts.backfill ? (existing?.authorName ?? u.authorName ?? null) : (u.authorName ?? existing?.authorName ?? null),
     totalMessages: (existing?.totalMessages ?? 0) + added,
     firstSeen: existing && existing.firstSeen < firstAt ? existing.firstSeen : firstAt,
     lastSeen: existing && existing.lastSeen > lastAt ? existing.lastSeen : lastAt,
@@ -153,6 +174,7 @@ export function mergeActivity(existing: ActivityRow | null, u: ActivityUserBatch
 
 /** The slice of Prisma used here (narrow so tests can fake it). */
 export interface ActivityTx {
+  $queryRaw(strings: TemplateStringsArray, ...values: unknown[]): Promise<unknown>
   discordActivity: {
     findMany(args: unknown): Promise<ActivityRow[]>
     upsert(args: unknown): Promise<unknown>
@@ -176,7 +198,7 @@ export type ApplyResult = { status: "applied"; users: number } | { status: "dupl
  */
 export async function applyActivityBatch(
   batch: ActivityBatch,
-  opts: { db?: ActivityDb; now?: () => Date } = {},
+  opts: { db?: ActivityDb; now?: () => Date; backfill?: boolean; countedDays?: readonly string[] } = {},
 ): Promise<ApplyResult> {
   const db = opts.db ?? (realPrisma as unknown as ActivityDb)
   const now = (opts.now ?? (() => new Date()))()
@@ -185,6 +207,9 @@ export async function applyActivityBatch(
   try {
     await db.$transaction(
       async (tx) => {
+        // One batch at a time across processes (backfill + live, two recorders during a deploy): increments are
+        // read-modify-write, so concurrent batches would lose counts. Released at commit.
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext('discord_activity'))`
         try {
           await tx.discordActivityBatch.create({ data: { id: batch.batchId, appliedAt: now } })
         } catch (e) {
@@ -195,7 +220,7 @@ export async function applyActivityBatch(
         const rows = await tx.discordActivity.findMany({ where: { discordId: { in: ids } } })
         const current = new Map(rows.map((r) => [r.discordId, r]))
         for (const u of batch.users) {
-          const data = mergeActivity(current.get(u.discordId) ?? null, u, now)
+          const data = mergeActivity(current.get(u.discordId) ?? null, u, now, { backfill: opts.backfill, countedDays: opts.countedDays })
           await tx.discordActivity.upsert({
             where: { discordId: u.discordId },
             create: { discordId: u.discordId, ...data },
@@ -212,7 +237,9 @@ export async function applyActivityBatch(
   }
   // Housekeeping, best effort.
   try {
-    await db.discordActivityBatch.deleteMany({ where: { appliedAt: { lt: new Date(now.getTime() - BATCH_ID_KEEP_DAYS * 86_400_000) } } })
+    await db.discordActivityBatch.deleteMany({
+      where: { appliedAt: { lt: new Date(now.getTime() - BATCH_ID_KEEP_DAYS * 86_400_000) }, NOT: { id: { startsWith: "backfill-" } } },
+    })
   } catch {
     // ignore
   }

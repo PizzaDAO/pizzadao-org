@@ -8,7 +8,7 @@
 import { prisma as realPrisma } from "./db"
 import { toggleEnabled } from "./settings/toggles"
 import { monthPrecisionIso } from "./member-since"
-import { readTopChannels } from "./discord-activity"
+import { channelKey, readTopChannels } from "./discord-activity"
 
 export interface PublicDiscordActivity {
   messages: number
@@ -31,29 +31,50 @@ interface GuildChannel {
   permission_overwrites?: Array<{ id: string; type: number; allow: string; deny: string }>
 }
 
+/** Channel key (see channelKey) -> the live display name, for keys that are public. */
+export type PublicChannels = Map<string, string>
+
 /**
- * Names of channels everyone in the server can see: @everyone's base permission, then the channel's
- * @everyone overwrite (deny, then allow). A name that also belongs to a channel @everyone cannot see
- * is left out (names are not unique, and the stored data has only the name).
+ * Channels everyone in the server can see: @everyone's base permission, then the channel's @everyone
+ * overwrite (deny, then allow). Keyed by channelKey (the stored names are sanitized); a key is public only
+ * when EVERY live channel with that key is public. Keys that match no live channel (e.g. threads and forum
+ * posts, which the old crawl stored as channels) are never public.
  */
-export function publicChannelNames(guildId: string, everyonePermissions: string, channels: GuildChannel[]): Set<string> {
+export function publicChannelNames(guildId: string, everyonePermissions: string, channels: GuildChannel[]): PublicChannels {
   const base = BigInt(everyonePermissions || "0")
-  const visible = new Set<string>()
+  const visible = new Map<string, string>()
   const hidden = new Set<string>()
   for (const ch of channels) {
     if (!ch.name || ch.type === undefined || !NAMED_TYPES.has(ch.type)) continue
     let perms = base
     const ow = ch.permission_overwrites?.find((o) => o.id === guildId && o.type === 0)
     if (ow) perms = (perms & ~BigInt(ow.deny || "0")) | BigInt(ow.allow || "0")
-    ;(perms & VIEW_CHANNEL ? visible : hidden).add(ch.name)
+    const key = channelKey(ch.name)
+    if (perms & VIEW_CHANNEL) {
+      if (!visible.has(key)) visible.set(key, ch.name)
+    } else hidden.add(key)
   }
-  for (const n of hidden) visible.delete(n)
+  for (const k of hidden) visible.delete(k)
   return visible
+}
+
+/** For the verification script: how many live channels each stored key maps to. */
+export function countKeyMatches(storedKeys: Iterable<string>, liveNames: string[]): { one: number; none: number; many: number } {
+  const live = new Map<string, number>()
+  for (const n of liveNames) live.set(channelKey(n), (live.get(channelKey(n)) ?? 0) + 1)
+  const out = { one: 0, none: 0, many: 0 }
+  for (const k of new Set([...storedKeys].map(channelKey))) {
+    const n = live.get(k) ?? 0
+    if (n === 0) out.none++
+    else if (n === 1) out.one++
+    else out.many++
+  }
+  return out
 }
 
 const CHANNEL_CACHE_MS = 60 * 60 * 1000
 const CHANNEL_RETRY_MS = 5 * 60 * 1000
-let channelCache: { at: number; names: Set<string> | null } | null = null
+let channelCache: { at: number; names: PublicChannels | null } | null = null
 
 /** Test hook. */
 export function clearPublicChannelCache() {
@@ -61,12 +82,12 @@ export function clearPublicChannelCache() {
 }
 
 /** The public channel names (cached one hour), or null when Discord cannot be read: show no names then. */
-export async function getPublicChannelNames(fetchImpl: typeof fetch = fetch): Promise<Set<string> | null> {
+export async function getPublicChannelNames(fetchImpl: typeof fetch = fetch): Promise<PublicChannels | null> {
   const now = Date.now()
   if (channelCache && now - channelCache.at < (channelCache.names ? CHANNEL_CACHE_MS : CHANNEL_RETRY_MS)) return channelCache.names
   const guildId = process.env.DISCORD_GUILD_ID
   const token = process.env.DISCORD_BOT_TOKEN
-  let names: Set<string> | null = null
+  let names: PublicChannels | null = null
   if (guildId && token) {
     try {
       const headers = { Authorization: `Bot ${token}` }
@@ -96,13 +117,15 @@ export interface PublicActivityRow {
 }
 
 /** Pure: the public shape of a row. `publicNames` null means channel names cannot be vetted: none shown. */
-export function toPublicActivity(row: PublicActivityRow, publicNames: Set<string> | null): PublicDiscordActivity {
-  const topChannels = publicNames
-    ? readTopChannels(row.topChannels)
-        .filter((c) => publicNames.has(c.name))
-        .slice(0, PUBLIC_TOP_CHANNELS)
-        .map((c) => c.name)
-    : []
+export function toPublicActivity(row: PublicActivityRow, publicNames: PublicChannels | null): PublicDiscordActivity {
+  const topChannels: string[] = []
+  if (publicNames) {
+    for (const c of readTopChannels(row.topChannels)) {
+      const shown = publicNames.get(channelKey(c.name))
+      if (shown && !topChannels.includes(shown)) topChannels.push(shown)
+      if (topChannels.length >= PUBLIC_TOP_CHANNELS) break
+    }
+  }
   return {
     messages: Math.max(0, Math.round(row.totalMessages)),
     since: monthPrecisionIso(row.firstSeen),
@@ -115,7 +138,7 @@ export function toPublicActivity(row: PublicActivityRow, publicNames: Set<string
 export interface PublicActivityDeps {
   findRow?: (discordId: string) => Promise<PublicActivityRow | null>
   show?: () => Promise<boolean>
-  channelNames?: () => Promise<Set<string> | null>
+  channelNames?: () => Promise<PublicChannels | null>
 }
 
 /** The member's public Discord activity, or null (switch off, no row, no messages, or any failure). Never throws. */

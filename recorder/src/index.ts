@@ -42,7 +42,7 @@ const client = new Client({
   // Deletes/edits of messages we did not cache still fire (as partials); cache few messages, and
   // drop them quickly: only the call channel's chat matters.
   partials: [...(cfg.captureVoiceChat ? [Partials.Message] : []), ...(cfg.followupDmForward ? [Partials.Channel] : [])],
-  makeCache: Options.cacheWithLimits({ ...Options.DefaultMakeCacheSettings, MessageManager: 50 }),
+  makeCache: Options.cacheWithLimits({ ...Options.DefaultMakeCacheSettings, MessageManager: cfg.captureVoiceChat ? 50 : 0 }),
   sweepers: { ...Options.DefaultSweeperSettings, messages: { interval: 300, lifetime: 1800 } },
 })
 

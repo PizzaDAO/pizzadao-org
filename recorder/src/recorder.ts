@@ -964,7 +964,7 @@ export class CallRecorder {
       const text = this.chatText(msg)
       if (!text) {
         // Without the MessageContent privileged intent Discord sends empty content.
-        if (!msg.attachments?.size && !this.warnedEmptyContent) {
+        if (this.cfg.captureVoiceChat && !msg.attachments?.size && !this.warnedEmptyContent) {
           this.warnedEmptyContent = true
           this.log('chat message arrived with empty content: is the MessageContent intent enabled in the Discord Developer Portal? Skipping empty messages.')
         }
