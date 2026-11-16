@@ -52,6 +52,9 @@ export const TOGGLES = {
   'calls.progressReportEnabled': { env: 'CALL_PROGRESS_ENABLED', legacy: ON_WORDS },
   'calls.liveAnnounceCommandEnabled': { env: 'CALL_LIVE_ANNOUNCE_COMMAND_ENABLED', legacy: ON_WORDS },
   'calls.liveAnnounceAutoEnabled': { env: 'CALL_LIVE_ANNOUNCE_AUTO_ENABLED', legacy: ON_WORDS },
+  'calls.startWelcomeEnabled': { env: 'CALL_START_WELCOME_ENABLED', legacy: ON_WORDS },
+  // On unless the env var is an explicit off: without a stream link the welcome still posts, minus the streaming sentence.
+  'calls.startWelcomeWithoutStream': { env: 'CALL_START_WELCOME_WITHOUT_STREAM_ENABLED', legacy: (raw) => !envKillsToggle(raw) },
   'calls.liveReminderEnabled': { env: 'CALL_LIVE_REMINDER_ENABLED', legacy: ON_WORDS },
   'calls.progressShowFollowups': { env: 'CALL_PROGRESS_FOLLOWUPS_ENABLED', legacy: ON_WORDS },
   // Off unless turned on: spoken call updates and their /metalhead command (plans/metalhead-reads-updates.md).

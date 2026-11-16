@@ -38,7 +38,7 @@ import { REMOTE_CONFIG_OFF, REMOTE_CONFIG_START_WAIT_MS, type RemoteConfig, type
 import type { SessionMeta } from './types.js'
 import { LiveItems, postLive, type LiveRequest } from './live-items.js'
 import { PlayOutListener, postPlayOut, type PlayOutAnswer } from './play-out.js'
-import { LiveStatePusher, postLiveState, type LiveStateBody, type PostResult } from './live-state.js'
+import { LiveStatePusher, postLiveState, type LiveStateBody, type PostReply, type PostResult } from './live-state.js'
 import { AfterRecordingTracker, liveContinuesAfter, occurrenceLive, occurrenceState, type AfterRecordingEnd } from './after-recording.js'
 
 const TICK_MS = 10_000
@@ -155,7 +155,7 @@ export class CallRecorder {
     /** Live action items request (tests inject it); default POSTs to the app. */
     private readonly livePost: ((body: LiveRequest) => Promise<string[]>) | null = null,
     /** Live-state heartbeat (tests inject it); default POSTs to the app. */
-    private readonly liveStatePost: ((body: LiveStateBody) => Promise<PostResult>) | null = null,
+    private readonly liveStatePost: ((body: LiveStateBody) => Promise<PostResult | PostReply>) | null = null,
     /** Play-out command check (tests inject it); default POSTs to the app. True = the command was given. */
     private readonly playOutCheck: ((body: LiveRequest) => Promise<PlayOutAnswer | null>) | null = null,
   ) {
@@ -509,7 +509,7 @@ export class CallRecorder {
         deferTarget: null,
         live,
         playOut,
-        liveState: this.liveStateFor(rc, { sessionId, eventId: event.id, eventName: event.name, channelId, startedAtMs }),
+        liveState: this.liveStateFor(rc, { sessionId, eventId: event.id, eventName: event.name, channelId, startedAtMs, channel }),
         eventSeenLive: false,
         tick: setInterval(() => this.serial(() => this.onTick()), TICK_MS),
       }
@@ -529,10 +529,13 @@ export class CallRecorder {
   }
 
   /** Live-state heartbeat for this call, or null (off). */
-  private liveStateFor(rc: RemoteConfig, o: { sessionId: string; eventId: string; eventName: string; channelId: string; startedAtMs: number }): LiveStatePusher | null {
+  private liveStateFor(rc: RemoteConfig, o: { sessionId: string; eventId: string; eventName: string; channelId: string; startedAtMs: number; channel: VoiceBasedChannel }): LiveStatePusher | null {
     if (!rc.liveView.enabled) return null
+    const { channel, ...rest } = o
     return new LiveStatePusher({
-      ...o,
+      ...rest,
+      // The call welcome (the app decides when: once the X stream is live) goes in the voice channel chat.
+      onWelcome: (content) => this.send(channel, content),
       pushSeconds: rc.liveView.pushSeconds,
       post: this.liveStatePost ?? ((body) => postLiveState(this.cfg.appBaseUrl, this.cfg.recorderApiKey, body, this.log)),
     })
@@ -971,7 +974,7 @@ export class CallRecorder {
       this.capturedChat.set(msg.id, s.dir)
       const atMs = Math.max(0, msg.createdTimestamp - s.meta.startedAtMs)
       appendRecord(s.dir, { t: 'chat', messageId: msg.id, userId: msg.author.id, displayName, text, atMs })
-      s.liveState?.onChat(text)
+      s.liveState?.onChat(text, msg.author.id)
       s.live?.onChat({ discordId: msg.author.id, displayName: displayName || null, messageId: msg.id, text, atMs })
     } catch (err) {
       this.log(`chat capture failed: ${err instanceof Error ? err.message : String(err)}`)
@@ -1182,6 +1185,6 @@ export class CallRecorder {
     const a = this.after.get(msg.channelId)
     if (!a || msg.author?.bot || msg.system) return
     const text = this.chatText(msg)
-    if (text) a.liveState.onChat(text)
+    if (text) a.liveState.onChat(text, msg.author?.id)
   }
 }

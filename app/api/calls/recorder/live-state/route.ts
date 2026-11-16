@@ -2,6 +2,7 @@ import { after, NextResponse } from 'next/server'
 import { liveTickForSession } from '@/app/lib/calls/live-announce-command'
 import { isRecorderAuthorized } from '@/app/lib/calls/recorder-auth'
 import { handleLiveState, liveStateSchema } from '@/app/lib/calls/live-state'
+import { welcomeForSessionId } from '@/app/lib/calls/welcome'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { ValidationError } from '@/app/lib/errors/api-errors'
 
@@ -29,5 +30,7 @@ export const POST = withErrorHandling(async (request: Request) => {
   if (out === 'off') return new NextResponse(null, { status: 204, headers: { 'Cache-Control': 'no-store' } })
   // The "we're live" announcement and its reminder ride on the heartbeat (each is off unless switched on).
   if (out === 'ok') after(() => liveTickForSession(parsed.data.sessionId))
-  return NextResponse.json({}, { headers: { 'Cache-Control': 'no-store' } })
+  // The call welcome rides on the heartbeat answer: the recorder posts it in the voice channel chat (once per call, once the stream is live).
+  const welcome = out === 'ok' ? await welcomeForSessionId(parsed.data.sessionId, { failed: parsed.data.welcomeFailed === true }) : null
+  return NextResponse.json(welcome ? { welcome } : {}, { headers: { 'Cache-Control': 'no-store' } })
 })

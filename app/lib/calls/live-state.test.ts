@@ -120,6 +120,17 @@ describe('handleLiveState', () => {
     expect(arg.data.presence).toEqual([{ discordId: '111111111111111', displayName: 'Ann', presentSec: 30, inChannel: true, leftAt: null }])
   })
 
+  it('stores a broadcast link as the welcome link only when a host posted it', async () => {
+    const link = 'https://x.com/i/broadcasts/abc'
+    const by = '222222222222222'
+    await handleLiveState(body({ chatBroadcast: { link, by } }), deps({ isHost: async () => false }))
+    expect((sessions.create.mock.calls[0][0] as unknown as { data: { welcomeStreamLink: unknown } }).data.welcomeStreamLink).toBeNull()
+    await handleLiveState(body({ chatBroadcast: { link: 'https://x.com/someone/status/5', by } }), deps({ isHost: async () => true }))
+    expect((sessions.create.mock.calls[1][0] as unknown as { data: { welcomeStreamLink: unknown } }).data.welcomeStreamLink).toBeNull()
+    await handleLiveState(body({ chatBroadcast: { link, by } }), deps({ isHost: async () => true }))
+    expect((sessions.create.mock.calls[2][0] as unknown as { data: { welcomeStreamLink: unknown } }).data.welcomeStreamLink).toBe(link)
+  })
+
   it('ignores a stream link that is not an x.com broadcast or status link', async () => {
     await handleLiveState(body({ streamLink: 'https://evil.test/i/broadcasts/abc' }), deps())
     expect((sessions.create.mock.calls[0][0] as unknown as { data: { streamLink: unknown } }).data.streamLink).toBeNull()

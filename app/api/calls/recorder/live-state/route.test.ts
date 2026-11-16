@@ -7,6 +7,8 @@ vi.mock('@/app/lib/calls/live-state', async (orig) => ({ ...(await orig<typeof i
 
 vi.mock('next/server', async (orig) => ({ ...(await orig<typeof import('next/server')>()), after: () => undefined }))
 vi.mock('@/app/lib/calls/live-announce-command', () => ({ liveTickForSession: vi.fn() }))
+const welcomeFor = vi.fn()
+vi.mock('@/app/lib/calls/welcome', () => ({ welcomeForSessionId: (...a: unknown[]) => welcomeFor(...a) }))
 
 import { POST } from './route'
 
@@ -19,6 +21,8 @@ describe('POST /api/calls/recorder/live-state', () => {
     process.env.RECORDER_API_KEY = 'secret'
     handle.mockReset()
     handle.mockResolvedValue('ok')
+    welcomeFor.mockReset()
+    welcomeFor.mockResolvedValue(null)
   })
   it('rejects a missing or wrong key before looking at the body', async () => {
     expect((await POST(req(good))).status).toBe(401)
@@ -34,6 +38,15 @@ describe('POST /api/calls/recorder/live-state', () => {
     const res = await POST(req(good, 'Bearer secret'))
     expect(res.status).toBe(200)
     expect(handle).toHaveBeenCalledTimes(1)
+  })
+  it('hands the call welcome to the recorder in the answer, and passes on a failed post', async () => {
+    welcomeFor.mockResolvedValue({ content: 'Welcome!' })
+    const res = await POST(req({ ...good, welcomeFailed: true }, 'Bearer secret'))
+    expect(await res.json()).toEqual({ welcome: { content: 'Welcome!' } })
+    expect(welcomeFor).toHaveBeenCalledWith('s-1', { failed: true })
+  })
+  it('answers an empty object when there is no welcome', async () => {
+    expect(await (await POST(req(good, 'Bearer secret'))).json()).toEqual({})
   })
   it('answers 204 when the live view is off', async () => {
     handle.mockResolvedValue('off')

@@ -28,6 +28,10 @@ export interface LiveStateBody {
   ended?: boolean
   /** false once the recording stopped (its limit) while the call goes on; omitted while recording. */
   recording?: boolean
+  /** true: the last call welcome handed out could not be posted; the app hands it out again. */
+  welcomeFailed?: boolean
+  /** The latest broadcast link posted in the call chat and its author (the app checks the author is a host). */
+  chatBroadcast?: { link: string; by: string } | null
 }
 
 export const MAX_PRESENCE = 300
@@ -117,6 +121,21 @@ export function findStreamLink(text: string): string | null {
 }
 
 export type PostResult = 'ok' | 'off' | 'error'
+/** An answer that carries the call welcome to post in the voice channel chat (the app decides when and what). */
+export type PostReply = { status: 'ok'; welcome: string }
+/** Most tries to post one welcome (a failure is reported to the app, which hands it out again). */
+export const MAX_WELCOME_TRIES = 3
+
+/** The welcome text in a heartbeat answer, or null (an empty or odd body is simply no welcome). */
+async function welcomeFrom(res: Response): Promise<string | null> {
+  try {
+    const j = (await res.json()) as { welcome?: { content?: unknown } } | null
+    const c = j?.welcome?.content
+    return typeof c === 'string' && c.trim() ? c : null
+  } catch {
+    return null
+  }
+}
 
 /** POST to the app. Never throws. */
 export async function postLiveState(
@@ -126,7 +145,7 @@ export async function postLiveState(
   log: (msg: string) => void,
   fetchImpl: typeof fetch = fetch,
   timeoutMs = LIVE_STATE_TIMEOUT_MS,
-): Promise<PostResult> {
+): Promise<PostResult | PostReply> {
   try {
     const res = await fetchImpl(`${appBaseUrl}/api/calls/recorder/live-state`, {
       method: 'POST',
@@ -139,7 +158,8 @@ export async function postLiveState(
       log(`live state: app answered ${res.status}`)
       return 'error'
     }
-    return 'ok'
+    const welcome = await welcomeFrom(res)
+    return welcome ? { status: 'ok', welcome } : 'ok'
   } catch (err) {
     log(`live state: request failed (${err instanceof Error ? err.message : String(err)})`)
     return 'error'
@@ -153,7 +173,9 @@ export interface LiveStatePusherDeps {
   channelId: string
   startedAtMs: number
   pushSeconds: number
-  post: (body: LiveStateBody) => Promise<PostResult>
+  post: (body: LiveStateBody) => Promise<PostResult | PostReply>
+  /** Posts the call welcome in the call's chat; true when it went out. */
+  onWelcome?: (content: string) => Promise<boolean>
   now?: () => number
 }
 
@@ -162,11 +184,15 @@ export class LiveStatePusher {
   private timer: NodeJS.Timeout | null = null
   private debounce: NodeJS.Timeout | null = null
   private streamLink: string | null = null
+  private chatBroadcast: { link: string; by: string } | null = null
   private pausedUntil = 0
   private stopped = false
   private recording = true
   private sending = false
   private again = false
+  private welcomeFailed = false
+  private welcomeTries = 0
+  private welcomePosted = false
   private readonly now: () => number
 
   constructor(private readonly d: LiveStatePusherDeps) {
@@ -193,10 +219,17 @@ export class LiveStatePusher {
   }
 
   /** A chat message: the first stream link in the call chat is kept, except that a broadcast link replaces a status link. */
-  onChat(text: string): void {
+  onChat(text: string, authorId?: string): void {
     if (this.stopped) return
     const link = findStreamLink(text)
     if (!link) return
+    if (authorId && isBroadcastLink(link) && this.chatBroadcast?.link !== link) {
+      this.chatBroadcast = { link, by: authorId }
+      if (this.streamLink && !(isBroadcastLink(link) && !isBroadcastLink(this.streamLink))) {
+        void this.push()
+        return
+      }
+    }
     if (this.streamLink && !(isBroadcastLink(link) && !isBroadcastLink(this.streamLink))) return
     this.streamLink = link
     void this.push()
@@ -217,6 +250,8 @@ export class LiveStatePusher {
       ...(this.streamLink ? { streamLink: this.streamLink } : {}),
       ...(ended ? { ended: true } : {}),
       ...(this.recording ? {} : { recording: false }),
+      ...(this.welcomeFailed ? { welcomeFailed: true } : {}),
+      ...(this.chatBroadcast ? { chatBroadcast: this.chatBroadcast } : {}),
     }
   }
 
@@ -244,7 +279,13 @@ export class LiveStatePusher {
     }
     this.sending = true
     try {
-      if ((await this.d.post(this.body(false))) === 'off') this.pausedUntil = this.now() + OFF_RETRY_MS
+      const body = this.body(false)
+      const reported = this.welcomeFailed
+      const res = await this.d.post(body)
+      const status = typeof res === 'string' ? res : res.status
+      if (status === 'off') this.pausedUntil = this.now() + OFF_RETRY_MS
+      if (reported && status === 'ok') this.welcomeFailed = false // the app got the failure report
+      if (typeof res !== 'string') await this.postWelcome(res.welcome)
     } finally {
       this.sending = false
     }
@@ -252,6 +293,23 @@ export class LiveStatePusher {
       this.again = false
       await this.push()
     }
+  }
+
+  /**
+   * Post the welcome the app handed out, once. A failure is reported in the next heartbeat (the app
+   * hands it out again), up to MAX_WELCOME_TRIES; after that it is dropped. Never throws.
+   */
+  private async postWelcome(content: string): Promise<void> {
+    if (this.welcomePosted || !this.d.onWelcome || this.welcomeTries >= MAX_WELCOME_TRIES) return
+    this.welcomeTries++
+    let ok = false
+    try {
+      ok = await this.d.onWelcome(content)
+    } catch {
+      ok = false
+    }
+    if (ok) this.welcomePosted = true
+    else this.welcomeFailed = this.welcomeTries < MAX_WELCOME_TRIES
   }
 
   /** Stop the heartbeat and tell the app the call ended (one last, short attempt). Safe to call twice. */

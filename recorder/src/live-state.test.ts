@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { CHANGE_DEBOUNCE_MS, NAME_RETRY_MS, findStreamLink, LiveStatePusher, MAX_PRESENCE, normalizeStreamLink, OFF_RETRY_MS, PresenceClock, postLiveState, type LiveStateBody, type PostResult } from './live-state.js'
+import { CHANGE_DEBOUNCE_MS, NAME_RETRY_MS, findStreamLink, LiveStatePusher, MAX_PRESENCE, normalizeStreamLink, OFF_RETRY_MS, PresenceClock, postLiveState, type LiveStateBody, type PostReply, type PostResult, MAX_WELCOME_TRIES } from './live-state.js'
 import { parseRemoteConfig } from './remote-config.js'
 
 describe('findStreamLink', () => {
@@ -155,6 +155,64 @@ describe('LiveStatePusher', () => {
   })
 })
 
+describe('LiveStatePusher chat broadcast author', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+  it('sends the author of a broadcast link, also when a status link came first', async () => {
+    const post = vi.fn(async (_b: LiveStateBody) => 'ok' as PostResult)
+    const p = new LiveStatePusher({ sessionId: 's-1', eventId: '1', eventName: 'Call', channelId: '2', startedAtMs: 0, pushSeconds: 20, post })
+    p.start()
+    p.onChat('https://x.com/member/status/9', '111111111111111')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(post.mock.calls.at(-1)?.[0].chatBroadcast).toBeUndefined()
+    p.onChat('live: https://x.com/i/broadcasts/1abc', '222222222222222')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(post.mock.calls.at(-1)?.[0].chatBroadcast).toEqual({ link: 'https://x.com/i/broadcasts/1abc', by: '222222222222222' })
+    p.stop()
+  })
+})
+
+describe('LiveStatePusher call welcome', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+  const reply: PostReply = { status: 'ok', welcome: 'Welcome to the call!' }
+  const make = (answers: Array<PostResult | PostReply>, onWelcome: (c: string) => Promise<boolean>) => {
+    const post = vi.fn(async (_b: LiveStateBody) => answers.shift() ?? 'ok')
+    const p = new LiveStatePusher({ sessionId: 's-1', eventId: '1', eventName: 'Call', channelId: '2', startedAtMs: 0, pushSeconds: 20, post, onWelcome })
+    return { p, post }
+  }
+
+  it('posts the welcome the app hands out, once', async () => {
+    const onWelcome = vi.fn(async () => true)
+    const { p, post } = make(['ok', reply, reply], onWelcome)
+    p.start()
+    await vi.advanceTimersByTimeAsync(20_000)
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(onWelcome).toHaveBeenCalledTimes(1)
+    expect(onWelcome).toHaveBeenCalledWith('Welcome to the call!')
+    expect(post.mock.calls.every((c) => c[0].welcomeFailed === undefined)).toBe(true)
+    p.stop()
+  })
+
+  it('reports a failed post in the next heartbeat, then stops asking after the retry limit', async () => {
+    const onWelcome = vi.fn(async () => false)
+    const { p, post } = make([reply, reply, reply, reply, reply], onWelcome)
+    p.start()
+    await vi.advanceTimersByTimeAsync(20_000 * 6)
+    expect(onWelcome).toHaveBeenCalledTimes(MAX_WELCOME_TRIES)
+    expect(post.mock.calls[1][0].welcomeFailed).toBe(true)
+    p.stop()
+  })
+
+  it('does nothing with a welcome when no poster is wired', async () => {
+    const post = vi.fn(async (_b: LiveStateBody) => reply as PostResult | PostReply)
+    const p = new LiveStatePusher({ sessionId: 's-1', eventId: '1', eventName: 'Call', channelId: '2', startedAtMs: 0, pushSeconds: 20, post })
+    p.start()
+    await vi.advanceTimersByTimeAsync(0)
+    p.stop()
+  })
+})
+
 describe('postLiveState', () => {
   const body = { sessionId: 's', eventId: null, eventName: null, channelId: '1', startedAt: new Date(0).toISOString(), present: [] }
   it('maps 204 to off, other failures to error, and never throws', async () => {
@@ -163,6 +221,9 @@ describe('postLiveState', () => {
     expect(await postLiveState('https://app', 'k', body, log, (async () => new Response('x', { status: 500 })) as typeof fetch)).toBe('error')
     expect(await postLiveState('https://app', 'k', body, log, (async () => { throw new Error('down') }) as typeof fetch)).toBe('error')
     expect(await postLiveState('https://app', 'k', body, log, (async () => new Response('{}', { status: 200 })) as typeof fetch)).toBe('ok')
+    expect(await postLiveState('https://app', 'k', body, log, (async () => new Response('', { status: 200 })) as typeof fetch)).toBe('ok')
+    expect(await postLiveState('https://app', 'k', body, log, (async () => new Response('{"welcome":{"content":"Hi"}}', { status: 200 })) as typeof fetch)).toEqual({ status: 'ok', welcome: 'Hi' })
+    expect(await postLiveState('https://app', 'k', body, log, (async () => new Response('{"welcome":{"content":" "}}', { status: 200 })) as typeof fetch)).toBe('ok')
   })
   it('sends the bearer key', async () => {
     const f = vi.fn(async () => new Response('{}'))

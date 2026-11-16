@@ -63,6 +63,10 @@ export const liveStateSchema = z.object({
    * Absent (an older recorder) means recording. Once false it stays so for the session.
    */
   recording: z.boolean().optional(),
+  /** true: the recorder could not post the call welcome it was handed; the app frees the claim so it is handed out again. */
+  welcomeFailed: z.boolean().optional(),
+  /** The latest /i/broadcasts/ link posted in the call chat and who posted it; the app checks the author is a host. */
+  chatBroadcast: z.object({ link: z.string().max(500), by: snowflake }).nullable().optional(),
 })
 export type LiveStateBody = z.infer<typeof liveStateSchema>
 
@@ -113,6 +117,8 @@ export interface LiveStateDeps {
   resolveCrew?: (e: { eventId: string | null; eventName: string | null }) => Promise<{ crewId: string; crewLabel: string } | null>
   now?: () => number
   env?: Record<string, string | undefined>
+  /** Whether this member may run the call (the live page's host check). */
+  isHost?: (discordId: string) => Promise<boolean>
 }
 
 export type LiveStateOutcome = 'off' | 'ok' | 'ended'
@@ -165,6 +171,18 @@ export async function handleLiveState(body: LiveStateBody, deps: LiveStateDeps =
   const presence = mergePresence(prevPresence, cleaned, now.getTime())
   // The first link stays, except that a broadcast link replaces an earlier status link.
   const streamLink = betterStreamLink(existing?.streamLink, normalizeStreamLink(body.streamLink))
+  // A broadcast link posted in the chat by a host (never a member) is what starts the call welcome. Checked once.
+  let welcomeStreamLink: string | null = existing?.welcomeStreamLink ?? null
+  const cb = body.chatBroadcast
+  const cbLink = cb ? normalizeStreamLink(cb.link) : null
+  if (!welcomeStreamLink && cb && cbLink && isBroadcastLink(cbLink)) {
+    try {
+      const isHost = deps.isHost ?? (async (id: string) => (await (await import('./live-access')).liveAccess(id)).host)
+      if (await isHost(cb.by)) welcomeStreamLink = cbLink
+    } catch {
+      // cannot tell: not a host
+    }
+  }
   const startedAt = new Date(body.startedAt)
   const data = {
     eventId: body.eventId ?? null,
@@ -175,6 +193,7 @@ export async function handleLiveState(body: LiveStateBody, deps: LiveStateDeps =
     lastSeenAt: now,
     hidden,
     streamLink,
+    welcomeStreamLink,
     presence,
     // Set once, the first time the recorder says it stopped recording; never cleared.
     ...(body.recording === false && !existing?.recordingEndedAt ? { recordingEndedAt: now } : {}),
