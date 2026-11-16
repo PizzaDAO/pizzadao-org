@@ -2741,5 +2741,17 @@
   },
   "memberSince": {
     "label": "Membre depuis {date}"
+  },
+  "discordActivity": {
+    "title": "Activité sur Discord",
+    "messages": "{count, plural, one {# message} other {# messages}}",
+    "messagesCompact": "{count} messages",
+    "since": "Actif depuis",
+    "lastActive": "Dernière activité",
+    "months": "Actif pendant",
+    "topChannels": "Salons préférés",
+    "activeMonths": "{count, plural, one {# mois} other {# mois}}",
+    "sinceShort": "depuis {date}",
+    "lastActiveShort": "dernière activité {date}"
   }
 }

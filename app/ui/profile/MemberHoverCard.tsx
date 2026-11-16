@@ -16,6 +16,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { formatMemberSince } from "@/app/lib/member-since-format";
+import { DiscordActivityLine } from "./DiscordActivityBlock";
 import type { MemberCard } from "@/app/api/public/member-card/[id]/route";
 
 const OPEN_DELAY_MS = 300;
@@ -277,6 +278,7 @@ function CardBody({ card }: { card: MemberCard }) {
                     {tSince("label", { date: sinceText })}
                 </span>
             )}
+            <DiscordActivityLine activity={card.discordActivity} />
             {card.crews.length > 0 && (
                 <span className="flex flex-wrap gap-1" aria-label={t("crews")}>
                     {card.crews.slice(0, 4).map((c) => (

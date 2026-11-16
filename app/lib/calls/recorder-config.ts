@@ -46,6 +46,8 @@ export interface RecorderConfig {
    * empty for afterRecordingEmptySeconds, the event ends, or maxHours since the recording started pass.
    */
   liveView: { enabled: boolean; pushSeconds: number; afterRecordingEmptySeconds: number; maxHours: number }
+  /** Live Discord message counting for the profile "Discord activity" block (members.discordActivityCount / ...FlushSeconds). */
+  discordActivity: { enabled: boolean; flushSeconds: number }
 }
 
 export const RECORDER_CONFIG_OFF: RecorderConfig = {
@@ -65,6 +67,7 @@ export const RECORDER_CONFIG_OFF: RecorderConfig = {
   transcriptionKeyterms: [],
   voiceChannels: { allowed: [], byEvent: [] },
   liveView: { enabled: false, pushSeconds: 20, afterRecordingEmptySeconds: 120, maxHours: 4 },
+  discordActivity: { enabled: false, flushSeconds: 300 },
 }
 
 /** Discord event ids of the given crews (normalized ids). A mapping read failure gives none. */
@@ -143,6 +146,10 @@ export async function buildRecorderConfig(): Promise<RecorderConfig> {
       pushSeconds: settings.get('calls.livePushSeconds'),
       afterRecordingEmptySeconds: settings.get('calls.liveAfterRecordingEmptySeconds'),
       maxHours: settings.get('calls.liveMaxHours'),
+    },
+    discordActivity: {
+      enabled: resolveToggle('members.discordActivityCount', settings),
+      flushSeconds: settings.get('members.discordActivityFlushSeconds'),
     },
   }
 }

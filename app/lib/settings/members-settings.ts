@@ -30,7 +30,43 @@ const nameReminderCooldownDays: SettingDef<number> = {
   input: { type: 'int', min: 1, max: 365, unit: 'days' },
 }
 
+const discordActivityShow: SettingDef<boolean> = {
+  key: 'members.discordActivityShow',
+  area: 'members',
+  label: 'Show Discord activity on profiles',
+  help: 'Shows a "Discord activity" block (message count, active since, last active, active months and the most-used public channels) on member profiles and the hover card. Dates are shown to the month only; channels only if everyone in the server can see them. Off hides the block everywhere.',
+  schema: z.boolean(),
+  default: true,
+  onReadFailure: { value: true },
+  input: { type: 'bool' },
+}
+
+const discordActivityCount: SettingDef<boolean> = {
+  key: 'members.discordActivityCount',
+  area: 'members',
+  label: 'Count Discord messages live',
+  help: 'The recorder bot counts each non-bot message in the server (no message content is read or stored) and sends the totals to the app in batches, keeping the per-member activity numbers fresh. Off stops counting; existing numbers stay.',
+  schema: z.boolean(),
+  default: true,
+  onReadFailure: { value: true },
+  input: { type: 'bool' },
+}
+
+const discordActivityFlushSeconds: SettingDef<number> = {
+  key: 'members.discordActivityFlushSeconds',
+  area: 'members',
+  label: 'Discord activity batch interval (seconds)',
+  help: 'How often the recorder sends the message counts it has gathered. A restart can lose up to this much counting.',
+  schema: z.number().int().min(60).max(3600),
+  default: 300,
+  onReadFailure: { value: 300 },
+  input: { type: 'int', min: 60, max: 3600, unit: 'seconds' },
+}
+
 export const MEMBERS_SETTINGS = {
+  'members.discordActivityShow': discordActivityShow,
+  'members.discordActivityCount': discordActivityCount,
+  'members.discordActivityFlushSeconds': discordActivityFlushSeconds,
   'members.nameReminderText': nameReminderText,
   'members.nameReminderCooldownDays': nameReminderCooldownDays,
 } as const satisfies Record<string, SettingDef>

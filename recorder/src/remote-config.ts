@@ -39,6 +39,8 @@ export interface RemoteConfig {
    * neither: the defaults apply.
    */
   liveView: { enabled: boolean; pushSeconds: number; afterRecordingEmptySeconds: number; maxHours: number }
+  /** Count server messages (no content) and send the totals to the app in batches every flushSeconds. */
+  discordActivity: { enabled: boolean; flushSeconds: number }
 }
 
 export const REMOTE_CONFIG_OFF: RemoteConfig = {
@@ -58,6 +60,7 @@ export const REMOTE_CONFIG_OFF: RemoteConfig = {
   transcriptionKeyterms: [],
   voiceChannels: VOICE_CHANNELS_OFF,
   liveView: { enabled: false, pushSeconds: 20, afterRecordingEmptySeconds: 120, maxHours: 4 },
+  discordActivity: { enabled: false, flushSeconds: 300 },
 }
 
 export const REMOTE_CONFIG_TIMEOUT_MS = 5_000
@@ -78,6 +81,7 @@ export function parseRemoteConfig(raw: unknown, previous?: RemoteConfig | null):
   const d = REMOTE_CONFIG_OFF
   const l = (o.liveItems && typeof o.liveItems === 'object' ? o.liveItems : {}) as Record<string, unknown>
   const lv = (o.liveView && typeof o.liveView === 'object' ? o.liveView : {}) as Record<string, unknown>
+  const da = (o.discordActivity && typeof o.discordActivity === 'object' ? o.discordActivity : {}) as Record<string, unknown>
   const strings = (v: unknown, max: number, len: number): string[] =>
     Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.trim().length > 0).map((x) => x.trim().slice(0, len)).slice(0, max) : []
   const eventIds = strings(l.eventIds, 100, 25).filter((x) => /^\d{15,25}$/.test(x))
@@ -132,6 +136,10 @@ export function parseRemoteConfig(raw: unknown, previous?: RemoteConfig | null):
       pushSeconds: int(lv.pushSeconds, d.liveView.pushSeconds, 10, 120),
       afterRecordingEmptySeconds: int(lv.afterRecordingEmptySeconds, d.liveView.afterRecordingEmptySeconds, 30, 1800),
       maxHours: int(lv.maxHours, d.liveView.maxHours, 1, 12),
+    },
+    discordActivity: {
+      enabled: da.enabled === true,
+      flushSeconds: int(da.flushSeconds, d.discordActivity.flushSeconds, 60, 3600),
     },
   }
 }

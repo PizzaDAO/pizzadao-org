@@ -949,6 +949,14 @@ model DiscordActivity {
   @@index([lastSeen])
 }
 
+// Batches of live message counts already applied to DiscordActivity (idempotency by batch id)
+model DiscordActivityBatch {
+  id        String   @id
+  appliedAt DateTime @default(now())
+
+  @@index([appliedAt])
+}
+
 // ===== UNLOCK TICKET CLAIMS =====
 
 model UnlockTicketClaim {

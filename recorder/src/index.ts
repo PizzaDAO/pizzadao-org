@@ -16,6 +16,7 @@ import { createR2Uploader } from './storage.js'
 import { postIngestWithRetry } from './ingest.js'
 import { handleDm, postFollowupInbound, type DmMessage } from './dm-forward.js'
 import { RemoteConfigClient } from './remote-config.js'
+import { ActivityCounter, postActivityBatch, toActivityEvent, type MessageLike } from './discord-activity.js'
 
 const log = (msg: string) => console.log(`${new Date().toISOString()} ${msg}`)
 
@@ -30,6 +31,9 @@ log(generateDependencyReport())
 // "Used disallowed intents" (set CAPTURE_VOICE_CHAT=false to run without it).
 const intents = [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.GuildScheduledEvents]
 if (cfg.captureVoiceChat) intents.push(GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent)
+// The live Discord message counter (profile "Discord activity") needs message events but not their content:
+// GuildMessages is NOT privileged. Without CAPTURE_VOICE_CHAT it is added alone.
+else intents.push(GatewayIntentBits.GuildMessages)
 // FOLLOWUP_DM_FORWARD (default off) adds DirectMessages, a NON-privileged intent (DM content is delivered
 // without MessageContent), and the Channel partial (DM channels are not cached).
 if (cfg.followupDmForward) intents.push(GatewayIntentBits.DirectMessages)
@@ -38,7 +42,7 @@ const client = new Client({
   // Deletes/edits of messages we did not cache still fire (as partials); cache few messages, and
   // drop them quickly: only the call channel's chat matters.
   partials: [...(cfg.captureVoiceChat ? [Partials.Message] : []), ...(cfg.followupDmForward ? [Partials.Channel] : [])],
-  makeCache: Options.cacheWithLimits({ ...Options.DefaultMakeCacheSettings, MessageManager: 50 }),
+  makeCache: Options.cacheWithLimits({ ...Options.DefaultMakeCacheSettings, MessageManager: cfg.captureVoiceChat ? 50 : 0 }),
   sweepers: { ...Options.DefaultSweeperSettings, messages: { interval: 300, lifetime: 1800 } },
 })
 
@@ -111,6 +115,20 @@ client.on('voiceStateUpdate', (o, n) => {
   serial(() => scheduleCheck(false))
 })
 client.on('messageCreate', (m) => recorder.onMessage(m))
+// Live message counts for the profile "Discord activity" block (counts only, no content; off unless the app's settings say so).
+const activity = new ActivityCounter({
+  post: (body) => postActivityBatch(cfg.appBaseUrl, cfg.recorderApiKey, body, log),
+  config: () => remote.get().discordActivity,
+  log,
+})
+client.on('messageCreate', (m) => {
+  try {
+    const e = toActivityEvent(m as unknown as MessageLike, cfg.guildId)
+    if (e) activity.add(e)
+  } catch (err) {
+    log(`discord activity count failed: ${err instanceof Error ? err.message : String(err)}`)
+  }
+})
 if (cfg.followupDmForward) {
   // Own handler: fire and forget (retries run in the background), so it can never delay or break recording.
   const dmDeps = {
@@ -127,6 +145,7 @@ client.on('error', (err) => log(`discord client error: ${err.message}`))
 
 client.once('ready', () => {
   log(`logged in as ${client.user?.tag}`)
+  void remote.refresh().then(() => activity.start())
   serial(async () => {
     const guild = await client.guilds.fetch(cfg.guildId)
 
@@ -175,6 +194,9 @@ async function shutdown(signal: string) {
   } catch (err) {
     log(`shutdown error: ${err instanceof Error ? err.message : String(err)}`)
   }
+  // Best effort: send the counts gathered so far (short wait; a lost batch is never resent with new data).
+  activity.stop()
+  await Promise.race([activity.flush(), new Promise((r) => setTimeout(r, 5_000))])
   server.close()
   void client.destroy()
   process.exit(0)

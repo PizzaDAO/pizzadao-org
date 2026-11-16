@@ -149,6 +149,9 @@ export const TOGGLES = {
   'manuals.hideReplaced': { env: 'MANUALS_HIDE_REPLACED', legacy: ON_WORDS },
   // Off unless turned on: the public features catalog (page, exports, header link, ops tools).
   'features.publicEnabled': { env: 'FEATURES_PUBLIC_ENABLED', legacy: ON_WORDS },
+  // On unless the env var is an explicit off: the profile Discord activity block, and live message counting by the recorder.
+  'members.discordActivityShow': { env: 'DISCORD_ACTIVITY_SHOW_ENABLED', legacy: (raw) => !envKillsToggle(raw) },
+  'members.discordActivityCount': { env: 'DISCORD_ACTIVITY_COUNT_ENABLED', legacy: (raw) => !envKillsToggle(raw) },
   'features.exportEnabled': { env: 'FEATURES_EXPORT_ENABLED', legacy: ON_WORDS },
   'features.navLinkEnabled': { env: 'FEATURES_NAV_LINK_ENABLED', legacy: ON_WORDS },
   'features.showOps': { env: 'FEATURES_SHOW_OPS', legacy: ON_WORDS },

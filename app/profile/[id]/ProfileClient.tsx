@@ -19,6 +19,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowUpRight } from "lucide-react";
+import { DiscordActivityBlock } from "../../ui/profile/DiscordActivityBlock";
 import { ProfileHero } from "../../ui/profile/ProfileHero";
 import { AboutChips } from "../../ui/profile/AboutChips";
 import { CrewChipRow, type CrewOption } from "../../ui/profile/CrewChipRow";
@@ -173,6 +174,8 @@ export function ProfileClient({ id, disavowWarning = null, buddyRecognition = nu
                 <ContributionsBlock memberId={id} />
 
                 <PassportBlock memberId={id} />
+
+                <DiscordActivityBlock activity={data.discordActivity ?? null} />
 
                 {/* Attendance — uses inline variant so this page owns the wrapper */}
                 <section
