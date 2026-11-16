@@ -41,7 +41,7 @@ Ne commande pas tout d'un coup. Commande par vagues, environ toutes les 45 minut
 
 ## Créer un POAP {#poaps}
 
-Un POAP est un badge de collection que les invités peuvent récupérer pour prouver qu'ils étaient là. En créer un pour ta fête est un joli geste, et c'est aussi l'une des missions. Les étapes sont dans [créer un POAP](/handbook/make-a-poap).
+Un POAP est un badge de collection que les invités peuvent récupérer pour prouver qu'ils étaient là. En créer un pour ta fête est un joli geste. Les étapes sont dans [créer un POAP](/handbook/make-a-poap).
 
 ## Annonce ta fête {#announce}
 

@@ -41,7 +41,7 @@ Do not order everything at once. Order in waves, about every 45 minutes, so the 
 
 ## Make a POAP {#poaps}
 
-A POAP is a collectable badge guests can claim to show they were there. Making one for your party is a nice touch, and it is also one of the missions. The steps are in [make a POAP](/handbook/make-a-poap).
+A POAP is a collectable badge guests can claim to show they were there. Making one for your party is a nice touch. The steps are in [make a POAP](/handbook/make-a-poap).
 
 ## Announce your party {#announce}
 
