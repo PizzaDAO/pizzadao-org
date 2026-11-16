@@ -16,11 +16,16 @@ export interface ReminderStore {
   listCallPrefs(): Promise<PrefLite[]>
   /** Sends in the last 24 hours that count against the daily cap, per member (one entry per DM). */
   sentSince(discordIds: readonly string[], since: Date): Promise<Map<string, Date[]>>
-  /** One query: the "<discordId>|<eventId>" pairs already sent a call reminder (any start time) since `since`. */
+  /** One query: the "<discordId>|<refKey>" call reminders already delivered (SENT, or RETRY_TG: Discord went out) for these events since `since`. */
   sentForEventsSince(discordIds: readonly string[], eventIds: readonly string[], since: Date): Promise<Set<string>>
+  /** One query: the "<discordId>|<refKey>" call pairs that cannot be claimed now (sent, claimed, skipped, failed, out of attempts), so a per-minute run skips them without further reads. */
+  handledCalls(discordIds: readonly string[], refKeys: readonly string[]): Promise<Set<string>>
   /** Claim (member, kind, refKey) before sending. False when it already exists (sent, claimed, skipped, failed) and is not due a retry. */
-  claimCall(discordId: string, refKey: string, kind?: SendKind): Promise<{ claimed: boolean; attempts: number }>
-  markSent(discordId: string, refKey: string, kind?: SendKind): Promise<void>
+  claimCall(discordId: string, refKey: string, kind?: SendKind): Promise<{ claimed: boolean; attempts: number; /** Discord already delivered; only Telegram is left. */ telegramOnly?: boolean }>
+  /** `channel` records which channels delivered ("discord", "telegram" or "discord,telegram"). */
+  markSent(discordId: string, refKey: string, kind?: SendKind, channel?: string): Promise<void>
+  /** Discord delivered but Telegram has to be retried (rate limited or unavailable): status RETRY_TG, claimed again by a later run for Telegram only. */
+  markPartial(discordId: string, refKey: string, channel: string, code: string): Promise<void>
   markSkipped(discordId: string, refKey: string, code: string, kind?: SendKind): Promise<void>
   /** Release the claim for the next run. `countAttempt` false keeps the attempt count (a rate limit is not the message's fault). */
   release(discordId: string, refKey: string, code: string, attempts: number, countAttempt: boolean, kind?: SendKind): Promise<void>
@@ -29,15 +34,27 @@ export interface ReminderStore {
 
 export const prismaStore: ReminderStore = {
   async listCallPrefs() {
-    const rows = await prisma.reminderPref.findMany({ where: { calls: { not: 'NONE' } }, select: { discordId: true, calls: true, crewIds: true } })
-    return rows.map((r) => ({ discordId: r.discordId, calls: r.calls, crewIds: r.crewIds }))
+    const rows = await prisma.reminderPref.findMany({ where: { calls: { not: 'NONE' } }, select: { discordId: true, calls: true, crewIds: true, callLeadMinutes: true, channel: true } })
+    return rows.map((r) => ({ discordId: r.discordId, calls: r.calls, crewIds: r.crewIds, leadMinutes: r.callLeadMinutes, channel: r.channel }))
+  },
+
+  async handledCalls(discordIds, refKeys) {
+    const out = new Set<string>()
+    if (!discordIds.length || !refKeys.length) return out
+    const rows = await prisma.reminderSend.findMany({
+      where: { discordId: { in: [...discordIds] }, kind: 'CALL', refKey: { in: [...refKeys] } },
+      select: { discordId: true, refKey: true, status: true, attempts: true },
+    })
+    for (const r of rows) if (r.status !== 'RETRY_TG' && (r.status !== 'RETRY' || r.attempts >= MAX_ATTEMPTS)) out.add(`${r.discordId}|${r.refKey}`)
+    return out
   },
 
   async sentSince(discordIds, since) {
     const out = new Map<string, Date[]>()
     if (!discordIds.length) return out
     const rows = await prisma.reminderSend.findMany({
-      where: { discordId: { in: [...discordIds] }, status: 'SENT', createdAt: { gte: since } },
+      // RETRY_TG: Discord did deliver, only Telegram is pending.
+      where: { discordId: { in: [...discordIds] }, status: { in: ['SENT', 'RETRY_TG'] }, createdAt: { gte: since } },
       select: { discordId: true, updatedAt: true },
     })
     for (const r of rows) out.set(r.discordId, [...(out.get(r.discordId) ?? []), r.updatedAt])
@@ -51,13 +68,13 @@ export const prismaStore: ReminderStore = {
       where: {
         discordId: { in: [...discordIds] },
         kind: 'CALL',
-        status: 'SENT',
+        status: { in: ['SENT', 'RETRY_TG'] }, // RETRY_TG: Discord did deliver
         updatedAt: { gte: since },
         OR: eventIds.map((e) => ({ refKey: { startsWith: `${e}:` } })),
       },
       select: { discordId: true, refKey: true },
     })
-    for (const r of rows) out.add(`${r.discordId}|${r.refKey.split(':')[0]}`)
+    for (const r of rows) out.add(`${r.discordId}|${r.refKey}`)
     return out
   },
 
@@ -73,13 +90,21 @@ export const prismaStore: ReminderStore = {
       where: { discordId, kind, refKey, status: 'RETRY', attempts: { lt: MAX_ATTEMPTS } },
       data: { status: 'CLAIMED' },
     })
-    if (won.count !== 1) return { claimed: false, attempts: 0 }
+    if (won.count !== 1) {
+      // A Discord-delivered row waiting on Telegram: exactly one run takes it, for Telegram only.
+      const tg = await prisma.reminderSend.updateMany({ where: { discordId, kind, refKey, status: 'RETRY_TG' }, data: { status: 'CLAIMED' } })
+      return tg.count === 1 ? { claimed: true, attempts: 0, telegramOnly: true } : { claimed: false, attempts: 0 }
+    }
     const row = await prisma.reminderSend.findUnique({ where: { discordId_kind_refKey: { discordId, kind, refKey } }, select: { attempts: true } })
     return { claimed: true, attempts: row?.attempts ?? 0 }
   },
 
-  async markSent(discordId, refKey, kind = 'CALL') {
-    await prisma.reminderSend.updateMany({ where: { discordId, kind, refKey }, data: { status: 'SENT', code: null } })
+  async markSent(discordId, refKey, kind = 'CALL', channel) {
+    await prisma.reminderSend.updateMany({ where: { discordId, kind, refKey }, data: { status: 'SENT', code: null, ...(channel ? { channel } : {}) } })
+  },
+
+  async markPartial(discordId, refKey, channel, code) {
+    await prisma.reminderSend.updateMany({ where: { discordId, kind: 'CALL', refKey }, data: { status: 'RETRY_TG', channel, code } })
   },
 
   async markSkipped(discordId, refKey, code, kind = 'CALL') {

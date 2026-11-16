@@ -19,7 +19,7 @@ describe('reminders settings', () => {
   })
 
   it('bounds the numbers', () => {
-    expect(SETTINGS['reminders.callLeadMinutes'].schema.safeParse(9).success).toBe(false)
+    expect(SETTINGS['reminders.callLeadMinutes'].schema.safeParse(4).success).toBe(false)
     expect(SETTINGS['reminders.callLeadMinutes'].schema.safeParse(1440).success).toBe(true)
     expect(SETTINGS['reminders.callLeadMinutes'].schema.safeParse(1441).success).toBe(false)
     expect(SETTINGS['reminders.proposalClosingHours'].schema.safeParse(1).success).toBe(false)

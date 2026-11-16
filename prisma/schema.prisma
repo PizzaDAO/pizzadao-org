@@ -2918,6 +2918,7 @@ enum ReminderChannel {
   AUTO
   DISCORD
   TELEGRAM
+  BOTH
 }
 
 enum ReminderKind {
@@ -2947,8 +2948,8 @@ model ReminderSend {
   discordId String
   kind      ReminderKind
   refKey    String // eventId:startsAt (calls) | proposalId
-  status    String // CLAIMED | SENT | RETRY | FAILED | SKIPPED
-  channel   String? // discord | telegram
+  status    String // CLAIMED | SENT | RETRY | RETRY_TG (Discord delivered, Telegram to retry) | FAILED | SKIPPED
+  channel   String? // channels that delivered: discord | telegram | discord,telegram
   code      String?
   attempts  Int          @default(0)
   createdAt DateTime     @default(now())

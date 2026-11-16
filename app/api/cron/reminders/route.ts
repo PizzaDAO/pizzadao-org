@@ -8,8 +8,9 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 120
 
 /**
- * GET /api/cron/reminders — every 5 minutes (Vercel Cron, Bearer CRON_SECRET).
- * Call reminders, then proposal reminders (opened, closing soon), by Discord DM to members who opted in.
+ * GET /api/cron/reminders — every minute (Vercel Cron, Bearer CRON_SECRET).
+ * Call reminders (Discord and/or Telegram DM, each at the member's own lead), then proposal reminders (opened,
+ * closing soon; Discord DM, only on every 5th minute) to members who opted in.
  * Answers {calls, proposals}, each a run result or {skipped}: a part that is off (reminders.callsEnabled /
  * reminders.proposalsEnabled, or any preview) is skipped without touching Discord or the database. `?dryRun=1`
  * (still needs the bearer token) runs the full counting path on demand, sending and claiming nothing. Counts only.

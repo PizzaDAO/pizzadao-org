@@ -12,6 +12,7 @@ vi.mock('@/app/lib/reminders/prefs', async (orig) => ({
   savePrefs: (id: string, b: { calls?: string }) => savePrefs(id, b),
 }))
 
+import { PrefsError } from '@/app/lib/reminders/prefs'
 import { GET, POST } from './route'
 
 const post = (body: unknown, headers: Record<string, string> = {}) =>
@@ -47,8 +48,26 @@ describe('/api/reminder-prefs', () => {
     expect((await POST(post({ proposals: 'yes' }))).status).toBe(400)
     expect(savePrefs).toHaveBeenCalledTimes(1)
   })
+  it('POST accepts a lead (5, 10, 15, 30, 60 or null) and a channel (Discord, Telegram, both)', async () => {
+    for (const body of [{ leadMinutes: 5 }, { leadMinutes: 60 }, { leadMinutes: null }, { channel: 'TELEGRAM' }, { channel: 'BOTH' }, { channel: 'DISCORD', leadMinutes: 15 }]) {
+      expect((await POST(post(body))).status).toBe(200)
+      expect(savePrefs).toHaveBeenLastCalledWith('u1', body)
+    }
+  })
+  it('Telegram without a linked account is a 400 with a code', async () => {
+    savePrefs.mockRejectedValueOnce(new PrefsError('telegram_not_linked'))
+    const res = await POST(post({ channel: 'BOTH' }))
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject({ code: 'telegram_not_linked' })
+  })
+  it('rejects other leads and channels', async () => {
+    for (const body of [{ leadMinutes: 3 }, { leadMinutes: 45 }, { leadMinutes: 120 }, { leadMinutes: '10' }, { channel: 'AUTO' }, { channel: 'SMS' }]) {
+      expect((await POST(post(body))).status).toBe(400)
+    }
+    expect(savePrefs).not.toHaveBeenCalled()
+  })
   it('rejects values B1 does not offer, unknown fields and empty bodies', async () => {
-    for (const body of [{ calls: 'SELECTED' }, { calls: 'COMMUNITY', discordId: 'u2' }, {}, { channel: 'TELEGRAM' }, 'not json']) {
+    for (const body of [{ calls: 'SELECTED' }, { calls: 'COMMUNITY', discordId: 'u2' }, {}, 'not json']) {
       expect((await POST(post(body))).status).toBe(400)
     }
     expect(savePrefs).not.toHaveBeenCalled()

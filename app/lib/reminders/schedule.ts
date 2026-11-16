@@ -12,9 +12,11 @@ import { isCrewExcluded, type PostFilter } from '@/app/lib/calls/post-filters'
 
 export const MINUTE_MS = 60_000
 /** A reminder closer than this to the start is skipped: too late is worse than none. */
-export const MIN_LEAD_MS = 5 * MINUTE_MS
-/** The cron interval; the fetch horizon is the lead plus this much slack. */
-export const HORIZON_SLACK_MS = 10 * MINUTE_MS
+export const MIN_LEAD_MS = 2 * MINUTE_MS
+/** The cron interval is one minute; the fetch horizon is the longest lead plus this much slack. */
+export const HORIZON_SLACK_MS = 2 * MINUTE_MS
+/** The lead times a member can pick (minutes). */
+export const LEAD_CHOICES = [5, 10, 15, 30, 60] as const
 /** Crew id of the Community Call (the crew sheet slug). */
 export const COMMUNITY_CREW_ID = 'community_call'
 /** A reminder already sent for the same event this recently blocks another one (a moved call, until the correction DM exists). */
@@ -48,7 +50,7 @@ export const refKeyFor = (eventId: string, startsAt: Date): string => `${eventId
 /** The event id inside a call refKey ("<id>:<iso>"). */
 export const eventIdOf = (refKey: string): string => refKey.split(':')[0]
 
-/** Due when 0 < start - now <= lead and start - now > 5 minutes. */
+/** Due when start - now is at most the lead and more than MIN_LEAD_MS. */
 export function isDue(startsAt: Date, now: Date, leadMs: number): boolean {
   const d = startsAt.getTime() - now.getTime()
   return d > MIN_LEAD_MS && d <= leadMs
@@ -77,11 +79,26 @@ export function dueOccurrences(o: {
 
 export type CallsPref = 'NONE' | 'COMMUNITY' | 'MY_CREWS' | 'SELECTED'
 
+export type ChannelPref = 'AUTO' | 'DISCORD' | 'TELEGRAM' | 'BOTH'
+
 export interface PrefLite {
   discordId: string
   calls: CallsPref
   crewIds: readonly string[]
+  /** The member's own lead in minutes; null/absent uses the setting. */
+  leadMinutes?: number | null
+  /** Where to DM; absent or AUTO means Discord. */
+  channel?: ChannelPref
 }
+
+/** The channels a pref asks for: AUTO and DISCORD are Discord only. */
+export function channelsOf(pref: Pick<PrefLite, 'channel'>): { discord: boolean; telegram: boolean } {
+  const c = pref.channel ?? 'AUTO'
+  return { discord: c !== 'TELEGRAM', telegram: c === 'TELEGRAM' || c === 'BOTH' }
+}
+
+/** The member's lead in ms: their own pick, or the default. */
+export const leadMsFor = (pref: Pick<PrefLite, 'leadMinutes'>, defaultMinutes: number): number => (pref.leadMinutes ?? defaultMinutes) * MINUTE_MS
 
 const isCommunity = (crewId: string) => normalizeCrewId(crewId) === COMMUNITY_CREW_ID
 

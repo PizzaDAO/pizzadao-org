@@ -21,6 +21,23 @@ export function callReminderComponents(settingsUrl: string | null): unknown[] {
   return [{ type: 1, components: buttons }]
 }
 
+/**
+ * The Telegram copy of a call reminder: plain text (Telegram has no per-reader time tags, so the time is
+ * UTC) and one URL button to the settings page, where reminders are changed or stopped.
+ */
+export function callReminderTelegramText(o: { crewLabel: string; startsAt: Date; now: Date; guildId: string | null; eventId: string }): string {
+  const mins = Math.max(1, Math.round((o.startsAt.getTime() - o.now.getTime()) / 60_000))
+  const hh = String(o.startsAt.getUTCHours()).padStart(2, '0')
+  const mm = String(o.startsAt.getUTCMinutes()).padStart(2, '0')
+  const join = o.guildId ? `\nJoin: https://discord.com/events/${o.guildId}/${o.eventId}` : ''
+  const crew = o.crewLabel.replace(/\s+calls?$/i, '').trim() || o.crewLabel
+  return `⏰ ${crew} call starts in about ${mins} min (${hh}:${mm} UTC).${join}`
+}
+
+export function callReminderTelegramButtons(settingsUrl: string | null): Array<Array<{ text: string; url: string }>> | undefined {
+  return settingsUrl ? [[{ text: 'Change or stop reminders', url: settingsUrl }]] : undefined
+}
+
 export const STOP_PROPOSALS_ID = 'rm:stop:proposals'
 
 const TITLE_MAX = 120

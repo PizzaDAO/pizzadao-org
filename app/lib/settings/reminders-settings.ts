@@ -25,8 +25,8 @@ function int(o: { key: string; label: string; help: string; min: number; max: nu
 const callsEnabled: SettingDef<boolean> = {
   key: 'reminders.callsEnabled',
   area: 'reminders',
-  label: 'Call reminders by Discord DM',
-  help: 'Send a short DM before each call to members who opted in on their profile page (Community Call, or also their crews). Each DM has a Stop button. Off: nothing is sent and the scheduler only logs what it would send. The REMINDERS_CALLS_ENABLED env var set to off always wins; previews never send.',
+  label: 'Call reminders by DM',
+  help: 'Send a short DM, on Discord and/or Telegram as each member chose, before each call to members who opted in on their profile page (Community Call, their crews, and calls they marked Interested on Discord). Discord DMs have a Stop button; Telegram DMs link to the settings page. Off: nothing is sent and the scheduler only logs what it would send. The REMINDERS_CALLS_ENABLED env var set to off always wins; previews never send.',
   schema: z.boolean(),
   default: false,
   onReadFailure: { value: false },
@@ -61,8 +61,8 @@ export const REMINDERS_SETTINGS = {
   'reminders.callLeadMinutes': int({
     key: 'reminders.callLeadMinutes',
     label: 'Call reminder lead time (minutes)',
-    help: 'How long before a call the DM goes out. The scheduler runs every 5 minutes, so it lands up to 5 minutes later than this. A call closer than 5 minutes away is skipped: too late is worse than none.',
-    min: 10,
+    help: 'The default for members who have not picked their own (5, 10, 15, 30 or 60 minutes on their profile page). The scheduler runs every minute. A call closer than 2 minutes away is skipped: too late is worse than none.',
+    min: 5,
     max: 1440,
     default: 60,
     unit: 'min',
@@ -70,7 +70,7 @@ export const REMINDERS_SETTINGS = {
   'reminders.maxSendsPerRun': int({
     key: 'reminders.maxSendsPerRun',
     label: 'Most reminders per scheduler run',
-    help: 'Caps one 5-minute run. The rest wait for the next run (a call reminder is only due for a limited time).',
+    help: 'Caps one scheduler run (every minute). The rest wait for the next run (a call reminder is only due for a limited time).',
     min: 1,
     max: 200,
     default: 40,
