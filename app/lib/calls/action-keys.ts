@@ -105,23 +105,27 @@ export function fillMissingKeys<T extends object>(items: T[]): { items: Array<T 
 
 /**
  * Make sure every stored action item of a call has a key (calls summarized before keys existed).
- * Read, assign and write under a per-call lock so two runs cannot hand out different keys.
+ * Read, assign and write under a per-call lock (reviewer saves take the same lock) with a write guarded by updatedAt, so two runs cannot hand out different keys and a concurrent save is never overwritten.
  * Returns the items, or [] when the call or its list is missing.
  */
 export async function ensureActionKeys(recordingId: string): Promise<Array<{ key: string; text: string; owner?: string }>> {
   return prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'action-keys:' + recordingId}))`
-    const rec = await tx.callRecording.findUnique({ where: { id: recordingId }, select: { actionItems: true } })
-    if (!rec || !Array.isArray(rec.actionItems)) return []
     const isObj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x)
-    const raw = (rec.actionItems as unknown[]).filter(isObj)
-    const { items, changed } = fillMissingKeys(raw)
-    if (changed) {
-      // Entries that are not objects (never written by the app) stay where they are.
-      let n = 0
-      const all = (rec.actionItems as unknown[]).map((x) => (isObj(x) ? items[n++] : x))
-      await tx.callRecording.update({ where: { id: recordingId }, data: { actionItems: all as unknown as Prisma.InputJsonValue } })
+    // The write only lands when nobody saved the call since we read it (updatedAt); otherwise read again.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const rec = await tx.callRecording.findUnique({ where: { id: recordingId }, select: { actionItems: true, updatedAt: true } })
+      if (!rec || !Array.isArray(rec.actionItems)) return []
+      const { items, changed } = fillMissingKeys((rec.actionItems as unknown[]).filter(isObj))
+      if (changed) {
+        // Entries that are not objects (never written by the app) stay where they are.
+        let n = 0
+        const all = (rec.actionItems as unknown[]).map((x) => (isObj(x) ? items[n++] : x))
+        const res = await tx.callRecording.updateMany({ where: { id: recordingId, updatedAt: rec.updatedAt }, data: { actionItems: all as unknown as Prisma.InputJsonValue } })
+        if (res.count !== 1) continue
+      }
+      return items.map((i) => ({ key: i.key, text: str(i.text), ...(typeof i.owner === 'string' && i.owner ? { owner: i.owner } : {}) }))
     }
-    return items.map((i) => ({ key: i.key, text: str(i.text), ...(typeof i.owner === 'string' && i.owner ? { owner: i.owner } : {}) }))
+    return []
   })
 }

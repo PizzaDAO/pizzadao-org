@@ -163,6 +163,14 @@ describe('live status on: the fitter gives up bullets, then links, then items', 
     expect(markerCount(t)).toBeGreaterThan(0)
   })
 
+  it('when not even one item fits, the "+N more" line and the heading are still there', () => {
+    const huge = Array.from({ length: 3 }, (_, i) => ({ text: `Item ${i} ${'x'.repeat(400)}` }))
+    const out = buildRecapText(input({ summary: summary(4, 380), actionItems: huge, actionViews: huge.map(() => view('done')) }), base, undefined, { bullets: 5, actions: 10, chars: 400, minBullets: 4 })
+    expect(out.length).toBeLessThanOrEqual(2000)
+    expect(out).toContain('**Action items**')
+    expect(out).toMatch(/\+\d+ more on the call page/)
+  })
+
   it('the floor is configurable', () => {
     expect(bulletCount(build(10, 40, 20, 5))).toBe(5)
     expect(bulletCount(build(10, 90, 60, 0))).toBeLessThan(3)
@@ -261,7 +269,7 @@ describe('repostRecap: ifChanged, hash and gone', () => {
       const edit = vi.fn(async () => { throw new DiscordPostError('Unknown Message', status) })
       expect(await repostRecap('abc123', { edit: true, ifChanged: true }, { env: live, edit, base })).toBe('gone')
     }
-    expect(db.callRecording.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { recapError: 'edit failed: Unknown Message' } }))
+    expect(db.callRecording.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { recapError: 'edit failed: gone: Unknown Message' } }))
     // Any other failure is just "failed".
     const edit = vi.fn(async () => { throw new DiscordPostError('Server error', 500) })
     expect(await repostRecap('abc123', { edit: true }, { env: live, edit, base })).toBe('failed')

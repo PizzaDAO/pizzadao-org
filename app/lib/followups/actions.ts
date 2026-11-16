@@ -11,7 +11,7 @@ import { DAY_MS } from './quiet-hours'
 import { OPEN_AFTER_SEND } from './state'
 import { addEvent, guardedTransition, optOut } from './store'
 import { requestRecapRefresh } from '@/app/lib/calls/recap-refresh'
-import { checkDoneUrl, doneUrlHost } from './done-url'
+import { checkDoneUrl, doneUrlHost, linkOffered } from './done-url'
 
 export const MAX_REPLY_CHARS = 1000
 /** Replies on one row alert the approvers at most once per this long; replies in between are merged. */
@@ -108,6 +108,9 @@ export async function applyMemberAction(a: {
   }
 }
 
+/** Most times one follow-up's finished-work link may be set or changed by the member. */
+export const MAX_LINK_CHANGES = 5
+
 /**
  * The member adds (or changes) the link to the finished work on a follow-up they marked done. The
  * link is shown publicly with the call recap, so it is validated (http(s) only, post filter) and an
@@ -117,14 +120,18 @@ export async function setDoneUrl(a: { followUpId: string; discordId: string; act
   const row = await prisma.followUp.findUnique({ where: { id: a.followUpId } })
   if (!row) return { ok: false, reason: 'not-found' }
   if (!row.ownerDiscordId || row.ownerDiscordId !== a.discordId) return { ok: false, reason: 'not-yours' }
-  if (row.status !== 'DONE') return { ok: false, reason: 'closed' }
+  // Off (live status or member links) or not tied to an action item: there is no link feature for this member.
+  if (row.status !== 'DONE' || !(await linkOffered(row))) return { ok: false, reason: 'closed' }
   const url = await checkDoneUrl(a.url)
   if (!url) return { ok: false, reason: 'bad-url' }
+  if (url === row.doneUrl) return { ok: true, kind: 'link', status: 'DONE' }
+  // A link can be changed only a few times: each change alerts the approvers, so none can reach the recap unseen.
+  const changes = (await prisma.followUpEvent.count({ where: { followUpId: row.id, type: 'done-link' } })) ?? 0
+  if (changes >= MAX_LINK_CHANGES) return { ok: false, reason: 'closed' }
   const res = await prisma.followUp.updateMany({ where: { id: row.id, status: 'DONE' }, data: { doneUrl: url, doneUrlAt: new Date(), doneUrlBy: a.actorId } })
   if (res.count !== 1) return { ok: false, reason: 'closed' }
   await addEvent(row.id, 'done-link', a.actorId, { host: doneUrlHost(url) })
-  if (row.recordingId && row.actionKey) await requestRecapRefresh(row.recordingId, 'done-link')
-  // One approver alert (within the member's daily cap) so a human sees what will show up publicly.
-  const alert = await takeAlertSlot(row.id, a.discordId, 'done-link', a.actorId)
-  return { ok: true, kind: 'link', status: 'DONE', ...(alert ? { notify: `${row.ownerName} added a link for "${row.ask}": ${doneUrlHost(url)}` } : {}) }
+  if (row.recordingId) await requestRecapRefresh(row.recordingId, 'done-link')
+  // Every set or change alerts the approvers (outside the daily help-alert cap) so a human sees what will show up publicly.
+  return { ok: true, kind: 'link', status: 'DONE', notify: `${row.ownerName} ${row.doneUrl ? 'changed' : 'added'} a link for "${row.ask}": ${doneUrlHost(url)}` }
 }

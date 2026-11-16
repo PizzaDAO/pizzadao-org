@@ -9,7 +9,7 @@ import { prisma } from '@/app/lib/db'
 import { loadSettings } from '@/app/lib/settings'
 import { settingInt } from '@/app/lib/settings/numbers'
 import { toggleEnabled } from '@/app/lib/settings/toggles'
-import { repostRecap, type PostRecapDeps } from '@/app/lib/calls/recap'
+import { EDIT_GONE_PREFIX, repostRecap, type PostRecapDeps } from '@/app/lib/calls/recap'
 import type { editDiscordMessage } from '@/app/lib/discord-rest'
 
 const MIN_MS = 60_000
@@ -27,7 +27,8 @@ export async function requestRecapRefresh(recordingId: string, reason: string, n
     if (!(await toggleEnabled('calls.recapLiveStatusEnabled'))) return false
     const delay = settingInt('calls.recapRefreshDelayMinutes', await loadSettings())
     const res = await prisma.callRecording.updateMany({
-      where: { id: recordingId, status: 'PUBLISHED', recapMessageId: { not: null }, recapRefreshAt: null },
+      // Not for a recap whose message is gone (deleted / no access): editing it can never work. A successful manual edit clears that note.
+      where: { id: recordingId, status: 'PUBLISHED', recapMessageId: { not: null }, recapRefreshAt: null, OR: [{ recapError: null }, { NOT: { recapError: { startsWith: EDIT_GONE_PREFIX } } }] },
       data: { recapRefreshAt: new Date(now.getTime() + delay * MIN_MS) },
     })
     return res.count > 0

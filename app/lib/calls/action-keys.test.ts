@@ -91,27 +91,50 @@ describe('fillMissingKeys', () => {
 })
 
 describe('ensureActionKeys', () => {
-  const tx = { $executeRaw: vi.fn(), callRecording: { findUnique: vi.fn(), update: vi.fn() } }
+  const tx = { $executeRaw: vi.fn(), callRecording: { findUnique: vi.fn(), updateMany: vi.fn() } }
   beforeEach(() => {
     vi.resetAllMocks()
     vi.mocked(prisma.$transaction).mockImplementation((async (fn: (t: unknown) => unknown) => fn(tx)) as never)
   })
 
   it('writes keys for items that have none, under the per-call lock', async () => {
-    tx.callRecording.findUnique.mockResolvedValue({ actionItems: [{ text: 'A', owner: 'Ann' }, { text: 'B', key: 'bbbbbbbb' }] })
+    const at = new Date('2026-12-01T10:00:00Z')
+    tx.callRecording.updateMany.mockResolvedValue({ count: 1 })
+    tx.callRecording.findUnique.mockResolvedValue({ actionItems: [{ text: 'A', owner: 'Ann' }, { text: 'B', key: 'bbbbbbbb' }], updatedAt: at })
     const out = await ensureActionKeys('rec1')
     expect(tx.$executeRaw).toHaveBeenCalled()
     expect(out.map((o) => o.text)).toEqual(['A', 'B'])
     expect(out[1].key).toBe('bbbbbbbb')
-    const written = tx.callRecording.update.mock.calls[0][0].data.actionItems as Array<{ key: string; text: string }>
+    // Guarded: only lands when the call was not saved since it was read.
+    expect(tx.callRecording.updateMany.mock.calls[0][0].where).toEqual({ id: 'rec1', updatedAt: at })
+    const written = tx.callRecording.updateMany.mock.calls[0][0].data.actionItems as Array<{ key: string; text: string }>
     expect(written.map((w) => w.key)).toEqual(out.map((o) => o.key))
   })
 
   it('writes nothing when all items already have keys, and nothing for a missing call', async () => {
     tx.callRecording.findUnique.mockResolvedValue({ actionItems: [{ text: 'A', key: 'aaaaaaaa' }] })
     expect(await ensureActionKeys('rec1')).toEqual([{ key: 'aaaaaaaa', text: 'A' }])
-    expect(tx.callRecording.update).not.toHaveBeenCalled()
+    expect(tx.callRecording.updateMany).not.toHaveBeenCalled()
     tx.callRecording.findUnique.mockResolvedValue(null)
+    expect(await ensureActionKeys('rec1')).toEqual([])
+  })
+
+  it('a concurrent save (the guarded write matches nothing) is re-read, never overwritten', async () => {
+    const t1 = new Date('2026-12-01T10:00:00Z')
+    const t2 = new Date('2026-12-01T10:00:05Z')
+    tx.callRecording.findUnique
+      .mockResolvedValueOnce({ actionItems: [{ text: 'A' }], updatedAt: t1 })
+      .mockResolvedValueOnce({ actionItems: [{ text: 'A edited', key: 'eeeeeeee' }], updatedAt: t2 })
+    tx.callRecording.updateMany.mockResolvedValueOnce({ count: 0 })
+    const out = await ensureActionKeys('rec1')
+    // The saved version already had keys: it is returned as is and nothing else is written.
+    expect(out).toEqual([{ key: 'eeeeeeee', text: 'A edited' }])
+    expect(tx.callRecording.updateMany).toHaveBeenCalledTimes(1)
+  })
+
+  it('gives up with nothing (so nothing links) when the call keeps changing', async () => {
+    tx.callRecording.findUnique.mockResolvedValue({ actionItems: [{ text: 'A' }], updatedAt: new Date() })
+    tx.callRecording.updateMany.mockResolvedValue({ count: 0 })
     expect(await ensureActionKeys('rec1')).toEqual([])
   })
 })

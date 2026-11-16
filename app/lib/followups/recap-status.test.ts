@@ -27,6 +27,8 @@ beforeEach(() => {
   vi.resetAllMocks()
   vi.mocked(requestRecapRefresh).mockResolvedValue(true)
   vi.mocked(prisma.followUpEvent.create).mockResolvedValue({} as never)
+  vi.mocked(prisma.followUpEvent.count).mockResolvedValue(0 as never)
+  vi.stubEnv('CALL_RECAP_LIVE_STATUS_ENABLED', '1')
   vi.mocked(prisma.followUp.updateMany).mockResolvedValue({ count: 1 } as never)
   vi.mocked(prisma.followUp.update).mockResolvedValue({} as never)
   vi.mocked(prisma.appSetting.findMany).mockResolvedValue([])
@@ -112,6 +114,7 @@ describe('setDoneUrl', () => {
     const r = await set('https://www.example.org/docs/plan?x=1')
     expect(r).toMatchObject({ ok: true, kind: 'link', status: 'DONE' })
     expect((r as { notify?: string }).notify).toBe('Member A added a link for "Send the report": example.org')
+    expect(prisma.$transaction).not.toHaveBeenCalled() // not the shared daily help-alert cap
     expect(prisma.followUp.updateMany).toHaveBeenCalledWith({ where: { id: ID, status: 'DONE' }, data: { doneUrl: 'https://www.example.org/docs/plan?x=1', doneUrlAt: expect.any(Date), doneUrlBy: '111' } })
     expect(prisma.followUpEvent.create).toHaveBeenCalledWith({ data: expect.objectContaining({ type: 'done-link', data: { host: 'example.org' } }) })
     expect(requestRecapRefresh).toHaveBeenCalledWith('rec1', 'done-link')
@@ -133,16 +136,34 @@ describe('setDoneUrl', () => {
     expect(requestRecapRefresh).not.toHaveBeenCalled()
   })
 
-  it('no refresh for a follow-up that is not linked to an item', async () => {
-    await set('https://example.org/x', { actionKey: null })
+  it('not offered (closed, nothing stored) when the follow-up is not tied to an item, or either switch is off', async () => {
+    expect(await set('https://example.org/x', { actionKey: null })).toEqual({ ok: false, reason: 'closed' })
+    vi.stubEnv('CALL_RECAP_LIVE_STATUS_ENABLED', '')
+    expect(await set('https://example.org/x')).toEqual({ ok: false, reason: 'closed' })
+    vi.stubEnv('CALL_RECAP_LIVE_STATUS_ENABLED', '1')
+    vi.stubEnv('CALL_RECAP_MEMBER_LINKS_ENABLED', '0')
+    expect(await set('https://example.org/x')).toEqual({ ok: false, reason: 'closed' })
+    expect(prisma.followUp.updateMany).not.toHaveBeenCalled()
     expect(requestRecapRefresh).not.toHaveBeenCalled()
   })
 
-  it('no alert past the daily cap, the link is still stored', async () => {
-    vi.mocked(prisma.$transaction).mockImplementation((async (fn: (tx: unknown) => unknown) => fn({ $executeRaw: vi.fn(), followUpEvent: { count: vi.fn(async () => 99), create: vi.fn() } })) as never)
-    const r = await set('https://example.org/x')
-    expect(r).toMatchObject({ ok: true, kind: 'link' })
-    expect((r as { notify?: string }).notify).toBeUndefined()
+  it('every change alerts the approvers, however many alerts the member already caused; the same link again is quiet', async () => {
+    const r = await set('https://example.org/second', { doneUrl: 'https://example.org/first' })
+    expect((r as { notify?: string }).notify).toBe('Member A changed a link for "Send the report": example.org')
+    const same = await set('https://example.org/first', { doneUrl: 'https://example.org/first' })
+    expect(same).toMatchObject({ ok: true, kind: 'link' })
+    expect((same as { notify?: string }).notify).toBeUndefined()
+  })
+
+  it('a link can be changed only a few times (each change is an approver alert)', async () => {
+    vi.mocked(prisma.followUpEvent.count).mockResolvedValue(5 as never)
+    expect(await set('https://example.org/x')).toEqual({ ok: false, reason: 'closed' })
+    expect(prisma.followUp.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('a valid link that is too long once normalized is a validation error, not a crash', async () => {
+    const long = `https://exämple.org/${'ü'.repeat(200)}`
+    expect(await set(long)).toEqual({ ok: false, reason: 'bad-url' })
   })
 })
 
@@ -154,6 +175,11 @@ describe('linkFollowUp (reviewer)', () => {
   it('links to a key the call has, in any status, and logs it', async () => {
     await linkFollowUp(ID, 'admin1', { actionKey: 'kkkkkkkk' })
     expect(prisma.followUp.update).toHaveBeenCalledWith({ where: { id: ID }, data: { actionKey: 'kkkkkkkk' } })
+    // An item that had no key when the page was drawn is addressed by number (the keys exist by now).
+    vi.mocked(prisma.followUp.update).mockClear()
+    await linkFollowUp(ID, 'admin1', { actionKey: '#1' })
+    expect(prisma.followUp.update).toHaveBeenCalledWith({ where: { id: ID }, data: { actionKey: 'kkkkkkkk' } })
+    await expect(linkFollowUp(ID, 'admin1', { actionKey: '#9' })).rejects.toMatchObject({ status: 400 })
     expect(prisma.followUpEvent.create).toHaveBeenCalledWith({ data: expect.objectContaining({ type: 'linked', actorId: 'admin1', data: { from: null, to: 'kkkkkkkk' } }) })
     expect(requestRecapRefresh).toHaveBeenCalledWith('rec1', 'admin-link')
   })

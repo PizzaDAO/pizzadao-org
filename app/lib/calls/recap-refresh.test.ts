@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/app/lib/db')
-vi.mock('@/app/lib/calls/recap', () => ({ repostRecap: vi.fn(async () => 'updated') }))
+vi.mock('@/app/lib/calls/recap', () => ({ repostRecap: vi.fn(async () => 'updated'), EDIT_GONE_PREFIX: 'edit failed: gone: ' }))
 
 import { prisma } from '@/app/lib/db'
 import { repostRecap } from '@/app/lib/calls/recap'
@@ -33,9 +33,15 @@ describe('requestRecapRefresh', () => {
   it('schedules one edit after the delay, only for a published, posted recap with no pending time', async () => {
     expect(await requestRecapRefresh('rec1', 'test', NOW)).toBe(true)
     expect(db.callRecording.updateMany).toHaveBeenCalledWith({
-      where: { id: 'rec1', status: 'PUBLISHED', recapMessageId: { not: null }, recapRefreshAt: null },
+      where: { id: 'rec1', status: 'PUBLISHED', recapMessageId: { not: null }, recapRefreshAt: null, OR: [{ recapError: null }, { NOT: { recapError: { startsWith: 'edit failed: gone: ' } } }] },
       data: { recapRefreshAt: min(10) },
     })
+  })
+
+  it('is not scheduled for a recap whose message is gone (the guard excludes the "gone" note)', async () => {
+    await requestRecapRefresh('rec1', 'test', NOW)
+    const where = (db.callRecording.updateMany.mock.calls[0][0] as { where: { OR: unknown[] } }).where
+    expect(where.OR).toEqual([{ recapError: null }, { NOT: { recapError: { startsWith: 'edit failed: gone: ' } } }])
   })
 
   it('a burst of requests keeps the earliest time (the guard is "no pending time")', async () => {

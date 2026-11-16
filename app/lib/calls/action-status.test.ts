@@ -1,7 +1,10 @@
 // @vitest-environment node
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+vi.mock('@/app/lib/db')
 import type { FollowUpStatus } from '@prisma/client'
-import { deriveActionViews } from './action-status'
+import { prisma } from '@/app/lib/db'
+import { deriveActionViews, loadActionViews } from './action-status'
 import { EMPTY_POST_FILTER, type PostFilter } from './post-filters'
 
 const fu = (actionKey: string | null, status: FollowUpStatus, doneUrl: string | null = null) => ({ actionKey, status, doneUrl })
@@ -87,5 +90,18 @@ describe('deriveActionViews links', () => {
     const v = deriveActionViews([item('a')], [fu('a', 'DONE', 'https://example.org/secretproject/doc'), fu('a', 'DONE', 'https://example.org/ok')], { memberLinks: true, filter })[0]
     expect(v.state).toBe('done')
     expect(v.links.map((l) => l.url)).toEqual(['https://example.org/ok'])
+  })
+})
+
+describe('loadActionViews fails closed when the post filter cannot be read', () => {
+  it('a null filter hides member links but keeps the reviewers\' marks and the follow-up status', async () => {
+    vi.mocked(prisma.appSetting.findMany).mockResolvedValue([])
+    vi.mocked(prisma.followUp.findMany).mockResolvedValue([{ actionKey: 'a', status: 'DONE', doneUrl: 'https://example.org/work' }] as never)
+    const items = [item('a'), item('b', { done: true, evidence: [{ url: 'https://example.org/ev' }] })]
+    const closed = await loadActionViews({ id: 'r1', actionItems: items }, null)
+    expect(closed[0]).toMatchObject({ state: 'done', links: [] })
+    expect(closed[1].links.map((l) => l.url)).toEqual(['https://example.org/ev'])
+    const open = await loadActionViews({ id: 'r1', actionItems: items }, EMPTY_POST_FILTER)
+    expect(open[0].links.map((l) => l.url)).toEqual(['https://example.org/work'])
   })
 })

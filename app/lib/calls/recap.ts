@@ -352,10 +352,11 @@ function fitStatusRecap(head: string, bullets: string[], actions: ActionLine[], 
   const compose = (nb: number, linkN: number, kept: number): string[] => {
     const out = [head]
     if (nb > 0) out.push('', ...bullets.slice(0, nb).map((b) => `- ${b}`))
-    if (kept > 0) {
+    if (actions.length > 0) {
       out.push('', '**Action items**', ...actions.slice(0, kept).map((a, i) => `${marker(a)} ${a.line}${i < linkN && a.link ? `: ${a.link}` : ''}`))
-      if (kept < actions.length) out.push(`+${actions.length - kept} more on the call page`)
     }
+    // Even when no item fits, say how many there are.
+    if (kept < actions.length) out.push(`+${actions.length - kept} more on the call page`)
     return [...out, ...tail]
   }
   const fits = (ls: string[]) => ls.join('\n').length <= DISCORD_MESSAGE_LIMIT
@@ -596,6 +597,8 @@ async function renderRecap(input: RecapInput & { source?: string | null; redacte
 export const recapHash = (content: string, allowedMentions: unknown): string => createHash('sha256').update(JSON.stringify([content, allowedMentions])).digest('hex')
 
 const EDIT_ERROR_PREFIX = 'edit failed: '
+/** The note of an edit that can never work (message deleted / no access): recap-refresh.ts schedules nothing for such a call. */
+export const EDIT_GONE_PREFIX = `${EDIT_ERROR_PREFIX}gone: `
 
 /** 'unchanged': the render equals the last one sent (ifChanged); 'gone': Discord says the message or channel is gone. */
 export type RepostResult = RecapResult | 'updated' | 'no-message' | 'unchanged' | 'gone'
@@ -639,7 +642,7 @@ export async function repostRecap(recordingId: string, opts: { edit?: boolean; i
     console.error('[calls/recap] edit failed:', msg)
     // The message was deleted or the bot lost access: retrying cannot help.
     if (err instanceof DiscordPostError && (err.status === 404 || err.status === 403)) {
-      await prisma.callRecording.updateMany({ where: { id: recordingId, OR: [{ recapError: null }, { recapError: { startsWith: EDIT_ERROR_PREFIX } }] }, data: { recapError: `${EDIT_ERROR_PREFIX}${msg}`.slice(0, 300) } })
+      await prisma.callRecording.updateMany({ where: { id: recordingId, OR: [{ recapError: null }, { recapError: { startsWith: EDIT_ERROR_PREFIX } }] }, data: { recapError: `${EDIT_GONE_PREFIX}${msg}`.slice(0, 300) } })
       return 'gone'
     }
     // Keep an earlier note (e.g. the original post's error); only an edit note is replaced.

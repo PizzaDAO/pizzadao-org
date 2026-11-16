@@ -53,14 +53,15 @@ export function deriveActionViews(items: unknown, followUps: readonly FollowUpSt
   })
 }
 
-/** Views for one call: a single query for its keyed follow-ups. A database error leaves the reviewers' marks only. */
-export async function loadActionViews(rec: { id: string; actionItems: unknown }, filter?: PostFilter): Promise<ActionView[]> {
-  const memberLinks = await toggleEnabled('calls.recapMemberLinksEnabled').catch(() => false)
+/** Views for one call: a single query for its keyed follow-ups. A null filter (unreadable) hides member links. A database error leaves the reviewers' marks only. */
+export async function loadActionViews(rec: { id: string; actionItems: unknown }, filter?: PostFilter | null): Promise<ActionView[]> {
+  // `null`: the post filter could not be read. Fail closed: no member-added links (the reviewers' own marks still show).
+  const memberLinks = filter !== null && (await toggleEnabled('calls.recapMemberLinksEnabled').catch(() => false))
   const followUps = await prisma.followUp
     .findMany({ where: { recordingId: rec.id, actionKey: { not: null } }, select: { actionKey: true, status: true, doneUrl: true } })
     .catch((err: unknown) => {
       console.error('[calls/action-status] follow-ups unavailable:', err instanceof Error ? err.message : err)
       return [] as FollowUpStatusRow[]
     })
-  return deriveActionViews(rec.actionItems, followUps, { memberLinks, filter })
+  return deriveActionViews(rec.actionItems, followUps, { memberLinks, filter: filter ?? undefined })
 }

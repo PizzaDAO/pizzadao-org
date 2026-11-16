@@ -48,6 +48,7 @@ export default async function FollowUpActionPage({ params }: Props) {
                     token={token}
                     action={action}
                     linkOnly={view.linkOnly}
+                    linkEnabled={view.linkOk}
                     labels={{
                         confirm: t(`actions.${action}.confirm`),
                         prompt: t(`actions.${action}.prompt`, { days: snoozeDays }),

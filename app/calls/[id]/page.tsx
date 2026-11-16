@@ -62,7 +62,7 @@ export default async function PublishedCallPage({ params }: Params) {
     const segments = showTranscript ? asSegments(rec.transcript) : [];
     const actionItems = (!showActionItems ? [] : Array.isArray(rec.actionItems) ? rec.actionItems : []) as Array<{ text?: string; owner?: string; suggestedBy?: string; done?: boolean; evidence?: unknown }>;
     // Live status (calls.recapLiveStatusEnabled): follow-up answers and finished-work links next to each item; off, only what the reviewers marked.
-    const views = actionItems.length > 0 && (await recapLiveStatusEnabled().catch(() => false)) ? await loadActionViews(rec, await loadPostFilter().catch(() => undefined)) : null;
+    const views = actionItems.length > 0 && (await recapLiveStatusEnabled().catch(() => false)) ? await loadActionViews(rec, await loadPostFilter().catch(() => null)) : null;
     const stateOf = (item: { done?: boolean }, i: number) => (views ? (views[i]?.state ?? null) : item.done ? "done" : null);
     const marked = actionItems.some((a, i) => stateOf(a, i) !== null);
     // Live Q&A and poll results of the call: gated like the action items (anonymous askers are never named).

@@ -29,7 +29,7 @@ type Labels = {
 const buttonClass = "rounded-lg border px-4 py-2 font-bold disabled:opacity-60";
 const border = { borderColor: "hsl(var(--rule-warm) / 0.55)" };
 
-export function ActionForm({ token, action, labels, linkOnly = false }: { token: string; action: string; labels: Labels; linkOnly?: boolean }) {
+export function ActionForm({ token, action, labels, linkOnly = false, linkEnabled = false }: { token: string; action: string; labels: Labels; linkOnly?: boolean; linkEnabled?: boolean }) {
     const [text, setText] = useState("");
     const [url, setUrl] = useState("");
     const [state, setState] = useState<"idle" | "busy" | "done" | "undone">("idle");
@@ -56,7 +56,7 @@ export function ActionForm({ token, action, labels, linkOnly = false }: { token:
     }
 
     async function confirm() {
-        if (await post(action === "reply" ? { text } : action === "done" && url.trim() ? { url: url.trim() } : {})) setState("done");
+        if (await post(action === "reply" ? { text } : action === "done" && linkEnabled && url.trim() ? { url: url.trim() } : {})) setState("done");
     }
 
     async function undo() {
@@ -96,7 +96,7 @@ export function ActionForm({ token, action, labels, linkOnly = false }: { token:
                     />
                 </label>
             )}
-            {action === "done" && (
+            {action === "done" && linkEnabled && (
                 <label className="grid gap-1">
                     <span className="text-sm text-foreground/60">{labels.linkLabel}</span>
                     <input

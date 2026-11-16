@@ -483,10 +483,24 @@ export type EditResult = 'ok' | 'not-found' | 'invalid'
  * call; a PUBLISHED call may not lose its title or summary.
  */
 export async function updateRecordingText(id: string, edit: RecordingTextEdit): Promise<EditResult> {
-  const rec = await prisma.callRecording.findUnique({ where: { id }, select: { id: true, status: true, title: true, summary: true, actionItems: true, chapters: true } })
-  if (!rec || rec.status === 'REJECTED') return 'not-found'
-  if (rec.status === 'PROCESSING') return 'invalid'
-  if (rec.status === 'PUBLISHED' && (edit.title === null || edit.summary === null)) return 'invalid'
+  // Action items carry keys that ensureActionKeys may be handing out: serialize with it on the same per-call lock.
+  const out =
+    edit.actionItems !== undefined
+      ? await prisma.$transaction(async (tx) => {
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'action-keys:' + id}))`
+          return updateRecordingTextIn(tx as unknown as typeof prisma, id, edit)
+        })
+      : await updateRecordingTextIn(prisma, id, edit)
+  // Only done / links changed on a published call: the posted recap follows by itself (live status on). Text edits keep using the "Update recap" button.
+  if (out.refresh) await requestRecapRefresh(id, 'review-status')
+  return out.result
+}
+
+async function updateRecordingTextIn(db: typeof prisma, id: string, edit: RecordingTextEdit): Promise<{ result: EditResult; refresh: boolean }> {
+  const rec = await db.callRecording.findUnique({ where: { id }, select: { id: true, status: true, title: true, summary: true, actionItems: true, chapters: true } })
+  if (!rec || rec.status === 'REJECTED') return { result: 'not-found', refresh: false }
+  if (rec.status === 'PROCESSING') return { result: 'invalid', refresh: false }
+  if (rec.status === 'PUBLISHED' && (edit.title === null || edit.summary === null)) return { result: 'invalid', refresh: false }
   const data: Prisma.CallRecordingUpdateInput = {}
   // A reviewer's words: automatic transcription/summary runs must never overwrite them.
   // Only a real change of the summary / action items / chapters text counts (a title-only or no-op save does not).
@@ -505,12 +519,10 @@ export async function updateRecordingText(id: string, edit: RecordingTextEdit): 
   // The server decides the keys: a key from the client is kept only when this call already had it.
   if (edit.actionItems !== undefined) data.actionItems = assignActionKeys(rec.actionItems, edit.actionItems) as unknown as Prisma.InputJsonValue
   if (edit.chapters !== undefined) data.chapters = edit.chapters as unknown as Prisma.InputJsonValue
-  if (Object.keys(data).length === 0) return 'ok'
-  await prisma.callRecording.update({ where: { id }, data })
-  // Only done / links changed on a published call: the posted recap follows by itself (live status on). Text edits keep using the "Update recap" button.
+  if (Object.keys(data).length === 0) return { result: 'ok', refresh: false }
+  await db.callRecording.update({ where: { id }, data })
   const textOnlyEdit = textChanged || (edit.title !== undefined && edit.title !== rec.title)
-  if (rec.status === 'PUBLISHED' && edit.actionItems !== undefined && !textOnlyEdit && !same(statusOf(rec.actionItems ?? []), statusOf(edit.actionItems))) await requestRecapRefresh(id, 'review-status')
-  return 'ok'
+  return { result: 'ok', refresh: rec.status === 'PUBLISHED' && edit.actionItems !== undefined && !textOnlyEdit && !same(statusOf(rec.actionItems ?? []), statusOf(edit.actionItems)) }
 }
 
 /**

@@ -185,7 +185,7 @@ export async function dismissFollowUp(id: string, actor: string): Promise<void> 
 }
 
 export interface FollowUpLinkPatch {
-  /** The stored action item this follow-up is about (its `key`), or null to unlink. */
+  /** The stored action item this follow-up is about (its `key`, or "#N" for the Nth item with text), or null to unlink. */
   actionKey?: string | null
   /** The finished-work link shown with the recap, or null to clear it. */
   doneUrl?: string | null
@@ -204,7 +204,11 @@ export async function linkFollowUp(id: string, actor: string, patch: FollowUpLin
     if (patch.actionKey !== null) {
       if (!row.recordingId) throw new FollowUpError(400, 'This follow-up does not belong to a call')
       const keys = await ensureActionKeys(row.recordingId)
-      if (!keys.some((k) => k.key === patch.actionKey)) throw new FollowUpError(400, 'Unknown action item')
+      // "#N": the Nth item with text, for items that had no key when the page was drawn (the keys exist now).
+      const byNumber = /^#(\d{1,2})$/.exec(patch.actionKey)
+      const resolved = byNumber ? keys.filter((k) => k.text)[Number(byNumber[1]) - 1]?.key : keys.find((k) => k.key === patch.actionKey)?.key
+      if (!resolved) throw new FollowUpError(400, 'Unknown action item')
+      patch = { ...patch, actionKey: resolved }
     }
     if (patch.actionKey !== row.actionKey) data.actionKey = patch.actionKey
   }

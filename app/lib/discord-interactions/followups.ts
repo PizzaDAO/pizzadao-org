@@ -11,6 +11,8 @@ import type { ActionResult } from '../followups/actions'
 
 export interface FollowUpInteractionDeps {
   respond: (a: { followUpId: string; discordId: string; action: FollowUpAction; text?: string }) => Promise<ActionResult>
+  /** Whether the finished-work link is offered for this follow-up and person (switches on, tied to an action item, theirs). */
+  canLink: (followUpId: string, discordId: string) => Promise<boolean>
   /** The member adds the finished-work link to a follow-up they marked done. */
   addLink: (a: { followUpId: string; discordId: string; url: string }) => Promise<ActionResult>
   /** Tell the approvers (route: after()). Must not block. */
@@ -28,7 +30,7 @@ function ack(r: ActionResult, action: FollowUpAction): string {
   if (!r.ok) return r.reason === 'bad-url' ? 'That does not look like a valid web link (http or https). Try again.' : r.reason === 'closed' ? 'This one is already closed.' : r.reason === 'empty' ? 'Write a reply first.' : r.reason === 'not-found' ? 'That message no longer exists.' : 'That message is not yours.'
   if (r.kind === 'stopped') return 'Done. You will not get these messages anymore.'
   if (r.kind === 'reply') return 'Thanks, passed it on.'
-  if (r.kind === 'link') return 'Thanks, the link was added. It shows with the call recap.'
+  if (r.kind === 'link') return 'Thanks, the link was added.'
   return action === 'done' ? 'Marked as done. Thanks!' : action === 'wip' ? 'Noted: you are on it.' : 'Noted: someone will reach out to help.'
 }
 
@@ -60,6 +62,7 @@ export async function handleFollowUpInteraction(i: Interaction, userId: string, 
   const lb = LINK_BUTTON_ID.exec(customId)
   if (lb) {
     if (!(await deps.owns(lb[1], userId))) return say('That message is not yours.')
+    if (!(await deps.canLink(lb[1], userId))) return say('This one is already closed.')
     const label = labelsFor(i.locale).addLink
     return {
       type: ResponseType.MODAL,
@@ -95,7 +98,7 @@ export async function handleFollowUpInteraction(i: Interaction, userId: string, 
   if (r.ok && r.notify) deps.notify(r.notify)
   const answer = say(ack(r, action))
   // Done stays one tap; an optional second tap adds the link to the finished work.
-  if (r.ok && action === 'done') {
+  if (r.ok && action === 'done' && (await deps.canLink(followUpId, userId))) {
     return { ...answer, data: { ...answer.data, components: [{ type: 1, components: [{ type: 2, style: 2, label: labelsFor(i.locale).addLink, custom_id: `fu:link:${followUpId}` }] }] } }
   }
   return answer

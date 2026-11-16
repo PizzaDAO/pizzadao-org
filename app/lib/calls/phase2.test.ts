@@ -77,6 +77,8 @@ beforeEach(() => {
   savedModel = process.env.CALL_SUMMARY_MODEL
   process.env.RECORDER_API_KEY = 'rec-key'
   delete process.env.CALL_SUMMARY_MODEL
+  // Action-item saves run in a transaction under the per-call key lock; the mock runs it against the same mocked client.
+  ;(prisma.$transaction as unknown as ReturnType<typeof vi.fn>).mockImplementation(async (fn: (t: unknown) => unknown) => fn(prisma))
 })
 afterEach(() => {
   if (savedKey === undefined) delete process.env.RECORDER_API_KEY
@@ -655,6 +657,18 @@ describe('reviewer edits', () => {
     db.callRecording.update.mockClear()
     await patch({ actionItems: [{ text: 'A', key: 'BAD KEY!' }] })
     expect(db.callRecording.update.mock.calls[0][0].data.actionItems[0].key).toMatch(/^[a-z0-9]{8}$/)
+  })
+
+  it('saving action items takes the per-call key lock; a save without them does not', async () => {
+    asReviewer()
+    db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'IN_REVIEW', actionItems: [] })
+    const raw = (prisma as unknown as { $executeRaw: ReturnType<typeof vi.fn> }).$executeRaw
+    raw.mockClear()
+    await patch({ actionItems: [{ text: 'A' }] })
+    expect(raw).toHaveBeenCalledTimes(1)
+    raw.mockClear()
+    await patch({ title: 'Only title' })
+    expect(raw).not.toHaveBeenCalled()
   })
 
   it('asks the posted recap to follow when only done / links changed on a published call', async () => {

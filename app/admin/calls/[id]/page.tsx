@@ -34,7 +34,6 @@ import { importedAllowed } from "@/app/lib/calls/imported";
 import { SpeakerLabel } from "../SpeakerLabel";
 import { UpdateRecap } from "../UpdateRecap";
 import { CallFollowUpLinks } from "../CallFollowUpLinks";
-import { ensureActionKeys } from "@/app/lib/calls/action-keys";
 import { settingInt } from "@/app/lib/settings/numbers";
 
 export const runtime = "nodejs";
@@ -60,8 +59,6 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
     }
 
     const { id } = await params;
-    // Calls summarized before action items had keys get them once a follow-up exists, so the panel below can link to them.
-    if ((await prisma.followUp.count({ where: { recordingId: id } }).catch(() => 0)) > 0) await ensureActionKeys(id).catch(() => []);
     const rec = await getRecording(id);
     if (!rec) notFound();
 
@@ -116,7 +113,8 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
     const tFollowUps = await getTranslations("adminFollowups");
     // The keyed items, labelled A1.. the way the drafting model saw them; the follow-up state beside each item (live status on only).
     const keyedItems = actionItems.flatMap((a) => (a.text && a.key ? [{ key: a.key, text: a.text }] : []));
-    const linkItems = actionItems.filter((a) => a.text).flatMap((a, i) => (a.key ? [{ key: a.key, label: `A${i + 1}`, text: a.text as string }] : []));
+    // Items without a key yet are offered as "#N" (their A-label number): the server hands out the keys when a link is saved, so this page never writes.
+    const linkItems = actionItems.filter((a) => a.text).map((a, i) => ({ key: a.key ?? `#${i + 1}`, label: `A${i + 1}`, text: a.text as string }));
     const followUpStates: Record<string, "in_progress" | "done"> = {};
     if (actionViews) {
         for (const it of keyedItems) {
