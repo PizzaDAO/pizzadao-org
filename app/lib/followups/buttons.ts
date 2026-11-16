@@ -15,16 +15,21 @@ export const REPLY_MODAL_PREFIX = 'fu:replymodal:'
 export const REPLY_INPUT_ID = 'fu:reply-input'
 export const BUTTON_ID = /^fu:(done|wip|help|reply|stop):([A-Za-z0-9]{20,40})$/
 export const MODAL_ID = /^fu:replymodal:([A-Za-z0-9]{20,40})$/
+/** "Add a link" after Done: the button on the ephemeral answer, the modal it opens and its one text input. */
+export const LINK_BUTTON_ID = /^fu:link:([A-Za-z0-9]{20,40})$/
+export const LINK_MODAL_PREFIX = 'fu:linkmodal:'
+export const LINK_MODAL_ID = /^fu:linkmodal:([A-Za-z0-9]{20,40})$/
+export const LINK_INPUT_ID = 'fu:link-input'
 
 export const buttonId = (action: FollowUpAction, id: string) => `fu:${action}:${id}`
 
 type Loc = 'en' | 'es' | 'fr'
-type Label = FollowUpAction | 'open' | 'openReply'
+type Label = FollowUpAction | 'open' | 'openReply' | 'addLink'
 
 const LABELS: Record<Loc, Record<Label, string>> = {
-  en: { done: 'Done', wip: 'On it', help: 'Need help', reply: 'Reply', stop: 'Stop these messages', snooze: 'Snooze', open: 'Open in app', openReply: 'Open / reply' },
-  es: { done: 'Hecho', wip: 'En ello', help: 'Necesito ayuda', reply: 'Responder', stop: 'Dejar de recibir estos mensajes', snooze: 'Posponer', open: 'Abrir en la app', openReply: 'Abrir / responder' },
-  fr: { done: 'Fait', wip: 'Je m\'en occupe', help: 'Besoin d\'aide', reply: 'Répondre', stop: 'Arrêter ces messages', snooze: 'Reporter', open: 'Ouvrir dans l\'app', openReply: 'Ouvrir / répondre' },
+  en: { done: 'Done', wip: 'On it', help: 'Need help', reply: 'Reply', stop: 'Stop these messages', snooze: 'Snooze', open: 'Open in app', openReply: 'Open / reply', addLink: 'Add a link to the finished work' },
+  es: { done: 'Hecho', wip: 'En ello', help: 'Necesito ayuda', reply: 'Responder', stop: 'Dejar de recibir estos mensajes', snooze: 'Posponer', open: 'Abrir en la app', openReply: 'Abrir / responder', addLink: 'Añadir un enlace al trabajo terminado' },
+  fr: { done: 'Fait', wip: 'Je m\'en occupe', help: 'Besoin d\'aide', reply: 'Répondre', stop: 'Arrêter ces messages', snooze: 'Reporter', open: 'Ouvrir dans l\'app', openReply: 'Ouvrir / répondre', addLink: 'Ajouter un lien vers le travail terminé' },
 }
 
 export function labelsFor(locale: string | null | undefined): Record<Label, string> {

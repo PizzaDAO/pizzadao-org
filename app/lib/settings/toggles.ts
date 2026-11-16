@@ -35,6 +35,10 @@ export const TOGGLES = {
   'calls.recapPostEnabled': { env: 'CALL_RECAP_POST_ENABLED', legacy: ON_WORDS },
   // On unless the env var is an explicit off (the kill switch): recap mentions notify the people they name.
   'calls.recapMentionPing': { env: 'CALL_RECAP_MENTION_PING_ENABLED', legacy: (raw) => !envKillsToggle(raw) },
+  // Off unless turned on: follow-up status (in progress / done), members' finished-work links and automatic edits of the posted recap.
+  'calls.recapLiveStatusEnabled': { env: 'CALL_RECAP_LIVE_STATUS_ENABLED', legacy: ON_WORDS },
+  // On unless the env var is an explicit off: members' finished-work links show in the recap (only while live status is on).
+  'calls.recapMemberLinksEnabled': { env: 'CALL_RECAP_MEMBER_LINKS_ENABLED', legacy: (raw) => !envKillsToggle(raw) },
   'calls.agendaPostEnabled': {
     env: 'CALL_AGENDA_POST_ENABLED',
     legacy: (raw) => ['true', '1'].includes((raw ?? '').trim().toLowerCase()),

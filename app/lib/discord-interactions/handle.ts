@@ -51,6 +51,8 @@ export interface Interaction {
   }
   member?: { user?: DiscordUser; roles?: string[]; joined_at?: string; nick?: string | null; avatar?: string | null }
   user?: DiscordUser
+  /** The user's Discord locale ("fr", "es-ES", ...). */
+  locale?: string
 }
 
 type AllowedMentions = { parse: string[]; users?: string[] }

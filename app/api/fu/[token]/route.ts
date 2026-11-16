@@ -1,6 +1,6 @@
 // app/api/fu/[token]/route.ts
 //
-// POST { text? , undo? }: run the action a signed follow-up link names (links.ts). The page only
+// POST { text?, url?, undo? }: run the action a signed follow-up link names (links.ts). The page only
 // ever shows a confirm button; nothing changes until this POST. There is no GET on purpose, so link
 // previews and prefetchers cannot mark things done or opt anyone out.
 
@@ -28,13 +28,13 @@ export async function POST(request: Request, ctx: Ctx) {
   const byToken = await checkKeyedRateLimit('followup-link-token', token)
   if (!byToken.success) return rateLimitResponse(byToken)
 
-  const b = (await request.json().catch(() => null)) as { text?: unknown; undo?: unknown } | null
-  const r = await performLinkAction(token, { text: typeof b?.text === 'string' ? b.text : undefined, undo: b?.undo === true }).catch((e) => {
+  const b = (await request.json().catch(() => null)) as { text?: unknown; url?: unknown; undo?: unknown } | null
+  const r = await performLinkAction(token, { text: typeof b?.text === 'string' ? b.text : undefined, url: typeof b?.url === 'string' ? b.url : undefined, undo: b?.undo === true }).catch((e) => {
     console.error('[followup link] failed:', e instanceof Error ? e.message.slice(0, 160) : 'error')
     return null
   })
   if (!r) return reply({ ok: false, reason: 'error' }, 500)
-  if (!r.ok) return reply({ ok: false, reason: r.reason }, r.reason === 'invalid' || r.reason === 'expired' || r.reason === 'not-found' ? 404 : r.reason === 'empty' ? 400 : 409)
+  if (!r.ok) return reply({ ok: false, reason: r.reason }, r.reason === 'invalid' || r.reason === 'expired' || r.reason === 'not-found' ? 404 : r.reason === 'empty' || r.reason === 'bad-url' ? 400 : 409)
   if ('notify' in r && r.notify) {
     const text = r.notify
     after(() => notifyApprovers(text).catch(() => 0))

@@ -34,9 +34,15 @@ describe('lookupLink (the page: it only looks)', () => {
   })
   it('a closed follow-up is shown as closed, but Stop always works', async () => {
     vi.mocked(prisma.followUp.findUnique).mockResolvedValue(row({ status: 'DONE' }) as never)
-    expect(await lookupLink(tok('done'))).toMatchObject({ ok: true, open: false })
+    expect(await lookupLink(tok('wip'))).toMatchObject({ ok: true, open: false })
     expect(await lookupLink(tok('stop'))).toMatchObject({ ok: true, open: true })
     expect(await lookupLink(tok('reply'))).toMatchObject({ ok: true, open: true })
+  })
+  it('a done link stays open after DONE, for the finished-work link only', async () => {
+    vi.mocked(prisma.followUp.findUnique).mockResolvedValue(row({ status: 'DONE' }) as never)
+    expect(await lookupLink(tok('done'))).toMatchObject({ ok: true, open: true, linkOnly: true })
+    vi.mocked(prisma.followUp.findUnique).mockResolvedValue(row({ status: 'SENT' }) as never)
+    expect(await lookupLink(tok('done'))).toMatchObject({ ok: true, open: true, linkOnly: false })
   })
   it('bad, expired and unknown links', async () => {
     expect(await lookupLink('nope')).toEqual({ ok: false, reason: 'invalid' })
@@ -66,6 +72,29 @@ describe('performLinkAction (the POST)', () => {
     expect(prisma.followUpEvent.create).toHaveBeenCalledWith({ data: expect.objectContaining({ type: 'snooze' }) })
     // No approver alert for a snooze.
     expect((r as { notify?: string }).notify).toBeUndefined()
+  })
+  it('done with a link marks it done and stores the link; a bad link is refused before anything changes', async () => {
+    vi.mocked(prisma.followUp.findUnique).mockResolvedValue(row() as never)
+    vi.mocked(prisma.$transaction).mockImplementation((async (fn: (tx: unknown) => unknown) => fn({ $executeRaw: vi.fn(), followUpEvent: { count: vi.fn(async () => 0), create: vi.fn() } })) as never)
+    expect(await performLinkAction(tok('done'), { url: 'javascript:alert(1)' })).toEqual({ ok: false, reason: 'bad-url' })
+    expect(prisma.followUp.updateMany).not.toHaveBeenCalled()
+    vi.mocked(prisma.followUp.findUnique).mockResolvedValueOnce(row() as never).mockResolvedValueOnce(row() as never).mockResolvedValue(row({ status: 'DONE' }) as never)
+    const r = await performLinkAction(tok('done'), { url: ' https://example.org/work ' })
+    expect(r).toMatchObject({ ok: true, kind: 'status', status: 'DONE' })
+    expect(prisma.followUp.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ doneUrl: 'https://example.org/work' }) }))
+  })
+  it('a blank link is no link: done works as before', async () => {
+    vi.mocked(prisma.followUp.findUnique).mockResolvedValue(row() as never)
+    expect(await performLinkAction(tok('done'), { url: '   ' })).toMatchObject({ ok: true, kind: 'status', status: 'DONE' })
+  })
+  it('after DONE the same link only adds or changes the finished-work link', async () => {
+    vi.mocked(prisma.followUp.findUnique).mockResolvedValue(row({ status: 'DONE' }) as never)
+    vi.mocked(prisma.$transaction).mockImplementation((async (fn: (tx: unknown) => unknown) => fn({ $executeRaw: vi.fn(), followUpEvent: { count: vi.fn(async () => 0), create: vi.fn() } })) as never)
+    expect(await performLinkAction(tok('done'), { url: 'https://example.org/later' })).toMatchObject({ ok: true, kind: 'link' })
+    expect(await performLinkAction(tok('done'))).toEqual({ ok: false, reason: 'bad-url' })
+    // No status transition was attempted.
+    expect(prisma.followUp.updateMany).toHaveBeenCalledTimes(1)
+    expect(prisma.followUp.updateMany).toHaveBeenCalledWith({ where: { id: ID, status: 'DONE' }, data: expect.objectContaining({ doneUrl: 'https://example.org/later' }) })
   })
   it('reply stores the text and still alerts the approvers', async () => {
     vi.mocked(prisma.followUp.findUnique).mockResolvedValue(row() as never)

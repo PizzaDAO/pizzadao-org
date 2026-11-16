@@ -46,6 +46,19 @@ describe('POST /api/fu/[token]', () => {
     expect(perform).toHaveBeenCalledWith('tok', { text: 'hello', undo: false })
     expect(notify).toHaveBeenCalledWith('Reply from Member A')
   })
+  it('passes the finished-work link, and a bad one is a 400', async () => {
+    perform.mockResolvedValue({ ok: true, kind: 'link', status: 'DONE' })
+    expect((await route.POST(post({ url: 'https://example.org/work' }), ctx)).status).toBe(200)
+    expect(perform).toHaveBeenCalledWith('tok', { text: undefined, url: 'https://example.org/work', undo: false })
+    perform.mockResolvedValue({ ok: false, reason: 'bad-url' })
+    const res = await route.POST(post({ url: 'javascript:alert(1)' }), ctx)
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({ ok: false, reason: 'bad-url' })
+    // A non-string url is ignored, not passed on.
+    perform.mockClear()
+    await route.POST(post({ url: 5 }), ctx)
+    expect(perform).toHaveBeenCalledWith('tok', { text: undefined, url: undefined, undo: false })
+  })
   it('maps refusals to statuses', async () => {
     for (const [reason, status] of [['invalid', 404], ['expired', 404], ['not-found', 404], ['empty', 400], ['closed', 409]] as const) {
       perform.mockResolvedValue({ ok: false, reason })

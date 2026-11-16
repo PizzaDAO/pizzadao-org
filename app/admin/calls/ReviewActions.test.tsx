@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest'
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }))
 
-import { stripEvidence as unticked, formatActionItems, formatChapters, invalidChapterLines, parseActionItems, parseChapters } from './ReviewActions'
+import { attachKeys, stripEvidence as unticked, formatActionItems, formatChapters, invalidChapterLines, parseActionItems, parseChapters } from './ReviewActions'
 
 describe('review form text formats', () => {
   it('round-trips action items with optional owners', () => {
@@ -84,5 +84,31 @@ describe('review form text formats', () => {
 
   it('flags chapter lines without a valid time', () => {
     expect(invalidChapterLines('12:30 ok\nno time\n\n5 also bad')).toEqual(['no time', '5 also bad'])
+  })
+})
+
+describe('action item keys in the editor', () => {
+  const loaded = [{ text: 'Send the deck', owner: 'Ann', key: 'aaaaaaaa' }, { text: 'Book the room', key: 'bbbbbbbb' }, { text: 'Book the room', key: 'cccccccc' }]
+
+  it('the text format never shows or changes keys', () => {
+    expect(formatActionItems(loaded)).toBe('Send the deck | Ann\nBook the room\nBook the room')
+    expect(parseActionItems(formatActionItems(loaded)).every((i) => !('key' in i))).toBe(true)
+  })
+
+  it('puts the keys back by position and text, also after a reorder or a deleted line', () => {
+    const parsed = parseActionItems('Book the room\nSend the deck | Ann')
+    expect(attachKeys(parsed, loaded).map((i) => i.key)).toEqual(['bbbbbbbb', 'aaaaaaaa'])
+    expect(attachKeys(parseActionItems('Send the deck | Ann\nBook the room\nBook the room'), loaded).map((i) => i.key)).toEqual(['aaaaaaaa', 'bbbbbbbb', 'cccccccc'])
+  })
+
+  it('never gives one key twice, and leaves reworded or new items without (the server decides)', () => {
+    const out = attachKeys(parseActionItems('Book the room\nBook the room\nBook the room\nSomething new'), loaded)
+    expect(out.map((i) => i.key)).toEqual(['bbbbbbbb', 'cccccccc', undefined, undefined])
+    expect(attachKeys(parseActionItems('Send the deck to the venue | Ann'), loaded)[0].key).toBeUndefined()
+  })
+
+  it('keeps done and evidence while attaching', () => {
+    const [i] = attachKeys(parseActionItems('[x] Send the deck | Ann | ev: https://example.org/a'), loaded)
+    expect(i).toMatchObject({ key: 'aaaaaaaa', done: true, evidence: [{ url: 'https://example.org/a' }] })
   })
 })

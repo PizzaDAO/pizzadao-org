@@ -11,6 +11,9 @@ import { fetchAllMembers } from '@/app/lib/sheets/members-list'
 import { addEvent, guardedTransition } from './store'
 import { canTransition, EDITABLE } from './state'
 import { resolveOwner, normalizeName, type MemberRef } from './resolve'
+import { ensureActionKeys } from '@/app/lib/calls/action-keys'
+import { requestRecapRefresh } from '@/app/lib/calls/recap-refresh'
+import { checkDoneUrl, doneUrlHost } from './done-url'
 
 export const MAX_MESSAGE_CHARS = 1500
 
@@ -168,7 +171,7 @@ export async function approveFollowUp(id: string, actor: string, opts: { escalat
 }
 
 export async function dismissFollowUp(id: string, actor: string): Promise<void> {
-  const row = await prisma.followUp.findUnique({ where: { id }, select: { status: true, sendAfter: true, sendAttemptAt: true } })
+  const row = await prisma.followUp.findUnique({ where: { id }, select: { status: true, sendAfter: true, sendAttemptAt: true, recordingId: true, actionKey: true } })
   if (!row) throw new FollowUpError(404, 'Not found')
   if (!canTransition(row.status, 'DISMISSED')) throw new FollowUpError(409, 'This follow-up can no longer be dismissed')
   // A send is in flight (attempt marker + live lease): dismissing now could not stop it.
@@ -177,6 +180,52 @@ export async function dismissFollowUp(id: string, actor: string): Promise<void> 
   }
   const ok = await guardedTransition(id, row.status, 'DISMISSED', { sendAfter: null }, { type: 'dismissed', actorId: actor })
   if (!ok) throw new FollowUpError(409, 'This follow-up changed; reload and retry')
+  // A dismissed in-progress row no longer shows on the recap.
+  if (row.recordingId && row.actionKey && (row.status === 'IN_PROGRESS' || row.status === 'NEEDS_HELP')) await requestRecapRefresh(row.recordingId, 'dismissed')
+}
+
+export interface FollowUpLinkPatch {
+  /** The stored action item this follow-up is about (its `key`), or null to unlink. */
+  actionKey?: string | null
+  /** The finished-work link shown with the recap, or null to clear it. */
+  doneUrl?: string | null
+}
+
+/**
+ * Reviewer link between a follow-up and an action item, and the finished-work link. Works in any
+ * status (also the unlink that overrides a member's wrong status). The key is checked against the
+ * call's own items; the link against the same rules as a member's. Asks the recap to refresh.
+ */
+export async function linkFollowUp(id: string, actor: string, patch: FollowUpLinkPatch): Promise<void> {
+  const row = await prisma.followUp.findUnique({ where: { id }, select: { id: true, recordingId: true, actionKey: true, doneUrl: true } })
+  if (!row) throw new FollowUpError(404, 'Not found')
+  const data: Prisma.FollowUpUpdateManyMutationInput = {}
+  if (patch.actionKey !== undefined) {
+    if (patch.actionKey !== null) {
+      if (!row.recordingId) throw new FollowUpError(400, 'This follow-up does not belong to a call')
+      const keys = await ensureActionKeys(row.recordingId)
+      if (!keys.some((k) => k.key === patch.actionKey)) throw new FollowUpError(400, 'Unknown action item')
+    }
+    if (patch.actionKey !== row.actionKey) data.actionKey = patch.actionKey
+  }
+  let host: string | null = null
+  if (patch.doneUrl !== undefined) {
+    if (patch.doneUrl === null) {
+      if (row.doneUrl) Object.assign(data, { doneUrl: null, doneUrlAt: null, doneUrlBy: null })
+    } else {
+      const url = await checkDoneUrl(patch.doneUrl)
+      if (!url) throw new FollowUpError(400, 'The link must be a plain http(s) address that passes the post filter')
+      if (url !== row.doneUrl) {
+        Object.assign(data, { doneUrl: url, doneUrlAt: new Date(), doneUrlBy: actor })
+        host = doneUrlHost(url)
+      }
+    }
+  }
+  if (Object.keys(data).length === 0) return
+  await prisma.followUp.update({ where: { id }, data })
+  if ('actionKey' in data) await addEvent(id, 'linked', actor, { from: row.actionKey, to: patch.actionKey ?? null })
+  if ('doneUrl' in data) await addEvent(id, 'done-link', actor, { host: host ?? 'cleared' })
+  if (row.recordingId) await requestRecapRefresh(row.recordingId, 'admin-link')
 }
 
 /** Redo the people match from the name (DRAFT rows only). */

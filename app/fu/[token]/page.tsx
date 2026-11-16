@@ -39,7 +39,7 @@ export default async function FollowUpActionPage({ params }: Props) {
     const action = view.claims.a;
     return (
         <EditorialPage width="max-w-[560px]">
-            <EditorialMasthead overline={t("overline")} title={t(`actions.${action}.title`)} dek={t("askIntro")} />
+            <EditorialMasthead overline={t("overline")} title={view.linkOnly ? t("addLinkTitle") : t(`actions.${action}.title`)} dek={t("askIntro")} />
             <section className={`${paperCard} mb-5 grid gap-2 p-5`}>
                 <p className="m-0 whitespace-pre-wrap font-bold">{view.ask}</p>
             </section>
@@ -47,6 +47,7 @@ export default async function FollowUpActionPage({ params }: Props) {
                 <ActionForm
                     token={token}
                     action={action}
+                    linkOnly={view.linkOnly}
                     labels={{
                         confirm: t(`actions.${action}.confirm`),
                         prompt: t(`actions.${action}.prompt`, { days: snoozeDays }),
@@ -61,6 +62,11 @@ export default async function FollowUpActionPage({ params }: Props) {
                         error: t("error"),
                         closed: t("closed.body"),
                         working: t("working"),
+                        linkLabel: t("linkLabel"),
+                        linkHelp: t("linkHelp"),
+                        linkSaved: t("linkSaved"),
+                        badUrl: t("badUrl"),
+                        saveLink: t("saveLink"),
                     }}
                 />
             ) : (

@@ -37,6 +37,9 @@ export interface ReviewLabels {
     publishNeedsContent: string;
     working: string;
     error: string;
+    /** Shown beside an item whose linked follow-ups say it is in progress / done (live status on). */
+    followUpInProgress?: string;
+    followUpDone?: string;
 }
 
 type Busy = "save" | "regenerate" | "publish" | null;
@@ -48,6 +51,8 @@ export interface ActionItem {
     done?: boolean;
     /** Links showing a done item was completed (up to 3). The editor shows them as a trailing " | ev: url url" segment. */
     evidence?: Evidence[];
+    /** Stable id of the stored item (set by the server). The editor never shows it; it is sent back so a reworded item keeps its follow-up links. */
+    key?: string;
 }
 export interface Chapter {
     startMs: number;
@@ -128,6 +133,22 @@ export function parseActionItems(raw: string): ActionItem[] {
         })
         .filter((i) => i.text);
 }
+/**
+ * Put back the keys of the items the editor loaded: the item at the same position with the same text,
+ * else an unused item with the same text. Anything else is left without (the server then matches by
+ * position / similarity or gives it a new key, and never trusts a key it does not know).
+ */
+export function attachKeys(parsed: ActionItem[], initial: ActionItem[]): ActionItem[] {
+    const norm = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
+    const used = new Set<string>();
+    return parsed.map((p, i) => {
+        const here = initial[i];
+        const cand = here?.key && !used.has(here.key) && norm(here.text) === norm(p.text) ? here : initial.find((x) => x.key && !used.has(x.key) && norm(x.text) === norm(p.text));
+        if (!cand?.key) return p;
+        used.add(cand.key);
+        return { ...p, key: cand.key };
+    });
+}
 /** "m:ss Title" or "h:mm:ss Title" per line. */
 export function formatChapters(chapters: Chapter[]): string {
     return chapters.map((c) => `${clock(c.startMs)} ${c.title}`).join("\n");
@@ -159,6 +180,7 @@ export function ReviewActions({
     initialSummary,
     initialActionItems,
     initialChapters,
+    followUpStates,
     labels,
 }: {
     recordingId: string;
@@ -167,6 +189,8 @@ export function ReviewActions({
     initialSummary: string;
     initialActionItems: ActionItem[];
     initialChapters: Chapter[];
+    /** Item key -> what its linked follow-ups say (only passed while live status is on). */
+    followUpStates?: Record<string, "in_progress" | "done">;
     labels: ReviewLabels;
 }) {
     const router = useRouter();
@@ -224,7 +248,7 @@ export function ReviewActions({
             body: JSON.stringify({
                 title,
                 summary,
-                actionItems: parseActionItems(actionItems),
+                actionItems: attachKeys(parseActionItems(actionItems), initialActionItems),
                 chapters: parseChapters(chapters),
             }),
         });
@@ -277,11 +301,12 @@ export function ReviewActions({
             </label>
             {parseActionItems(actionItems).length > 0 && (
                 <div className="grid gap-1">
-                    {parseActionItems(actionItems).map((it, i) => (
+                    {attachKeys(parseActionItems(actionItems), initialActionItems).map((it, i) => (
                         <div key={i} className="grid gap-1">
                             <label className="flex items-center gap-2 text-sm">
                                 <input type="checkbox" checked={!!it.done} onChange={() => toggleDone(i)} aria-label={`${labels.actionItemDone}: ${it.text}`} />
                                 <span className={it.done ? "text-foreground/60" : undefined}>{it.text}</span>
+                                {it.key && followUpStates?.[it.key] && <span className="text-xs text-foreground/60">{followUpStates[it.key] === "done" ? labels.followUpDone : labels.followUpInProgress}</span>}
                             </label>
                             {it.done && (
                                 <input

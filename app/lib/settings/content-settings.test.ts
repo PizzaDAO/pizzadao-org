@@ -63,6 +63,9 @@ describe('content settings: lock to today\'s values', () => {
       ['calls.recapMaxBullets', 5],
       ['calls.recapMaxActions', 10],
       ['calls.recapBulletChars', 220],
+      ['calls.recapRefreshDelayMinutes', 10],
+      ['calls.recapRefreshMaxDays', 60],
+      ['calls.recapMinBullets', 3],
       ['calls.summaryModel', ''],
       ['calls.summaryPromptExtra', ''],
       ['calls.agendaLeadMinutes', 30],
@@ -203,6 +206,7 @@ describe('content settings: bounds', () => {
   it('numbers are bounded on both sides and whole', () => {
     const cases: Array<[SettingKey, number, number]> = [
       ['calls.recapMaxBullets', 1, 10], ['calls.recapMaxActions', 1, 10], ['calls.recapBulletChars', 80, 400],
+      ['calls.recapRefreshDelayMinutes', 1, 120], ['calls.recapRefreshMaxDays', 1, 365], ['calls.recapMinBullets', 0, 10],
       ['calls.agendaLeadMinutes', 10, 120], ['calls.agendaMaxBullets', 1, 10], ['calls.agendaMaxTasks', 1, 10],
       ['calls.agendaMaxFollowups', 0, 5], ['calls.agendaItemChars', 40, 200],
       ['reengage.callWindowDays', 1, 30], ['reengage.sendWeekday', 0, 6],
