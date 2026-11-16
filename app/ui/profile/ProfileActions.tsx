@@ -27,7 +27,8 @@ export type ProfileActionsMode = "public" | "owner-readonly" | "owner-edit";
 interface ProfileActionsProps {
     memberId: string;
     mode: ProfileActionsMode;
-    viewerId: string | null;
+    /** undefined = viewer not resolved yet: render a placeholder, never the signed-out CTA. */
+    viewerId: string | null | undefined;
     /** When true, hide the kebab "Send PEP" item (e.g., self-view doesn't need it). */
     hideSendPep?: boolean;
 }
@@ -116,6 +117,17 @@ export function ProfileActions({
                 targetMemberId={memberId}
                 currentMemberId={viewerId}
             />
+        );
+    } else if (viewerId === undefined) {
+        primary = (
+            <span
+                data-testid="vouch-placeholder"
+                aria-hidden
+                className="btn-pill pointer-events-none"
+                style={{ background: "hsl(var(--cream) / 0.15)", color: "transparent" }}
+            >
+                Sign in to vouch
+            </span>
         );
     } else if (!viewerId) {
         const returnTo = encodeURIComponent(`/profile/${memberId}`);

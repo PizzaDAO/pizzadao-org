@@ -90,6 +90,21 @@ describe("ProfileHero", () => {
         expect(signIn.getAttribute("href")).toContain(encodeURIComponent("/profile/14071"));
     });
 
+    it("unknown viewer renders a placeholder, not the sign-in link or a vouch button", () => {
+        render(<ProfileHero {...base} mode="public" viewerId={undefined} />);
+        expect(screen.getByTestId("vouch-placeholder")).toBeTruthy();
+        expect(screen.queryByRole("link", { name: /sign in to vouch/i })).toBeNull();
+        expect(screen.queryByTestId("add-vouch-button")).toBeNull();
+    });
+
+    it("known signed-in viewer swaps the placeholder for Vouch", () => {
+        const { rerender } = render(<ProfileHero {...base} mode="public" viewerId={undefined} />);
+        expect(screen.getByTestId("vouch-placeholder")).toBeTruthy();
+        rerender(<ProfileHero {...base} mode="public" viewerId="42" />);
+        expect(screen.queryByTestId("vouch-placeholder")).toBeNull();
+        expect(screen.getByTestId("add-vouch-button")).toBeTruthy();
+    });
+
     it("owner banner is suppressed when suppressOwnerBanner is true", () => {
         render(
             <ProfileHero

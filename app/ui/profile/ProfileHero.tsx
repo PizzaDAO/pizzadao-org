@@ -36,7 +36,8 @@ interface ProfileHeroProps {
     /** ISO date for "Member since"; omitted or null renders nothing. */
     memberSince?: string | null;
     mode: ProfileActionsMode;
-    viewerId: string | null;
+    /** undefined = viewer not resolved yet (see ProfileActions). */
+    viewerId: string | null | undefined;
     /** When true, suppress the owner banner (used when ?as=visitor is set). */
     suppressOwnerBanner?: boolean;
 }
