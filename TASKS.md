@@ -12,9 +12,8 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 | calzone-93434 | Add Telegram login | todo | P2 |  |  |  | plans/calzone-93434-telegram-login.md |  | account linking shipped in #128; login itself not built |
 | discord-bounty-command | Discord /bounty command: list open bounties (PEP rewards, crew filter) and claim one from Discord, reusing the website bounty logic | doing | P2 |  | Snax | discord, bounties | plans/discord-bounty-command.md |  | member idea from #general 2026-11-17 |
 | profile-events-attended | Member profiles show the events they've attended (IRL pizza parties and other events: rsv.pizza check-ins/RSVPs, event POAPs), alongside the existing call attendance | doing | P2 |  | Snax | profile, events | plans/profile-events-attended.md |  | requested 2026-11-17 |
-| discord-task-command | Discord /task command: list open crew tasks across crews (filter by crew) and sign up for one from Discord, using the same claim rules as the crew pages | review | P2 |  | Snax | discord, crews | plans/discord-task-command.md | #391 | member idea from #general 2026-11-17 (crew tasks, not bounties); live 2026-11-17 |
-| discord-task-add | Discord /task add: crew leads and admins create a crew task from Discord (crew, task, optional priority and due), same rules and save path as the crew page editor | doing | P2 |  | Snax | discord, crews | plans/discord-task-add.md |  | follow-up to /task |
 | website-refuse-closed-claims | Website: refuse claiming closed crew tasks | todo | P3 |  | Snax | crews |  |  | follow-up from plans/discord-task-command.md: Discord already refuses closed tasks, the website does not |
+| task-add-row-cap | /task add: refuse adds once a crew has as many active tasks as the crew editor allows (its row limit) | todo | P4 |  | Snax | discord, crews |  |  | review note on #394 |
 | agenda-action-status | Call agenda: list the last call's action items with their status (✅ done / 🔄 in progress, finished links) so calls open by reviewing them | todo | P2 |  | Snax | calls |  |  | depends on recap-action-status (plans/recap-action-status.md) shipping first |
 | bellpepper-80127 | Idea para dashboard: carpeta para subir memes de pizzadao y bennys xD | todo | P2 |  |  |  |  |  |  |
 | pineapple-84122 | Auto-Invite member to event or one is near their city | todo | P2 |  |  |  | plans/pineapple-84122-nearby-event-invites.md |  |  |
@@ -25,6 +24,8 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 ## Done
 
 | ID | Task | Priority | Done | PR | Notes |
+| discord-task-add | Discord /task add: crew leads and admins create a crew task from Discord | P2 | 2026-11-17 | #394 | registered and live 2026-11-17 |
+| discord-task-command | Discord /task command: list open crew tasks and sign up for one from Discord | P2 | 2026-11-17 | #391 | member idea from #general; live 2026-11-17 |
 | mozzarella-67760 | Add Language Preference to the dashboard | P2 | 2026-09-29 | #121 | commit 404c4ab4 "Extract LanguageEditor and add language preference to the dashboard" |
 | buffalo-96244 | Support ticket function | P3 | 2026-10-02 | #128 |  |
 | pizzaiolo-13628 | update timezone for crewsheet | P2 | 2026-10-02 | #125 | when someone selects their city, the timezone should auto format to their local pov |
