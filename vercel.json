@@ -28,6 +28,7 @@
     { "path": "/api/cron/crew-task-updates", "schedule": "*/15 * * * *" },
     { "path": "/api/cron/buddies", "schedule": "25 7 * * *" },
     { "path": "/api/cron/buddies?mode=intros", "schedule": "35 * * * *" },
-    { "path": "/api/cron/feature-links", "schedule": "20 3 * * *" }
+    { "path": "/api/cron/feature-links", "schedule": "20 3 * * *" },
+    { "path": "/api/cron/warm", "schedule": "*/5 * * * *" }
   ]
 }

@@ -158,6 +158,8 @@ export const TOGGLES = {
   // On unless the env var is an explicit off: the profile Discord activity block, and live message counting by the recorder.
   'members.discordActivityShow': { env: 'DISCORD_ACTIVITY_SHOW_ENABLED', legacy: (raw) => !envKillsToggle(raw) },
   'members.discordActivityCount': { env: 'DISCORD_ACTIVITY_COUNT_ENABLED', legacy: (raw) => !envKillsToggle(raw) },
+  // On unless the env var is an explicit off: the 5-minute prewarm cron (reads pages only).
+  'members.warmEnabled': { env: 'SITE_WARM_ENABLED', legacy: (raw) => !envKillsToggle(raw) },
   'features.exportEnabled': { env: 'FEATURES_EXPORT_ENABLED', legacy: ON_WORDS },
   'features.navLinkEnabled': { env: 'FEATURES_NAV_LINK_ENABLED', legacy: ON_WORDS },
   'features.showOps': { env: 'FEATURES_SHOW_OPS', legacy: ON_WORDS },

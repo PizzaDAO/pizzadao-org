@@ -16,6 +16,15 @@ describe("prefetchRoute", () => {
     expect(await prefetchRoute(async () => Response.json({ error: "no" }, { status: 500 }), "/api/x")).toBeNull();
   });
 
+  it("passes route params as the handler's second argument", async () => {
+    const out = await prefetchRoute<{ id: string }>(
+      async (_req, ctx) => Response.json({ id: (await (ctx as unknown as { params: Promise<{ id: string }> }).params).id }),
+      "/api/x/7",
+      { params: Promise.resolve({ id: "7" }) },
+    );
+    expect(out).toEqual({ id: "7" });
+  });
+
   it("returns null when the handler throws", async () => {
     expect(await prefetchRoute(async () => { throw new Error("boom"); }, "/api/x")).toBeNull();
   });

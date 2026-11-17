@@ -32,8 +32,9 @@ import { useSession } from "../../lib/hooks/use-session";
 import { useProfileSummary, type ProfileSummaryData } from "../../lib/hooks/use-api";
 import { norm } from "../../lib/strings";
 import { DisavowChip } from "../../disavow/_components/DisavowChip";
-import { BuddyRecognitionBlock } from "../../ui/profile/BuddyRecognitionBlock";
-import type { BuddyRecognition } from "../../lib/buddy/recognition";
+import type { ReactNode } from "react";
+import type { ProfilePrefill } from "./profile-page-data";
+import type { AttendanceResult } from "../../lib/attendance";
 
 
 interface ProfileClientProps {
@@ -44,13 +45,15 @@ interface ProfileClientProps {
      * everyone else sees exactly the page they always did.
      */
     disavowWarning?: { id: string; label: string } | null;
-    /** Loaded server-side, public fields only; null while buddy.publicRecognitionEnabled is off or there is nothing to show. */
-    buddyRecognition?: BuddyRecognition | null;
+    /** Buddy recognition, streamed from the server on its own (public fields only; renders nothing while the feature is off). */
+    buddySlot?: ReactNode;
+    /** Above-the-fold sections loaded on the server (public data; passport only for an anonymous request). */
+    prefill?: ProfilePrefill | null;
     /** Viewer-independent summary loaded on the server so the page paints without a client fetch. */
     initialSummary?: ProfileSummaryData | null;
 }
 
-export function ProfileClient({ id, disavowWarning = null, buddyRecognition = null, initialSummary = null }: ProfileClientProps) {
+export function ProfileClient({ id, disavowWarning = null, buddySlot = null, initialSummary = null, prefill = null }: ProfileClientProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const asVisitor = searchParams?.get("as") === "visitor";
@@ -60,7 +63,8 @@ export function ProfileClient({ id, disavowWarning = null, buddyRecognition = nu
     // on mount in parallel with the summary, shared with the nav) or from the refetched summary,
     // whichever lands first. undefined = still unknown: never show the signed-out CTA for that.
     const { data: session } = useSession();
-    const summaryHasViewer = dataUpdatedAt > 0;
+    // The server-rendered summary carries no viewer, so it never counts; only a refetched one does.
+    const summaryHasViewer = dataUpdatedAt > 0 && !(initialSummary && !initialSummary.partial && data === initialSummary);
     const viewerId: string | null | undefined = session
         ? session.authenticated
             ? session.memberId
@@ -183,11 +187,16 @@ export function ProfileClient({ id, disavowWarning = null, buddyRecognition = nu
 
                 <CrewChipRow crewIds={data.crewIds} crewOptions={crewOptions} />
 
-                {buddyRecognition && <BuddyRecognitionBlock recognition={buddyRecognition} />}
+                {buddySlot}
 
-                <ContributionsBlock memberId={id} />
+                <ContributionsBlock
+                    memberId={id}
+                    initialArticles={prefill?.articles ?? null}
+                    initialVouches={prefill?.vouches ?? null}
+                    initialVouchers={prefill?.vouchers ?? null}
+                />
 
-                <PassportBlock memberId={id} />
+                <PassportBlock memberId={id} initialData={(prefill?.passport as never) ?? null} />
 
                 <DiscordActivityBlock activity={data.discordActivity ?? null} />
 
@@ -202,7 +211,7 @@ export function ProfileClient({ id, disavowWarning = null, buddyRecognition = nu
                     }}
                 >
                     <p className="overline text-tomato mb-3">§ 05 · Showing up</p>
-                    <AttendanceCard memberId={id} variant="inline" />
+                    <AttendanceCard memberId={id} variant="inline" initialData={(prefill?.attendance as AttendanceResult | null) ?? null} />
                 </section>
 
                 <EventsAttendedLazy memberId={id} isOwner={isOwner} />
