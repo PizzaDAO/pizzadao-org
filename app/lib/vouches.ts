@@ -2,6 +2,7 @@ import { prisma } from './db'
 import { VouchSource } from '@prisma/client'
 import { createNotification, NotificationType } from './notifications'
 import { fetchMemberById } from './sheets/member-repository'
+import { invalidateProfileSummary } from './profile-summary-cache'
 
 export { VouchSource }
 
@@ -17,22 +18,27 @@ export async function addVouch(
     throw new Error('Cannot vouch for yourself')
   }
 
-  return prisma.vouch.create({
+  const created = await prisma.vouch.create({
     data: {
       followerId,
       followeeId,
       source
     }
   })
+  // The followee's profile shows their inbound vouch count.
+  invalidateProfileSummary(followeeId)
+  return created
 }
 
 /**
  * Remove a vouch. Deletes the one-way vouch relationship.
  */
 export async function removeVouch(followerId: string, followeeId: string) {
-  return prisma.vouch.deleteMany({
+  const removed = await prisma.vouch.deleteMany({
     where: { followerId, followeeId }
   })
+  invalidateProfileSummary(followeeId)
+  return removed
 }
 
 /**

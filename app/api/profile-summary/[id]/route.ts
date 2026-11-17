@@ -25,6 +25,15 @@ import { resolvePfpUrlAsync } from "@/app/lib/pfp";
 import { resolveMemberSince, monthPrecisionIso } from "@/app/lib/member-since";
 import { getPublicDiscordActivity, type PublicDiscordActivity } from "@/app/lib/discord-activity-public";
 import { internalError } from "@/app/lib/errors/error-response";
+import { unstable_cache } from "next/cache";
+import {
+    PROFILE_L1_MAX,
+    PROFILE_L1_TTL_MS,
+    PROFILE_MEMBERS_TAG,
+    PROFILE_SUMMARY_REVALIDATE_SECONDS,
+    profileL1,
+    profileTag,
+} from "@/app/lib/profile-summary-cache";
 
 export const runtime = "nodejs";
 
@@ -60,6 +69,12 @@ export interface ProfileSummary {
     crewOptions: CrewOption[];
     viewerId: string | null;
     isOwner: boolean;
+    /**
+     * Set only by the profile page when it painted from the light data because the full summary
+     * was still composing: the client then refetches to fill in level, rank, member-since and
+     * Discord activity. Never set by the composer and never cached.
+     */
+    partial?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -77,18 +92,14 @@ export const SENSITIVE_SHEET_KEYS = [
 ] as const;
 
 // ---------------------------------------------------------------------------
-// In-memory cache. Keyed by `${id}:${viewerKey}` because isOwner/viewerId
-// depend on the caller. 5 min TTL — short, public payload.
+// Caching: see getPublicProfileSummary (L1 memory + shared unstable_cache, viewer-independent only).
 // ---------------------------------------------------------------------------
 
 // The response depends on the caller's session (isOwner / viewerId), so browsers and the CDN must
 // not cache it: a copy cached while signed out kept showing "Sign in to vouch" after login.
 export const PROFILE_SUMMARY_CACHE_HEADERS = { "Cache-Control": "private, no-store" } as const;
 
-interface CacheEntry { time: number; data: ProfileSummary }
-const CACHE = new Map<string, CacheEntry>();
-const CACHE_TTL_MS = 5 * 60 * 1000;
-const CACHE_MAX = 500;
+// The per-instance L1 (profileL1) and the shared data-cache settings live in app/lib/profile-summary-cache.ts.
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -164,6 +175,11 @@ export interface ComposeOptions {
      * on the slow lookups.
      */
     light?: boolean;
+    /**
+     * Do not extend the request with `after()` for lookups that missed their deadline; the caller
+     * does it (via `pendingLookups`). Used inside unstable_cache, where `after()` is not available.
+     */
+    deferKeepAlive?: boolean;
 }
 
 /** How long the profile waits for a cold mafia rank (Discord + Alchemy + POAP calls, ~4s). */
@@ -209,11 +225,18 @@ function keepAlive(p: Promise<unknown>) {
 
 /** Set when the summary was composed without a mafia rank because it was still computing. */
 const INCOMPLETE = new WeakSet<ProfileSummary>();
+/** Lookups still running for an incomplete summary composed with deferKeepAlive. */
+const PENDING = new WeakMap<ProfileSummary, Promise<unknown>[]>();
 
 export async function composeProfileSummary(
     opts: ComposeOptions
 ): Promise<ProfileSummary | null> {
-    const { memberId, viewerMemberId, light = false } = opts;
+    const { memberId, viewerMemberId, light = false, deferKeepAlive = false } = opts;
+    const pending: Promise<unknown>[] = [];
+    const keep = (p: Promise<unknown>) => {
+        if (deferKeepAlive) pending.push(p);
+        else keepAlive(p);
+    };
 
     // Everything below except mission progress is keyed by memberId alone, so it starts now,
     // alongside the member read, instead of waiting for it.
@@ -278,10 +301,10 @@ export async function composeProfileSummary(
     const discordActivity = activityResult.value;
     if (!member) return null;
     const memberSince = sinceResult.value;
-    if (sinceResult.timedOut) keepAlive(sincePromise);
+    if (sinceResult.timedOut) keep(sincePromise);
     const mafia = mafiaResult.value;
-    if (mafiaResult.timedOut) keepAlive(mafiaPromise);
-    if (activityResult.timedOut) keepAlive(activityPromise);
+    if (mafiaResult.timedOut) keep(mafiaPromise);
+    if (activityResult.timedOut) keep(activityPromise);
 
     const publicMember = publicMemberView(member);
 
@@ -352,7 +375,10 @@ export async function composeProfileSummary(
         viewerId: viewerMemberId,
         isOwner,
     };
-    if (mafiaResult.timedOut || sinceResult.timedOut || activityResult.timedOut) INCOMPLETE.add(summary);
+    if (mafiaResult.timedOut || sinceResult.timedOut || activityResult.timedOut) {
+        INCOMPLETE.add(summary);
+        if (pending.length) PENDING.set(summary, pending);
+    }
     return summary;
 }
 
@@ -360,22 +386,69 @@ export async function composeProfileSummary(
 // GET handler
 // ---------------------------------------------------------------------------
 
+/** Thrown inside the cached function so an incomplete (or missing) summary is returned but never stored. */
+class NotCacheable extends Error {
+    constructor(readonly summary: ProfileSummary | null) {
+        super("profile summary not cacheable");
+    }
+}
+
 /**
- * The viewer-independent summary (cached 5 min in memory). Shared by the API route and the
- * profile page, which prefills it on the server. Null when the member does not exist.
+ * Compose through Next's shared data cache. Only a COMPLETE summary is stored: when the compose
+ * missed a deadline (INCOMPLETE) or the member does not exist, the value is carried out in a
+ * sentinel error, which unstable_cache does not store, and returned to the caller.
+ * Cache key ["profile-summary-v1", id]; tags "members" and `profile:<id>`; revalidate 300 s.
+ */
+async function composeViaSharedCache(id: string): Promise<ProfileSummary | null> {
+    let ran = false;
+    let carried: { summary: ProfileSummary | null } | null = null;
+    const cached = unstable_cache(
+        async (): Promise<ProfileSummary> => {
+            ran = true;
+            const base = await composeProfileSummary({ memberId: id, viewerMemberId: null, deferKeepAlive: true });
+            if (!base || INCOMPLETE.has(base)) {
+                carried = { summary: base };
+                throw new NotCacheable(base);
+            }
+            return base;
+        },
+        ["profile-summary-v1", id],
+        { revalidate: PROFILE_SUMMARY_REVALIDATE_SECONDS, tags: [PROFILE_MEMBERS_TAG, profileTag(id)] },
+    );
+    try {
+        return await cached();
+    } catch (err) {
+        const out: { summary: ProfileSummary | null } | null =
+            carried ?? (err instanceof NotCacheable ? { summary: err.summary } : null);
+        if (out) {
+            const pending = out.summary ? PENDING.get(out.summary) : undefined;
+            if (pending) keepAlive(Promise.allSettled(pending));
+            return out.summary;
+        }
+        // The compose itself failed: surface it. Otherwise the data cache is unavailable here
+        // (scripts, tests): compose directly.
+        if (ran) throw err;
+        return composeProfileSummary({ memberId: id, viewerMemberId: null });
+    }
+}
+
+/**
+ * The viewer-independent summary: memory L1 (30 s), then the shared data cache (5 min, tagged
+ * `members` and `profile:<id>`), then a compose. Shared by the API route and the profile page,
+ * which prefills it on the server. Null when the member does not exist. Never holds anything
+ * viewer-specific (isOwner / viewerId are applied by the caller).
  */
 export async function getPublicProfileSummary(id: string): Promise<ProfileSummary | null> {
-    const cached = CACHE.get(id);
-    if (cached && Date.now() - cached.time < CACHE_TTL_MS) return cached.data;
-    const base = await composeProfileSummary({ memberId: id, viewerMemberId: null });
-    if (base) {
+    const l1 = profileL1.get(id);
+    if (l1 && Date.now() - l1.time < PROFILE_L1_TTL_MS) return l1.data as ProfileSummary;
+    const base = await composeViaSharedCache(id);
+    if (base && !INCOMPLETE.has(base)) {
         // Bound cache growth.
-        if (CACHE.size > CACHE_MAX) {
-            const oldest = Array.from(CACHE.entries()).sort((a, b) => a[1].time - b[1].time)[0]?.[0];
-            if (oldest) CACHE.delete(oldest);
+        if (profileL1.size > PROFILE_L1_MAX) {
+            const oldest = Array.from(profileL1.entries()).sort((a, b) => a[1].time - b[1].time)[0]?.[0];
+            if (oldest) profileL1.delete(oldest);
         }
-        // A summary missing its rank (still computing) is not memoised, so the next load picks it up.
-        if (!INCOMPLETE.has(base)) CACHE.set(id, { time: Date.now(), data: base });
+        profileL1.set(id, { time: Date.now(), data: base });
     }
     return base;
 }

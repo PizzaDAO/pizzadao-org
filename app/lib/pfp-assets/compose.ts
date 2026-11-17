@@ -1,5 +1,6 @@
 // Composing a member PFP: server-side layer validation (unlock re-check), base resolution from
 // allowlisted hosts only, sharp compositing at 1024x1024, upload to Vercel Blob, MemberPfp upsert.
+import { invalidateProfileSummary } from '@/app/lib/profile-summary-cache'
 import { promises as fs } from 'fs'
 import path from 'path'
 import { createHash } from 'crypto'
@@ -286,6 +287,7 @@ export async function composeMemberPfp(args: {
     create: { memberId, baseKind: base.kind, baseUrl: baseImg.url, layers: layers as never, composedUrl: blob.url, originalBaseKind: original?.kind ?? null, originalBaseUrl: original?.url ?? null },
     update: { baseKind: base.kind, baseUrl: baseImg.url, layers: layers as never, composedUrl: blob.url, originalBaseKind: original?.kind ?? null, originalBaseUrl: original?.url ?? null },
   })
+  invalidateProfileSummary(memberId) // the profile hero shows this picture
   if (prev?.composedUrl && prev.composedUrl !== blob.url && isOwnBlobUrl(prev.composedUrl)) {
     await del(prev.composedUrl).catch(() => undefined) // best effort
   }

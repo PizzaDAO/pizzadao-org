@@ -6,7 +6,7 @@ vi.mock("./settings", () => ({ getSetting: vi.fn(async () => "900000000000000002
 vi.mock("./settings/toggles", () => ({ toggleEnabled: vi.fn(async () => true) }))
 
 import { channelKey } from "./discord-activity"
-import { parsePublicRoleIds, countKeyMatches, clearPublicChannelCache, getPublicChannelNames, getPublicDiscordActivity, publicChannelNames, toPublicActivity } from "./discord-activity-public"
+import { channelNamesKey, parsePublicRoleIds, countKeyMatches, clearPublicChannelCache, getPublicChannelNames, getPublicDiscordActivity, publicChannelNames, toPublicActivity } from "./discord-activity-public"
 
 const GUILD = "900000000000000001"
 const VIEW = String(1 << 10)
@@ -192,5 +192,67 @@ describe("getPublicChannelNames timeouts and single flight", () => {
     const [a, b] = await Promise.all([getPublicChannelNames(f as unknown as typeof fetch), getPublicChannelNames(f as unknown as typeof fetch)])
     expect(a).toBe(b)
     expect(f).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe("shared (KV) channel-name cache", () => {
+  const json = (b: unknown) => ({ ok: true, json: async () => b }) as unknown as Response
+  beforeEach(() => {
+    clearPublicChannelCache()
+    process.env.DISCORD_GUILD_ID = GUILD
+    process.env.DISCORD_BOT_TOKEN = "t"
+  })
+  const ok = () =>
+    vi.fn(async (url: string) => (url.endsWith("/roles") ? json([{ id: GUILD, permissions: VIEW }]) : json([ch("general"), ch("staff", { deny: VIEW })])))
+
+  it("stores only the filtered names, under a key derived from the role ids", async () => {
+    const { cacheGet } = await import("@/app/api/lib/cache")
+    await getPublicChannelNames(ok() as unknown as typeof fetch)
+    const stored = (await cacheGet<{ value: Array<[string, string]> }>(channelNamesKey([ROLE])))!
+    expect(stored.value).toEqual([[channelKey("general"), "general"]])
+    expect(JSON.stringify(stored)).not.toContain("staff")
+    expect(channelNamesKey([ROLE])).not.toBe(channelNamesKey([]))
+    expect(channelNamesKey(["b", "a"])).toBe(channelNamesKey(["a", "b"]))
+  })
+
+  it("a changed role setting never reads the old allow-list's entry", async () => {
+    const { getSetting } = await import("./settings")
+    const { clearGuildChannelsCache, clearGuildRolesCache } = await import("./discord-channels")
+    await getPublicChannelNames(ok() as unknown as typeof fetch)
+    clearGuildChannelsCache()
+    clearGuildRolesCache()
+    vi.mocked(getSetting).mockResolvedValueOnce("" as never)
+    const f = ok()
+    await getPublicChannelNames(f as unknown as typeof fetch)
+    expect(f).toHaveBeenCalledTimes(2) // loaded again: different key
+  })
+
+  it("another instance (empty memory) is served from the shared cache without calling Discord", async () => {
+    const { clearGuildChannelsCache, clearGuildRolesCache } = await import("./discord-channels")
+    await getPublicChannelNames(ok() as unknown as typeof fetch)
+    clearGuildChannelsCache()
+    clearGuildRolesCache()
+    const f = vi.fn(async () => {
+      throw new Error("must not be called")
+    })
+    const names = await getPublicChannelNames(f as unknown as typeof fetch)
+    expect([...names!.values()]).toEqual(["general"])
+    expect(f).not.toHaveBeenCalled()
+  })
+
+  it("serves a stale entry at once and refreshes it in the background", async () => {
+    const { cacheSet, cacheGet } = await import("@/app/api/lib/cache")
+    await cacheSet(channelNamesKey([ROLE]), { value: [[channelKey("old"), "old"]], fetchedAt: Date.now() - 2 * 3600_000 }, 3600)
+    const f = ok()
+    const names = await getPublicChannelNames(f as unknown as typeof fetch)
+    expect([...names!.values()]).toEqual(["old"])
+    await new Promise((r) => setTimeout(r, 30))
+    expect(f).toHaveBeenCalled()
+    expect((await cacheGet<{ value: Array<[string, string]> }>(channelNamesKey([ROLE])))!.value.map((e) => e[1])).toEqual(["general"])
+  })
+
+  it("fails closed (null) when nothing is stored and Discord cannot be read", async () => {
+    const bad = vi.fn(async () => ({ ok: false, json: async () => ({}) }) as unknown as Response)
+    expect(await getPublicChannelNames(bad as unknown as typeof fetch)).toBeNull()
   })
 })

@@ -19,6 +19,7 @@
 // Plans: plans/truffle-91035-profile-redesign.md §6.3 (PR4 — burrata-13316);
 //        plans/anchovy-65959-i18n.md (locale field).
 
+import { invalidateProfileSummary } from "@/app/lib/profile-summary-cache";
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/app/lib/session";
 import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
@@ -234,6 +235,9 @@ export async function POST(
             update,
             select: { tagline: true, locale: true },
         });
+
+        // The profile summary carries the tagline: expire the cached copy.
+        invalidateProfileSummary(id);
 
         const res = NextResponse.json({
             tagline: saved.tagline,
