@@ -18,6 +18,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { prettyLabel } from "@/app/lib/pretty-label";
 import { ArrowUpRight } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { DiscordText } from "@/app/ui/shared/DiscordText";
@@ -308,7 +309,7 @@ function JobItem({
                         color: "hsl(var(--muted-foreground))",
                     }}
                 >
-                    {j.crew}
+                    {prettyLabel(j.crew)}
                 </div>
             )}
         </Link>

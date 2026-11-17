@@ -111,7 +111,7 @@ describe('createBounty', () => {
     mockFn(prisma.bounty.create).mockResolvedValue({ id: 12 })
 
     await expect(createBounty('creator-1', 'Due <t:9999999999999>', 100)).resolves.toMatchObject({ id: 12 })
-    expect(logTransaction).toHaveBeenCalledWith(prisma, 'creator-1', 'BOUNTY_ESCROW', -100, 'Bounty escrow: Due ', { bountyId: 12 })
+    expect(logTransaction).toHaveBeenCalledWith(prisma, 'creator-1', 'BOUNTY_ESCROW', -100, 'Bounty escrow: Due', { bountyId: 12 })
   })
 })
 
@@ -180,7 +180,7 @@ describe('completeBounty', () => {
     mockFn(prisma.bounty.updateMany).mockResolvedValue({ count: 1 })
 
     await expect(completeBounty('creator-1', 10)).resolves.toMatchObject({ status: 'COMPLETED' })
-    expect(logTransaction).toHaveBeenCalledWith(prisma, 'claimer-1', 'BOUNTY_REWARD', 100, 'Bounty reward: Due ', { bountyId: 10, approvedBy: 'creator-1' })
+    expect(logTransaction).toHaveBeenCalledWith(prisma, 'claimer-1', 'BOUNTY_REWARD', 100, 'Bounty reward: Due', { bountyId: 10, approvedBy: 'creator-1' })
   })
 })
 

@@ -46,8 +46,8 @@ export async function POST(request: NextRequest) {
     const rawDescription = job.description.replace(/{amount}/gi, rewardAmount.toString())
     // Resolve any <#channelId> / <@&roleId> Discord mentions so the ledger
     // memo stores plain text, not raw markup (resolveDiscordMentions never
-    // throws — a failed Discord lookup just falls back to "#channel"/"@role"
-    // instead of a name).
+    // throws — a failed Discord lookup just keeps the raw tag in the memo,
+    // which history rendering can still resolve later).
     const { channels, roles, users, guildId } = await resolveDiscordMentions([rawDescription])
 
     // Verify the member really did the job before paying (fails closed).
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
     // frozen to today's formatted date/relative string at write time; keep
     // it raw in the stored memo so display-time rendering (DiscordText)
     // formats it fresh, every time it's shown.
-    const description = `Daily job: ${discordTextToPlainText(rawDescription, { channels, roles, users }, { keepTimestamps: true })}`
+    const description = `Daily job: ${discordTextToPlainText(rawDescription, { channels, roles, users }, { keepTimestamps: true, keepUnresolved: true })}`
     const awarded = await recordDailyJobCompletion(session.discordId, jobId, rewardAmount, description, proof)
     if (awarded === 'reused') {
       return NextResponse.json({ error: 'That post already completed another job.', code: 'POST_REUSED' }, { status: 409 })

@@ -19,6 +19,10 @@ vi.mock('@/app/lib/jobs-verify', async (orig) => ({
   verifyPostsEnabled: vi.fn(),
   unverifiablePayOnClick: vi.fn(),
 }))
+vi.mock('@/app/lib/discord-mention-resolve', async (orig) => {
+  const actual = await orig<typeof import('@/app/lib/discord-mention-resolve')>()
+  return { ...actual, resolveDiscordMentions: vi.fn(actual.resolveDiscordMentions) }
+})
 vi.mock('@/app/lib/rate-limit', () => ({
   checkKeyedRateLimit: vi.fn(),
   rateLimitResponse: () => new Response(JSON.stringify({ error: 'slow down' }), { status: 429 }),
@@ -39,6 +43,7 @@ import {
 } from '@/app/lib/jobs'
 import { verifyJobPost, verifyPostsEnabled, unverifiablePayOnClick } from '@/app/lib/jobs-verify'
 import { checkKeyedRateLimit } from '@/app/lib/rate-limit'
+import { resolveDiscordMentions } from '@/app/lib/discord-mention-resolve'
 import { requireOnboarded, getOrCreateEconomy } from '@/app/lib/economy'
 
 const mockFn = (f: unknown) => f as ReturnType<typeof vi.fn>
@@ -80,7 +85,7 @@ describe('POST /api/jobs/assign — memo building with a <t:...> timestamp', () 
       'user-1',
       7,
       50,
-      'Daily job: Due  and <t:1700000000:R>',
+      'Daily job: Due and <t:1700000000:R>',
       undefined,
     )
   })
@@ -96,13 +101,39 @@ describe('POST /api/jobs/assign — memo building with a <t:...> timestamp', () 
     const res = await POST(createRequest({ jobId: 8 }))
 
     expect(res.status).toBe(200)
-    // No Discord bot token configured in tests, so the mention falls back
-    // to "#channel" instead of leaking raw <#id> markup into the ledger.
+    // No Discord bot token configured in tests, so the mention is unresolved
+    // and stays a raw tag (display-time rendering can still resolve it later).
     expect(recordDailyJobCompletion).toHaveBeenCalledWith(
       'user-1',
       8,
       50,
-      'Daily job: Meet in #channel at <t:1700000000:t>',
+      'Daily job: Meet in <#123456789012345678> at <t:1700000000:t>',
+      { messageId: 'm1', channelId: '123456789012345678' },
+    )
+  })
+
+  it('writes a resolved #name and no :emoji: text into the memo', async () => {
+    mockFn(getJob).mockResolvedValue({
+      id: 10,
+      description: 'Post in <#123456789012345678> <:pizza:111111111111111111> today',
+      type: 'General',
+      isActive: true,
+    })
+    mockFn(resolveDiscordMentions).mockResolvedValueOnce({
+      channels: { '123456789012345678': 'general' },
+      roles: {},
+      users: {},
+      guildId: '999',
+    })
+
+    const res = await POST(createRequest({ jobId: 10 }))
+
+    expect(res.status).toBe(200)
+    expect(recordDailyJobCompletion).toHaveBeenCalledWith(
+      'user-1',
+      10,
+      50,
+      'Daily job: Post in #general today',
       { messageId: 'm1', channelId: '123456789012345678' },
     )
   })

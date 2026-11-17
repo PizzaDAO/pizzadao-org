@@ -37,7 +37,7 @@ vi.mock('@/app/lib/sheets/member-repository', () => ({
 }))
 
 vi.mock('@/app/lib/jobs', () => ({
-  getDailyJobs: vi.fn(async () => ({ jobs: [{ id: 1, description: 'Do it', type: null, assignees: [] }], resetAt: new Date() })),
+  getDailyJobs: vi.fn(async () => ({ jobs: [{ id: 1, description: 'Do it', type: null }], resetAt: new Date() })),
   getCompletedJobsToday: vi.fn(async () => []),
   getJobRewardAmount: vi.fn(async () => 50),
 }))

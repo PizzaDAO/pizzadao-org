@@ -30,6 +30,8 @@ type LeaderboardEntry = {
   // used for the /profile/{memberId} link. Null when no matching sheet row
   // exists for the Discord ID.
   memberId: string | null;
+  // Server-resolved display name (PizzaDAO name, cleaned guild name or "a member").
+  name?: string;
   balance: number;
   formatted: string;
 };
@@ -165,6 +167,7 @@ export function Leaderboard({ refreshKey = 0 }: { refreshKey?: number }) {
                   <UserLink
                     discordId={entry.userId}
                     memberId={entry.memberId}
+                    name={entry.name}
                     style={{ fontSize: "inherit", color: "hsl(var(--cream))" }}
                   />
                 </span>

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { JobCard } from '../JobCard'
 
-const job = { id: 7, description: 'Share a pizza photo', type: 'Social', assignees: [] }
+const job = { id: 7, description: 'Share a pizza photo', type: 'Social' }
 
 describe('JobCard', () => {
   beforeEach(() => {
@@ -61,7 +61,6 @@ describe('JobCard', () => {
       id: 8,
       description: 'Check <#1099323056012394556> for details',
       type: 'Social',
-      assignees: [],
     }
     const channels = { '1099323056012394556': 'partner-suggestions' }
 

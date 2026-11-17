@@ -43,9 +43,9 @@ describe("DiscordText", () => {
     expect(screen.getByText("@role")).toBeInTheDocument();
   });
 
-  it("renders a user mention as plain @user", () => {
+  it("renders an unresolved user mention as plain @member", () => {
     render(<DiscordText text="hi <@123456789012345678>" />);
-    expect(screen.getByText("@user")).toBeInTheDocument();
+    expect(screen.getByText("@member")).toBeInTheDocument();
   });
 
   it("renders a markdown link as a new-tab anchor", () => {

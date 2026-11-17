@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { getLeaderboard, formatCurrency } from '@/app/lib/economy'
 import { getSheetData } from '@/app/lib/sheets/member-repository'
 import { NO_STORE_HEADERS } from '@/app/lib/no-store'
+import { memberNamesByDiscordId } from '@/app/lib/member-names'
+import { getGuildMemberCleanName } from '@/app/lib/discord-channels'
 
 export const runtime = 'nodejs'
 
@@ -21,11 +23,23 @@ export async function GET() {
     const sheetData = await getSheetData().catch(() => null)
     const discordToMember = sheetData?.discordToMember ?? null
 
+    // Names on the server, one query for the whole top 10: PizzaDAO name, else the
+    // cleaned guild name, else "a member" (never a truncated id).
+    const ids = leaderboard.map((entry: any) => String(entry.userId))
+    const members = await memberNamesByDiscordId(ids)
+    const guildNames = new Map<string, string | null>()
+    await Promise.all(
+      ids
+        .filter((id: string) => !members.has(id))
+        .map(async (id: string) => guildNames.set(id, await getGuildMemberCleanName(id).catch(() => null))),
+    )
+
     const result = {
       leaderboard: leaderboard.map((entry: any, index: number) => ({
         rank: index + 1,
         userId: entry.userId,
         memberId: discordToMember?.get(String(entry.userId)) ?? null,
+        name: members.get(String(entry.userId))?.name ?? guildNames.get(String(entry.userId)) ?? 'a member',
         balance: entry.balance,
         formatted: formatCurrency(entry.balance)
       }))
