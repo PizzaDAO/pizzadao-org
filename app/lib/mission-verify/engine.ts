@@ -28,6 +28,7 @@ import { Prisma, type MissionHold } from '@prisma/client'
 import { prisma } from '../db'
 import { createNotification } from '../notifications'
 import { clearReviewNotificationsFor } from '../review-notifications'
+import { invalidateProfileSummaryForDiscord } from '../profile-summary-invalidate'
 import { notifyReviewers, recordReviewEvent, rejectionSnapshot, settleLevels } from '../missions'
 import { queueReviewCardSync, reviewCardsEnabled, syncReviewCardsFor } from './review-cards'
 import { NEW_REVIEW_ROUND } from './review-ids'
@@ -339,6 +340,8 @@ export async function runVerifiers(discordId: string, opts: RunOptions): Promise
     report.levelsPaid = await settleLevels(discordId)
     if (report.approved.length || report.held.length || report.reopened.length || report.levelsPaid.length || report.checks.some((c) => c.outcome === 'recorded')) {
       invalidateProgressCache(discordId)
+      // An auto-approval can change the profile's level even when no level reward is paid.
+      await invalidateProfileSummaryForDiscord(discordId)
     }
     await notifyInApp(discordId, report, policy)
     // Discord review cards (Phase 3): post one for a new hold / reopen, and
