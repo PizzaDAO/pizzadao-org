@@ -10,8 +10,6 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 | parmesan-10386 | Deliver POAPs automatically to people on the discord channel attendance | doing | P3 |  |  |  |  |  | manual POAP claims shipped in #192; automatic delivery still to do (later) |
 | marinara-32633 | generated nametags for rsvp'd members | todo | P2 |  |  |  |  |  |  |
 | calzone-93434 | Add Telegram login | todo | P2 |  |  |  | plans/calzone-93434-telegram-login.md |  | account linking shipped in #128; login itself not built |
-| discord-bounty-command | Discord /bounty command: list open bounties (PEP rewards, crew filter) and claim one from Discord, reusing the website bounty logic | doing | P2 |  | Snax | discord, bounties | plans/discord-bounty-command.md |  | member idea from #general 2026-11-17 |
-| profile-events-attended | Member profiles show the events they've attended (IRL pizza parties and other events: rsv.pizza check-ins/RSVPs, event POAPs), alongside the existing call attendance | doing | P2 |  | Snax | profile, events | plans/profile-events-attended.md |  | requested 2026-11-17 |
 | website-refuse-closed-claims | Website: refuse claiming closed crew tasks | todo | P3 |  | Snax | crews |  |  | follow-up from plans/discord-task-command.md: Discord already refuses closed tasks, the website does not |
 | task-add-row-cap | /task add: refuse adds once a crew has as many active tasks as the crew editor allows (its row limit) | todo | P4 |  | Snax | discord, crews |  |  | review note on #394 |
 | agenda-action-status | Call agenda: list the last call's action items with their status (✅ done / 🔄 in progress, finished links) so calls open by reviewing them | todo | P2 |  | Snax | calls |  |  | depends on recap-action-status (plans/recap-action-status.md) shipping first |
@@ -24,6 +22,8 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 ## Done
 
 | ID | Task | Priority | Done | PR | Notes |
+| profile-events-attended | Member profiles show events attended (rsv.pizza check-ins, Unlock tickets, POAPs; link an rsv.pizza account by email) | P2 | 2026-11-17 | #392 | live 2026-11-17 |
+| discord-bounty-command | Discord /bounty command: list and claim PEP bounties | P2 | 2026-11-17 | #389 | shipped, then turned off and unregistered (crew tasks via /task instead) |
 | discord-task-add | Discord /task add: crew leads and admins create a crew task from Discord | P2 | 2026-11-17 | #394 | registered and live 2026-11-17 |
 | discord-task-command | Discord /task command: list open crew tasks and sign up for one from Discord | P2 | 2026-11-17 | #391 | member idea from #general; live 2026-11-17 |
 | mozzarella-67760 | Add Language Preference to the dashboard | P2 | 2026-09-29 | #121 | commit 404c4ab4 "Extract LanguageEditor and add language preference to the dashboard" |
