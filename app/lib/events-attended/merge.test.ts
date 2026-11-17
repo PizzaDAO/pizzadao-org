@@ -47,6 +47,13 @@ describe('mergeEvents', () => {
     expect(mergeEvents(input, { ...opts, viewerIsOwner: true }).events).toHaveLength(2)
   })
 
+  it('drops a ticket that matches a hidden-guest-list party for other viewers, but keeps it merged for the owner', () => {
+    const input = { ...none, attended: [att('bk', { guestListHidden: true })], tickets: [{ id: 't', name: 'Pizza Party Brooklyn 2026', year: 2026, url: null }] }
+    expect(mergeEvents(input, opts).events).toEqual([])
+    const owner = mergeEvents(input, { ...opts, viewerIsOwner: true })
+    expect(owner.events.map((e) => e.badge)).toEqual(['attended'])
+  })
+
   it('sorts newest first with unknown dates last, and caps with a total', () => {
     const r = mergeEvents(
       { ...none, attended: [att('old', { date: new Date('2024-01-01Z') }), att('new', { date: new Date('2026-01-01Z') }), att('undated', { date: null })], tickets: [{ id: 't', name: 'T', year: 2025, url: null }] },

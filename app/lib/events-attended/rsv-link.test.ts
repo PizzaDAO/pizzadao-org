@@ -63,6 +63,14 @@ describe('verifyLinkToken', () => {
     expect((await verifyLinkToken(await mint({ claims: { sub: 'rsvpizza:123' } }), 'STATE', cfg, { getKey, now })).ok).toBe(false)
   })
 
+  it('rejects a token issued in the future', async () => {
+    const { getKey, mint, now } = await setup()
+    const nowSec = Math.floor(NOW / 1000)
+    expect((await verifyLinkToken(await mint({ iat: nowSec + 120, exp: nowSec + 180 }), 'STATE', cfg, { getKey, now })).ok).toBe(false)
+    // within the 30 s clock tolerance is fine
+    expect((await verifyLinkToken(await mint({ iat: nowSec + 20, exp: nowSec + 320 }), 'STATE', cfg, { getKey, now })).ok).toBe(true)
+  })
+
   it('rejects a lifetime over 300 seconds', async () => {
     const { getKey, mint, now } = await setup()
     const nowSec = Math.floor(NOW / 1000)
@@ -81,7 +89,7 @@ describe('verifyLinkToken', () => {
 
   it('reports an expired token', async () => {
     const { getKey, mint, now } = await setup()
-    expect(await verifyLinkToken(await mint({ exp: Math.floor(NOW / 1000) - 10 }), 'STATE', cfg, { getKey, now })).toEqual({ ok: false, reason: 'expired' })
+    expect(await verifyLinkToken(await mint({ iat: Math.floor(NOW / 1000) - 250, exp: Math.floor(NOW / 1000) - 40 }), 'STATE', cfg, { getKey, now })).toEqual({ ok: false, reason: 'expired' })
   })
 
   it('rejects a token signed by another key, an unknown kid, or a non-ES256 algorithm', async () => {

@@ -205,7 +205,7 @@ export function ProfileClient({ id, disavowWarning = null, buddyRecognition = nu
                     <AttendanceCard memberId={id} variant="inline" />
                 </section>
 
-                <EventsAttendedLazy memberId={id} />
+                <EventsAttendedLazy memberId={id} isOwner={isOwner} />
 
                 <CollectionsLazy memberId={id} />
 

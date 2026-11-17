@@ -19,6 +19,7 @@ export const LINK_STATE_COOKIE = 'rsv_link_state'
 export const LINK_TOKEN_TYP = 'pizzadao-link+jwt'
 export const LINK_TOKEN_USE = 'pizzadao_link'
 export const LINK_TOKEN_MAX_LIFETIME_S = 300
+export const LINK_CLOCK_TOLERANCE_S = 30
 const HASH_RE = /^[0-9a-f]{64}$/
 
 type Env = NodeJS.ProcessEnv
@@ -101,6 +102,8 @@ export async function verifyLinkToken(
     const getKey = opts.getKey ?? keySetFor(cfg.jwksUrl)
     const { payload } = await jwtVerify(token, getKey, {
       algorithms: ['ES256'],
+      maxTokenAge: LINK_TOKEN_MAX_LIFETIME_S,
+      clockTolerance: LINK_CLOCK_TOLERANCE_S,
       typ: LINK_TOKEN_TYP,
       issuer: cfg.issuer,
       audience: cfg.audience,
@@ -110,6 +113,9 @@ export async function verifyLinkToken(
     // An MCP token carries a `sub`; the link token never does (stops that token being replayed here).
     if (payload.sub !== undefined) return { ok: false, reason: 'invalid' }
     if (typeof payload.iat !== 'number' || typeof payload.exp !== 'number' || payload.exp - payload.iat > LINK_TOKEN_MAX_LIFETIME_S) return { ok: false, reason: 'invalid' }
+    // Not issued in the future, and not valid for longer than a token may live (clock skew allowed).
+    const nowSec = Math.floor((opts.now ?? new Date()).getTime() / 1000)
+    if (payload.iat > nowSec + LINK_CLOCK_TOLERANCE_S || payload.exp - nowSec > LINK_TOKEN_MAX_LIFETIME_S + LINK_CLOCK_TOLERANCE_S) return { ok: false, reason: 'invalid' }
     if (typeof payload.jti !== 'string' || !payload.jti || payload.jti.length > 200) return { ok: false, reason: 'invalid' }
     if (typeof payload.state !== 'string' || !safeEqual(payload.state, expectedState)) return { ok: false, reason: 'invalid' }
     const eh = payload.email_sha256

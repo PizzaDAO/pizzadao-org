@@ -28,6 +28,12 @@ describe('fetchGuestAttendance', () => {
     expect(JSON.parse(init.body as string)).toEqual({ emailHashes: [HASH], wallets: [WALLET] })
   })
 
+  it('turns a non-https url into no link', async () => {
+    const f = reply({ ok: true, events: [{ eventId: 'e', name: 'A', matchedBy: ['email'], url: 'javascript:alert(1)' }, { eventId: 'f', name: 'B', matchedBy: ['email'], url: 'http://rsv.pizza/x' }, { eventId: 'g', name: 'C', matchedBy: ['email'], url: null }] })
+    const r = await fetchGuestAttendance({ emailHashes: [HASH] }, o(f))
+    expect(r?.map((e) => e.url)).toEqual([null, null, null])
+  })
+
   it('caps identifiers at 10 each', async () => {
     const f = reply({ ok: true, events: [] })
     const hashes = Array.from({ length: 15 }, (_, i) => i.toString(16).padStart(64, '0'))

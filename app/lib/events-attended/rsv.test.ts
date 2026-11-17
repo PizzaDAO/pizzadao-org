@@ -3,20 +3,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const db = vi.hoisted(() => ({
   memberProfileExtras: { findUnique: vi.fn(), findMany: vi.fn() },
-  memberRsvEvent: { deleteMany: vi.fn((a: unknown) => ({ op: 'delete', a })), createMany: vi.fn((a: unknown) => ({ op: 'create', a })) },
-  memberRsvCheck: { deleteMany: vi.fn((a: unknown) => ({ op: 'delCheck', a })), upsert: vi.fn((a: unknown) => ({ op: 'upsert', a })), findMany: vi.fn() },
+  memberRsvEvent: { deleteMany: vi.fn(async (a: unknown) => ({ op: 'delete', a })), createMany: vi.fn(async (a: unknown) => ({ op: 'create', a })) },
+  memberRsvCheck: { deleteMany: vi.fn(async (a: unknown) => ({ op: 'delCheck', a })), upsert: vi.fn(async (a: unknown) => ({ op: 'upsert', a })), findMany: vi.fn() },
   memberWallet: { findMany: vi.fn() },
-  $transaction: vi.fn(async (ops: unknown[]) => ops),
+  $transaction: vi.fn(async (arg: unknown) => (typeof arg === 'function' ? (arg as (tx: unknown) => unknown)(db) : Promise.all(arg as unknown[]))),
 }))
 vi.mock('@/app/lib/db', () => ({ prisma: db }))
-const wallets = vi.hoisted(() => ({ getEvmWalletsForMember: vi.fn(async () => [] as string[]) }))
-vi.mock('@/app/lib/wallet-lookup', () => wallets)
 const cfg = vi.hoisted(() => ({ enabled: true }))
 vi.mock('./config', () => ({ loadEventsAttendedConfig: vi.fn(async () => ({ enabled: cfg.enabled, rsvRecheckDays: 7, rsvApiUrl: 'https://api.rsv.example' })) }))
 const client = vi.hoisted(() => ({ fetchGuestAttendance: vi.fn() }))
 vi.mock('./guest-attendance', async (orig) => ({ ...(await orig<typeof import('./guest-attendance')>()), fetchGuestAttendance: client.fetchGuestAttendance }))
 
-import { clearEmailMatches, collectIdentifiers, hashEmail, listDueMembers, refreshRsvEvents, refreshRsvEventsIfEnabled } from './rsv'
+import { clearEmailMatches, clearWalletMatches, collectIdentifiers, hashEmail, listDueMembers, refreshRsvEvents, refreshRsvEventsIfEnabled } from './rsv'
 import { emailHash } from '@/app/lib/telegram/host-match'
 
 const W = '0x' + '2'.repeat(40)
@@ -26,7 +24,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   cfg.enabled = true
   db.memberProfileExtras.findUnique.mockResolvedValue({ email: 'A@x.io', emailVerifiedAt: new Date(), rsvLinkedEmailHash: null })
-  wallets.getEvmWalletsForMember.mockResolvedValue([])
+  db.memberWallet.findMany.mockResolvedValue([])
 })
 
 describe('collectIdentifiers', () => {
@@ -52,13 +50,14 @@ describe('collectIdentifiers', () => {
 
 describe('refreshRsvEvents', () => {
   it('replaces the stored rows and the check marker in one transaction', async () => {
-    wallets.getEvmWalletsForMember.mockResolvedValue([W])
+    db.memberWallet.findMany.mockResolvedValue([{ walletAddress: W }])
     client.fetchGuestAttendance.mockResolvedValue([ev('a'), ev('b', 'wallet')])
     expect(await refreshRsvEvents('1')).toEqual({ ok: true, count: 2 })
     expect(client.fetchGuestAttendance).toHaveBeenCalledWith({ emailHashes: [emailHash('a@x.io')], wallets: [W] }, expect.objectContaining({ baseUrl: 'https://api.rsv.example' }))
     expect(db.$transaction).toHaveBeenCalledTimes(1)
-    const ops = (db.$transaction.mock.calls[0] as unknown as [Array<{ op: string }>])[0].map((o) => o.op)
-    expect(ops).toEqual(['delete', 'create', 'upsert'])
+    expect(db.memberRsvEvent.deleteMany).toHaveBeenCalledWith({ where: { memberId: '1' } })
+    expect(db.memberRsvEvent.createMany).toHaveBeenCalledWith(expect.objectContaining({ skipDuplicates: true }))
+    expect(db.memberRsvCheck.upsert).toHaveBeenCalled()
   })
   it('sends the profile-email hash and the linked hash together in one call, de-duplicating events', async () => {
     db.memberProfileExtras.findUnique.mockResolvedValue({ email: 'a@x.io', emailVerifiedAt: new Date(), rsvLinkedEmailHash: 'c'.repeat(64) })
@@ -80,6 +79,25 @@ describe('refreshRsvEvents', () => {
   })
 })
 
+describe('refresh races', () => {
+  it('writes nothing when the identifiers changed while rsv.pizza was being asked', async () => {
+    client.fetchGuestAttendance.mockImplementation(async () => {
+      // the member removed their email during the call
+      db.memberProfileExtras.findUnique.mockResolvedValue({ email: null, emailVerifiedAt: null, rsvLinkedEmailHash: null })
+      return [ev('a')]
+    })
+    expect(await refreshRsvEvents('1')).toEqual({ ok: false })
+    expect(db.memberRsvEvent.createMany).not.toHaveBeenCalled()
+    expect(db.memberRsvEvent.deleteMany).not.toHaveBeenCalled()
+  })
+  it('does not wipe the rows if an identifier appeared meanwhile', async () => {
+    let n = 0
+    db.memberProfileExtras.findUnique.mockImplementation(async () => (n++ === 0 ? { email: null, emailVerifiedAt: null, rsvLinkedEmailHash: null } : { email: 'a@x.io', emailVerifiedAt: new Date(), rsvLinkedEmailHash: null }))
+    await refreshRsvEvents('1')
+    expect(db.memberRsvEvent.deleteMany).not.toHaveBeenCalled()
+  })
+})
+
 describe('refreshRsvEventsIfEnabled', () => {
   it('does nothing while the feature is off, and never throws', async () => {
     cfg.enabled = false
@@ -88,6 +106,14 @@ describe('refreshRsvEventsIfEnabled', () => {
     cfg.enabled = true
     db.memberProfileExtras.findUnique.mockRejectedValue(new Error('db down'))
     await expect(refreshRsvEventsIfEnabled('1')).resolves.toBeUndefined()
+  })
+})
+
+describe('clearWalletMatches', () => {
+  it('deletes only wallet-matched rows (email-matched rows stay) and resets the check marker', async () => {
+    await clearWalletMatches('1')
+    expect(db.memberRsvEvent.deleteMany).toHaveBeenCalledWith({ where: { memberId: '1', matchedBy: 'wallet' } })
+    expect(db.memberRsvCheck.deleteMany).toHaveBeenCalledWith({ where: { memberId: '1' } })
   })
 })
 

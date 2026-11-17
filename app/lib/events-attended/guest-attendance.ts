@@ -40,7 +40,8 @@ const eventSchema = z.object({
   name: z.string().min(1).max(200),
   date: z.string().max(40).nullable().optional(),
   city: z.string().max(120).nullable().optional(),
-  url: z.string().max(300).nullable().optional(),
+  // Only https links are ever rendered; anything else becomes "no link".
+  url: z.string().max(300).nullable().optional().transform((v) => (v && /^https:\/\//i.test(v) ? v : null)),
   matchedBy: z.array(z.enum(['email', 'wallet'])).max(2),
   hideGuestList: z.boolean().optional(),
 })

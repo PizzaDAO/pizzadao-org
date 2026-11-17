@@ -10,12 +10,14 @@ import { canView, parseVisibility, type Viewer } from '@/app/lib/profile/visibil
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const PUBLIC_CACHE = 'public, s-maxage=300, stale-while-revalidate=3600'
+const PUBLIC_CACHE = 'public, s-maxage=60'
 
 /**
- * GET /api/events-attended/[memberId]: the member's attended / ticketed / organized events. Database
- * reads only. Always answers 200: `{ enabled: false }` when the feature is off, an empty list for a
- * missing, merged, disavowed or hidden profile (never says why). The owner also gets the prompt state.
+ * GET /api/events-attended/[memberId]: the VISITOR view of a member's events. Database reads only. The
+ * body never depends on who is asking beyond "may they see it at all", and never contains owner-only
+ * data (hidden guest lists, prompts, controls), so a CDN copy of a public body is safe to share. The owner
+ * gets their own view from the no-store /api/events-attended/me. Always 200: `{ enabled: false }` when
+ * the feature is off, an empty list for a missing, disavowed or hidden profile (never says why).
  */
 export async function GET(_req: Request, { params }: { params: Promise<{ memberId: string }> }) {
   const { memberId } = await params
@@ -27,32 +29,18 @@ export async function GET(_req: Request, { params }: { params: Promise<{ memberI
   const discordId = member?.discordId
   if (!discordId) return json({ enabled: true, events: [], total: 0 })
 
-  const viewer: Viewer = session?.discordId ? (session.discordId === discordId ? 'owner' : 'member') : 'anonymous'
-
   if (await isHiddenSubject(discordId)) return json({ enabled: true, events: [], total: 0 })
 
-  const extras = await prisma.memberProfileExtras.findUnique({
-    where: { memberId },
-    select: { eventsVisibility: true, email: true, emailVerifiedAt: true, rsvLinkedEmailHash: true },
-  })
+  const extras = await prisma.memberProfileExtras.findUnique({ where: { memberId }, select: { eventsVisibility: true } })
   const visibility = parseVisibility(extras?.eventsVisibility)
+  // The owner is treated as a plain member here: owner data only comes from /me.
+  const viewer: Viewer = session?.discordId ? 'member' : 'anonymous'
   if (!canView(visibility, viewer)) return json({ enabled: true, events: [], total: 0 })
 
-  const result = await loadEventsAttended(memberId, discordId, { countTickets: config.countTickets, viewerIsOwner: viewer === 'owner' }).catch(() => ({ events: [], total: 0 }))
-
-  if (viewer === 'owner') {
-    const emailState = !extras?.email ? 'none' : extras.emailVerifiedAt ? 'verified' : 'unverified'
-    return json({
-      enabled: true,
-      isOwner: true,
-      ...result,
-      visibility,
-      emailState,
-      link: { available: true, linked: !!extras?.rsvLinkedEmailHash },
-    })
-  }
+  const result = await loadEventsAttended(memberId, discordId, { countTickets: config.countTickets, viewerIsOwner: false }).catch(() => ({ events: [], total: 0 }))
   return NextResponse.json(
     { enabled: true, isOwner: false, ...result },
+    // Only a public list is shared; a members-only list is never cached (the cache key has no session).
     { headers: { 'Cache-Control': visibility === 'public' ? PUBLIC_CACHE : 'private, no-store' } },
   )
 }

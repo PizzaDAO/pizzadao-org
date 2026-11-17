@@ -49,16 +49,32 @@ describe("EventsAttendedLazy", () => {
         expect(container.querySelector("section")).toBeNull();
     });
 
+    it("reads the no-store owner endpoint for the owner and the shared one for visitors", async () => {
+        const f = reply({ enabled: true, isOwner: true, events: [], total: 0, emailState: "verified", visibility: "public", link: { available: false, linked: false } });
+        vi.stubGlobal("fetch", f);
+        const owner = render(<EventsAttendedLazy memberId="42" isOwner />);
+        await scrollIntoView();
+        await waitFor(() => expect(f).toHaveBeenCalledWith("/api/events-attended/me"));
+        expect(f).not.toHaveBeenCalledWith("/api/events-attended/42");
+        owner.unmount();
+        const g = reply({ enabled: true, isOwner: false, events: [row(1)], total: 1 });
+        vi.stubGlobal("fetch", g);
+        render(<EventsAttendedLazy memberId="42" />);
+        await scrollIntoView();
+        await waitFor(() => expect(g).toHaveBeenCalledWith("/api/events-attended/42"));
+        expect(g).not.toHaveBeenCalledWith("/api/events-attended/me");
+    });
+
     it("shows the owner the add-email prompt when empty, and the verify prompt when unverified", async () => {
         vi.stubGlobal("fetch", reply({ enabled: true, isOwner: true, events: [], total: 0, emailState: "none", visibility: "public", link: { available: false, linked: false } }));
-        render(<EventsAttendedLazy memberId="42" />);
+        render(<EventsAttendedLazy memberId="42" isOwner />);
         await scrollIntoView();
         expect(await screen.findByTestId("prompt-email-none")).toBeTruthy();
     });
 
     it("shows the verify prompt for an unverified email even when there are events", async () => {
         vi.stubGlobal("fetch", reply({ enabled: true, isOwner: true, events: [row(1, "ticket")], total: 1, emailState: "unverified", visibility: "public", link: { available: false, linked: false } }));
-        render(<EventsAttendedLazy memberId="42" />);
+        render(<EventsAttendedLazy memberId="42" isOwner />);
         await scrollIntoView();
         expect(await screen.findByTestId("prompt-email-unverified")).toBeTruthy();
         expect(screen.getByText("Ticket")).toBeTruthy();
@@ -76,7 +92,7 @@ describe("EventsAttendedLazy", () => {
 
     it("offers Link rsv.pizza account when available, and Unlink when linked", async () => {
         vi.stubGlobal("fetch", reply({ enabled: true, isOwner: true, events: [], total: 0, emailState: "verified", visibility: "public", link: { available: true, linked: false } }));
-        const first = render(<EventsAttendedLazy memberId="42" />);
+        const first = render(<EventsAttendedLazy memberId="42" isOwner />);
         await scrollIntoView();
         const a = await screen.findByTestId("rsv-link-start");
         expect(a.getAttribute("href")).toBe("/api/events-attended/link/start");
@@ -85,7 +101,7 @@ describe("EventsAttendedLazy", () => {
         let linked = true;
         const f = vi.fn(async (_u: string, init?: RequestInit) => { if (init?.method === "DELETE") linked = false; return new Response(JSON.stringify({ enabled: true, isOwner: true, events: [], total: 0, emailState: "verified", visibility: "public", link: { available: true, linked } }), { status: 200 }); });
         vi.stubGlobal("fetch", f);
-        render(<EventsAttendedLazy memberId="42" />);
+        render(<EventsAttendedLazy memberId="42" isOwner />);
         await scrollIntoView();
         expect(await screen.findByTestId("rsv-linked")).toBeTruthy();
         fireEvent.click(screen.getByText("Unlink"));

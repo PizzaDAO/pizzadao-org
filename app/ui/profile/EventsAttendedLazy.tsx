@@ -35,7 +35,11 @@ interface Payload {
 
 const FIRST = 6;
 
-export function EventsAttendedLazy({ memberId }: { memberId: string }) {
+/**
+ * `isOwner` (the profile page knows the viewer from the session) picks the endpoint: the owner reads the
+ * no-store /me view, everyone else the shared, cacheable visitor view. The two bodies are never mixed.
+ */
+export function EventsAttendedLazy({ memberId, isOwner = false }: { memberId: string; isOwner?: boolean }) {
     const t = useTranslations("eventsAttended");
     const locale = useLocale();
     const wrapperRef = useRef<HTMLDivElement | null>(null);
@@ -67,15 +71,16 @@ export function EventsAttendedLazy({ memberId }: { memberId: string }) {
 
     const load = useCallback(async () => {
         try {
-            const r = await fetch(`/api/events-attended/${encodeURIComponent(memberId)}`);
+            const r = await fetch(isOwner ? "/api/events-attended/me" : `/api/events-attended/${encodeURIComponent(memberId)}`);
             setData(r.ok ? ((await r.json()) as Payload) : null);
         } catch {
             setData(null);
         }
-    }, [memberId]);
+    }, [memberId, isOwner]);
 
     useEffect(() => {
         if (!inView) return;
+        setData(null); // never show one view's body under the other's controls
         void load();
         const q = new URLSearchParams(window.location.search).get("rsv");
         if (q === "linked") setNote(t("linkedNote"));

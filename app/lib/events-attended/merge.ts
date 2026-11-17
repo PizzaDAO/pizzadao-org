@@ -100,8 +100,9 @@ export function mergeEvents(
 
   if (opts.countTickets) {
     for (const t of input.tickets) {
-      const a = attended.find((x) => sameTicketEvent(t, x))
-      if (a) continue // collapses into the Attended (or Organizer) row
+      // Match against ALL check-ins: a ticket for a hidden-guest-list party must not reveal it to others.
+      const a = input.attended.find((x) => sameTicketEvent(t, x))
+      if (a) continue // collapses into the Attended row (or is dropped with it for other viewers)
       rows.push({ id: `tix:${t.id}`, name: t.name, date: null, year: t.year, city: null, url: t.url, badge: 'ticket' })
     }
   }

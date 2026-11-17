@@ -11,7 +11,7 @@ import {
   setPrimaryWallet,
   getWalletForMember,
 } from "@/app/lib/wallet-lookup";
-import { refreshRsvEventsIfEnabled } from "@/app/lib/events-attended/rsv";
+import { clearWalletMatches, refreshRsvEventsIfEnabled } from "@/app/lib/events-attended/rsv";
 import { emitMissionEvent } from "@/app/lib/mission-verify/events";
 import { promoteAwaitingWallet } from "@/app/lib/slices/claims";
 import { processMintQueueSafe } from "@/app/lib/slices/mint-queue";
@@ -291,7 +291,8 @@ export async function DELETE(request: NextRequest) {
     if (ownership instanceof NextResponse) return ownership;
 
     await deleteWalletForMember(String(memberId), walletId);
-    // Rows found through the removed wallet must not linger: re-check without it.
+    // Rows found only through wallets go now, then re-check with the wallets that remain.
+    await clearWalletMatches(String(memberId)).catch(() => undefined);
     after(() => refreshRsvEventsIfEnabled(String(memberId)));
 
     // Sync primary wallet to sheet (may have changed or cleared)

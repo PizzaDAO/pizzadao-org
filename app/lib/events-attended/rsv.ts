@@ -8,7 +8,6 @@
  */
 import { createHash } from 'crypto'
 import { prisma } from '@/app/lib/db'
-import { getEvmWalletsForMember } from '@/app/lib/wallet-lookup'
 import { loadEventsAttendedConfig } from './config'
 import { fetchGuestAttendance, GUEST_ATTENDANCE_MAX_HASHES, GUEST_ATTENDANCE_MAX_WALLETS } from './guest-attendance'
 
@@ -20,19 +19,24 @@ export interface RsvIdentifiers {
   wallets: string[]
 }
 
-export async function collectIdentifiers(memberId: string): Promise<RsvIdentifiers> {
+type Db = Pick<typeof prisma, 'memberProfileExtras' | 'memberWallet'>
+
+export async function collectIdentifiers(memberId: string, db: Db = prisma): Promise<RsvIdentifiers> {
   const [extras, wallets] = await Promise.all([
-    prisma.memberProfileExtras.findUnique({
+    db.memberProfileExtras.findUnique({
       where: { memberId },
       select: { email: true, emailVerifiedAt: true, rsvLinkedEmailHash: true },
     }),
-    getEvmWalletsForMember(memberId).catch(() => [] as string[]),
+    db.memberWallet.findMany({ where: { memberId, chainType: 'evm' }, select: { walletAddress: true }, orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }], take: GUEST_ATTENDANCE_MAX_WALLETS }),
   ])
   const hashes = new Set<string>()
   if (extras?.email && extras.emailVerifiedAt) hashes.add(hashEmail(extras.email))
   if (extras?.rsvLinkedEmailHash) hashes.add(extras.rsvLinkedEmailHash)
-  return { hashes: [...hashes].slice(0, GUEST_ATTENDANCE_MAX_HASHES), wallets: wallets.slice(0, GUEST_ATTENDANCE_MAX_WALLETS) }
+  return { hashes: [...hashes].slice(0, GUEST_ATTENDANCE_MAX_HASHES), wallets: wallets.map((w) => w.walletAddress) }
 }
+
+const sameIds = (a: RsvIdentifiers, b: RsvIdentifiers) =>
+  JSON.stringify([[...a.hashes].sort(), [...a.wallets].map((w) => w.toLowerCase()).sort()]) === JSON.stringify([[...b.hashes].sort(), [...b.wallets].map((w) => w.toLowerCase()).sort()])
 
 function parseDate(s: string | null): Date | null {
   if (!s) return null
@@ -46,10 +50,13 @@ export type RefreshResult = { ok: true; count: number } | { ok: false }
 export async function refreshRsvEvents(memberId: string, opts: { fetchImpl?: typeof fetch; env?: NodeJS.ProcessEnv } = {}): Promise<RefreshResult> {
   const ids = await collectIdentifiers(memberId)
   if (ids.hashes.length === 0 && ids.wallets.length === 0) {
-    await prisma.$transaction([
-      prisma.memberRsvEvent.deleteMany({ where: { memberId } }),
-      prisma.memberRsvCheck.deleteMany({ where: { memberId } }),
-    ])
+    await prisma.$transaction(async (tx) => {
+      // Re-read inside the transaction: only wipe if the member still has nothing to match.
+      const now = await collectIdentifiers(memberId, tx)
+      if (now.hashes.length || now.wallets.length) return
+      await tx.memberRsvEvent.deleteMany({ where: { memberId } })
+      await tx.memberRsvCheck.deleteMany({ where: { memberId } })
+    })
     return { ok: true, count: 0 }
   }
 
@@ -58,9 +65,13 @@ export async function refreshRsvEvents(memberId: string, opts: { fetchImpl?: typ
   if (!found) return { ok: false }
   const events = [...new Map(found.map((e) => [e.id, e])).values()]
   const now = new Date()
-  await prisma.$transaction([
-    prisma.memberRsvEvent.deleteMany({ where: { memberId } }),
-    prisma.memberRsvEvent.createMany({
+  const written = await prisma.$transaction(async (tx) => {
+    // The identifiers may have changed while we waited on rsv.pizza (email changed, wallet removed):
+    // those triggers refresh again, so do not write a result for the old ones.
+    if (!sameIds(ids, await collectIdentifiers(memberId, tx))) return false
+    await tx.memberRsvEvent.deleteMany({ where: { memberId } })
+    await tx.memberRsvEvent.createMany({
+      skipDuplicates: true,
       data: events.map((e) => ({
         memberId,
         rsvEventId: e.id,
@@ -72,9 +83,11 @@ export async function refreshRsvEvents(memberId: string, opts: { fetchImpl?: typ
         guestListHidden: e.guestListHidden,
         fetchedAt: now,
       })),
-    }),
-    prisma.memberRsvCheck.upsert({ where: { memberId }, create: { memberId, checkedAt: now }, update: { checkedAt: now } }),
-  ])
+    })
+    await tx.memberRsvCheck.upsert({ where: { memberId }, create: { memberId, checkedAt: now }, update: { checkedAt: now } })
+    return true
+  })
+  if (!written) return { ok: false }
   return { ok: true, count: events.length }
 }
 
@@ -95,6 +108,18 @@ export async function refreshRsvEventsIfEnabled(memberId: string): Promise<void>
 export async function clearEmailMatches(memberId: string): Promise<void> {
   await prisma.$transaction([
     prisma.memberRsvEvent.deleteMany({ where: { memberId, matchedBy: 'email' } }),
+    prisma.memberRsvCheck.deleteMany({ where: { memberId } }),
+  ])
+}
+
+/**
+ * A wallet was removed: rows found only through wallets go now (email-matched rows stay), and the check
+ * marker is reset so a failed background refresh is retried by the nightly job. The refresh re-adds
+ * anything a remaining wallet still matches.
+ */
+export async function clearWalletMatches(memberId: string): Promise<void> {
+  await prisma.$transaction([
+    prisma.memberRsvEvent.deleteMany({ where: { memberId, matchedBy: 'wallet' } }),
     prisma.memberRsvCheck.deleteMany({ where: { memberId } }),
   ])
 }
