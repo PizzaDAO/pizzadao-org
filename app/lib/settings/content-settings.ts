@@ -189,6 +189,14 @@ export const CONTENT_SETTINGS = {
     key: 'calls.agendaMaxFollowups', area: 'calls', label: 'Agenda: most items from the last call', help: 'Action items from the previous call listed in one agenda.',
     min: 0, max: 5, default: 2,
   }),
+  'calls.agendaReviewMaxItems': num({
+    key: 'calls.agendaReviewMaxItems', area: 'calls', label: 'Agenda review: most items', help: 'Last-call action items listed in the agenda review. The rest show as "+N more" with the call page link.',
+    min: 1, max: 15, default: 8,
+  }),
+  'calls.agendaReviewMaxDays': num({
+    key: 'calls.agendaReviewMaxDays', area: 'calls', label: 'Agenda review: how old a call may be', help: 'A call older than this is not reviewed in the agenda.',
+    min: 1, max: 120, default: 35, unit: 'days',
+  }),
   'calls.agendaItemChars': num({
     key: 'calls.agendaItemChars', area: 'calls', label: 'Agenda: characters per item', help: 'Longer task and action item text is cut here.',
     min: 40, max: 200, default: 110, unit: 'chars',

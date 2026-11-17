@@ -41,6 +41,11 @@ export function evidenceLabel(url: string): string {
   }
 }
 
+/** A Discord masked link with <> around the URL (no embed); brackets and markdown characters are stripped from the label. */
+export function maskedLink(l: { url: string; label: string }): string {
+  return `[${l.label.replace(/[\[\]()<>*_`~|\\]/g, '') || 'link'}](<${l.url}>)`
+}
+
 /** Strict: calls `fail` (which throws) on anything invalid. Absent / null gives []. */
 export function parseEvidenceStrict(raw: unknown, name: string, fail: (msg: string) => never): Evidence[] {
   if (raw == null) return []

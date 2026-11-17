@@ -43,6 +43,8 @@ export const TOGGLES = {
     env: 'CALL_AGENDA_POST_ENABLED',
     legacy: (raw) => ['true', '1'].includes((raw ?? '').trim().toLowerCase()),
   },
+  // Off unless turned on: the pre-call agenda opens with last call's action items and their status.
+  'calls.agendaReviewEnabled': { env: 'CALL_AGENDA_REVIEW_ENABLED', legacy: ON_WORDS },
   'education.sessionAnnounceEnabled': { env: 'EDUCATION_SESSION_ANNOUNCE_ENABLED', legacy: ON_WORDS },
   // Off unless turned on: manage page edits, the public /learn page and the dashboard card.
   'education.editEnabled': { env: 'EDUCATION_EDIT_ENABLED', legacy: ON_WORDS },

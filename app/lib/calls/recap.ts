@@ -22,7 +22,7 @@ import { toggleEnabled } from '@/app/lib/settings/toggles'
 import { loadSettings, type Settings } from '@/app/lib/settings'
 import { settingInt } from '@/app/lib/settings/numbers'
 import { importedAllowed, isImportedSource } from '@/app/lib/calls/imported'
-import { readEvidence } from '@/app/lib/calls/evidence'
+import { readEvidence, maskedLink } from '@/app/lib/calls/evidence'
 import { loadActionViews, type ActionView } from '@/app/lib/calls/action-status'
 import { createHash } from 'node:crypto'
 import { enqueueMirror } from '@/app/lib/telegram/city-posts'
@@ -393,9 +393,9 @@ export function buildRecapParts(input: RecapInput, base: string = SITE_URL, filt
       const state: ActionView['state'] = statusMode ? (view?.state ?? null) : done ? 'done' : null
       // Status mode: the first link of the item only (the call page lists them all), masked, URLs over 200 characters left out.
       const first = view?.links.find((l) => l.url.length <= 200)
-      const link = first ? `[${first.label.replace(/[\[\]()<>*_`~|\\]/g, '') || 'link'}](<${first.url}>)` : ''
+      const link = first ? maskedLink(first) : ''
       // Masked links with <> around the URL (no embeds); only on done items. Long URLs are left out to keep the line short.
-      const proof = done ? readEvidence(o.evidence).filter((e) => e.url.length <= 200).map((e) => `[${e.label.replace(/[\[\]()<>*_`~|\\]/g, '') || 'link'}](<${e.url}>)`) : []
+      const proof = done ? readEvidence(o.evidence).filter((e) => e.url.length <= 200).map(maskedLink) : []
       const ev = proof.length ? `: ${proof.join(', ')}` : ''
       const text = typeof o?.text === 'string' ? oneLine(o.text) : ''
       const owner = typeof o?.owner === 'string' ? oneLine(o.owner) : ''

@@ -12,6 +12,7 @@ import { agendaLimits, type ActionItem } from '@/app/lib/call-agenda/rank'
 import { savedChannelId } from '@/app/lib/settings/channels'
 import { loadSettings, type Settings } from '@/app/lib/settings'
 import { redactionsNewerThanSummary } from '@/app/lib/calls/recap'
+import { redactedSpeakerNames } from '@/app/lib/calls/redacted-names'
 import { buildUpdatesScript, updatesSettings, type LastCallData, type ScriptResult, type UpdatesDeps } from './script'
 
 const API = 'https://discord.com/api/v10'
@@ -43,14 +44,7 @@ export async function lastCallForUpdates(crewId: string): Promise<LastCallData |
   for (const r of rows) {
     const items = parseAllActionItems(r.actionItems)
     if (!items.length) continue
-    let redactedNames: string[] = []
-    if (r.redactedSpeakerIds.length) {
-      const speakers = await prisma.callSpeaker.findMany({
-        where: { recordingId: r.id, OR: [{ discordId: { in: r.redactedSpeakerIds } }, { linkedDiscordId: { in: r.redactedSpeakerIds } }] },
-        select: { displayName: true },
-      })
-      redactedNames = speakers.map((s) => s.displayName).filter((n): n is string => !!n)
-    }
+    const redactedNames = await redactedSpeakerNames(r.id, r.redactedSpeakerIds)
     return { items, startedAt: r.startedAt, redactionsStale: redactionsNewerThanSummary(r), redactedNames }
   }
   return null

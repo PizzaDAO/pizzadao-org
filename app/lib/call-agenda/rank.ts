@@ -167,9 +167,73 @@ export function parseAgendaLinks(raw: string): Map<string, { label: string; url:
   return links
 }
 
-/** The Discord message: bullets, then the crew's link (the crew page unless calls.agendaLinks says otherwise). */
-export function formatAgendaMessage(o: { crewLabel: string; startsAt: Date; bullets: readonly AgendaBullet[]; crewUrl: string; linkLabel?: string }): string {
-  const ts = Math.floor(o.startsAt.getTime() / 1000)
-  const lines = [`**${o.crewLabel} call agenda** (starts <t:${ts}:R>)`, ...o.bullets.map((b) => `- ${b.text}`), `${o.linkLabel ?? 'Crew page'}: ${o.crewUrl}`]
-  return lines.join('\n')
+/** One line of the "Since last call" block: the status marker, the text with its owner, and the first finished-work link (a masked link). */
+export interface ReviewLine {
+  marker: '✅' | '🔄' | '-'
+  text: string
+  link?: string
 }
+
+/** The "Since last call" block of an agenda. `more` counts items left out; `moreUrl` is where they can be read. */
+export interface AgendaReviewBlock {
+  startedAt: Date
+  items: readonly ReviewLine[]
+  more: number
+  moreUrl: string
+}
+
+/** Discord's message limit. */
+export const DISCORD_MESSAGE_MAX = 2000
+
+/** How many review items and how old a call the agenda review shows (settings calls.agendaReviewMax*). */
+export function agendaReviewLimits(settings?: Settings): { maxItems: number; maxDays: number; openFirst: boolean } {
+  return {
+    maxItems: settingInt('calls.agendaReviewMaxItems', settings),
+    maxDays: settingInt('calls.agendaReviewMaxDays', settings),
+    openFirst: settings?.get('calls.agendaReviewOpenFirst') === true,
+  }
+}
+
+/** The Discord message: bullets, then the crew's link (the crew page unless calls.agendaLinks says otherwise). With `review`, the last call's items come first and the message is fitted to Discord's limit. */
+export function formatAgendaMessage(o: { crewLabel: string; startsAt: Date; bullets: readonly AgendaBullet[]; crewUrl: string; linkLabel?: string; review?: AgendaReviewBlock }): string {
+  const ts = Math.floor(o.startsAt.getTime() / 1000)
+  const head = `**${o.crewLabel} call agenda** (starts <t:${ts}:R>)`
+  const tail = `${o.linkLabel ?? 'Crew page'}: ${o.crewUrl}`
+  if (!o.review) return [head, ...o.bullets.map((b) => `- ${b.text}`), tail].join('\n')
+
+  const r = o.review
+  let items: ReviewLine[] = r.items.map((i) => ({ ...i }))
+  let more = r.more
+  let bullets = [...o.bullets]
+  const render = (): string => {
+    const lines = [head]
+    if (items.length || more > 0) {
+      lines.push(`**Since last call** (<t:${Math.floor(r.startedAt.getTime() / 1000)}:d>)`)
+      for (const i of items) lines.push(`${i.marker} ${i.text}${i.link ? `: ${i.link}` : ''}`)
+      if (more > 0) lines.push(`+${more} more: ${r.moreUrl}`)
+      if (bullets.length) lines.push('**Up next**')
+    }
+    for (const b of bullets) lines.push(`- ${b.text}`)
+    lines.push(tail)
+    return lines.join('\n')
+  }
+  // Over the limit: give up links first (last item upward), then review items from the end, then task bullets from the end.
+  let msg = render()
+  for (let k = items.length - 1; k >= 0 && msg.length > DISCORD_MESSAGE_MAX; k--) {
+    if (items[k].link) {
+      items[k] = { marker: items[k].marker, text: items[k].text }
+      msg = render()
+    }
+  }
+  while (msg.length > DISCORD_MESSAGE_MAX && items.length) {
+    items = items.slice(0, -1)
+    more++
+    msg = render()
+  }
+  while (msg.length > DISCORD_MESSAGE_MAX && bullets.length) {
+    bullets = bullets.slice(0, -1)
+    msg = render()
+  }
+  return msg
+}
+
