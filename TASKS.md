@@ -12,17 +12,17 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 | calzone-93434 | Add Telegram login | todo | P2 |  |  |  | plans/calzone-93434-telegram-login.md |  | account linking shipped in #128; login itself not built |
 | website-refuse-closed-claims | Website: refuse claiming closed crew tasks | todo | P3 |  | Snax | crews |  |  | follow-up from plans/discord-task-command.md: Discord already refuses closed tasks, the website does not |
 | task-add-row-cap | /task add: refuse adds once a crew has as many active tasks as the crew editor allows (its row limit) | todo | P4 |  | Snax | discord, crews |  |  | review note on #394 |
-| agenda-action-status | Call agenda: list the last call's action items with their status (✅ done / 🔄 in progress, finished links) so calls open by reviewing them | doing | P2 |  | Snax | calls | plans/agenda-action-status.md |  | depends on recap-action-status (plans/recap-action-status.md) shipping first |
 | bellpepper-80127 | Idea para dashboard: carpeta para subir memes de pizzadao y bennys xD | todo | P2 |  |  |  |  |  |  |
 | pineapple-84122 | Auto-Invite member to event or one is near their city | todo | P2 |  |  |  | plans/pineapple-84122-nearby-event-invites.md |  |  |
 | pineapple-71302 | add a email claiming system for memebes to claim a unique pizzadao emails | todo | P3 |  |  |  | plans/pineapple-71302-pizzadao-emails.md |  | 2026-10-17: on hold, not yet (Snax) |
 | neapolitan-96018 | Crew page with start crew call button | todo | P2 |  |  |  |  |  | moved back from Done 2026-11-14: no evidence it shipped |
-| diavola-24729 | Fix pep jobs so they don't have ugly discord names etc | doing | P2 |  |  |  | plans/diavola-24729.md |  | moved back from Done 2026-11-14: no evidence it shipped |
 | discord-guild-channels-timeout | Discord: GET /guilds/{id}/channels times out in prod | todo | P2 |  |  |  |  |  | found in plans/diavola-24729.md: GET /guilds/{id}/channels times out in prod; blanks public channel names on profiles and recaps |
 
 ## Done
 
 | ID | Task | Priority | Done | PR | Notes |
+| agenda-action-status | Call agenda opens with last call's action items and their status | P2 | 2026-11-17 | #396 | turned on 2026-11-17 |
+| diavola-24729 | PEP jobs and economy pages: readable channel and member names; Discord replies show PizzaDAO names | P2 | 2026-11-17 | #397, #398 | 18 junk job memos rewritten |
 | profile-events-attended | Member profiles show events attended (rsv.pizza check-ins, Unlock tickets, POAPs; link an rsv.pizza account by email) | P2 | 2026-11-17 | #392 | live 2026-11-17 |
 | discord-bounty-command | Discord /bounty command: list and claim PEP bounties | P2 | 2026-11-17 | #389 | shipped, then turned off and unregistered (crew tasks via /task instead) |
 | discord-task-add | Discord /task add: crew leads and admins create a crew task from Discord | P2 | 2026-11-17 | #394 | registered and live 2026-11-17 |
