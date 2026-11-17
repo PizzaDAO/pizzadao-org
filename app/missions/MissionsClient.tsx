@@ -623,7 +623,7 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
               className="overline"
               style={{ color: "hsl(var(--ink) / 0.7)" }}
             >
-              § Current Level
+              {allLevelsDone ? "§ All levels complete" : "§ Working on"}
             </span>
             <div
               style={{
@@ -656,6 +656,11 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
                 }}
               >
                 <span className="circle-scribble">{data.levelTitle}</span>
+              </div>
+            )}
+            {!allLevelsDone && currentLevel > 1 && (
+              <div style={{ fontSize: 13, color: "hsl(var(--ink) / 0.7)" }}>
+                Level {currentLevel - 1} complete
               </div>
             )}
             <div style={{ display: "flex", justifyContent: "center", marginTop: 6 }}>
