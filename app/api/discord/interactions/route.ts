@@ -14,7 +14,7 @@
 //      missions.verifiersEnabled is edited in via the interaction webhook.
 // /vouch, /level, /profile (discord.vouchCommandEnabled / levelCommandEnabled / profileCommandEnabled):
 //      deferred ephemeral replies (app/lib/discord-interactions/member-commands.ts), 10 per member per minute.
-// /task list | claim | mine | drop (discord.taskCommandEnabled): crew tasks, deferred ephemeral replies
+// /task list | claim | mine | drop | add (discord.taskCommandEnabled): crew tasks, deferred ephemeral replies
 //      (app/lib/discord-interactions/task-command.ts) over claimCrewTask (app/lib/crews/claim-task.ts), 10 per member per minute.
 // /bounty list | claim | mine | giveup (discord.bountyCommandEnabled): deferred ephemeral replies
 //      (app/lib/discord-interactions/bounty-command.ts) over the website's bounty functions, 10 per member per minute.
@@ -41,7 +41,11 @@ import { runMemberCommand, type MemberCommandJob } from "@/app/lib/discord-inter
 import { runBountyCommand, type BountyJob, type BountyRow } from "@/app/lib/discord-interactions/bounty-command";
 import { bountyPickChoices } from "@/app/lib/discord-interactions/bounty-choices";
 import { runTaskCommand, type TaskJob } from "@/app/lib/discord-interactions/task-command";
-import { myCrewTasks, openCrewTasks, taskPickChoices } from "@/app/lib/discord-interactions/task-choices";
+import { addCrewChoices, findOpenDuplicate, myCrewTasks, openCrewTasks, taskPickChoices } from "@/app/lib/discord-interactions/task-choices";
+import { createCrewTask } from "@/app/lib/crew-tasks-write";
+import { canManageCrew } from "@/app/lib/crew-leads";
+import { realCrews } from "@/app/lib/crew-id";
+import { usesDb } from "@/app/lib/sheets-import/source";
 import { claimCrewTask } from "@/app/lib/crews/claim-task";
 import { claimBounty, getClaimedBounties, getCrewLabelMap, getOpenBounties, giveUpBounty } from "@/app/lib/bounties";
 import { requireOnboarded } from "@/app/lib/economy";
@@ -234,6 +238,19 @@ async function taskRateLimit(discordId: string): Promise<Date | null> {
   return r.success ? null : new Date(r.reset);
 }
 
+/** /task add (writes a crew task): 5 per member per 10 minutes, on top of the general /task limit. */
+async function taskAddRateLimit(discordId: string): Promise<Date | null> {
+  const r = await checkKeyedRateLimit("task-add", discordId);
+  return r.success ? null : new Date(r.reset);
+}
+
+/** Where a crew's tasks live: the database, a Google Sheet, or nowhere (not a real crew). */
+async function taskCrewSource(crewId: string): Promise<"db" | "sheet" | "unknown"> {
+  const { crews } = await getCrewMappings();
+  if (!realCrews(crews).some((c) => c.id === crewId)) return "unknown";
+  return (await usesDb("crewTasks", crewId)) ? "db" : "sheet";
+}
+
 /** The deferred /task work, after the type-5 reply has gone out. */
 function deferTask(job: TaskJob) {
   after(async () => {
@@ -248,14 +265,23 @@ function deferTask(job: TaskJob) {
       drop: (discordId, taskId) => claimCrewTask({ discordId, taskId, action: "giveup" }),
       isMember: async (id) => !!(await fetchMemberIdByDiscordId(id)),
       crewLabels: getCrewLabelMap,
+      canManageCrew,
+      crewSource: taskCrewSource,
+      findOpenDuplicate,
+      // No transaction handle, so createCrewTask writes the audit event and invalidates the crew cache itself.
+      create: (crewId, input, actor, eventData) => createCrewTask(crewId, input, actor, eventData),
       appUrl: appUrl(),
     });
   });
 }
 
-/** Autocomplete for /task: crews (list), open tasks (claim), the tasks you lead (drop). */
-async function taskChoices(kind: "crew" | "claim" | "drop", discordId: string, query: string): Promise<Array<{ name: string; value: string | number }>> {
+/** Autocomplete for /task: crews (list), open tasks (claim), the tasks you lead (drop), crews to add to (add; the caller's own first). */
+async function taskChoices(kind: "crew" | "claim" | "drop" | "addCrew", discordId: string, query: string, roles: string[] = []): Promise<Array<{ name: string; value: string | number }>> {
   if (kind === "crew") return progressCrewChoices(query);
+  if (kind === "addCrew") {
+    const memberId = await fetchMemberIdByDiscordId(discordId);
+    return addCrewChoices(memberId ? String(memberId) : null, query, roles);
+  }
   const memberId = kind === "drop" ? await fetchMemberIdByDiscordId(discordId) : null;
   return taskPickChoices(kind, memberId ? String(memberId) : null, query);
 }
@@ -353,7 +379,7 @@ function deps(guildId: string | undefined, settings: Settings): HandlerDeps {
     missions: { rateLimit: missionsRateLimit, defer: deferMissions },
     memberCommands: { enabled: (name) => toggleEnabled(MEMBER_COMMAND_TOGGLES[name]), rateLimit: memberCommandRateLimit, defer: deferMemberCommand },
     progress: { enabled: progressEnabled, rateLimit: progressRateLimit, defer: deferProgress, crewChoices: progressCrewChoices },
-    task: { enabled: () => toggleEnabled("discord.taskCommandEnabled"), rateLimit: taskRateLimit, defer: deferTask, choices: taskChoices },
+    task: { enabled: () => toggleEnabled("discord.taskCommandEnabled"), rateLimit: taskRateLimit, addRateLimit: taskAddRateLimit, defer: deferTask, choices: taskChoices },
     bounty: { enabled: () => toggleEnabled("discord.bountyCommandEnabled"), rateLimit: bountyRateLimit, defer: deferBounty, choices: bountyChoices },
     live: {
       enabled: () => liveCommandEnabled(),

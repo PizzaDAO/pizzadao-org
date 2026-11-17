@@ -23,6 +23,7 @@ import { handleReviewButton, handleReviewModal, type MissionReviewDeps } from '.
 import type { MemberCommandJob, MemberCommandName } from './member-commands'
 import { BOUNTY_SUBCOMMANDS, type BountyJob } from './bounty-command'
 import { TASK_SUBCOMMANDS, type TaskJob } from './task-command'
+import { cleanTaskText, parseDue, parsePriority } from './task-add'
 import { CREW_ID_PATTERN, normalizeCrewId } from '../crew-id'
 import { handleFollowUpInteraction, isFollowUpInteraction, type FollowUpInteractionDeps } from './followups'
 import { handleReminderInteraction, isReminderInteraction, type ReminderInteractionDeps } from './reminders'
@@ -54,6 +55,8 @@ export interface Interaction {
   }
   member?: { user?: DiscordUser; roles?: string[]; joined_at?: string; nick?: string | null; avatar?: string | null }
   user?: DiscordUser
+  /** The interaction id (kept in the audit event of /task add). */
+  id?: string
   /** The user's Discord locale ("fr", "es-ES", ...). */
   locale?: string
 }
@@ -169,16 +172,21 @@ export interface HandlerDeps {
     choices: (kind: 'crew' | 'claim' | 'giveup', discordId: string, query: string) => Promise<Array<{ name: string; value: string | number }>>
   }
   /**
-   * /task list | claim | mine | drop (./task-command.ts, discord.taskCommandEnabled), crew tasks rather than
+   * /task list | claim | mine | drop | add (./task-command.ts, discord.taskCommandEnabled), crew tasks rather than
    * bounties. Same shape as `bounty`: `enabled` is checked first, `defer` edits the deferred ephemeral
    * message and must not block (route: after()). `choices` feeds the autocomplete: crews for list's `crew`,
-   * open tasks for claim, the member's own tasks for drop (values are task ids).
+   * open tasks for claim, the member's own tasks for drop (values are task ids), and for add's `crew` the
+   * crews the member can probably add to first (`roles` are the caller's Discord role ids; a hint only,
+   * the deferred step checks permission). `addRateLimit` is the extra limit on writes (add only).
    */
   task?: {
     enabled: () => Promise<boolean>
     rateLimit: (discordId: string) => Promise<Date | null>
+    addRateLimit: (discordId: string) => Promise<Date | null>
     defer: (job: TaskJob) => void
-    choices: (kind: 'crew' | 'claim' | 'drop', discordId: string, query: string) => Promise<Array<{ name: string; value: string | number }>>
+    choices: (kind: 'crew' | 'claim' | 'drop' | 'addCrew', discordId: string, query: string, roles?: string[]) => Promise<Array<{ name: string; value: string | number }>>
+    /** The clock (tests). */
+    now?: () => Date
   }
   /** Mission review card buttons and the Reject modal (./mission-review.ts). */
   missionReview?: MissionReviewDeps
@@ -628,11 +636,11 @@ async function command(i: Interaction, userId: string, deps: HandlerDeps, cur: s
       if (!i.application_id || !i.token) return out.error('Could not start the command. Please try again.')
       const subOpt = i.data?.options?.[0] as { name?: string; options?: Option[] } | undefined
       const sub = TASK_SUBCOMMANDS.find((s) => s === subOpt?.name)
-      if (!sub) return out.error('Pick one of: list, claim, mine, drop.')
+      if (!sub) return out.error('Pick one of: list, claim, mine, drop, add.')
       const crewRaw = subOpt?.options?.find((o) => o.name === 'crew')?.value
       const taskRaw = subOpt?.options?.find((o) => o.name === 'task')?.value
       let crewId: string | undefined
-      if (sub === 'list' && crewRaw !== undefined && crewRaw !== '') {
+      if (sub === 'add' || (sub === 'list' && crewRaw !== undefined && crewRaw !== '')) {
         crewId = typeof crewRaw === 'string' ? normalizeCrewId(crewRaw) : ''
         if (!crewId || !CREW_ID_PATTERN.test(crewId)) return out.error('Pick a crew from the list.')
       }
@@ -641,13 +649,30 @@ async function command(i: Interaction, userId: string, deps: HandlerDeps, cur: s
         if (typeof taskRaw !== 'string' || !/^[a-z0-9]{20,40}$/.test(taskRaw)) return out.error('Pick a task from the list.')
         taskId = taskRaw
       }
+      // add: the text, priority and due date are checked here so a typo is answered at once.
+      let add: { label: string; priority: string | null; due: string | null } | undefined
+      if (sub === 'add') {
+        const text = cleanTaskText(taskRaw)
+        if (!text.ok) return out.error(text.error)
+        const priority = parsePriority(subOpt?.options?.find((o) => o.name === 'priority')?.value)
+        if (!priority.ok) return out.error(priority.error)
+        const due = parseDue(subOpt?.options?.find((o) => o.name === 'due')?.value, (deps.task.now ?? (() => new Date()))())
+        if (!due.ok) return out.error(due.error)
+        add = { label: text.label, priority: priority.priority, due: due.due }
+      }
       const readyAt = await deps.task.rateLimit(userId)
       if (readyAt) return out.wait('Slow down.', `You can use /task again ${rel(readyAt)}.`)
+      if (add) {
+        const addReadyAt = await deps.task.addRateLimit(userId)
+        if (addReadyAt) return out.wait('Slow down.', `You can add more tasks ${rel(addReadyAt)}.`)
+      }
       deps.task.defer({
         sub,
         discordId: userId,
         ...(crewId ? { crewId } : {}),
         ...(taskId ? { taskId } : {}),
+        ...(add ?? {}),
+        ...(add && i.id ? { interactionId: i.id } : {}),
         applicationId: i.application_id,
         token: i.token,
         author: authorFor(i.member ? { ...i.member, guildId: i.guild_id } : undefined),
@@ -722,12 +747,13 @@ async function autocomplete(i: Interaction, deps: HandlerDeps): Promise<Interact
     const kind = f?.name === 'crew' && sub?.name === 'list' ? 'crew' : f?.name === 'bounty' && (sub?.name === 'claim' || sub?.name === 'giveup') ? sub.name : null
     if (kind && userId) choices = (await deps.bounty.choices(kind, userId, String(f?.value ?? ''))).slice(0, 25)
   } else if (i.data?.name === 'task' && deps.task && (await deps.task.enabled())) {
-    // The focused option sits inside the subcommand: list.crew, claim.task or drop.task.
+    // The focused option sits inside the subcommand: list.crew, add.crew, claim.task or drop.task.
     const sub = i.data.options?.[0] as { name?: string; options?: Option[] } | undefined
     const f = sub?.options?.find((o) => o.focused)
     const userId = i.member?.user?.id ?? i.user?.id
-    const kind = f?.name === 'crew' && sub?.name === 'list' ? 'crew' : f?.name === 'task' && (sub?.name === 'claim' || sub?.name === 'drop') ? sub.name : null
-    if (kind && userId) choices = (await deps.task.choices(kind, userId, String(f?.value ?? ''))).slice(0, 25)
+    const kind =
+      f?.name === 'crew' && sub?.name === 'list' ? 'crew' : f?.name === 'crew' && sub?.name === 'add' ? 'addCrew' : f?.name === 'task' && (sub?.name === 'claim' || sub?.name === 'drop') ? sub.name : null
+    if (kind && userId) choices = (await deps.task.choices(kind, userId, String(f?.value ?? ''), i.member?.roles ?? [])).slice(0, 25)
   } else if (i.data?.name === 'progress' && focused?.name === 'crew' && deps.progress && (await deps.progress.enabled())) {
     choices = (await deps.progress.crewChoices(String(focused.value ?? ''))).slice(0, 25)
   }

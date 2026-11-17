@@ -80,3 +80,22 @@ export async function canManageBounty(
   if (bounty.createdBy === discordId) return true
   return canManageCrew(discordId, bounty.crewId)
 }
+
+/**
+ * Ids of the crews this member (by member id) leads, from the CrewRole table: one query. Only a
+ * hint for autocomplete ordering, never a permission check (that is canManageCrew). While crew rosters
+ * are still read from sheets it returns an empty set, since per-crew sheet reads are too slow for
+ * Discord's 3-second autocomplete window. Fails closed (empty set) on any error.
+ */
+export async function leadCrewIds(memberId: string | null | undefined): Promise<Set<string>> {
+  if (!memberId) return new Set()
+  try {
+    const { crewRolesFromDb } = await import('./crew-roles')
+    if (!(await crewRolesFromDb())) return new Set()
+    const { prisma } = await import('./db')
+    const rows = await prisma.crewRole.findMany({ where: { memberId: String(memberId), archived: false }, select: { crewId: true, status: true } })
+    return new Set(rows.filter((r) => isLeadStatus(r.status)).map((r) => r.crewId))
+  } catch {
+    return new Set()
+  }
+}

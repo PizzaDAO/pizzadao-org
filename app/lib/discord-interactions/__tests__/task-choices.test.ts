@@ -1,7 +1,8 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const m = vi.hoisted(() => ({ findMany: vi.fn(), getCrewMappings: vi.fn(), usesDb: vi.fn() }))
+const m = vi.hoisted(() => ({ findMany: vi.fn(), getCrewMappings: vi.fn(), usesDb: vi.fn(), leadCrewIds: vi.fn() }))
+vi.mock('@/app/lib/crew-leads', () => ({ leadCrewIds: m.leadCrewIds }))
 vi.mock('@/app/lib/db', () => ({ prisma: { crewTask: { findMany: m.findMany } } }))
 vi.mock('@/app/lib/crew-mappings', async () => {
   const actual = await vi.importActual<typeof import('@/app/lib/crew-mappings')>('@/app/lib/crew-mappings')
@@ -9,12 +10,13 @@ vi.mock('@/app/lib/crew-mappings', async () => {
 })
 vi.mock('@/app/lib/sheets-import/source', () => ({ usesDb: m.usesDb }))
 
-import { myCrewTasks, openCrewTasks, taskChoice, taskPickChoices } from '../task-choices'
+import { addCrewChoices, findOpenDuplicate, myCrewTasks, openCrewTasks, taskChoice, taskPickChoices } from '../task-choices'
 
 const task = (id: string, over: Record<string, unknown> = {}) => ({ id, crewId: 'ops', label: `Task ${id}`, stage: 'todo', priority: null, due: null, position: 1, ...over })
 
 beforeEach(() => {
   m.findMany.mockReset().mockResolvedValue([])
+  m.leadCrewIds.mockReset().mockResolvedValue(new Set())
   m.getCrewMappings.mockResolvedValue({
     crews: [
       { id: 'ops', label: 'Ops', turtles: [] },
@@ -94,5 +96,52 @@ describe('taskChoice', () => {
     const name = taskChoice({ id: 'x', crewId: 'ops', label: '🍕'.repeat(200) }, new Map([['ops', 'Ops']])).name
     expect(Array.from(name)).toHaveLength(100)
     expect(name).not.toMatch(/[\ud800-\udbff]$/)
+  })
+})
+
+describe('findOpenDuplicate', () => {
+  it('queries the crew, not archived, not closed, and matches the normalized label', async () => {
+    m.findMany.mockResolvedValue([task('a', { label: 'Other thing' }), task('b', { label: '  Print the  FLYERS! ' }), task('c', { label: 'Print the flyers', stage: 'Done' })])
+    const hit = await findOpenDuplicate('ops', 'print the flyers')
+    expect(m.findMany.mock.calls[0][0].where).toMatchObject({ crewId: 'ops', archived: false })
+    expect(hit?.id).toBe('b')
+  })
+
+  it('returns null when nothing open matches (a closed twin does not count)', async () => {
+    m.findMany.mockResolvedValue([task('c', { label: 'Print the flyers', stage: 'done' })])
+    expect(await findOpenDuplicate('ops', 'Print the flyers')).toBeNull()
+  })
+})
+
+describe('addCrewChoices', () => {
+  it('lists only database crews (no sheet crews, no community crew)', async () => {
+    m.leadCrewIds.mockResolvedValue(new Set())
+    const r = await addCrewChoices('42', '')
+    expect(r.map((c) => c.value)).toEqual(['art', 'ops'])
+    expect(r[0]).toEqual({ name: 'Art', value: 'art' })
+  })
+
+  it('puts the crews the member leads first, then the rest alphabetically', async () => {
+    m.leadCrewIds.mockResolvedValue(new Set(['ops']))
+    expect((await addCrewChoices('42', '')).map((c) => c.value)).toEqual(['ops', 'art'])
+    expect(m.leadCrewIds).toHaveBeenCalledWith('42')
+  })
+
+  it('an admin role treats every crew as manageable (alphabetical, no lead lookup)', async () => {
+    m.leadCrewIds.mockResolvedValue(new Set(['ops']))
+    const { ADMIN_ROLE_IDS } = await import('@/app/ui/constants')
+    expect((await addCrewChoices('42', '', [ADMIN_ROLE_IDS[0]])).map((c) => c.value)).toEqual(['art', 'ops'])
+    expect(m.leadCrewIds).not.toHaveBeenCalled()
+  })
+
+  it('filters by label or id, case-insensitively', async () => {
+    m.leadCrewIds.mockResolvedValue(new Set())
+    expect((await addCrewChoices('42', 'OP')).map((c) => c.value)).toEqual(['ops'])
+    expect(await addCrewChoices('42', 'sheet')).toEqual([])
+  })
+
+  it('no lead preference (empty set, as on a lookup error) still lists the crews', async () => {
+    m.leadCrewIds.mockResolvedValue(new Set())
+    expect((await addCrewChoices(null, '')).map((c) => c.value)).toEqual(['art', 'ops'])
   })
 })
