@@ -152,3 +152,45 @@ describe("getPublicChannelNames with the role setting", () => {
     expect(parsePublicRoleIds(` ${ROLE}\nabc\n\n${ROLE}`)).toEqual([ROLE])
   })
 })
+
+describe("getPublicChannelNames timeouts and single flight", () => {
+  beforeEach(() => {
+    clearPublicChannelCache()
+    process.env.DISCORD_GUILD_ID = GUILD
+    process.env.DISCORD_BOT_TOKEN = "secret-token"
+  })
+  const json = (b: unknown) => ({ ok: true, json: async () => b }) as unknown as Response
+
+  it("gives both Discord calls a timeout signal and logs only the duration", async () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => {})
+    const seen: Array<AbortSignal | undefined> = []
+    const f = vi.fn(async (url: string, init?: RequestInit) => {
+      seen.push(init?.signal ?? undefined)
+      return url.endsWith("/roles") ? json([{ id: GUILD, permissions: VIEW }]) : json([ch("general")])
+    })
+    await getPublicChannelNames(f as unknown as typeof fetch)
+    expect(seen).toHaveLength(2)
+    expect(seen.every((s) => s instanceof AbortSignal)).toBe(true)
+    expect(info).toHaveBeenCalledTimes(1)
+    expect(info.mock.calls[0][0]).toBe("[discord-activity] channel names")
+    expect(info.mock.calls[0][1]).toMatchObject({ ok: true })
+    expect(JSON.stringify(info.mock.calls)).not.toContain("secret-token")
+    info.mockRestore()
+  })
+
+  it("a Discord call that times out gives null names (no channel names shown)", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {})
+    const f = vi.fn(async () => {
+      throw new DOMException("timed out", "TimeoutError")
+    })
+    expect(await getPublicChannelNames(f as unknown as typeof fetch)).toBeNull()
+  })
+
+  it("concurrent cold requests share one Discord lookup", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {})
+    const f = vi.fn(async (url: string) => (url.endsWith("/roles") ? json([{ id: GUILD, permissions: VIEW }]) : json([ch("general")])))
+    const [a, b] = await Promise.all([getPublicChannelNames(f as unknown as typeof fetch), getPublicChannelNames(f as unknown as typeof fetch)])
+    expect(a).toBe(b)
+    expect(f).toHaveBeenCalledTimes(2)
+  })
+})

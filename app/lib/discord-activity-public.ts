@@ -10,6 +10,7 @@ import { getSetting } from "./settings"
 import { toggleEnabled } from "./settings/toggles"
 import { monthPrecisionIso } from "./member-since"
 import { channelKey, readTopChannels } from "./discord-activity"
+import { clearGuildChannelsCache, clearGuildRolesCache, getGuildChannels, getGuildRoles } from "./discord-channels"
 
 export interface PublicDiscordActivity {
   messages: number
@@ -105,38 +106,54 @@ export function countKeyMatches(storedKeys: Iterable<string>, liveNames: string[
 const CHANNEL_CACHE_MS = 60 * 60 * 1000
 const CHANNEL_RETRY_MS = 5 * 60 * 1000
 let channelCache: { at: number; names: PublicChannels | null } | null = null
+let channelInflight: Promise<PublicChannels | null> | null = null
 
 /** Test hook. */
 export function clearPublicChannelCache() {
   channelCache = null
+  channelInflight = null
+  clearGuildChannelsCache()
+  clearGuildRolesCache()
+}
+
+async function loadPublicChannelNames(fetchImpl: typeof fetch): Promise<PublicChannels | null> {
+  const guildId = process.env.DISCORD_GUILD_ID
+  const token = process.env.DISCORD_BOT_TOKEN
+  if (!guildId || !token) return null
+  const started = Date.now()
+  let names: PublicChannels | null = null
+  try {
+    // The shared helpers time out (2.5 s), cache an hour per instance, keep the stale list on a failed
+    // refresh and negative-cache a failure, so concurrent profile loads never each wait on Discord.
+    const [roles, channels] = await Promise.all([getGuildRoles({ fetchImpl }), getGuildChannels({ fetchImpl })])
+    if (roles && channels) {
+      const everyone = roles.find((r) => r.id === guildId)
+      const wanted = parsePublicRoleIds(await getSetting("members.discordActivityPublicRoleIds").catch(() => ""))
+      if (everyone) names = publicChannelNames(guildId, everyone.permissions ?? "0", channels as GuildChannel[], roles.filter((r) => wanted.includes(r.id)))
+    }
+  } catch {
+    names = null
+  }
+  console.info("[discord-activity] channel names", { ms: Date.now() - started, ok: names !== null })
+  return names
 }
 
 /** The public channel names (cached one hour), or null when Discord cannot be read: show no names then. */
 export async function getPublicChannelNames(fetchImpl: typeof fetch = fetch): Promise<PublicChannels | null> {
   const now = Date.now()
   if (channelCache && now - channelCache.at < (channelCache.names ? CHANNEL_CACHE_MS : CHANNEL_RETRY_MS)) return channelCache.names
-  const guildId = process.env.DISCORD_GUILD_ID
-  const token = process.env.DISCORD_BOT_TOKEN
-  let names: PublicChannels | null = null
-  if (guildId && token) {
-    try {
-      const headers = { Authorization: `Bot ${token}` }
-      const [rolesRes, chRes] = await Promise.all([
-        fetchImpl(`https://discord.com/api/v10/guilds/${guildId}/roles`, { headers, cache: "no-store" }),
-        fetchImpl(`https://discord.com/api/v10/guilds/${guildId}/channels`, { headers, cache: "no-store" }),
-      ])
-      if (rolesRes.ok && chRes.ok) {
-        const roles = (await rolesRes.json()) as Array<{ id: string; permissions?: string }>
-        const everyone = roles.find((r) => r.id === guildId)
-        const wanted = parsePublicRoleIds(await getSetting("members.discordActivityPublicRoleIds").catch(() => ""))
-        if (everyone) names = publicChannelNames(guildId, everyone.permissions ?? "0", (await chRes.json()) as GuildChannel[], roles.filter((r) => wanted.includes(r.id)))
-      }
-    } catch {
-      names = null
-    }
+  // Single flight: concurrent cold requests share one lookup.
+  if (!channelInflight) {
+    channelInflight = loadPublicChannelNames(fetchImpl)
+      .then((names) => {
+        channelCache = { at: Date.now(), names }
+        return names
+      })
+      .finally(() => {
+        channelInflight = null
+      })
   }
-  channelCache = { at: now, names }
-  return names
+  return channelInflight
 }
 
 export interface PublicActivityRow {
