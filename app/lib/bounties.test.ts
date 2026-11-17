@@ -94,15 +94,15 @@ describe('createBounty', () => {
 
     await createBounty('creator-1', 'Due <t:1700000000:R> — see <#123456789012345678>', 100)
 
-    // No Discord bot token configured in tests, so the mention falls back
-    // to "#channel" instead of leaking raw <#id> markup into the ledger;
-    // the timestamp tag is kept raw, not frozen to a formatted string.
+    // No Discord bot token configured in tests, so the mention stays a raw
+    // tag (history rendering resolves it later); the timestamp tag is kept
+    // raw too, not frozen to a formatted string.
     expect(logTransaction).toHaveBeenCalledWith(
       prisma,
       'creator-1',
       'BOUNTY_ESCROW',
       -100,
-      'Bounty escrow: Due <t:1700000000:R> — see #channel',
+      'Bounty escrow: Due <t:1700000000:R> — see <#123456789012345678>',
       { bountyId: 11 },
     )
   })

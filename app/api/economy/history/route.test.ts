@@ -9,7 +9,8 @@ vi.mock('@/app/lib/transactions', () => ({
   getTransactionHistory: vi.fn(),
 }))
 
-vi.mock('@/app/lib/member-names', () => ({
+vi.mock('@/app/lib/member-names', async (orig) => ({
+  ...(await orig<typeof import('@/app/lib/member-names')>()),
   memberNamesByDiscordId: vi.fn(async () => new Map()),
 }))
 vi.mock('@/app/lib/discord-channels', async (orig) => ({

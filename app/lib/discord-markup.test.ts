@@ -483,3 +483,11 @@ describe("cleanChannelName / cleanGuildName", () => {
     expect(cleanGuildName(null, null, null)).toBeNull()
   })
 })
+
+describe("masked link with an emoji-only label", () => {
+  it("falls back to the URL host", () => {
+    expect(parseDiscordMarkup("[<:pizza:111111111111>](https://example.org/x)")).toEqual([
+      { type: "link", href: "https://example.org/x", text: "example.org" },
+    ])
+  })
+})

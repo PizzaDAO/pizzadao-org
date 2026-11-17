@@ -8,12 +8,14 @@
  * referenced, so a response doesn't leak the whole guild's channel/role list.
  *
  * Roles come from one cached guild list (getGuildRoles). Channel names are
- * looked up one id at a time (getChannelName, cached in memory and KV): the
+ * looked up one id at a time (getPublicChannelName, cached in memory and KV): the
  * full guild channel list times out in production, and jobs only mention a
- * handful of channels.
+ * handful of channels. Only PUBLIC channels of our guild get a name: the text
+ * can be member-written, so a private channel's name must never leak.
  */
 import { extractMentionIdsFromAll, type ResolvedUser } from "./discord-markup"
-import { getChannelName, getGuildRoles, getGuildMemberCleanName, type DiscordOpts } from "./discord-channels"
+import { getGuildRoles, getGuildMemberCleanName, type DiscordOpts } from "./discord-channels"
+import { getPublicChannelName } from "./discord-channel-name"
 import { cleanChannelName } from "./discord-names"
 import { memberNamesByDiscordId } from "./member-names"
 
@@ -66,7 +68,7 @@ export async function resolveDiscordMentions(
 
   const channelLookups = channelIds.slice(0, MAX_BOT_CHANNEL_LOOKUPS)
   const [channelNames, roleList, users] = await Promise.all([
-    Promise.all(channelLookups.map((id) => getChannelName(id, opts).catch(() => null))),
+    Promise.all(channelLookups.map((id) => getPublicChannelName(id, opts).catch(() => null))),
     roleIds.length > 0 ? getGuildRoles(opts) : Promise.resolve(null),
     resolveUsers(userIds, opts).catch(() => ({}) as Record<string, ResolvedUser>),
   ])

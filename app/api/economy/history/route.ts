@@ -3,7 +3,7 @@ import { getSession } from '@/app/lib/session'
 import { getTransactionHistory } from '@/app/lib/transactions'
 import { NO_STORE_HEADERS } from '@/app/lib/no-store'
 import { resolveDiscordMentions } from '@/app/lib/discord-mention-resolve'
-import { memberNamesByDiscordId } from '@/app/lib/member-names'
+import { memberNamesByDiscordId, mapWithLimit } from '@/app/lib/member-names'
 import { getGuildMemberCleanName } from '@/app/lib/discord-channels'
 
 // Most non-member counterparties looked up via the bot per page (one cached REST call each).
@@ -46,11 +46,10 @@ export async function GET(request: NextRequest) {
     const ids = [...new Set(transactions.map(counterpartId).filter((id): id is string => !!id))]
     const members = await memberNamesByDiscordId(ids)
     const guildNames = new Map<string, string | null>()
-    await Promise.all(
-      ids
-        .filter((id) => !members.has(id))
-        .slice(0, MAX_COUNTERPART_LOOKUPS)
-        .map(async (id) => guildNames.set(id, await getGuildMemberCleanName(id).catch(() => null))),
+    await mapWithLimit(
+      ids.filter((id) => !members.has(id)).slice(0, MAX_COUNTERPART_LOOKUPS),
+      5,
+      async (id) => guildNames.set(id, await getGuildMemberCleanName(id).catch(() => null)),
     )
     const rows = transactions.map((t) => {
       const id = counterpartId(t)

@@ -3,10 +3,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 const findMany = vi.fn()
 vi.mock("./db", () => ({ prisma: { member: { findMany: (...a: unknown[]) => findMany(...a) } } }))
 
-vi.mock("../api/lib/cache", () => ({ cacheGet: vi.fn(async () => null), cacheSet: vi.fn(async () => {}) }))
+vi.mock("../api/lib/cache", () => ({ cacheGet: vi.fn(async () => null), cacheSet: vi.fn(async () => {}), cacheDel: vi.fn(async () => {}) }))
+vi.mock("./settings", () => ({ getSetting: vi.fn(async () => "") }))
 
 import { resolveDiscordMentions } from "./discord-mention-resolve"
-import { clearGuildChannelsCache, clearGuildRolesCache, clearGuildMemberNamesCache, clearChannelNamesCache } from "./discord-channels"
+import { clearGuildChannelsCache, clearGuildRolesCache, clearGuildMemberNamesCache } from "./discord-channels"
+import { clearChannelNamesCache } from "./discord-channel-name"
 
 const OPTS = { botToken: "test-token", guildId: "999", now: 0 }
 
@@ -16,10 +18,11 @@ function fetchFor(channels: Record<string, string>, roles: unknown) {
   return vi.fn(async (url: string) => {
     const m = /\/channels\/(\d+)$/.exec(url)
     if (m && channels[m[1]]) {
-      return new Response(JSON.stringify({ id: m[1], name: channels[m[1]], type: 0 }), { status: 200 })
+      return new Response(JSON.stringify({ id: m[1], name: channels[m[1]], type: 0, guild_id: "999" }), { status: 200 })
     }
     if (url.endsWith("/roles")) {
-      return new Response(JSON.stringify(roles), { status: 200 })
+      // @everyone (id = guild id) can view channels (VIEW_CHANNEL = 1024).
+      return new Response(JSON.stringify([...(roles as unknown[]), { id: "999", name: "@everyone", permissions: "1024" }]), { status: 200 })
     }
     return new Response("not found", { status: 404 })
   })
@@ -84,7 +87,9 @@ describe("resolveDiscordMentions", () => {
     const fetchImpl = fetchFor(names, [])
     const result = await resolveDiscordMentions([ids.map((id) => `<#${id}>`).join(" ")], { ...OPTS, fetchImpl: fetchImpl as unknown as typeof fetch })
     expect(Object.keys(result.channels)).toHaveLength(25)
-    expect(fetchImpl).toHaveBeenCalledTimes(25)
+    const urls = fetchImpl.mock.calls.map((c) => c[0] as string)
+    expect(urls.filter((u) => /\/channels\/\d+$/.test(u))).toHaveLength(25)
+    expect(urls.filter((u) => u.endsWith("/roles"))).toHaveLength(1) // one shared role fetch
   })
 
   it("omits ids it can't resolve instead of throwing", async () => {

@@ -161,6 +161,14 @@ function trimTrailingPunctuation(url: string): string {
   return url.slice(0, end)
 }
 
+function hostLabel(href: string): string {
+  try {
+    return new URL(href).host || "link"
+  } catch {
+    return "link"
+  }
+}
+
 /** Parse `text` into renderable tokens, resolving mentions via `maps` when possible. */
 export function parseDiscordMarkup(text: string, maps: DiscordMarkupMaps = {}): DiscordMarkupToken[] {
   const tokens: DiscordMarkupToken[] = []
@@ -210,7 +218,8 @@ export function parseDiscordMarkup(text: string, maps: DiscordMarkupMaps = {}): 
       // The link TEXT can itself contain markup (a mention, an emoji tag,
       // ...) — flatten it to plain text so nothing raw shows inside the
       // anchor's label.
-      const cleanedText = discordMarkupToPlainText(parseDiscordMarkup(linkText, maps), maps)
+      // An emoji-only label flattens to nothing: fall back to the URL host.
+      const cleanedText = discordMarkupToPlainText(parseDiscordMarkup(linkText, maps), maps) || hostLabel(linkHref)
       tokens.push({ type: "link", href: linkHref, text: cleanedText })
     } else if (emojiId !== undefined) {
       tokens.push({ type: "emoji", id: emojiId, name: emojiName, animated: emojiAnimated === "a" })

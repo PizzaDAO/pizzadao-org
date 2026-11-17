@@ -101,9 +101,8 @@ export function JobCard({
 
   const reward = earnedReward || rewardAmount;
 
-  const plainDescription = discordMarkupToPlainText(
-    parseDiscordMarkup(job.description, { channels, roles, users }),
-  );
+  const plainDescription =
+    discordMarkupToPlainText(parseDiscordMarkup(job.description, { channels, roles, users })) || "Discord message";
   const actionWord = completed ? "Paid" : loading ? "Checking" : "Complete";
 
   return (

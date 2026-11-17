@@ -11,7 +11,8 @@ vi.mock('@/app/lib/economy', () => ({
 vi.mock('@/app/lib/sheets/member-repository', () => ({
   getSheetData: vi.fn(async () => ({ discordToMember: new Map([['100000000000000001', '42']]) })),
 }))
-vi.mock('@/app/lib/member-names', () => ({
+vi.mock('@/app/lib/member-names', async (orig) => ({
+  ...(await orig<typeof import('@/app/lib/member-names')>()),
   memberNamesByDiscordId: vi.fn(async () => new Map([['100000000000000001', { name: 'Member One', memberId: 'm-1' }]])),
 }))
 vi.mock('@/app/lib/discord-channels', () => ({

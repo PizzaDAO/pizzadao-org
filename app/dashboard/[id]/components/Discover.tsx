@@ -172,7 +172,7 @@ function BountyItem({
     // description render as styled, non-interactive text (interactive
     // nested inside this <Link> would be invalid HTML and fight the
     // tile's own click target) — same pattern as JobItem below.
-    const plainDescription = discordTextToPlainText(b.description, { channels, roles, users });
+    const plainDescription = discordTextToPlainText(b.description, { channels, roles, users }) || "Discord message";
     return (
         <Link
             href={`/pep`}
@@ -260,7 +260,7 @@ function JobItem({
     // description render as styled, non-interactive text (interactive
     // nested inside this <Link> would be invalid HTML and fight the
     // tile's own click target).
-    const plainDescription = discordTextToPlainText(j.description, { channels, roles, users });
+    const plainDescription = discordTextToPlainText(j.description, { channels, roles, users }) || "Discord message";
     return (
         <Link
             href={`/pep`}

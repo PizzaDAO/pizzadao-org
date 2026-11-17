@@ -1,11 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-vi.mock("../api/lib/cache", () => ({ cacheGet: vi.fn(async () => null), cacheSet: vi.fn(async () => {}) }))
-
-import { cacheGet } from "../api/lib/cache"
 import {
   getChannel,
-  getChannelName,
-  clearChannelNamesCache,
+  fetchChannel,
   getGuildChannels,
   getGuildRoles,
   clearGuildChannelsCache,
@@ -88,46 +84,17 @@ describe("getGuildChannels / getGuildRoles negative cache", () => {
   })
 })
 
-describe("getChannelName / getChannel name", () => {
+describe("getChannel / fetchChannel", () => {
   const ID = "1099323056012394556"
-  beforeEach(() => {
-    clearChannelNamesCache()
-    vi.mocked(cacheGet).mockResolvedValue(null)
+
+  it("getChannel includes the name, guild and permission overwrites", async () => {
+    const ow = [{ id: "999", type: 0, allow: "0", deny: "1024" }]
+    const fetchImpl = vi.fn(async () => res(200, { id: ID, name: "general", type: 0, guild_id: "999", permission_overwrites: ow }))
+    expect(await getChannel(ID, { ...OPTS, fetchImpl })).toMatchObject({ id: ID, name: "general", guildId: "999", permissionOverwrites: ow })
   })
 
-  it("returns the name from GET /channels/{id} and caches it", async () => {
-    const fetchImpl = vi.fn(async () => res(200, { id: ID, name: "general", type: 0 }))
-    expect(await getChannelName(ID, { ...OPTS, now: 0, fetchImpl })).toBe("general")
-    expect(await getChannelName(ID, { ...OPTS, now: 1000, fetchImpl })).toBe("general")
-    expect(fetchImpl).toHaveBeenCalledTimes(1)
-    expect(String((fetchImpl.mock.calls[0] as unknown[])[0])).toMatch(/\/channels\/1099323056012394556$/)
-  })
-
-  it("caches a 404 as null for an hour", async () => {
-    const fetchImpl = vi.fn(async () => res(404, {}))
-    expect(await getChannelName(ID, { ...OPTS, now: 0, fetchImpl })).toBeNull()
-    expect(await getChannelName(ID, { ...OPTS, now: 1000, fetchImpl })).toBeNull()
-    expect(fetchImpl).toHaveBeenCalledTimes(1)
-  })
-
-  it("negative-caches a failure briefly, then retries", async () => {
-    const fetchImpl = vi.fn(async () => res(500, {}))
-    expect(await getChannelName(ID, { ...OPTS, now: 0, fetchImpl })).toBeNull()
-    expect(await getChannelName(ID, { ...OPTS, now: 1000, fetchImpl })).toBeNull()
-    expect(fetchImpl).toHaveBeenCalledTimes(1)
-    await getChannelName(ID, { ...OPTS, now: 61_000, fetchImpl })
-    expect(fetchImpl).toHaveBeenCalledTimes(2)
-  })
-
-  it("uses the shared KV copy without calling Discord", async () => {
-    vi.mocked(cacheGet).mockResolvedValue("from-kv")
-    const fetchImpl = vi.fn()
-    expect(await getChannelName(ID, { ...OPTS, now: 0, fetchImpl: fetchImpl as unknown as typeof fetch })).toBe("from-kv")
-    expect(fetchImpl).not.toHaveBeenCalled()
-  })
-
-  it("getChannel includes the name", async () => {
-    const fetchImpl = vi.fn(async () => res(200, { id: ID, name: "general", type: 0, guild_id: "999" }))
-    expect(await getChannel(ID, { ...OPTS, fetchImpl })).toMatchObject({ id: ID, name: "general", guildId: "999" })
+  it("fetchChannel reports Retry-After on a 429", async () => {
+    const fetchImpl = vi.fn(async () => new Response("{}", { status: 429, headers: { "retry-after": "7" } }))
+    expect(await fetchChannel(ID, { ...OPTS, fetchImpl })).toEqual({ ok: false, status: 429, retryAfterMs: 7000 })
   })
 })

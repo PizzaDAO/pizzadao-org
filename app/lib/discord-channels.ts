@@ -14,21 +14,19 @@
  *     wait out the REST timeout again — they get the stale list (or null)
  *     immediately instead.
  *   - getGuildMemberName: one member's display name, cached per id.
- *   - getChannelName: one channel's name via GET /channels/{id} (small and
- *     fast, unlike the full guild list), cached in memory and in the shared KV.
  *   - getChannelMessage / getChannel: one REST call each. "unknown" means the
  *     call itself failed (network, 5xx, rate limit, no token), as opposed to a
  *     definite "not found" (null).
  *
  * Everything takes an optional fetchImpl so tests never reach Discord.
  */
-import { cacheGet, cacheSet } from '../api/lib/cache'
 import { cleanGuildName } from './discord-names'
 
 const API = 'https://discord.com/api/v10'
 const TTL_MS = 60 * 60 * 1000
 const FAIL_TTL_MS = 60 * 1000
 const TIMEOUT_MS = 2500
+const MAX_RETRY_AFTER_MS = 5 * 60 * 1000
 const SNOWFLAKE = /^\d{5,25}$/
 
 export type FetchLike = typeof fetch
@@ -85,7 +83,7 @@ export async function getGuildMemberName(userId: string, opts: DiscordOpts = {})
   if (hit && now - hit.at < hit.ttl) return hit.name
   const r = await getJson(`/guilds/${guildId}/members/${userId}`, opts)
   if (!r.ok) {
-    memberNameCache.set(key, { guildId, name: hit?.name ?? null, parts: hit?.parts, at: now, ttl: r.status === 404 ? TTL_MS : FAIL_TTL_MS })
+    memberNameCache.set(key, { guildId, name: hit?.name ?? null, parts: hit?.parts, at: now, ttl: r.status === 404 ? TTL_MS : r.retryAfterMs ?? FAIL_TTL_MS })
     return hit?.name ?? null
   }
   const m = r.json as { nick?: string | null; user?: { global_name?: string | null; username?: string | null } }
@@ -117,7 +115,9 @@ function guild(opts: DiscordOpts): string {
   return (opts.guildId ?? process.env.DISCORD_GUILD_ID ?? '').trim()
 }
 
-async function getJson(path: string, opts: DiscordOpts): Promise<{ ok: true; json: unknown } | { ok: false; status: number }> {
+type JsonResult = { ok: true; json: unknown } | { ok: false; status: number; retryAfterMs?: number }
+
+async function getJson(path: string, opts: DiscordOpts): Promise<JsonResult> {
   const t = token(opts)
   if (!t) return { ok: false, status: 0 }
   try {
@@ -126,7 +126,10 @@ async function getJson(path: string, opts: DiscordOpts): Promise<{ ok: true; jso
       cache: 'no-store',
       signal: AbortSignal.timeout(TIMEOUT_MS),
     })
-    if (!res.ok) return { ok: false, status: res.status }
+    if (!res.ok) {
+      const secs = res.status === 429 ? Number(res.headers?.get?.('retry-after')) : NaN
+      return { ok: false, status: res.status, ...(Number.isFinite(secs) && secs > 0 ? { retryAfterMs: Math.min(secs * 1000, MAX_RETRY_AFTER_MS) } : {}) }
+    }
     return { ok: true, json: await res.json() }
   } catch {
     return { ok: false, status: 0 }
@@ -227,59 +230,50 @@ export async function getChannelMessage(channelId: string, messageId: string, op
   return { id: String(m.id), channelId: String(m.channel_id ?? channelId), authorId: String(m.author.id), timestamp: m.timestamp ?? null }
 }
 
-export type ChannelInfo = { id: string; parentId: string | null; guildId: string | null; type?: number; name?: string }
+export type ChannelInfo = {
+  id: string
+  parentId: string | null
+  guildId: string | null
+  type?: number
+  name?: string
+  /** Only present when Discord returned them (the public-visibility check reads these). */
+  permissionOverwrites?: Array<{ id: string; type: number; allow: string; deny: string }>
+}
+
+export type ChannelResult = { ok: true; channel: ChannelInfo } | { ok: false; status: number; retryAfterMs?: number }
+
+/** One channel (or thread), keeping the failure status (404/403 = definite, 429 = retryAfterMs, else transient). */
+export async function fetchChannel(channelId: string, opts: DiscordOpts = {}): Promise<ChannelResult> {
+  if (!SNOWFLAKE.test(channelId)) return { ok: false, status: 404 }
+  const r = await getJson(`/channels/${channelId}`, opts)
+  if (!r.ok) return r
+  const c = r.json as {
+    id?: string
+    parent_id?: string | null
+    guild_id?: string | null
+    type?: number
+    name?: string | null
+    permission_overwrites?: ChannelInfo['permissionOverwrites']
+  }
+  return {
+    ok: true,
+    channel: {
+      id: String(c.id ?? channelId),
+      parentId: c.parent_id ? String(c.parent_id) : null,
+      guildId: c.guild_id ? String(c.guild_id) : null,
+      type: c.type,
+      ...(typeof c.name === 'string' && c.name ? { name: c.name } : {}),
+      ...(Array.isArray(c.permission_overwrites) ? { permissionOverwrites: c.permission_overwrites } : {}),
+    },
+  }
+}
 
 /** One channel (or thread), or null / "unknown" as above. */
 export async function getChannel(channelId: string, opts: DiscordOpts = {}): Promise<ChannelInfo | null | 'unknown'> {
   if (!SNOWFLAKE.test(channelId)) return null
-  const r = await getJson(`/channels/${channelId}`, opts)
+  const r = await fetchChannel(channelId, opts)
   if (!r.ok) return r.status === 404 || r.status === 403 ? null : 'unknown'
-  const c = r.json as { id?: string; parent_id?: string | null; guild_id?: string | null; type?: number; name?: string | null }
-  return {
-    id: String(c.id ?? channelId),
-    parentId: c.parent_id ? String(c.parent_id) : null,
-    guildId: c.guild_id ? String(c.guild_id) : null,
-    type: c.type,
-    ...(typeof c.name === 'string' && c.name ? { name: c.name } : {}),
-  }
-}
-
-// One channel's name, cached per id: an hour in memory for a hit or a definite
-// "not found / no access", the short negative window for a failed call. A copy
-// of a hit also lives in the shared KV (24 h) so a cold instance skips Discord.
-const channelNameCache = new Map<string, { name: string | null; at: number; ttl: number }>()
-const CHANNEL_NAME_KV_TTL_S = 24 * 60 * 60
-
-export function clearChannelNamesCache() {
-  channelNameCache.clear()
-}
-
-/** A channel's name (no leading "#"), or null when unknown / not visible to the bot. Never throws. */
-export async function getChannelName(channelId: string, opts: DiscordOpts = {}): Promise<string | null> {
-  if (!SNOWFLAKE.test(channelId)) return null
-  const now = opts.now ?? Date.now()
-  const hit = channelNameCache.get(channelId)
-  if (hit && now - hit.at < hit.ttl) return hit.name
-  const kvKey = `discord:channel-name:${channelId}`
-  try {
-    const cached = await cacheGet<string>(kvKey)
-    if (typeof cached === 'string' && cached) {
-      channelNameCache.set(channelId, { name: cached, at: now, ttl: TTL_MS })
-      return cached
-    }
-  } catch {
-    // KV unavailable: ask Discord.
-  }
-  const r = await getJson(`/channels/${channelId}`, opts)
-  if (!r.ok) {
-    channelNameCache.set(channelId, { name: hit?.name ?? null, at: now, ttl: r.status === 404 || r.status === 403 ? TTL_MS : FAIL_TTL_MS })
-    return hit?.name ?? null
-  }
-  const raw = (r.json as { name?: unknown })?.name
-  const name = typeof raw === 'string' && raw.trim() ? raw.trim() : null
-  channelNameCache.set(channelId, { name, at: now, ttl: TTL_MS })
-  if (name) await cacheSet(kvKey, name, CHANNEL_NAME_KV_TTL_S).catch(() => {})
-  return name
+  return r.channel
 }
 
 /**

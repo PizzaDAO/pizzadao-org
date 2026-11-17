@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getLeaderboard, formatCurrency } from '@/app/lib/economy'
 import { getSheetData } from '@/app/lib/sheets/member-repository'
 import { NO_STORE_HEADERS } from '@/app/lib/no-store'
-import { memberNamesByDiscordId } from '@/app/lib/member-names'
+import { memberNamesByDiscordId, mapWithLimit } from '@/app/lib/member-names'
 import { getGuildMemberCleanName } from '@/app/lib/discord-channels'
 
 export const runtime = 'nodejs'
@@ -28,10 +28,10 @@ export async function GET() {
     const ids = leaderboard.map((entry: any) => String(entry.userId))
     const members = await memberNamesByDiscordId(ids)
     const guildNames = new Map<string, string | null>()
-    await Promise.all(
-      ids
-        .filter((id: string) => !members.has(id))
-        .map(async (id: string) => guildNames.set(id, await getGuildMemberCleanName(id).catch(() => null))),
+    await mapWithLimit(
+      ids.filter((id: string) => !members.has(id)),
+      5,
+      async (id: string) => guildNames.set(id, await getGuildMemberCleanName(id).catch(() => null)),
     )
 
     const result = {
