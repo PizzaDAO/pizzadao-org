@@ -215,6 +215,7 @@ describe('settings registry', () => {
       ['discord.levelCommandEnabled', false],
       ['discord.profileCommandEnabled', false],
       ['discord.bountyCommandEnabled', false],
+      ['discord.taskCommandEnabled', false],
       ['calls.importedRecapPostEnabled', false],
       ['calls.importedFollowupsEnabled', false],
       ['calls.importedAgendaContext', false],

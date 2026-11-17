@@ -12,6 +12,7 @@
  */
 import { ApiError } from '@/app/lib/errors/api-errors'
 import { makeEmbed, type Embed, type EmbedAuthor } from './embeds'
+import { esc, link, shortText } from './text'
 
 const API = 'https://discord.com/api/v10'
 
@@ -57,18 +58,10 @@ export const LIST_CAP = 10
 const DESCRIPTION_CHARS = 90
 const BODY_LIMIT = 4000
 
-/** Markdown/mention-safe text for a reply. */
-const esc = (s: string) => s.replace(/([*_`~|>\\[\]])/g, '\\$1').replace(/@/g, '@\u200b')
-const link = (label: string, url: string) => `[${label}](<${url}>)`
 const n = (v: number) => v.toLocaleString('en-US')
 
 /** One line of text: newlines flattened, cut to about 90 characters, then escaped. */
-function short(description: string): string {
-  const flat = description.replace(/\s+/g, ' ').trim()
-  // Cut by code points, so an emoji is never split in half.
-  const chars = Array.from(flat)
-  return esc(chars.length > DESCRIPTION_CHARS ? `${chars.slice(0, DESCRIPTION_CHARS - 1).join('').trimEnd()}…` : flat)
-}
+const short = (description: string) => shortText(description, DESCRIPTION_CHARS)
 
 /** Where a bounty lives on the site: the crew's bounty board, or /pep for a general one. */
 export const boardUrl = (appUrl: string, crewId?: string | null) =>
