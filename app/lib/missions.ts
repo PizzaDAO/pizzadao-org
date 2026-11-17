@@ -10,6 +10,7 @@ import { DREAD_PIZZA_ROBERTS_ROLE_ID, MISSION_REVIEWER_ROLE_IDS } from '../ui/co
 import { dprOnlyMinLevel, missionReviewerRoleIds, reviewerRoleSetting } from './mission-review-access'
 import { getSetting } from './settings'
 import { ValidationError, NotFoundError, ConflictError } from './errors/api-errors'
+import { invalidateProfileSummaryForDiscord } from './profile-summary-invalidate'
 import { approvalNeedsNote, NEW_REVIEW_ROUND } from './mission-verify/review-ids'
 
 // ===== QUERIES =====
@@ -625,6 +626,9 @@ export async function approveMission(
   // complete a level above one that was banked by a verifier).
   const levelsPaid = await settleLevels(completion.discordId)
 
+  // The profile shows the level this approval may have changed.
+  await invalidateProfileSummaryForDiscord(completion.discordId)
+
   return { ...updated, levelsPaid }
 }
 
@@ -695,6 +699,8 @@ export async function rejectMission(
     metadata: { missionId: completion.missionId, completionId },
     linkUrl: '/missions',
   }).catch(() => {})
+
+  await invalidateProfileSummaryForDiscord(completion.discordId)
 
   return updated
 }
@@ -780,6 +786,7 @@ export async function payBonusRewards(discordId: string): Promise<number[]> {
       console.warn('[missions] bonus reward failed', r.missionId, e)
     }
   }
+  if (paidNow.length) await invalidateProfileSummaryForDiscord(discordId)
   return paidNow
 }
 
@@ -849,6 +856,9 @@ export async function checkAndAwardLevelReward(discordId: string, level: number)
   })
 
   if (!awarded) return false
+
+  // The level and PEP balance changed (after the transaction committed).
+  await invalidateProfileSummaryForDiscord(discordId)
 
   // Send level completion notification
   createNotification({

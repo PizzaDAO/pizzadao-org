@@ -4,6 +4,7 @@ import { approveMission, rejectMission, getCompletionForReview } from '@/app/lib
 import { canReviewMission } from '@/app/lib/mission-review-access'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { UnauthorizedError, ForbiddenError, ValidationError, NotFoundError } from '@/app/lib/errors/api-errors'
+import { invalidateProfileSummaryForDiscord } from '@/app/lib/profile-summary-invalidate'
 import { invalidateProgressCache } from '@/app/lib/mission-cache'
 import { announceMissionResults } from '@/app/lib/mission-verify/notify'
 import { reviewCardsEnabled, syncReviewCard } from '@/app/lib/mission-verify/review-cards'
@@ -65,6 +66,8 @@ const POST_HANDLER = async (request: NextRequest) => {
 
   // Invalidate cached progress for the submission's owner
   invalidateProgressCache(result.discordId)
+  // And the cached public profile (level / rank). Never fails the request.
+  await invalidateProfileSummaryForDiscord(result.discordId)
 
   // Keep the Discord review card in sync (outcome, who, when; buttons
   // disabled). After the response, best effort: never blocks this request.
