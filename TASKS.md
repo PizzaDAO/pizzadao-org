@@ -11,6 +11,7 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 | marinara-32633 | generated nametags for rsvp'd members | todo | P2 |  |  |  |  |  |  |
 | calzone-93434 | Add Telegram login | todo | P2 |  |  |  | plans/calzone-93434-telegram-login.md |  | account linking shipped in #128; login itself not built |
 | discord-bounty-command | Discord /bounty command: list open bounties (PEP rewards, crew filter) and claim one from Discord, reusing the website bounty logic | todo | P2 |  | Snax | discord, bounties | plans/discord-bounty-command.md |  | member idea from #general 2026-11-17 |
+| profile-events-attended | Member profiles show the events they've attended (IRL pizza parties and other events: rsv.pizza check-ins/RSVPs, event POAPs), alongside the existing call attendance | todo | P2 |  | Snax | profile, events | plans/profile-events-attended.md |  | requested 2026-11-17 |
 | agenda-action-status | Call agenda: list the last call's action items with their status (✅ done / 🔄 in progress, finished links) so calls open by reviewing them | todo | P2 |  | Snax | calls |  |  | depends on recap-action-status (plans/recap-action-status.md) shipping first |
 | bellpepper-80127 | Idea para dashboard: carpeta para subir memes de pizzadao y bennys xD | todo | P2 |  |  |  |  |  |  |
 | pineapple-84122 | Auto-Invite member to event or one is near their city | todo | P2 |  |  |  | plans/pineapple-84122-nearby-event-invites.md |  |  |
