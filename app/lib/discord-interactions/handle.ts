@@ -319,7 +319,9 @@ export async function handleInteraction(i: Interaction, deps: HandlerDeps): Prom
   if (i.type === InteractionType.PING) return { type: ResponseType.PONG }
   const invoker = i.member ? { ...i.member, guildId: i.guild_id } : i.user ? { user: i.user } : undefined
   const author = authorFor(invoker)
-  if (author && deps.memberName && invoker?.user?.id && i.type !== InteractionType.AUTOCOMPLETE) {
+  // DM follow-up / reminder buttons build their own replies, so they skip the name lookup.
+  const dmButton = (i.type === InteractionType.MESSAGE_COMPONENT || i.type === InteractionType.MODAL_SUBMIT) && (isFollowUpInteraction(i) || isReminderInteraction(i))
+  if (author && deps.memberName && invoker?.user?.id && i.type !== InteractionType.AUTOCOMPLETE && !dmButton) {
     const name = await lookupMemberName(deps.memberName, invoker.user.id)
     if (name) author.name = sliceUnits(name, 256)
   }
