@@ -214,6 +214,7 @@ describe('settings registry', () => {
       ['discord.vouchCommandEnabled', false],
       ['discord.levelCommandEnabled', false],
       ['discord.profileCommandEnabled', false],
+      ['discord.bountyCommandEnabled', false],
       ['calls.importedRecapPostEnabled', false],
       ['calls.importedFollowupsEnabled', false],
       ['calls.importedAgendaContext', false],

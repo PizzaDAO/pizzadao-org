@@ -21,6 +21,8 @@ import { EPHEMERAL, InteractionType, ResponseType } from './commands'
 import { authorFor, displayName, makeEmbed, numbered, roleLabel, type Embed, type EmbedAuthor, type EmbedField, type Tone } from './embeds'
 import { handleReviewButton, handleReviewModal, type MissionReviewDeps } from './mission-review'
 import type { MemberCommandJob, MemberCommandName } from './member-commands'
+import { BOUNTY_SUBCOMMANDS, type BountyJob } from './bounty-command'
+import { CREW_ID_PATTERN, normalizeCrewId } from '../crew-id'
 import { handleFollowUpInteraction, isFollowUpInteraction, type FollowUpInteractionDeps } from './followups'
 import { handleReminderInteraction, isReminderInteraction, type ReminderInteractionDeps } from './reminders'
 import { SITE_HOST, SITE_URL } from '@/app/lib/site-url'
@@ -68,7 +70,7 @@ type MessageData = {
 export interface InteractionResponse {
   type: number
   data?: Partial<MessageData> & {
-    choices?: Array<{ name: string; value: string }>
+    choices?: Array<{ name: string; value: string | number }>
     /** Modal (type 9). */
     custom_id?: string
     title?: string
@@ -152,6 +154,18 @@ export interface HandlerDeps {
     enabled: (name: MemberCommandName) => Promise<boolean>
     rateLimit: (discordId: string) => Promise<Date | null>
     defer: (job: MemberCommandJob) => void
+  }
+  /**
+   * /bounty list | claim | mine | giveup (./bounty-command.ts, discord.bountyCommandEnabled). `enabled` is
+   * checked first so a disabled command uses no rate limit. `defer` builds the reply and edits the deferred
+   * ephemeral message; it must not block (route: after()). `choices` feeds the autocomplete: crews for
+   * list's `crew`, open bounties (not the member's own) for claim, the member's claims for giveup.
+   */
+  bounty?: {
+    enabled: () => Promise<boolean>
+    rateLimit: (discordId: string) => Promise<Date | null>
+    defer: (job: BountyJob) => void
+    choices: (kind: 'crew' | 'claim' | 'giveup', discordId: string, query: string) => Promise<Array<{ name: string; value: string | number }>>
   }
   /** Mission review card buttons and the Reject modal (./mission-review.ts). */
   missionReview?: MissionReviewDeps
@@ -563,6 +577,39 @@ async function command(i: Interaction, userId: string, deps: HandlerDeps, cur: s
       return { type: ResponseType.DEFERRED_CHANNEL_MESSAGE, data: { flags: EPHEMERAL } }
     }
 
+    case 'bounty': {
+      if (!deps.bounty || !(await deps.bounty.enabled())) return out.error("/bounty isn't enabled yet.")
+      if (!i.application_id || !i.token) return out.error('Could not start the command. Please try again.')
+      const subOpt = i.data?.options?.[0] as { name?: string; options?: Option[] } | undefined
+      const sub = BOUNTY_SUBCOMMANDS.find((s) => s === subOpt?.name)
+      if (!sub) return out.error('Pick one of: list, claim, mine, giveup.')
+      const crewRaw = subOpt?.options?.find((o) => o.name === 'crew')?.value
+      const bountyRaw = subOpt?.options?.find((o) => o.name === 'bounty')?.value
+      let crewId: string | undefined
+      if (sub === 'list' && crewRaw !== undefined && crewRaw !== '') {
+        crewId = typeof crewRaw === 'string' ? normalizeCrewId(crewRaw) : ''
+        if (!crewId || !CREW_ID_PATTERN.test(crewId)) return out.error('Pick a crew from the list.')
+      }
+      let bountyId: number | undefined
+      if (sub === 'claim' || sub === 'giveup') {
+        if (typeof bountyRaw !== 'number' || !Number.isSafeInteger(bountyRaw) || bountyRaw < 1) return out.error('Pick a bounty.', 'Choose one from the list, or type its #id.')
+        bountyId = bountyRaw
+      }
+      const readyAt = await deps.bounty.rateLimit(userId)
+      if (readyAt) return out.wait('Slow down.', `You can use /bounty again ${rel(readyAt)}.`)
+      deps.bounty.defer({
+        sub,
+        discordId: userId,
+        ...(crewId ? { crewId } : {}),
+        ...(bountyId ? { bountyId } : {}),
+        applicationId: i.application_id,
+        token: i.token,
+        author: authorFor(i.member ? { ...i.member, guildId: i.guild_id } : undefined),
+      })
+      // "Pepperoni Bot is thinking..." (only you see it); the reply is edited in.
+      return { type: ResponseType.DEFERRED_CHANNEL_MESSAGE, data: { flags: EPHEMERAL } }
+    }
+
     default:
       return out.error('Unknown command.')
   }
@@ -609,7 +656,7 @@ async function component(i: Interaction, userId: string, deps: HandlerDeps, cur:
 
 async function autocomplete(i: Interaction, deps: HandlerDeps): Promise<InteractionResponse> {
   const focused = i.data?.options?.find((o) => o.focused)
-  let choices: Array<{ name: string; value: string }> = []
+  let choices: Array<{ name: string; value: string | number }> = []
   if (i.data?.name === 'buy' && focused?.name === 'item') {
     const q = String(focused.value ?? '').toLowerCase()
     const items = await deps.shopItems()
@@ -621,6 +668,13 @@ async function autocomplete(i: Interaction, deps: HandlerDeps): Promise<Interact
     // The focused option sits inside the subcommand; only the `call` option has choices.
     const sub = i.data.options?.[0] as { options?: Option[] } | undefined
     if (sub?.options?.some((o) => o.focused && o.name === 'call')) choices = (await deps.metalhead.callChoices()).slice(0, 25)
+  } else if (i.data?.name === 'bounty' && deps.bounty && (await deps.bounty.enabled())) {
+    // The focused option sits inside the subcommand: list.crew, claim.bounty or giveup.bounty.
+    const sub = i.data.options?.[0] as { name?: string; options?: Option[] } | undefined
+    const f = sub?.options?.find((o) => o.focused)
+    const userId = i.member?.user?.id ?? i.user?.id
+    const kind = f?.name === 'crew' && sub?.name === 'list' ? 'crew' : f?.name === 'bounty' && (sub?.name === 'claim' || sub?.name === 'giveup') ? sub.name : null
+    if (kind && userId) choices = (await deps.bounty.choices(kind, userId, String(f?.value ?? ''))).slice(0, 25)
   } else if (i.data?.name === 'progress' && focused?.name === 'crew' && deps.progress && (await deps.progress.enabled())) {
     choices = (await deps.progress.crewChoices(String(focused.value ?? ''))).slice(0, 25)
   }

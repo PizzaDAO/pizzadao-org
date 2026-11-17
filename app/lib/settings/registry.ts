@@ -1897,6 +1897,13 @@ export const SETTINGS = {
     help: 'Let members see profile stats with /profile [@member] (private reply). Another member shows only what their public profile shows. The PROFILE_COMMAND_ENABLED env var set to off always wins; on preview deploys only the env var counts.',
     confirmOn: 'Members will be able to look up profile stats from Discord.',
   }),
+  'discord.bountyCommandEnabled': boolSetting({
+    key: 'discord.bountyCommandEnabled',
+    area: 'discord',
+    label: '/bounty command',
+    help: 'Let members list open bounties, claim one, see their claims and give one up with /bounty (private replies). It uses the same rules as the website; submitting work and the payout stay on the website. The command must also be registered with Discord. The BOUNTY_COMMAND_ENABLED env var set to off always wins; on preview deploys only the env var counts.',
+    confirmOn: 'Members will be able to list and claim bounties from Discord.',
+  }),
   // Calls imported from X live broadcasts (plans/x-call-import.md). All off: an imported call never reaches Discord,
   // the follow-up drafter, the agenda or the automatic summary sweep unless a setting here says so.
   'calls.importedRecapPostEnabled': boolSetting({
