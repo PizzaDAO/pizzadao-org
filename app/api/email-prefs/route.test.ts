@@ -12,6 +12,12 @@ vi.mock("@/app/lib/auth-guards", () => ({
 }));
 vi.mock("@/app/lib/sheets/member-repository", () => ({ fetchMemberIdByDiscordId: vi.fn(async () => "42") }));
 
+const rsv = vi.hoisted(() => ({ clearEmailMatches: vi.fn(async () => undefined), refreshRsvEventsIfEnabled: vi.fn(async () => undefined) }));
+vi.mock("@/app/lib/events-attended/rsv", () => rsv);
+const cfg = vi.hoisted(() => ({ enabled: false }));
+vi.mock("@/app/lib/events-attended/config", () => ({ loadEventsAttendedConfig: vi.fn(async () => ({ enabled: cfg.enabled })) }));
+vi.mock("next/server", async (orig) => ({ ...(await orig<typeof import("next/server")>()), after: (fn: () => unknown) => void fn() }));
+
 import { GET, POST } from "./route";
 import { __setMinInterval } from "@/app/lib/reengage/mailer";
 
@@ -144,5 +150,31 @@ describe("/api/email-prefs", () => {
     expect(j.confirmation).toBe("too_many");
     expect(db.emailConfirmSend.delete).toHaveBeenCalledTimes(1);
     expect(f).not.toHaveBeenCalled();
+  });
+});
+
+describe("Events attended triggers", () => {
+  beforeEach(() => { cfg.enabled = true; });
+  afterEach(() => { cfg.enabled = false; });
+  it("a changed address clears the email-matched rows and re-checks", async () => {
+    ex.findUnique.mockResolvedValue(row({ email: "old@x.io", emailVerifiedAt: new Date() }));
+    ex.upsert.mockResolvedValue(row({ email: "new@x.io" }));
+    const res = await POST(post({ email: "new@x.io" }));
+    expect(res.status).toBe(200);
+    expect(rsv.clearEmailMatches).toHaveBeenCalledWith("42");
+    expect(rsv.refreshRsvEventsIfEnabled).toHaveBeenCalledWith("42");
+    expect((await res.json()).eventsNudge).toBe(true);
+  });
+  it("removing the address clears the email-matched rows", async () => {
+    ex.findUnique.mockResolvedValue(row({ email: "old@x.io", emailVerifiedAt: new Date() }));
+    ex.upsert.mockResolvedValue(row());
+    await POST(post({ email: null }));
+    expect(rsv.clearEmailMatches).toHaveBeenCalledWith("42");
+  });
+  it("saving the same address leaves the matches alone", async () => {
+    ex.findUnique.mockResolvedValue(row({ email: "a@x.io", emailVerifiedAt: new Date() }));
+    ex.upsert.mockResolvedValue(row({ email: "a@x.io", emailVerifiedAt: new Date() }));
+    await POST(post({ email: "A@x.io" }));
+    expect(rsv.clearEmailMatches).not.toHaveBeenCalled();
   });
 });

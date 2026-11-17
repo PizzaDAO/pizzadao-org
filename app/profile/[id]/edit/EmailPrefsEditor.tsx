@@ -7,7 +7,7 @@
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 
-type Prefs = { email: string | null; verified: boolean; optIn: boolean; newsletter?: { subscribed: boolean; pending: boolean; canSendConfirm?: boolean } };
+type Prefs = { eventsNudge?: boolean; email: string | null; verified: boolean; optIn: boolean; newsletter?: { subscribed: boolean; pending: boolean; canSendConfirm?: boolean } };
 
 export function EmailPrefsEditor() {
     const t = useTranslations("reengage.prefs");
@@ -132,6 +132,7 @@ export function EmailPrefsEditor() {
                     </button>
                 ) : null}
             </div>
+            {prefs?.eventsNudge ? <div style={{ fontSize: 13 }}>{t("verifyNudge")}</div> : null}
             {loadError ? (
                 <div role="alert" style={{ fontSize: 13, color: "hsl(var(--destructive))" }}>
                     {t("loadError")}

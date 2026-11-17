@@ -10,7 +10,7 @@
 // first.
 //
 // onion-47612: editorial restyle — paper-soft card wrapper with
-// "§ 06 · Collections" overline above the CollapsibleSection title. The
+// "§ 07 · Collections" overline above the CollapsibleSection title. The
 // CollapsibleSection primitive itself is off-limits, so we layer
 // the overline above and leave the title control as-is.
 

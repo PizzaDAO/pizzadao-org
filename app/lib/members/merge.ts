@@ -76,6 +76,8 @@ export const TABLES: TableSpec[] = [
   { kind: 'singleton', model: 'MafiaRankCache', field: 'memberId' },
   { kind: 'singleton', model: 'MemberCollectionStats', field: 'memberId' },
   { kind: 'singleton', model: 'TelegramHostMatchCheck', field: 'memberId' },
+  { kind: 'singleton', model: 'MemberRsvCheck', field: 'memberId' },
+  { kind: 'unique', model: 'MemberRsvEvent', field: 'memberId', scope: ['rsvEventId'] },
   { kind: 'array', model: 'Article', field: 'collaboratorMemberIds' },
   { kind: 'array', model: 'AccountSignal', field: 'memberIds' },
 ]
@@ -95,6 +97,7 @@ export const PK_OVERRIDES: Record<string, string> = {
   MafiaRankCache: 'memberId',
   MemberCollectionStats: 'memberId',
   TelegramHostMatchCheck: 'memberId',
+  MemberRsvCheck: 'memberId',
 }
 const pkOf = (model: string) => PK_OVERRIDES[model] ?? 'id'
 

@@ -26,6 +26,7 @@ import { CrewChipRow, type CrewOption } from "../../ui/profile/CrewChipRow";
 import { ContributionsBlock } from "../../ui/profile/ContributionsBlock";
 import { PassportBlock } from "../../ui/profile/PassportBlock";
 import { CollectionsLazy } from "../../ui/profile/CollectionsLazy";
+import { EventsAttendedLazy } from "../../ui/profile/EventsAttendedLazy";
 import { AttendanceCard } from "../../ui/attendance-card";
 import { useSession } from "../../lib/hooks/use-session";
 import { useProfileSummary, type ProfileSummaryData } from "../../lib/hooks/use-api";
@@ -203,6 +204,8 @@ export function ProfileClient({ id, disavowWarning = null, buddyRecognition = nu
                     <p className="overline text-tomato mb-3">§ 05 · Showing up</p>
                     <AttendanceCard memberId={id} variant="inline" />
                 </section>
+
+                <EventsAttendedLazy memberId={id} />
 
                 <CollectionsLazy memberId={id} />
 

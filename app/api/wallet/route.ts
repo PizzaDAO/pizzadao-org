@@ -11,6 +11,7 @@ import {
   setPrimaryWallet,
   getWalletForMember,
 } from "@/app/lib/wallet-lookup";
+import { refreshRsvEventsIfEnabled } from "@/app/lib/events-attended/rsv";
 import { emitMissionEvent } from "@/app/lib/mission-verify/events";
 import { promoteAwaitingWallet } from "@/app/lib/slices/claims";
 import { processMintQueueSafe } from "@/app/lib/slices/mint-queue";
@@ -182,7 +183,11 @@ export async function POST(request: NextRequest) {
     // Re-check missions that look at wallets (background, no-op unless enabled).
     const walletDiscordId = session.discordId;
     after(() => emitMissionEvent(walletDiscordId, "wallet_connected", { memberId: String(memberId) }).then(() => undefined));
-    if (chainType === "evm") releaseSliceClaims(walletDiscordId);
+    if (chainType === "evm") {
+      releaseSliceClaims(walletDiscordId);
+      // New wallet: look for rsv.pizza check-ins made with it (background, no-op unless enabled).
+      after(() => refreshRsvEventsIfEnabled(String(memberId)));
+    }
 
     return NextResponse.json({
       success: true,
@@ -286,6 +291,8 @@ export async function DELETE(request: NextRequest) {
     if (ownership instanceof NextResponse) return ownership;
 
     await deleteWalletForMember(String(memberId), walletId);
+    // Rows found through the removed wallet must not linger: re-check without it.
+    after(() => refreshRsvEventsIfEnabled(String(memberId)));
 
     // Sync primary wallet to sheet (may have changed or cleared)
     await syncPrimaryToSheet(String(memberId));

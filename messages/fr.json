@@ -1733,6 +1733,7 @@
       "label": "M'envoyer l'e-mail hebdomadaire PizzaDAO",
       "saveError": "Impossible d'enregistrer votre préférence e-mail. Réessayer ?",
       "saved": "Enregistré",
+      "verifyNudge": "La vérification affiche aussi vos fêtes rsv.pizza sur votre profil.",
       "emailLabel": "Adresse e-mail",
       "optIn": "Recevoir un résumé hebdomadaire PizzaDAO",
       "save": "Enregistrer",
@@ -2639,6 +2640,33 @@
     "copyLink": "Copier le lien",
     "copied": "Lien copié",
     "copyFailed": "Impossible de copier le lien"
+  },
+  "eventsAttended": {
+    "overline": "§ 06 · Dans le monde",
+    "title": "Événements auxquels vous avez assisté",
+    "badge": {
+      "attended": "Présent",
+      "ticket": "Billet",
+      "organizer": "Organisateur"
+    },
+    "promptNone": "Ajoutez votre e-mail pour voir les fêtes où vous êtes allé.",
+    "promptNoneLink": "Ajouter un e-mail",
+    "promptUnverified": "Vérifiez votre boîte de réception pour confirmer votre e-mail.",
+    "promptUnverifiedLink": "Gérer l'e-mail",
+    "emailOnlyUsedFor": "Votre e-mail sert uniquement à retrouver vos check-ins rsv.pizza.",
+    "empty": "Aucun événement pour l'instant. Vérifiez votre e-mail ou liez votre compte rsv.pizza pour voir les fêtes où vous êtes allé.",
+    "showAll": "Tout afficher ({count})",
+    "linked": "Lié à rsv.pizza",
+    "unlink": "Dissocier",
+    "linkButton": "Lier le compte rsv.pizza",
+    "visibilityLabel": "Qui peut voir cette section",
+    "visibility": {
+      "public": "Tout le monde",
+      "members": "Membres uniquement",
+      "private": "Moi seul"
+    },
+    "linkedNote": "Compte rsv.pizza lié.",
+    "linkFailed": "Impossible de lier votre compte rsv.pizza. Réessayez et, si le lien de connexion s'ouvre dans un nouvel onglet, utilisez plutôt le code à 6 chiffres."
   },
   "collectionStats": {
     "aria": "Totaux de la collection",

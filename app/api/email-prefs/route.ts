@@ -15,10 +15,12 @@
 //     counted in EmailConfirmSend (address and IP hashed). The log row is
 //     inserted first and removed if it pushed a counter over its cap.
 import { createHash } from "crypto";
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/app/lib/auth-guards";
 import { prisma } from "@/app/lib/db";
 import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
+import { loadEventsAttendedConfig } from "@/app/lib/events-attended/config";
+import { clearEmailMatches, refreshRsvEventsIfEnabled } from "@/app/lib/events-attended/rsv";
 import { internalError } from "@/app/lib/errors/error-response";
 import { EMAIL_RE } from "@/app/lib/reengage/run";
 import { sendEmail, postalAddress } from "@/app/lib/reengage/mailer";
@@ -56,6 +58,15 @@ function state(row: { email: string | null; emailVerifiedAt: Date | null; reenga
   return { email: row?.email ?? null, verified: !!row?.emailVerifiedAt, optIn: !!row?.reengageEmailOptIn };
 }
 
+/** Only present while Events attended is on: lets the editor show the "verifying also shows your parties" line. */
+async function eventsNudgePart(): Promise<{ eventsNudge?: true }> {
+  try {
+    return (await loadEventsAttendedConfig()).enabled ? { eventsNudge: true } : {};
+  } catch {
+    return {};
+  }
+}
+
 /** The newsletter checkbox state, only present while newsletter.memberOptInEnabled is on. */
 async function newsletterPart(
   email: string | null,
@@ -78,7 +89,7 @@ export async function GET() {
     const memberId = await memberFor(auth.session.discordId);
     if (!memberId) return NextResponse.json({ error: "Member not found" }, { status: 404 });
     const row = await prisma.memberProfileExtras.findUnique({ where: { memberId }, select: SELECT });
-    return NextResponse.json({ ...state(row), ...(await newsletterPart(row?.email ?? null, !!row?.emailVerifiedAt)) });
+    return NextResponse.json({ ...state(row), ...(await newsletterPart(row?.email ?? null, !!row?.emailVerifiedAt)), ...(await eventsNudgePart()) });
   } catch (err) {
     return internalError(err, "email-prefs GET", "Couldn't load email preference");
   }
@@ -183,6 +194,12 @@ export async function POST(req: NextRequest) {
       select: SELECT,
     });
 
+    // A changed or removed address (it is now unverified): rows found through the old one must not linger.
+    if (data.email !== undefined) {
+      await clearEmailMatches(memberId).catch(() => undefined);
+      after(() => refreshRsvEventsIfEnabled(memberId));
+    }
+
     // Ask for confirmation only when the member wants the digest and the address is unverified.
     let confirmation: Confirmation | null = null;
     const wantsConfirm = body.resend === true || data.email !== undefined || body.optIn === true;
@@ -197,7 +214,7 @@ export async function POST(req: NextRequest) {
       }
       newsletter = await newsletterPart(saved.email, !!saved.emailVerifiedAt);
     }
-    return NextResponse.json({ ...state(saved), confirmation, ...newsletter });
+    return NextResponse.json({ ...state(saved), confirmation, ...newsletter, ...(await eventsNudgePart()) });
   } catch (err) {
     return internalError(err, "email-prefs POST", "Couldn't save email preference");
   }

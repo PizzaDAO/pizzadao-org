@@ -1733,6 +1733,7 @@
       "label": "Enviarme el correo semanal de PizzaDAO",
       "saveError": "No pudimos guardar tu preferencia de correo. ¿Intentas de nuevo?",
       "saved": "Guardado",
+      "verifyNudge": "Verificar también muestra tus fiestas de rsv.pizza en tu perfil.",
       "emailLabel": "Correo electrónico",
       "optIn": "Recibir un resumen semanal de PizzaDAO",
       "save": "Guardar",
@@ -2639,6 +2640,33 @@
     "copyLink": "Copiar enlace",
     "copied": "Enlace copiado",
     "copyFailed": "No se pudo copiar el enlace"
+  },
+  "eventsAttended": {
+    "overline": "§ 06 · Por el mundo",
+    "title": "Eventos a los que asististe",
+    "badge": {
+      "attended": "Asistió",
+      "ticket": "Entrada",
+      "organizer": "Organizador"
+    },
+    "promptNone": "Agrega tu correo para ver las fiestas a las que has ido.",
+    "promptNoneLink": "Agregar correo",
+    "promptUnverified": "Revisa tu bandeja para confirmar tu correo.",
+    "promptUnverifiedLink": "Gestionar correo",
+    "emailOnlyUsedFor": "Tu correo solo se usa para encontrar tus check-ins de rsv.pizza.",
+    "empty": "Aún no hay eventos. Verifica tu correo o vincula tu cuenta de rsv.pizza para ver las fiestas a las que has ido.",
+    "showAll": "Ver todos ({count})",
+    "linked": "Vinculado a rsv.pizza",
+    "unlink": "Desvincular",
+    "linkButton": "Vincular cuenta de rsv.pizza",
+    "visibilityLabel": "Quién puede ver esta sección",
+    "visibility": {
+      "public": "Todos",
+      "members": "Solo miembros",
+      "private": "Solo yo"
+    },
+    "linkedNote": "Cuenta de rsv.pizza vinculada.",
+    "linkFailed": "No se pudo vincular tu cuenta de rsv.pizza. Inténtalo de nuevo y, si el enlace de acceso se abre en otra pestaña, usa la opción del código de 6 dígitos."
   },
   "collectionStats": {
     "aria": "Totales de la colección",
