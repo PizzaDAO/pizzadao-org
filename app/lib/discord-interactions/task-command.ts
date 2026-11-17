@@ -106,7 +106,7 @@ export function renderList(rows: TaskRow[], appUrl: string, labels: Map<string, 
   const shown = rows.slice(0, LIST_CAP)
   const more = rows.length - shown.length
   const board = link(more > 0 ? `${more} more on the website` : 'Open the crew page', crewUrl(appUrl, crewId))
-  const foot = `\n\nSign up with \`/task claim\`. ${board}\nPaid work: \`/bounty list\`.`
+  const foot = `\n\nSign up with \`/task claim\`. ${board}`
   let body = shown.map((t) => taskLine(t, labels)).join('\n')
   if (body.length > BODY_LIMIT - foot.length) body = body.slice(0, BODY_LIMIT - foot.length - 1) + '…'
   const head = `${rows.length} open task${rows.length === 1 ? '' : 's'}${crewId ? ` for ${crewName(labels, crewId)}` : ''}`

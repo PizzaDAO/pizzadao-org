@@ -50,7 +50,7 @@ describe('renderers', () => {
     expect(e.description).toMatch(/Ops Crew · Do thing 2\n/)
     expect(e.description).toContain('2 open tasks')
     expect(e.description).toContain('`/task claim`')
-    expect(e.description).toContain('`/bounty list`')
+    expect(e.description).not.toContain('/bounty')
     expect(e.description).toContain(`(<${APP}/crews>)`)
   })
 
