@@ -207,7 +207,7 @@ async function fetchCrewTasks(
 /** One task as the ranking sees it (stage lowercase; priority as the sheet holds it). */
 export type RankableTask = { label: string; url?: string; priority: string; isActive: boolean; stage: string; due?: string };
 
-const getPriorityRank = (p: string) => {
+export const getPriorityRank = (p: string) => {
   const lower = p.toLowerCase();
   if (lower.includes("top") || lower === "0") return 0;
   if (lower.includes("high") || lower === "1") return 1;

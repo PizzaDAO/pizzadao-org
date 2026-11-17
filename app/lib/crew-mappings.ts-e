@@ -1,0 +1,547 @@
+/**
+ * Shared crew mappings data fetcher
+ * This module provides direct access to crew mappings without HTTP fetching,
+ * avoiding Vercel deployment protection issues with internal API calls.
+ */
+
+import type { GvizResponse } from "@/app/lib/gviz-parser";
+import { getTaskLinks, getColumnHyperlinks } from "@/app/api/lib/google-sheets";
+import { swrGet, swrInvalidate } from "@/app/lib/swr-cache";
+import { cacheDel, CACHE_TTL } from "@/app/api/lib/cache";
+import { fetchGviz, buildGvizUrl, GvizFetchError } from "@/app/lib/sheets/gviz";
+import { SHEET_IDS, SHEET_TABS } from "@/app/lib/sheets/config";
+import { norm as normalizeSpaces } from "@/app/lib/strings";
+import promiseLimit from "promise-limit";
+
+const SHEET_ID = SHEET_IDS.crewMappings;
+const TAB_NAME = SHEET_TABS.crewMappings;
+
+/** Read-only config sheets (the mappings tab and each crew's task sheet). */
+const CONFIG_REVALIDATE_SECONDS = 300;
+const GVIZ_HEADERS = { "User-Agent": "Mozilla/5.0", Accept: "text/plain,*/*" };
+
+function slugify(s: unknown) {
+  return normalizeSpaces(s)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function splitList(s: unknown) {
+  return normalizeSpaces(s)
+    .split(/[,/|]+/)
+    .map((x) => normalizeSpaces(x))
+    .filter(Boolean);
+}
+
+export type CrewTask = {
+  label: string;
+  url?: string;
+  priority?: string;
+};
+
+export type CrewOption = {
+  id: string;
+  label: string;
+  turtles: string[];
+  role?: string;
+  channel?: string;
+  event?: string;
+  emoji?: string;
+  sheet?: string;
+  callTime?: string;
+  callTimeUrl?: string;
+  callLength?: string;
+  /** Registry type: "crew" for crews; other values (e.g. "community") are calls, not crews (isRealCrew in crew-id.ts). */
+  type?: string;
+  tasks?: CrewTask[];
+  taskCount?: number; // Total active tasks (including hidden ones)
+};
+
+function extractSheetId(url: string) {
+  const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+  return match ? match[1] : null;
+}
+
+function extractUrlFromText(text: string): string | undefined {
+  const parenMatch = text.match(/\((https?:\/\/[^\s\)]+)\)/);
+  if (parenMatch) return parenMatch[1];
+  const rawMatch = text.match(/https?:\/\/[^\s\)]+/);
+  if (rawMatch) return rawMatch[0];
+  const domainMatch = text.match(/([a-zA-Z0-9-]+\.(?:com|pizza|xyz|org|net|io|me))/i);
+  if (domainMatch) return `https://${domainMatch[1]}`;
+  return undefined;
+}
+
+/** One open task with everything the call agenda ranks on. */
+export type CrewTaskDetail = {
+  label: string;
+  url?: string;
+  /** "Top" | "High" | "Mid" | "Low" | raw sheet value. */
+  priority?: string;
+  stage: string;
+  /** ISO date (YYYY-MM-DD) from the sheet's Due column, when it parses. */
+  due?: string;
+  isActive: boolean;
+};
+
+/** A gviz date cell: `Date(2026,9,30)` (month is 0-based) or a formatted string. */
+export function parseSheetDue(cell: { v?: unknown; f?: unknown } | undefined): string | undefined {
+  if (!cell) return undefined;
+  const m = String(cell.v ?? "").match(/^Date\((\d{4}),\s*(\d{1,2}),\s*(\d{1,2})/);
+  if (m) return `${m[1]}-${String(+m[2] + 1).padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+  const raw = String(cell.f ?? cell.v ?? "").trim();
+  const d = /^\d{4}-\d{2}-\d{2}/.test(raw) || /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(raw) ? new Date(raw) : null;
+  return d && !Number.isNaN(d.getTime()) ? d.toISOString().slice(0, 10) : undefined;
+}
+
+/** Every open (not done/skipped) task of a crew sheet, in sheet-ranked order. Empty on any sheet error. */
+export async function fetchOpenCrewTasks(sheetUrl: string): Promise<CrewTaskDetail[]> {
+  return (await fetchOpenCrewTasksResult(sheetUrl)).tasks;
+}
+
+/** Like fetchOpenCrewTasks, but `error` is true when the sheet could not be read (vs. genuinely no open tasks). */
+export async function fetchOpenCrewTasksResult(sheetUrl: string): Promise<{ tasks: CrewTaskDetail[]; error: boolean }> {
+  const r = await fetchCrewTasks(sheetUrl, false, true);
+  return { tasks: r.all ?? [], error: !!r.error };
+}
+
+async function fetchCrewTasks(
+  sheetUrl: string,
+  forceRefresh = false,
+  detail = false,
+): Promise<{ tasks: CrewTask[]; totalCount: number; all?: CrewTaskDetail[]; error?: boolean }> {
+  const id = extractSheetId(sheetUrl);
+  if (!id) return { tasks: [], totalCount: 0 };
+
+  // Clear task-links cache for this sheet if force refresh
+  if (forceRefresh) {
+    await cacheDel(`task-links:${id}`);
+  }
+
+  try {
+    // Throws on a non-2xx response; the catch below returns the empty result.
+    const gviz = await fetchGviz(
+      id,
+      { headers: 1 },
+      forceRefresh
+        ? { fresh: true, headers: GVIZ_HEADERS }
+        : { revalidate: CONFIG_REVALIDATE_SECONDS, headers: GVIZ_HEADERS },
+    );
+    const rows = gviz?.table?.rows || [];
+
+    let tasksRowIdx = -1;
+
+    for (let ri = 0; ri < rows.length; ri++) {
+      const rowCells = rows[ri]?.c || [];
+      for (let ci = 0; ci < rowCells.length; ci++) {
+        const val = String(rowCells[ci]?.v || "").trim().toLowerCase();
+        if (val === "tasks" || val === "task") {
+          tasksRowIdx = ri;
+          break;
+        }
+      }
+      if (tasksRowIdx !== -1) break;
+    }
+
+    if (tasksRowIdx === -1) return { tasks: [], totalCount: 0 };
+
+    let headerRowIdx = -1;
+    let stageIdx = -1;
+    let taskIdx = -1;
+
+    for (let i = 0; i <= 3; i++) {
+      const ri = tasksRowIdx + i;
+      if (ri >= rows.length) break;
+      const row = rows[ri]?.c || [];
+      const findCol = (name: string) =>
+        row.findIndex((c: any) => String(c?.v || "").toLowerCase().trim() === name.toLowerCase());
+
+      const sIdx = findCol("stage");
+      const tIdx = findCol("task");
+
+      if (tIdx !== -1) {
+        headerRowIdx = ri;
+        stageIdx = sIdx;
+        taskIdx = tIdx;
+        break;
+      }
+    }
+
+    if (headerRowIdx === -1) return { tasks: [], totalCount: 0 };
+
+    const headerRow = rows[headerRowIdx]?.c || [];
+    const priorityIdx = headerRow.findIndex((c: any) => String(c?.v || "").toLowerCase().includes("priority"));
+    const dueIdx = headerRow.findIndex((c: any) => String(c?.v || "").toLowerCase().trim() === "due");
+
+    const htmlLinkMap = await getTaskLinks(id);
+
+    const allTasks: { label: string; url?: string; priority: string; isActive: boolean; stage: string; due?: string }[] = [];
+    for (let i = headerRowIdx + 1; i < rows.length; i++) {
+      const r = rows[i]?.c || [];
+      const stage = stageIdx !== -1 ? String(r[stageIdx]?.v || "").trim().toLowerCase() : "";
+
+      // Skip tasks that are "Done" or "Skip"
+      if (isClosedStage(stage)) continue;
+
+      const taskCell = r[taskIdx];
+      const rawLabel = String(taskCell?.v || "").trim();
+      const taskUrl = htmlLinkMap[rawLabel] || taskCell?.l || extractUrlFromText(rawLabel);
+      const taskLabel = rawLabel.replace(/\s*\(https?:\/\/[^\s\)]+\)\s*/g, " ").trim();
+      const priority = priorityIdx !== -1 ? String(r[priorityIdx]?.v || "").trim() : "";
+
+      // Check if task is actively being worked on (for sorting purposes)
+      const isActive = isActiveStage(stage);
+
+      if (taskLabel) {
+        allTasks.push({ label: taskLabel, url: taskUrl, priority, isActive, stage, due: dueIdx !== -1 ? parseSheetDue(r[dueIdx]) : undefined });
+      }
+    }
+
+    return rankCrewTasks(allTasks, detail);
+  } catch (e) {
+    return { tasks: [], totalCount: 0, error: true };
+  }
+}
+
+/** One task as the ranking sees it (stage lowercase; priority as the sheet holds it). */
+export type RankableTask = { label: string; url?: string; priority: string; isActive: boolean; stage: string; due?: string };
+
+export const getPriorityRank = (p: string) => {
+  const lower = p.toLowerCase();
+  if (lower.includes("top") || lower === "0") return 0;
+  if (lower.includes("high") || lower === "1") return 1;
+  if (lower.includes("mid") || lower === "2") return 2;
+  if (lower.includes("low") || lower === "3") return 3;
+  return 999;
+};
+
+export const getPriorityLabel = (p: string) => {
+  const lower = p.toLowerCase();
+  if (lower.includes("top") || lower === "0") return "Top";
+  if (lower.includes("high") || lower === "1") return "High";
+  if (lower.includes("mid") || lower === "2") return "Mid";
+  if (lower.includes("low") || lower === "3") return "Low";
+  return p || undefined;
+};
+
+/** Stages that close a task (it no longer shows as open). */
+export function isClosedStage(stage: string): boolean {
+  const s = stage.trim().toLowerCase();
+  return s === "done" || s === "skip" || s === "skipped" || s === "complete" || s === "completed";
+}
+
+/** Stages that count as actively worked on (ranked first). */
+export function isActiveStage(stage: string): boolean {
+  const s = stage.trim().toLowerCase();
+  return s === "now" || s === "doing" || s === "in progress" || s === "todo" || s.includes("progress");
+}
+
+/**
+ * Rank open tasks the way crew pages and the call agenda always have: active first, then by
+ * priority (stable within a rank, so sheet order breaks ties). Pure; shared by the sheet and
+ * database paths.
+ */
+export function rankCrewTasks(
+  openTasks: RankableTask[],
+  detail = false,
+): { tasks: CrewTask[]; totalCount: number; all?: CrewTaskDetail[] } {
+  const allTasks = [...openTasks];
+  // Sort by: active tasks first, then by priority
+  allTasks.sort((a, b) => {
+    // Active tasks come first
+    if (a.isActive && !b.isActive) return -1;
+    if (!a.isActive && b.isActive) return 1;
+    // Then sort by priority
+    return getPriorityRank(a.priority) - getPriorityRank(b.priority);
+  });
+
+  const totalCount = allTasks.length;
+  const topTasks = allTasks.slice(0, 3).map(t => ({
+    label: t.label,
+    url: t.url,
+    priority: getPriorityLabel(t.priority)
+  }));
+
+  const all = detail
+    ? allTasks.map((t) => ({ label: t.label, url: t.url, priority: getPriorityLabel(t.priority), stage: t.stage, due: t.due, isActive: t.isActive }))
+    : undefined;
+  return { tasks: topTasks, totalCount, all };
+}
+
+/** Open tasks of a crew from the database (CrewTask), ranked like the sheet path. */
+export async function fetchCrewTasksFromDb(crewId: string, detail = false): Promise<{ tasks: CrewTask[]; totalCount: number; all?: CrewTaskDetail[] }> {
+  const { loadCrewTasks } = await import("@/app/lib/crew-content");
+  const rows = await loadCrewTasks(crewId);
+  const open: RankableTask[] = rows
+    .filter((t) => !isClosedStage(t.stage) && t.label.trim())
+    .map((t) => ({
+      // Same clean-up as the sheet path: a pasted link in the label is not part of the title.
+      label: t.label.replace(/\s*\(https?:\/\/[^\s\)]+\)\s*/g, " ").trim(),
+      url: t.url ?? undefined,
+      priority: t.priority ?? "",
+      isActive: isActiveStage(t.stage),
+      stage: t.stage.trim().toLowerCase(),
+      due: t.due ?? undefined,
+    }));
+  return rankCrewTasks(open, detail);
+}
+
+/**
+ * Every open task of a crew, from its sheet or (once `sheets.source.crewTasks` covers this crew)
+ * the database. `error` is true when the source could not be read.
+ */
+export async function fetchOpenCrewTasksForCrew(crew: Pick<CrewOption, "id" | "sheet">): Promise<{ tasks: CrewTaskDetail[]; error: boolean }> {
+  const { usesDb } = await import("@/app/lib/sheets-import/source");
+  if (await usesDb("crewTasks", crew.id)) {
+    try {
+      return { tasks: (await fetchCrewTasksFromDb(crew.id, true)).all ?? [], error: false };
+    } catch {
+      return { tasks: [], error: true };
+    }
+  }
+  return crew.sheet ? fetchOpenCrewTasksResult(crew.sheet) : { tasks: [], error: false };
+}
+
+/** Extra Crew Mappings columns the app does not show but the importer keeps. */
+export type CrewMappingExtras = { type?: string; script?: string };
+
+/**
+ * Parse the Crew Mappings tab (GViz, headers=1) into crews, merging duplicate rows the way the
+ * app always has. Pure; shared by the sheet read path and the importer. No tasks, no call links.
+ */
+export function parseCrewMappings(gviz: GvizResponse): { crews: CrewOption[]; extras: Map<string, CrewMappingExtras> } {
+  const table = gviz?.table;
+  const cols: any[] = Array.isArray(table?.cols) ? table.cols : [];
+  const rows: any[] = Array.isArray(table?.rows) ? table.rows : [];
+
+  const cell = (r: any, i: number) => {
+    if (i < 0) return "";
+    const v = r?.c?.[i];
+    return normalizeSpaces(v?.f ?? v?.v ?? "");
+  };
+
+  let headers = cols.map((c) => normalizeSpaces(c?.label ?? ""));
+  const allBlank = headers.every((h) => !h);
+
+  let dataRows = rows;
+  if (allBlank) {
+    const firstRow = rows[0];
+    if (!firstRow) {
+      throw new Error(`No rows found in "${TAB_NAME}" tab (and column labels were blank).`);
+    }
+    headers = cols.map((_, i) => cell(firstRow, i));
+    dataRows = rows.slice(1);
+  }
+
+  const idx = (name: string) =>
+    headers.findIndex((h) => normalizeSpaces(h).toLowerCase() === name.toLowerCase());
+
+  const crewIdx = idx("Crew");
+  if (crewIdx === -1) {
+    throw new Error(`Missing required column "Crew". Found: ${headers.join(", ")}`);
+  }
+
+  const turtlesIdx = idx("Turtles");
+  const roleIdx = idx("Role");
+  const channelIdx = idx("Channel");
+  const eventIdx = idx("Event");
+  const emojiIdx = idx("Emoji");
+  const typeIdx = idx("Type");
+  const scriptIdx = idx("Script");
+
+  const findFuzzy = (subs: string[]) =>
+    headers.findIndex((h) => {
+      const normH = normalizeSpaces(h).toLowerCase();
+      return subs.some((s) => normH.includes(s.toLowerCase()));
+    });
+
+  const sheetIdx = findFuzzy(["Sheet", "URL", "Link"]);
+  const callTimeIdx = findFuzzy(["Call Time", "Call (", "Call Day"]);
+  const callLengthIdx = findFuzzy(["Call Length", "Length", "Duration"]);
+
+  const byId = new Map<string, CrewOption>();
+  const extras = new Map<string, CrewMappingExtras>();
+
+  for (const r of dataRows) {
+    const crew = cell(r, crewIdx);
+    if (!crew) continue;
+
+    const id = slugify(crew) || crew.toLowerCase();
+
+    const turtles = turtlesIdx !== -1 ? splitList(cell(r, turtlesIdx)) : [];
+    const role = roleIdx !== -1 ? cell(r, roleIdx) : "";
+    const channel = channelIdx !== -1 ? cell(r, channelIdx) : "";
+    const event = eventIdx !== -1 ? cell(r, eventIdx) : "";
+    const emoji = emojiIdx !== -1 ? cell(r, emojiIdx) : "";
+    const sheet = sheetIdx !== -1 ? cell(r, sheetIdx) : "";
+    const callTime = callTimeIdx !== -1 ? cell(r, callTimeIdx) : "";
+    const callLength = callLengthIdx !== -1 ? cell(r, callLengthIdx) : "";
+    const type = typeIdx !== -1 ? cell(r, typeIdx) : "";
+    const script = scriptIdx !== -1 ? cell(r, scriptIdx) : "";
+
+    const ex = extras.get(id) ?? {};
+    if (!ex.type && type) ex.type = type;
+    if (!ex.script && script) ex.script = script;
+    extras.set(id, ex);
+
+    const existing = byId.get(id);
+    if (existing) {
+      for (const t of turtles) if (!existing.turtles.includes(t)) existing.turtles.push(t);
+      if (!existing.role && role) existing.role = role;
+      if (!existing.channel && channel) existing.channel = channel;
+      if (!existing.event && event) existing.event = event;
+      if (!existing.emoji && emoji) existing.emoji = emoji;
+      if (!existing.sheet && sheet) existing.sheet = sheet;
+      if (!existing.callTime && callTime) existing.callTime = callTime;
+      if (!existing.callLength && callLength) existing.callLength = callLength;
+    } else {
+      byId.set(id, {
+        id,
+        label: crew,
+        turtles,
+        role: role || undefined,
+        channel: channel || undefined,
+        event: event || undefined,
+        emoji: emoji || undefined,
+        sheet: sheet || undefined,
+        callTime: callTime || undefined,
+        callLength: callLength || undefined,
+        tasks: [],
+      });
+    }
+  }
+
+  const crews = Array.from(byId.values()).sort((a, b) => a.label.localeCompare(b.label));
+  // The type tells crews from calls that are not crews (the Community Call), like the DB path.
+  for (const c of crews) {
+    const type = extras.get(c.id)?.type;
+    if (type) c.type = type;
+  }
+  return { crews, extras };
+}
+
+/**
+ * The Crew Mappings tab with call-time links, straight from the sheet (no tasks). Throws on a
+ * sheet error.
+ */
+export async function fetchCrewMappingsFromSheet(forceRefresh = false): Promise<{ crews: CrewOption[]; extras: Map<string, CrewMappingExtras> }> {
+  const gvizEndpoint = buildGvizUrl(SHEET_ID, { tab: TAB_NAME, headers: 1 });
+
+  let gviz: GvizResponse;
+  try {
+    gviz = await fetchGviz(
+      SHEET_ID,
+      { tab: TAB_NAME, headers: 1 },
+      forceRefresh
+        ? { fresh: true, headers: GVIZ_HEADERS }
+        : { revalidate: CONFIG_REVALIDATE_SECONDS, headers: GVIZ_HEADERS },
+    );
+  } catch (e) {
+    const status = e instanceof GvizFetchError ? e.status : "unknown";
+    throw new Error(
+      `Failed to fetch sheet via GViz. status=${status} url=${gvizEndpoint} error=${
+        e instanceof Error ? e.message : String(e)
+      }`
+    );
+  }
+
+  const parsed = parseCrewMappings(gviz);
+
+  // Fetch calendar event links from Call Time column
+  const callTimeLinks = await getColumnHyperlinks(SHEET_ID, TAB_NAME, "Crew", "Call Time");
+  for (const c of parsed.crews) {
+    if (callTimeLinks[c.label]) {
+      c.callTimeUrl = callTimeLinks[c.label];
+    }
+  }
+  return parsed;
+}
+
+/** A Crew row as the app's CrewOption (same shape as the sheet path, before tasks). */
+export function crewRowToOption(r: {
+  id: string; label: string; emoji: string | null; turtles: string[]; role: string | null; channel: string | null; event: string | null;
+  callTime: string | null; callTimeUrl: string | null; callLength: string | null; legacySheetUrl: string | null;
+  type?: string | null;
+}): CrewOption {
+  const opt: CrewOption = { id: r.id, label: r.label, turtles: [...(r.turtles ?? [])], tasks: [] };
+  if (r.role) opt.role = r.role;
+  if (r.channel) opt.channel = r.channel;
+  if (r.event) opt.event = r.event;
+  if (r.emoji) opt.emoji = r.emoji;
+  if (r.legacySheetUrl) opt.sheet = r.legacySheetUrl;
+  if (r.callTime) opt.callTime = r.callTime;
+  if (r.callTimeUrl) opt.callTimeUrl = r.callTimeUrl;
+  if (r.callLength) opt.callLength = r.callLength;
+  if (r.type) opt.type = r.type;
+  return opt;
+}
+
+/** The crew registry from the database (not archived), sorted like the sheet path. No tasks. */
+export async function fetchCrewsFromDb(): Promise<CrewOption[]> {
+  const { prisma } = await import("@/app/lib/db");
+  const rows = await prisma.crew.findMany({ where: { archived: false } });
+  return rows.map(crewRowToOption).sort((a, b) => a.label.localeCompare(b.label));
+}
+
+/** Top tasks + count for each crew (from its sheet, or the database once crew tasks move). */
+async function attachTasks(crews: CrewOption[], forceRefresh: boolean): Promise<void> {
+  const { getSource, readsFromDb } = await import("@/app/lib/sheets-import/source");
+  const source = await getSource("crewTasks");
+  const limit = promiseLimit(3);
+  await Promise.all(
+    crews.map((c) => limit(async () => {
+      if (readsFromDb(source, c.id)) {
+        const { tasks, totalCount } = await fetchCrewTasksFromDb(c.id).catch(() => ({ tasks: [] as CrewTask[], totalCount: 0 }));
+        c.tasks = tasks;
+        c.taskCount = totalCount;
+      } else if (c.sheet) {
+        const { tasks, totalCount } = await fetchCrewTasks(c.sheet, forceRefresh);
+        c.tasks = tasks;
+        c.taskCount = totalCount;
+      }
+    }))
+  );
+}
+
+const CREW_MAPPINGS_KEEP = 60 * 60 * 24; // stale lists stay servable for a day
+// Previous formats may still be written by older deployments sharing this cache (previews share KV
+// with production), so every format gets its own key and no key ever holds two formats:
+// db:v1 / v7 (bare { crews }), db:v2 / v8 (bare { crews } with `type`), db:v2:swr / v8:swr (SWR
+// envelope without `type`). Current: the SWR envelope whose entries carry `type`.
+const LEGACY_DB_CACHE_KEYS = ["crew-mappings:db:v1", "crew-mappings:db:v2", "crew-mappings:db:v2:swr"];
+const legacySheetCacheKeys = () => [`crew-mappings:v7:${SHEET_ID}`, `crew-mappings:v8:${SHEET_ID}`, `crew-mappings:v8:swr:${SHEET_ID}`];
+const DB_CACHE_KEY = "crew-mappings:db:v3:swr";
+const sheetCacheKey = () => `crew-mappings:v9:swr:${SHEET_ID}`;
+
+/** Forget the cached crew list (after an edit on the website). */
+export async function invalidateCrewMappingsCache(): Promise<void> {
+  await Promise.all([swrInvalidate(DB_CACHE_KEY, ...LEGACY_DB_CACHE_KEYS), swrInvalidate(sheetCacheKey(), ...legacySheetCacheKeys())]);
+}
+
+/**
+ * Get crew mappings data directly (without HTTP fetch). Source: the Crew Mappings sheet, or the
+ * Crew table once `sheets.source.crews` is "db" (plans/sheets-cutover.md).
+ * @param forceRefresh - If true, bypass cache
+ * @param opts.staleWhileRevalidate - Page reads only: serve a stale list and refresh behind the response.
+ *   Everything else keeps the blocking 5-minute behavior.
+ * @returns Crew mappings data
+ */
+export async function getCrewMappings(forceRefresh = false, opts: { staleWhileRevalidate?: boolean } = {}): Promise<{ crews: CrewOption[]; cached: boolean }> {
+  const { usesDb } = await import("@/app/lib/sheets-import/source");
+  const fromDb = await usesDb("crews");
+  const cacheKey = fromDb ? DB_CACHE_KEY : sheetCacheKey();
+
+  // Stale-while-revalidate: serve the last list at once and refresh behind the response; only a
+  // truly empty cache (or a force refresh) waits on the source and the task sheets.
+  const { value, cached } = await swrGet(
+    cacheKey,
+    async () => {
+      const crews = fromDb ? await fetchCrewsFromDb() : (await fetchCrewMappingsFromSheet(forceRefresh)).crews;
+      await attachTasks(crews, forceRefresh);
+      return { crews };
+    },
+    { freshSeconds: CACHE_TTL.CREW_MAPPINGS, keepSeconds: CREW_MAPPINGS_KEEP, forceRefresh, isValid: (v) => Array.isArray(v?.crews), serveStale: opts.staleWhileRevalidate === true },
+  );
+  return { ...value, cached };
+}

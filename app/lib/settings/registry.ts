@@ -1904,6 +1904,13 @@ export const SETTINGS = {
     help: 'Let members list open bounties, claim one, see their claims and give one up with /bounty (private replies). It uses the same rules as the website; submitting work and the payout stay on the website. The command must also be registered with Discord. The BOUNTY_COMMAND_ENABLED env var set to off always wins; on preview deploys only the env var counts.',
     confirmOn: 'Members will be able to list and claim bounties from Discord.',
   }),
+  'discord.taskCommandEnabled': boolSetting({
+    key: 'discord.taskCommandEnabled',
+    area: 'discord',
+    label: '/task command',
+    help: 'Let members list open crew tasks, sign up for one, see the tasks they lead and drop one with /task (private replies). It uses the same rules as the crew pages; claiming does not add anyone to the crew, and no public post is made (turn on the crew task update digest for that). The command must also be registered with Discord. The TASK_COMMAND_ENABLED env var set to off always wins; on preview deploys only the env var counts.',
+    confirmOn: 'Members will be able to sign up for crew tasks from Discord.',
+  }),
   // Calls imported from X live broadcasts (plans/x-call-import.md). All off: an imported call never reaches Discord,
   // the follow-up drafter, the agenda or the automatic summary sweep unless a setting here says so.
   'calls.importedRecapPostEnabled': boolSetting({

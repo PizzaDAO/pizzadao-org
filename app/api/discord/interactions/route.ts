@@ -14,6 +14,8 @@
 //      missions.verifiersEnabled is edited in via the interaction webhook.
 // /vouch, /level, /profile (discord.vouchCommandEnabled / levelCommandEnabled / profileCommandEnabled):
 //      deferred ephemeral replies (app/lib/discord-interactions/member-commands.ts), 10 per member per minute.
+// /task list | claim | mine | drop (discord.taskCommandEnabled): crew tasks, deferred ephemeral replies
+//      (app/lib/discord-interactions/task-command.ts) over claimCrewTask (app/lib/crews/claim-task.ts), 10 per member per minute.
 // /bounty list | claim | mine | giveup (discord.bountyCommandEnabled): deferred ephemeral replies
 //      (app/lib/discord-interactions/bounty-command.ts) over the website's bounty functions, 10 per member per minute.
 // /progress (calls.progressReportEnabled on): deferred public reply, then the crew's last call
@@ -38,6 +40,9 @@ import { getCrewMappings } from "@/app/lib/crew-mappings";
 import { runMemberCommand, type MemberCommandJob } from "@/app/lib/discord-interactions/member-commands";
 import { runBountyCommand, type BountyJob, type BountyRow } from "@/app/lib/discord-interactions/bounty-command";
 import { bountyPickChoices } from "@/app/lib/discord-interactions/bounty-choices";
+import { runTaskCommand, type TaskJob } from "@/app/lib/discord-interactions/task-command";
+import { myCrewTasks, openCrewTasks, taskPickChoices } from "@/app/lib/discord-interactions/task-choices";
+import { claimCrewTask } from "@/app/lib/crews/claim-task";
 import { claimBounty, getClaimedBounties, getCrewLabelMap, getOpenBounties, giveUpBounty } from "@/app/lib/bounties";
 import { requireOnboarded } from "@/app/lib/economy";
 import { giveVouch } from "@/app/lib/give-vouch";
@@ -223,6 +228,38 @@ async function bountyChoices(kind: "crew" | "claim" | "giveup", discordId: strin
   return bountyPickChoices(kind, discordId, query);
 }
 
+/** /task: 10 per member per minute (private replies, cheap). */
+async function taskRateLimit(discordId: string): Promise<Date | null> {
+  const r = await checkKeyedRateLimit("task-command", discordId);
+  return r.success ? null : new Date(r.reset);
+}
+
+/** The deferred /task work, after the type-5 reply has gone out. */
+function deferTask(job: TaskJob) {
+  after(async () => {
+    await runTaskCommand(job, {
+      openTasks: openCrewTasks,
+      myTasks: async (discordId) => {
+        const memberId = await fetchMemberIdByDiscordId(discordId);
+        return memberId ? myCrewTasks(String(memberId)) : [];
+      },
+      // The same rules, audit trail and activation as the crew page's Claim / Give up buttons. Discord refuses closed tasks.
+      claim: (discordId, taskId) => claimCrewTask({ discordId, taskId, action: "claim", requireOpen: true, awaitActivation: true }),
+      drop: (discordId, taskId) => claimCrewTask({ discordId, taskId, action: "giveup" }),
+      isMember: async (id) => !!(await fetchMemberIdByDiscordId(id)),
+      crewLabels: getCrewLabelMap,
+      appUrl: appUrl(),
+    });
+  });
+}
+
+/** Autocomplete for /task: crews (list), open tasks (claim), the tasks you lead (drop). */
+async function taskChoices(kind: "crew" | "claim" | "drop", discordId: string, query: string): Promise<Array<{ name: string; value: string | number }>> {
+  if (kind === "crew") return progressCrewChoices(query);
+  const memberId = kind === "drop" ? await fetchMemberIdByDiscordId(discordId) : null;
+  return taskPickChoices(kind, memberId ? String(memberId) : null, query);
+}
+
 /** Autocomplete for the /progress crew option: crews whose label or id contains the query. */
 async function progressCrewChoices(query: string): Promise<Array<{ name: string; value: string }>> {
   const q = query.trim().toLowerCase();
@@ -316,6 +353,7 @@ function deps(guildId: string | undefined, settings: Settings): HandlerDeps {
     missions: { rateLimit: missionsRateLimit, defer: deferMissions },
     memberCommands: { enabled: (name) => toggleEnabled(MEMBER_COMMAND_TOGGLES[name]), rateLimit: memberCommandRateLimit, defer: deferMemberCommand },
     progress: { enabled: progressEnabled, rateLimit: progressRateLimit, defer: deferProgress, crewChoices: progressCrewChoices },
+    task: { enabled: () => toggleEnabled("discord.taskCommandEnabled"), rateLimit: taskRateLimit, defer: deferTask, choices: taskChoices },
     bounty: { enabled: () => toggleEnabled("discord.bountyCommandEnabled"), rateLimit: bountyRateLimit, defer: deferBounty, choices: bountyChoices },
     live: {
       enabled: () => liveCommandEnabled(),

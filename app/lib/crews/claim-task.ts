@@ -1,4 +1,4 @@
-import { recordActivationLater as recordActivation } from '@/app/lib/activation'
+import { recordActivation, recordActivationLater } from '@/app/lib/activation'
 import { google } from 'googleapis'
 import { prisma } from '@/app/lib/db'
 import { getGoogleAuth, GOOGLE_SCOPES } from '@/app/lib/google-auth'
@@ -24,11 +24,22 @@ export interface ClaimInput {
   taskId?: string | null
   /** Refuse to claim a task in a closed stage (done, skip, ...). Only with `taskId`. */
   requireOpen?: boolean
+  /**
+   * Await the activation write instead of scheduling it. Callers already running inside after()
+   * (the Discord command) set this, so the write is not left dangling. The web route leaves it off.
+   */
+  awaitActivation?: boolean
 }
 
 export type ClaimResult =
   | { ok: true; action: ClaimAction; task?: { id: string; label: string; crewId: string } }
   | { ok: false; status: 400 | 403 | 404 | 409 | 500; error: string }
+
+/** Record the first-contribution activation: scheduled with the response, or awaited when asked. */
+async function activate(discordId: string, awaitIt?: boolean): Promise<void> {
+  if (awaitIt) await recordActivation('first_contribution', { discordId, code: 'task_claim' })
+  else recordActivationLater('first_contribution', { discordId, code: 'task_claim' })
+}
 
 const fail = (status: 400 | 403 | 404 | 409 | 500, error: string): ClaimResult => ({ ok: false, status, error })
 
@@ -71,13 +82,13 @@ export async function claimCrewTask(input: ClaimInput): Promise<ClaimResult> {
     if (!task) return fail(404, 'Task not found')
     const dbCrew = await findDbTaskCrew(task.crewId, null)
     if (!dbCrew) return fail(404, 'Task not found')
-    return claimInDb(discordId, dbCrew, task.label.trim(), action, null, { taskId: input.taskId, requireOpen: input.requireOpen })
+    return claimInDb(discordId, dbCrew, task.label.trim(), action, null, { taskId: input.taskId, requireOpen: input.requireOpen }, input.awaitActivation)
   }
 
   // Crews whose tasks live in the database (sheets.source.crewTasks): write CrewTask, not the sheet.
   if (typeof taskName === 'string' && taskName.trim()) {
     const dbCrew = await findDbTaskCrew(crewId, sheetUrl)
-    if (dbCrew) return claimInDb(discordId, dbCrew, taskName.trim(), action, sheetUrl)
+    if (dbCrew) return claimInDb(discordId, dbCrew, taskName.trim(), action, sheetUrl, undefined, input.awaitActivation)
   }
 
   if (typeof sheetUrl !== 'string' || typeof taskName !== 'string' || !sheetUrl || !taskName.trim()) {
@@ -249,7 +260,7 @@ export async function claimCrewTask(input: ClaimInput): Promise<ClaimResult> {
     }
   }
 
-  if (action === 'claim') recordActivation('first_contribution', { discordId, code: 'task_claim' })
+  if (action === 'claim') await activate(discordId, input.awaitActivation)
   return { ok: true, action }
 }
 
@@ -289,6 +300,7 @@ async function claimInDb(
   action: ClaimAction,
   sheetUrl: string | null,
   byId?: { taskId: string; requireOpen?: boolean },
+  awaitActivation?: boolean,
 ): Promise<ClaimResult> {
   const member = await fetchMemberByDiscordId(discordId)
   const memberId = member?.memberId ?? (await fetchMemberIdByDiscordId(discordId))
@@ -336,7 +348,7 @@ async function claimInDb(
     } catch (err) {
       console.error('[claim-task] failed to log TaskClaimEvent (non-blocking):', err)
     }
-    recordActivation('first_contribution', { discordId, code: 'task_claim' })
+    await activate(discordId, awaitActivation)
   }
   return { ok: true, action, task: { id: task.id, label: task.label.trim(), crewId: crew.id } }
 }

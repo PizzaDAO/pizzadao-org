@@ -170,6 +170,19 @@ export const PEP_COMMANDS = [
     ],
     dm_permission: false,
   },
+  {
+    // Deferred and ephemeral (type 5, flags 64): crew tasks (not bounties), the same claim rules as the
+    // crew pages. Answers "not enabled" until discord.taskCommandEnabled.
+    name: 'task',
+    description: 'Crew tasks: list, sign up, see yours, drop one (only you see the reply)',
+    options: [
+      { type: SUB_COMMAND, name: 'list', description: 'Open crew tasks', options: [{ type: STRING, name: 'crew', description: 'Only this crew’s tasks', required: false, autocomplete: true, max_length: 80 }] },
+      { type: SUB_COMMAND, name: 'claim', description: 'Sign up for an open crew task', options: [{ type: STRING, name: 'task', description: 'Which task (pick one from the list)', required: true, autocomplete: true, max_length: 100 }] },
+      { type: SUB_COMMAND, name: 'mine', description: 'Crew tasks you lead' },
+      { type: SUB_COMMAND, name: 'drop', description: 'Drop a task you lead', options: [{ type: STRING, name: 'task', description: 'Which task', required: true, autocomplete: true, max_length: 100 }] },
+    ],
+    dm_permission: false,
+  },
 ] as const
 
 /**
