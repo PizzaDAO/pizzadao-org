@@ -490,6 +490,11 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
   const { levels, currentLevel, isAuthenticated } = data;
   // Data-driven top level (no hard-coded 8): past it means every level is done.
   const allLevelsDone = levels.length > 0 && currentLevel > Math.max(...levels.map((l) => l.level));
+  // The header shows the level the member has completed; currentLevel is the one they're working on.
+  const completedLevel = currentLevel - 1;
+  const completedTitle = completedLevel > 0
+    ? levels.find((l) => l.level === completedLevel)?.title || LEVEL_TITLES[completedLevel] || null
+    : null;
 
   return (
     <div style={pageContainer()}>
@@ -623,7 +628,7 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
               className="overline"
               style={{ color: "hsl(var(--ink) / 0.7)" }}
             >
-              {allLevelsDone ? "§ All levels complete" : "§ Working on"}
+              {allLevelsDone ? "§ All levels complete" : "§ Current Level"}
             </span>
             <div
               style={{
@@ -641,11 +646,11 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
                   <span style={{ color: "hsl(var(--foreground) / 0.35)", fontWeight: 700 }}>
                     Lv.
                   </span>
-                  {currentLevel}
+                  {completedLevel}
                 </>
               )}
             </div>
-            {data.levelTitle && (
+            {(allLevelsDone ? data.levelTitle : completedTitle) && (
               <div
                 style={{
                   fontSize: "clamp(1.05rem, 2.6vw, 1.35rem)",
@@ -655,12 +660,12 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
                   color: "hsl(var(--foreground))",
                 }}
               >
-                <span className="circle-scribble">{data.levelTitle}</span>
+                <span className="circle-scribble">{allLevelsDone ? data.levelTitle : completedTitle}</span>
               </div>
             )}
-            {!allLevelsDone && currentLevel > 1 && (
+            {!allLevelsDone && (
               <div style={{ fontSize: 13, color: "hsl(var(--ink) / 0.7)" }}>
-                Level {currentLevel - 1} complete
+                Working on Level {currentLevel}
               </div>
             )}
             <div style={{ display: "flex", justifyContent: "center", marginTop: 6 }}>
