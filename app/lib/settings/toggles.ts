@@ -72,6 +72,7 @@ export const TOGGLES = {
   'discord.vouchCommandEnabled': { env: 'VOUCH_COMMAND_ENABLED', legacy: ON_WORDS },
   'discord.levelCommandEnabled': { env: 'LEVEL_COMMAND_ENABLED', legacy: ON_WORDS },
   'discord.profileCommandEnabled': { env: 'PROFILE_COMMAND_ENABLED', legacy: ON_WORDS },
+  'discord.bountyCommandEnabled': { env: 'BOUNTY_COMMAND_ENABLED', legacy: ON_WORDS },
   'calls.welcomeEnabled': { env: 'CALL_WELCOME_ENABLED', legacy: ON_WORDS },
   'calls.liveActionItemsEnabled': { env: 'CALL_LIVE_ACTION_ITEMS_ENABLED', legacy: ON_WORDS },
   'calls.chatActionItemsEnabled': { env: 'CALL_CHAT_ACTION_ITEMS_ENABLED', legacy: ON_WORDS },

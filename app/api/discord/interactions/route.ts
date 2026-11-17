@@ -14,6 +14,8 @@
 //      missions.verifiersEnabled is edited in via the interaction webhook.
 // /vouch, /level, /profile (discord.vouchCommandEnabled / levelCommandEnabled / profileCommandEnabled):
 //      deferred ephemeral replies (app/lib/discord-interactions/member-commands.ts), 10 per member per minute.
+// /bounty list | claim | mine | giveup (discord.bountyCommandEnabled): deferred ephemeral replies
+//      (app/lib/discord-interactions/bounty-command.ts) over the website's bounty functions, 10 per member per minute.
 // /progress (calls.progressReportEnabled on): deferred public reply, then the crew's last call
 //      action items and open tasks (app/lib/calls/progress-report.ts), 1 per channel per 2 min.
 // /metalhead (discord.metalheadCommandEnabled on): spoken call updates and their stop / pause / resume / skip
@@ -34,6 +36,9 @@ import { liveCallChoices, metalheadEnabled, runMetalheadCommand } from "@/app/li
 import { progressEnabled, runProgressCommand } from "@/app/lib/calls/progress-command";
 import { getCrewMappings } from "@/app/lib/crew-mappings";
 import { runMemberCommand, type MemberCommandJob } from "@/app/lib/discord-interactions/member-commands";
+import { runBountyCommand, type BountyJob, type BountyRow } from "@/app/lib/discord-interactions/bounty-command";
+import { claimBounty, getClaimedBounties, getCrewLabelMap, getOpenBounties, giveUpBounty } from "@/app/lib/bounties";
+import { requireOnboarded } from "@/app/lib/economy";
 import { giveVouch } from "@/app/lib/give-vouch";
 import { getLevelInfo } from "@/app/lib/level-info";
 import { getProfileStats } from "@/app/lib/profile-stats";
@@ -186,6 +191,54 @@ function deferMemberCommand(job: MemberCommandJob) {
   });
 }
 
+/** /bounty: 10 per member per minute (private replies, cheap). */
+async function bountyRateLimit(discordId: string): Promise<Date | null> {
+  const r = await checkKeyedRateLimit("bounty-command", discordId);
+  return r.success ? null : new Date(r.reset);
+}
+
+/** The deferred /bounty work, after the type-5 reply has gone out. */
+function deferBounty(job: BountyJob) {
+  after(async () => {
+    await runBountyCommand(job, {
+      openBounties: (crewId) => getOpenBounties({ crewId }),
+      claimedBy: getClaimedBounties,
+      // Same as the web claim route: an onboarded user row, then the shared claim rules.
+      claim: async (discordId, bountyId): Promise<BountyRow> => {
+        await requireOnboarded(discordId);
+        return claimBounty(discordId, bountyId);
+      },
+      giveUp: giveUpBounty,
+      isMember: async (id) => !!(await fetchMemberIdByDiscordId(id)),
+      crewLabels: getCrewLabelMap,
+      appUrl: appUrl(),
+    });
+  });
+}
+
+/** `#id · N $PEP · description`, at most 100 characters (Discord's limit for a choice name). */
+const bountyChoice = (b: { id: number; reward: number; description: string }) => ({
+  name: `#${b.id} · ${b.reward.toLocaleString("en-US")} $PEP · ${b.description.replace(/\s+/g, " ").trim()}`.slice(0, 100),
+  value: b.id,
+});
+
+/** Autocomplete for /bounty: crews (list), open bounties that aren't yours (claim), your claims (giveup). */
+async function bountyChoices(kind: "crew" | "claim" | "giveup", discordId: string, query: string): Promise<Array<{ name: string; value: string | number }>> {
+  if (kind === "crew") return progressCrewChoices(query);
+  const q = query.trim().toLowerCase().replace(/^#/, "");
+  const textMatch = q ? [{ description: { contains: q, mode: "insensitive" as const } }, ...(/^\d{1,9}$/.test(q) ? [{ id: Number(q) }] : [])] : undefined;
+  const rows = await prisma.bounty.findMany({
+    where:
+      kind === "claim"
+        ? { status: "OPEN", createdBy: { not: discordId }, ...(textMatch ? { OR: textMatch } : {}) }
+        : { claimedBy: discordId, status: { in: ["CLAIMED", "SUBMITTED"] }, ...(textMatch ? { OR: textMatch } : {}) },
+    orderBy: { createdAt: "desc" },
+    take: 25,
+    select: { id: true, reward: true, description: true },
+  });
+  return rows.map(bountyChoice);
+}
+
 /** Autocomplete for the /progress crew option: crews whose label or id contains the query. */
 async function progressCrewChoices(query: string): Promise<Array<{ name: string; value: string }>> {
   const q = query.trim().toLowerCase();
@@ -279,6 +332,7 @@ function deps(guildId: string | undefined, settings: Settings): HandlerDeps {
     missions: { rateLimit: missionsRateLimit, defer: deferMissions },
     memberCommands: { enabled: (name) => toggleEnabled(MEMBER_COMMAND_TOGGLES[name]), rateLimit: memberCommandRateLimit, defer: deferMemberCommand },
     progress: { enabled: progressEnabled, rateLimit: progressRateLimit, defer: deferProgress, crewChoices: progressCrewChoices },
+    bounty: { enabled: () => toggleEnabled("discord.bountyCommandEnabled"), rateLimit: bountyRateLimit, defer: deferBounty, choices: bountyChoices },
     live: {
       enabled: () => liveCommandEnabled(),
       canRun: (roles) =>
