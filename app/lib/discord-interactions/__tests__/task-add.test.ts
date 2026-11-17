@@ -7,6 +7,10 @@ describe('cleanTaskText', () => {
     expect(cleanTaskText('  Print \n\n the\tflyers  ')).toEqual({ ok: true, label: 'Print the flyers' })
   })
 
+  it('strips bidi isolates and zero-width spaces before collapsing whitespace', () => {
+    expect(cleanTaskText('\u2066Print\u2069 \u200b the flyers')).toEqual({ ok: true, label: 'Print the flyers' })
+  })
+
   it('strips control and zero-width characters', () => {
     expect(cleanTaskText('Pri​nt\u0007 fly⁠ers')).toEqual({ ok: true, label: 'Print flyers' })
   })

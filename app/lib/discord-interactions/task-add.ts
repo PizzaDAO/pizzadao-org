@@ -21,8 +21,8 @@ export type Checked<T> = ({ ok: true } & T) | { ok: false; error: string }
 export function cleanTaskText(raw: unknown): Checked<{ label: string }> {
   if (typeof raw !== 'string') return { ok: false, error: 'Say what needs doing.' }
   const label = raw
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u00ad\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff]/g, '')
     .replace(/\s+/g, ' ')
-    .replace(/[\u0000-\u001f\u007f-\u009f​-‏‪-‮⁠-⁤﻿]/g, '')
     .trim()
   const len = Array.from(label).length
   if (len < TASK_MIN_CHARS) return { ok: false, error: `Describe the task in at least ${TASK_MIN_CHARS} characters.` }
