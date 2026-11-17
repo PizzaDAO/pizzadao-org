@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, vi } from 'vitest'
 import { handleInteraction, type HandlerDeps } from '../handle'
-import { PEP_COMMANDS } from '../commands'
+import { BOUNTY_COMMAND } from '../commands'
 import { buildBountyReply, renderList, runBountyCommand, type BountyDeps, type BountyJob, type BountyRow } from '../bounty-command'
 import { ConflictError, NotFoundError, ValidationError } from '@/app/lib/errors/api-errors'
 import { TOGGLES } from '@/app/lib/settings/toggles'
@@ -12,7 +12,7 @@ const APP = 'https://app.example.org'
 
 describe('registration', () => {
   type Opt = { type: number; name: string; description: string; options?: readonly Opt[]; max_length?: number }
-  const bounty = (PEP_COMMANDS as readonly { name: string; description: string; options?: readonly Opt[]; dm_permission?: boolean }[]).find((c) => c.name === 'bounty')!
+  const bounty = BOUNTY_COMMAND as unknown as { name: string; description: string; options?: readonly Opt[]; dm_permission?: boolean }
 
   it('has the four subcommands, guild only', () => {
     expect(bounty.options?.map((o) => o.name)).toEqual(['list', 'claim', 'mine', 'giveup'])

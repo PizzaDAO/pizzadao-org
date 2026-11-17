@@ -170,20 +170,26 @@ export const PEP_COMMANDS = [
     ],
     dm_permission: false,
   },
-  {
-    // Deferred and ephemeral (type 5, flags 64): open bounties and claiming, the same rules as the website.
-    // Answers "not enabled" until discord.bountyCommandEnabled.
-    name: 'bounty',
-    description: 'Open bounties: see them, claim one, see yours or give one up (only you see the reply)',
-    options: [
-      { type: SUB_COMMAND, name: 'list', description: 'Open bounties, newest first', options: [{ type: STRING, name: 'crew', description: 'Only this crew’s bounties', required: false, autocomplete: true, max_length: 80 }] },
-      { type: SUB_COMMAND, name: 'claim', description: 'Claim an open bounty', options: [{ type: INTEGER, name: 'bounty', description: 'Which bounty (pick one or type its id number)', required: true, autocomplete: true, min_value: 1 }] },
-      { type: SUB_COMMAND, name: 'mine', description: 'Bounties you have claimed' },
-      { type: SUB_COMMAND, name: 'giveup', description: 'Give up a bounty you claimed', options: [{ type: INTEGER, name: 'bounty', description: 'Which bounty', required: true, autocomplete: true, min_value: 1 }] },
-    ],
-    dm_permission: false,
-  },
 ] as const
+
+/**
+ * /bounty is NOT registered (the owner turned it off): it is left out of PEP_COMMANDS so
+ * register-commands.mjs does not bring it back. The handler and this definition stay, so re-adding
+ * it is one line in PEP_COMMANDS.
+ */
+export const BOUNTY_COMMAND = {
+  // Deferred and ephemeral (type 5, flags 64): open bounties and claiming, the same rules as the website.
+  // Answers "not enabled" until discord.bountyCommandEnabled.
+  name: 'bounty',
+  description: 'Open bounties: see them, claim one, see yours or give one up (only you see the reply)',
+  options: [
+    { type: SUB_COMMAND, name: 'list', description: 'Open bounties, newest first', options: [{ type: STRING, name: 'crew', description: 'Only this crew’s bounties', required: false, autocomplete: true, max_length: 80 }] },
+    { type: SUB_COMMAND, name: 'claim', description: 'Claim an open bounty', options: [{ type: INTEGER, name: 'bounty', description: 'Which bounty (pick one or type its id number)', required: true, autocomplete: true, min_value: 1 }] },
+    { type: SUB_COMMAND, name: 'mine', description: 'Bounties you have claimed' },
+    { type: SUB_COMMAND, name: 'giveup', description: 'Give up a bounty you claimed', options: [{ type: INTEGER, name: 'bounty', description: 'Which bounty', required: true, autocomplete: true, min_value: 1 }] },
+  ],
+  dm_permission: false,
+} as const
 
 export type PepCommandName = (typeof PEP_COMMANDS)[number]['name']
 
