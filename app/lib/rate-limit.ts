@@ -52,6 +52,8 @@ export const RATE_LIMITS = {
   "bounty-command": { limit: 10, windowSec: 60 },
   // /task (list, claim, mine, drop): per member.
   "task-command": { limit: 10, windowSec: 60 },
+  // /task add (writes a crew task): per member, on top of task-command.
+  "task-add": { limit: 5, windowSec: 10 * 60 },
   // /metalhead (spoken call updates and their controls): per member.
   "metalhead-command": { limit: 10, windowSec: 60 },
   // Admin voice samples for the spoken call updates (each one is a paid text-to-speech call).

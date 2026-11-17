@@ -8,7 +8,10 @@ import { prisma } from '@/app/lib/db'
 import { getCrewMappings, getPriorityRank, isClosedStage } from '@/app/lib/crew-mappings'
 import { realCrews } from '@/app/lib/crew-id'
 import { usesDb } from '@/app/lib/sheets-import/source'
+import { leadCrewIds } from '@/app/lib/crew-leads'
+import { ADMIN_ROLE_IDS } from '@/app/ui/constants'
 import { cutChars } from './text'
+import { normalizeForDedupe } from './task-add'
 import type { TaskRow } from './task-command'
 
 /** Stages that close a task (mirror of isClosedStage), for the database filter. */
@@ -85,4 +88,30 @@ export async function taskPickChoices(kind: 'claim' | 'drop', memberId: string |
     select: SELECT,
   })
   return rows.filter((r) => r.label.trim() && !isClosedStage(r.stage)).map((r) => taskChoice(r, labels))
+}
+
+/** An open (not archived, not closed) task of the crew whose normalized label equals `label`, or null. */
+export async function findOpenDuplicate(crewId: string, label: string): Promise<TaskRow | null> {
+  const key = normalizeForDedupe(label)
+  if (!key) return null
+  const rows = await prisma.crewTask.findMany({ where: { crewId, archived: false, ...notClosed }, select: SELECT })
+  const hit = rows.find((r) => !isClosedStage(r.stage) && normalizeForDedupe(r.label) === key)
+  return hit ? toRow(hit) : null
+}
+
+/**
+ * /task add's `crew` choices: real crews whose tasks are in the database (a sheet crew is refused in
+ * the deferred step), the ones the caller can manage first (alphabetical), then the rest. Admin roles
+ * mean every crew is manageable; otherwise the caller's lead crews come from `leadCrewIds`. Only a
+ * hint: permission is always checked by canManageCrew when the command runs.
+ */
+export async function addCrewChoices(memberId: string | null, query: string, roles: string[] = []): Promise<Array<{ name: string; value: string }>> {
+  const { ids, labels } = await dbCrewIds()
+  const q = query.trim().toLowerCase()
+  const isAdmin = roles.some((r) => (ADMIN_ROLE_IDS as readonly string[]).includes(r))
+  const mine = isAdmin ? new Set(ids) : await leadCrewIds(memberId)
+  const byLabel = (a: string, b: string) => (labels.get(a) ?? a).localeCompare(labels.get(b) ?? b)
+  const shown = ids.filter((id) => !q || (labels.get(id) ?? id).toLowerCase().includes(q) || id.includes(q))
+  const ordered = [...shown.filter((id) => mine.has(id)).sort(byLabel), ...shown.filter((id) => !mine.has(id)).sort(byLabel)]
+  return ordered.slice(0, 25).map((id) => ({ name: cutChars(labels.get(id) ?? id, 100), value: id }))
 }

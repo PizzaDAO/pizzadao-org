@@ -1,5 +1,5 @@
 /**
- * /task list | claim | mine | drop: the deferred half. The interaction handler answers within
+ * /task list | claim | mine | drop | add: the deferred half. The interaction handler answers within
  * Discord's 3 s window with a deferred EPHEMERAL reply (type 5, flags 64); this runs afterwards
  * (route: after()) and edits the reply in via the interaction webhook:
  *
@@ -16,7 +16,7 @@ import type { ClaimResult } from '@/app/lib/crews/claim-task'
 
 const API = 'https://discord.com/api/v10'
 
-export const TASK_SUBCOMMANDS = ['list', 'claim', 'mine', 'drop'] as const
+export const TASK_SUBCOMMANDS = ['list', 'claim', 'mine', 'drop', 'add'] as const
 export type TaskSub = (typeof TASK_SUBCOMMANDS)[number]
 
 /** The CrewTask columns the replies need. */
@@ -39,6 +39,12 @@ export interface TaskJob {
   crewId?: string
   /** The `task` option of `claim` / `drop` (a CrewTask id from autocomplete). */
   taskId?: string
+  /** `add`: the cleaned task text, optional priority (Top | High | Mid | Low) and ISO due date. */
+  label?: string
+  priority?: string | null
+  due?: string | null
+  /** `add`: the Discord interaction id, kept in the audit event. */
+  interactionId?: string
   applicationId: string
   token: string
   author?: EmbedAuthor
@@ -54,6 +60,14 @@ export interface TaskDeps {
   isMember: (discordId: string) => Promise<boolean>
   /** Crew id to display label. */
   crewLabels: () => Promise<Map<string, string>>
+  /** `add`: lead of the crew, or guild admin (the crew page editor's rule). Fails closed. */
+  canManageCrew: (discordId: string, crewId: string) => Promise<boolean>
+  /** `add`: where the crew's tasks live; `unknown` means not a real crew. */
+  crewSource: (crewId: string) => Promise<'db' | 'sheet' | 'unknown'>
+  /** `add`: an open (not archived, not closed) task of this crew with the same normalized label. */
+  findOpenDuplicate: (crewId: string, label: string) => Promise<TaskRow | null>
+  /** `add`: writes the task and its audit event (createCrewTask); returns the new task id. */
+  create: (crewId: string, input: { label: string; priority: string | null; due: string | null }, actor: string, eventData: Record<string, unknown>) => Promise<string>
   appUrl: string
   fetchImpl?: typeof fetch
 }
@@ -137,6 +151,55 @@ export function renderDropped(task: { label: string }, author?: EmbedAuthor): Em
   return makeEmbed('success', `You dropped ${shortText(task.label, LABEL_CHARS)}.`, "It's open for anyone again.", { author })
 }
 
+/** `Added to Crew: label · High · due Dec 5`, with how to sign up. */
+export function renderAdded(task: TaskRow, appUrl: string, labels: Map<string, string>, author?: EmbedAuthor): Embed {
+  const parts = [shortText(task.label, LABEL_CHARS)]
+  const p = priorityLabel(task.priority)
+  if (p) parts.push(p)
+  const d = dueLabel(task.due)
+  if (d) parts.push(`due ${d}`)
+  return makeEmbed('success', `Added to ${crewName(labels, task.crewId)}: ${parts.join(' · ')}`, `Anyone can sign up with \`/task claim\`.\n\n${link('Open the crew page', crewUrl(appUrl, task.crewId))}`, { author })
+}
+
+export function renderDuplicate(task: TaskRow, appUrl: string, labels: Map<string, string>, author?: EmbedAuthor): Embed {
+  return makeEmbed('error', "That's already on the list:", `${taskLine(task, labels)}\n\n${link('Open the crew page', crewUrl(appUrl, task.crewId))}`, { author })
+}
+
+/** Prisma's unique-constraint error (a double submit that raced past the duplicate check). */
+const isUniqueViolation = (err: unknown) => typeof err === 'object' && err !== null && (err as { code?: unknown }).code === 'P2002'
+
+async function addTask(job: TaskJob, deps: TaskDeps): Promise<Embed> {
+  const { author } = job
+  const crewId = job.crewId
+  const label = job.label
+  if (!crewId || !label) return makeEmbed('error', 'Pick a crew from the list.', undefined, { author })
+  const source = await deps.crewSource(crewId)
+  if (source === 'unknown') return makeEmbed('error', 'Pick a crew from the list.', undefined, { author })
+  // Permission first, then the source, like the crew page editor: non-leads learn nothing about storage.
+  if (!(await deps.canManageCrew(job.discordId, crewId))) {
+    return makeEmbed('error', "Only this crew's leads and admins can add tasks.", `Suggest it in the crew's channel, or open ${link('the crew page', crewUrl(deps.appUrl, crewId))}.`, { author })
+  }
+  if (source === 'sheet') {
+    return makeEmbed('error', "This crew's tasks are still kept in its Google Sheet. Add it there for now.", link('Open the crew page', crewUrl(deps.appUrl, crewId)), { author })
+  }
+  const labels = await deps.crewLabels()
+  const dup = await deps.findOpenDuplicate(crewId, label)
+  if (dup) return renderDuplicate(dup, deps.appUrl, labels, author)
+  const input = { label, priority: job.priority ?? null, due: job.due ?? null }
+  try {
+    // No transaction handle: createCrewTask invalidates the crew mappings cache itself. Crew pages read
+    // tasks uncached and a new task has no lead, so nothing else needs refreshing.
+    const id = await deps.create(crewId, input, job.discordId, { via: 'discord', ...(job.interactionId ? { interactionId: job.interactionId } : {}) })
+    return renderAdded({ id, crewId, label, priority: input.priority, due: input.due }, deps.appUrl, labels, author)
+  } catch (err) {
+    if (isUniqueViolation(err)) {
+      const raced = await deps.findOpenDuplicate(crewId, label)
+      if (raced) return renderDuplicate(raced, deps.appUrl, labels, author)
+    }
+    throw err
+  }
+}
+
 /** Friendlier wording for the refusals claimCrewTask returns (the rest are shown as they are). */
 function friendly(status: number, sub: 'claim' | 'drop', message: string): string {
   if (status === 409 && sub === 'claim') return /closed/i.test(message) ? 'That task is closed.' : 'Someone else signed up for it, or it was closed.'
@@ -175,6 +238,8 @@ export async function buildTaskReply(job: TaskJob, deps: TaskDeps): Promise<Embe
       if (r.status < 500) return makeEmbed('error', friendly(r.status, 'drop', r.error), undefined, { author })
       throw new Error(r.error)
     }
+    case 'add':
+      return addTask(job, deps)
   }
 }
 

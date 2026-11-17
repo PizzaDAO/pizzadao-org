@@ -7,7 +7,11 @@ vi.mock('./member-utils', () => ({ findMemberIdByDiscordId: vi.fn() }))
 vi.mock('./auth-guards', () => ({ isAdminDiscordId: vi.fn() }))
 vi.mock('./crew-roles', () => ({ crewRolesFromDb: vi.fn(async () => false), loadCrewRosterFromDb: vi.fn() }))
 
-import { isLeadStatus, getCrewLeadMemberIds, isCrewLead, canManageCrew, canManageBounty } from './crew-leads'
+const crewRoleFindMany = vi.hoisted(() => vi.fn())
+vi.mock('./db', () => ({ prisma: { crewRole: { findMany: crewRoleFindMany } } }))
+
+import { isLeadStatus, getCrewLeadMemberIds, isCrewLead, canManageCrew, canManageBounty, leadCrewIds } from './crew-leads'
+import { crewRolesFromDb } from './crew-roles'
 import { getCrewMappings } from './crew-mappings'
 import { fetchCrewRoster } from './crew-sheet'
 import { findMemberIdByDiscordId } from './member-utils'
@@ -120,5 +124,32 @@ describe('canManageCrew / canManageBounty', () => {
   it('an admin can for any bounty', async () => {
     mockFn(isAdminDiscordId).mockResolvedValue(true)
     expect(await canManageBounty('boss', { createdBy: 'poster', crewId: null })).toBe(true)
+  })
+})
+
+describe('leadCrewIds (autocomplete hint)', () => {
+  it('returns the crews where the member is a lead, from one CrewRole query', async () => {
+    mockFn(crewRolesFromDb).mockResolvedValueOnce(true)
+    crewRoleFindMany.mockResolvedValueOnce([
+      { crewId: 'ops', status: 'Lead' },
+      { crewId: 'art', status: 'Active' },
+      { crewId: 'web', status: 'Capo' },
+    ])
+    expect([...(await leadCrewIds('m1'))].sort()).toEqual(['ops', 'web'])
+    expect(crewRoleFindMany).toHaveBeenCalledTimes(1)
+    expect(crewRoleFindMany.mock.calls[0][0].where).toEqual({ memberId: 'm1', archived: false })
+  })
+
+  it('gives no preference while rosters are sheet-backed, without a query', async () => {
+    mockFn(crewRolesFromDb).mockResolvedValueOnce(false)
+    expect((await leadCrewIds('m1')).size).toBe(0)
+    expect(crewRoleFindMany).not.toHaveBeenCalled()
+  })
+
+  it('gives no preference without a member id, and fails closed on an error', async () => {
+    expect((await leadCrewIds(null)).size).toBe(0)
+    mockFn(crewRolesFromDb).mockResolvedValueOnce(true)
+    crewRoleFindMany.mockRejectedValueOnce(new Error('db down'))
+    expect((await leadCrewIds('m1')).size).toBe(0)
   })
 })
