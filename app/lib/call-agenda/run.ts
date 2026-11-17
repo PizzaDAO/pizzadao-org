@@ -207,7 +207,9 @@ export async function planAgendas(o: { now?: Date; horizonMs: number; fetchImpl?
     const filteredOut = review
       ? sheet.tasks.length - tasks.length + (reviewResult?.filteredOut ?? 0)
       : sheet.tasks.length - tasks.length + actionItems.length - items.length
-    const bullets = buildAgendaBullets({ tasks, actionItems: items, now, limits: review ? { ...limits, followups: 0 } : limits })
+    // Stale redactions fail closed: the old follow-up bullets would show the same call's items unredacted.
+    const noFollowups = !!review || reviewResult?.skipped === 'stale-redactions'
+    const bullets = buildAgendaBullets({ tasks, actionItems: items, now, limits: noFollowups ? { ...limits, followups: 0 } : limits })
     const link = links.get(crew.id.toLowerCase())
     const crewUrl = link?.url ?? crewPageUrl(crew.id)
     plans.push({

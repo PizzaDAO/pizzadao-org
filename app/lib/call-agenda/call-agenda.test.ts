@@ -396,6 +396,8 @@ describe('runCallAgenda', () => {
       const [p] = await plan()
       expect(p.reviewNote).toBe('stale-redactions')
       expect(p.message).not.toContain('Since last call')
+      // Fails closed: the old follow-up bullets don't bring the same items back.
+      expect(p.message).not.toContain('Book venue')
     })
 
     it('review items dropped by the post filter are counted in filteredOut', async () => {
