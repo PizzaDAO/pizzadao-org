@@ -1,12 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const findMany = vi.fn()
-vi.mock('./db', () => ({ prisma: { member: { findMany: (...a: unknown[]) => findMany(...a) } } }))
+let failNext = false
+vi.mock('./db', () => ({ prisma: { member: { findMany: (...a: unknown[]) => (failNext ? Promise.reject(new Error('down')) : findMany(...a)) } } }))
 
 import { memberNamesByDiscordId } from './member-names'
 
 describe('memberNamesByDiscordId', () => {
-  beforeEach(() => findMany.mockReset())
+  beforeEach(() => { findMany.mockReset(); failNext = false })
 
   it('maps discord ids to trimmed names', async () => {
     findMany.mockResolvedValue([{ id: 'm1', discordId: '111', name: '  Test Chef ' }])
@@ -22,7 +23,7 @@ describe('memberNamesByDiscordId', () => {
   })
 
   it('returns an empty map on a DB error', async () => {
-    findMany.mockRejectedValue(new Error('down'))
+    failNext = true
     expect((await memberNamesByDiscordId(['111'])).size).toBe(0)
   })
 })
