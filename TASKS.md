@@ -12,7 +12,7 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 | calzone-93434 | Add Telegram login | todo | P2 |  |  |  | plans/calzone-93434-telegram-login.md |  | account linking shipped in #128; login itself not built |
 | website-refuse-closed-claims | Website: refuse claiming closed crew tasks | todo | P3 |  | Snax | crews |  |  | follow-up from plans/discord-task-command.md: Discord already refuses closed tasks, the website does not |
 | task-add-row-cap | /task add: refuse adds once a crew has as many active tasks as the crew editor allows (its row limit) | todo | P4 |  | Snax | discord, crews |  |  | review note on #394 |
-| agenda-action-status | Call agenda: list the last call's action items with their status (✅ done / 🔄 in progress, finished links) so calls open by reviewing them | todo | P2 |  | Snax | calls |  |  | depends on recap-action-status (plans/recap-action-status.md) shipping first |
+| agenda-action-status | Call agenda: list the last call's action items with their status (✅ done / 🔄 in progress, finished links) so calls open by reviewing them | doing | P2 |  | Snax | calls | plans/agenda-action-status.md |  | depends on recap-action-status (plans/recap-action-status.md) shipping first |
 | bellpepper-80127 | Idea para dashboard: carpeta para subir memes de pizzadao y bennys xD | todo | P2 |  |  |  |  |  |  |
 | pineapple-84122 | Auto-Invite member to event or one is near their city | todo | P2 |  |  |  | plans/pineapple-84122-nearby-event-invites.md |  |  |
 | pineapple-71302 | add a email claiming system for memebes to claim a unique pizzadao emails | todo | P3 |  |  |  | plans/pineapple-71302-pizzadao-emails.md |  | 2026-10-17: on hold, not yet (Snax) |

@@ -134,6 +134,8 @@ describe('settings registry', () => {
       ['calls.recapMemberLinksEnabled', true],
       ['education.sessionAnnounceEnabled', false],
       ['calls.agendaPostEnabled', false],
+      ['calls.agendaReviewEnabled', false],
+      ['calls.agendaReviewOpenFirst', false],
       ['calls.agendaLinks', ''],
       ['calls.attendanceExcludeIds', ''],
       ['calls.attendanceCrewAliases', 'community = community_call'],

@@ -1039,6 +1039,19 @@ export const SETTINGS = {
     help: 'Post the pre-call agenda to Discord. The CALL_AGENDA_POST_ENABLED env var set to off always wins.',
     confirmOn: 'Upcoming calls will get an agenda post in Discord.',
   }),
+  'calls.agendaReviewEnabled': boolSetting({
+    key: 'calls.agendaReviewEnabled',
+    area: 'calls',
+    label: 'Review last call in the agenda',
+    help: 'Open each pre-call agenda with last call\'s action items and their status (done, in progress), with the finished-work link on done items. In-progress status from members\' follow-ups needs "Live status in call recaps" on; without it only the reviewers\' done marks show. The CALL_AGENDA_REVIEW_ENABLED env var set to off always wins.',
+    confirmOn: 'Pre-call agendas will open with last call\'s action items, and a crew with nothing urgent but a recent call will now get an agenda post.',
+  }),
+  'calls.agendaReviewOpenFirst': boolSetting({
+    key: 'calls.agendaReviewOpenFirst',
+    area: 'calls',
+    label: 'Agenda review: open items first',
+    help: 'On: not-started items first, then in progress, then done. Off: the same order as the call recap. Only used while the agenda review is on.',
+  }),
   'calls.agendaLinks': textSetting({
     key: 'calls.agendaLinks',
     area: 'calls',

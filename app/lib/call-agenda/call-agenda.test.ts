@@ -22,6 +22,7 @@ import { postDiscordMessage, DiscordPostError } from '@/app/lib/discord-rest'
 import { getGuildChannels } from '@/app/lib/discord-channels'
 import { buildAgendaBullets, daysOverdue, parseActionItems, parseAgendaLinks, formatAgendaMessage, agendaTimeZone } from './rank'
 import { clearPostFilterCache } from '@/app/lib/calls/post-filters'
+import { clearSettingsCache } from '@/app/lib/settings'
 import { enqueueMirror } from '@/app/lib/telegram/city-posts'
 import { runCallAgenda, resolveCrewChannel, fetchUpcomingEvents } from './run'
 
@@ -322,5 +323,181 @@ describe('runCallAgenda', () => {
     const { planAgendas } = await import('./run')
     const [plan] = await planAgendas({ now: NOW, horizonMs: 30 * 60 * 1000, fetchImpl: fetchEvents })
     expect(plan.message.split('\n').at(-1)).toBe('Call guide: https://x/guide')
+  })
+
+  describe('review block (calls.agendaReviewEnabled)', () => {
+    const REC = (items: unknown[], o: Record<string, unknown> = {}) =>
+      ({ id: 'rec1', startedAt: new Date('2026-10-22T15:00:00Z'), actionItems: items, redactionsUpdatedAt: null, summaryGeneratedAt: new Date('2026-10-22T16:00:00Z'), summaryEditedAt: null, redactedSpeakerIds: [], ...o }) as never
+    const plan = async () => {
+      const { planAgendas } = await import('./run')
+      return planAgendas({ now: NOW, horizonMs: 30 * 60 * 1000, fetchImpl: fetchEvents })
+    }
+    const on = () => {
+      process.env.CALL_AGENDA_REVIEW_ENABLED = 'true'
+      clearSettingsCache({ all: true })
+    }
+    beforeEach(() => {
+      delete process.env.CALL_AGENDA_REVIEW_ENABLED
+      clearSettingsCache({ all: true })
+    })
+
+    it('off: the message is exactly the old one and the extra calls are not made', async () => {
+      vi.mocked(prisma.callRecording.findMany).mockResolvedValue([REC([{ text: 'Book venue', owner: 'Ben' }, { text: 'Done thing', done: true }])])
+      const [p] = await plan()
+      const ts = Math.floor(p.startsAt.getTime() / 1000)
+      expect(p.message).toBe(`**Ops call agenda** (starts <t:${ts}:R>)\n- Top priority: Ship thing\n- From last call: Book venue (Ben)\nCrew page: ${p.crewUrl}`)
+      expect(p.review).toBeUndefined()
+      expect(prisma.callRecording.findMany).toHaveBeenCalledTimes(1)
+    })
+
+    it('on: the block comes before the tasks, with no "From last call" bullets', async () => {
+      on()
+      vi.mocked(prisma.callRecording.findMany).mockResolvedValue([
+        REC([{ text: 'Draft guide', owner: 'Ana', done: true, evidence: [{ url: 'https://github.com/o/r/pull/12' }] }, { text: 'Book venue', owner: 'Ben' }]),
+      ])
+      const [p] = await plan()
+      const lines = p.message.split('\n')
+      expect(lines[1]).toMatch(/^\*\*Since last call\*\* \(<t:\d+:d>\)$/)
+      expect(lines.slice(2, 4)).toEqual(['✅ Draft guide (owner: Ana): [PR #12](<https://github.com/o/r/pull/12>)', '- Book venue (owner: Ben)'])
+      expect(lines.slice(4)).toEqual(['**Up next**', '- Top priority: Ship thing', `Crew page: ${p.crewUrl}`])
+      expect(p.message).not.toContain('From last call')
+    })
+
+    it('on, no urgent tasks: the agenda still posts with just the block', async () => {
+      on()
+      vi.mocked(fetchOpenCrewTasksForCrew).mockResolvedValue({ tasks: [], error: false })
+      vi.mocked(prisma.callRecording.findMany).mockResolvedValue([REC([{ text: 'Book venue' }])])
+      const r = await runCallAgenda({ now: NOW, fetchImpl: fetchEvents })
+      expect(r.outcomes[0].status).toBe('posted')
+      const body = vi.mocked(postDiscordMessage).mock.calls[0][1]
+      expect(body.content).toContain('**Since last call**')
+      expect(body.content).not.toContain('Up next')
+    })
+
+    it('on, nothing to review and nothing urgent: still no-items', async () => {
+      on()
+      vi.mocked(fetchOpenCrewTasksForCrew).mockResolvedValue({ tasks: [], error: false })
+      const r = await runCallAgenda({ now: NOW, fetchImpl: fetchEvents })
+      expect(r.outcomes[0].status).toBe('no-items')
+    })
+
+    it('on, the review load fails: the agenda still posts without the block', async () => {
+      on()
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+      vi.mocked(prisma.callRecording.findMany).mockRejectedValue(new Error('db down'))
+      const [p] = await plan()
+      expect(p.review).toBeUndefined()
+      expect(p.message).toContain('Top priority: Ship thing')
+    })
+
+    it('a stale-redaction call is left out and noted for the preview', async () => {
+      on()
+      vi.mocked(prisma.callRecording.findMany).mockResolvedValue([REC([{ text: 'Book venue' }], { redactionsUpdatedAt: new Date('2026-10-28T00:00:00Z') })])
+      const [p] = await plan()
+      expect(p.reviewNote).toBe('stale-redactions')
+      expect(p.message).not.toContain('Since last call')
+    })
+
+    it('review items dropped by the post filter are counted in filteredOut', async () => {
+      on()
+      setFilter({ blockedTerms: ['venue'] })
+      vi.mocked(prisma.callRecording.findMany).mockResolvedValue([REC([{ text: 'Book venue' }, { text: 'Send deck' }])])
+      const [p] = await plan()
+      expect(p.filteredOut).toBe(1)
+      expect(p.message).toContain('Send deck')
+      expect(p.message).not.toContain('venue')
+    })
+
+    it('two events for one crew read the recordings once for the review', async () => {
+      on()
+      const two = [
+        { id: '111111111111111111', name: 'Ops Call', channel_id: '823956905739026442', status: 1, scheduled_start_time: '2026-10-29T15:20:00Z' },
+        { id: '555555555555555555', name: 'Ops Call', channel_id: '823956905739026442', status: 1, scheduled_start_time: '2026-10-29T15:25:00Z' },
+      ]
+      vi.mocked(getCrewMappings).mockResolvedValue({
+        cached: false,
+        crews: [{ id: 'ops', label: 'Ops', turtles: [], event: '111111111111111111,555555555555555555', channel: '555555555555555555', sheet: 'https://docs.google.com/spreadsheets/d/abc/edit' }],
+      })
+      vi.mocked(prisma.callRecording.findMany).mockResolvedValue([REC([{ text: 'Book venue' }])])
+      const { planAgendas } = await import('./run')
+      const plans = await planAgendas({ now: NOW, horizonMs: 30 * 60 * 1000, fetchImpl: (async () => ({ ok: true, status: 200, json: async () => two })) as unknown as typeof fetch })
+      // Review: one findMany per crew; the old follow-up lookup runs per event.
+      const reviewCalls = vi.mocked(prisma.callRecording.findMany).mock.calls.filter(([a]) => (a as { select?: { redactionsUpdatedAt?: boolean } }).select?.redactionsUpdatedAt)
+      if (plans.length === 2) expect(reviewCalls).toHaveLength(1)
+      else expect(reviewCalls.length).toBeLessThanOrEqual(1)
+    })
+
+    it('cron path skips the review for an occurrence that is already posted; the preview still loads it', async () => {
+      on()
+      vi.mocked(prisma.callAgendaPost.findFirst).mockResolvedValue({ id: 'x' } as never)
+      vi.mocked(prisma.callRecording.findMany).mockResolvedValue([REC([{ text: 'Book venue' }])])
+      await runCallAgenda({ now: NOW, fetchImpl: fetchEvents })
+      expect(vi.mocked(prisma.callRecording.findMany).mock.calls.filter(([a]) => (a as { select?: { redactionsUpdatedAt?: boolean } }).select?.redactionsUpdatedAt)).toHaveLength(0)
+      const [p] = await plan()
+      expect(p.review).toBeDefined()
+    })
+
+    it('the Telegram copy shows (label) instead of the masked link', async () => {
+      on()
+      vi.mocked(prisma.callRecording.findMany).mockResolvedValue([REC([{ text: 'Draft guide', done: true, evidence: [{ url: 'https://github.com/o/r/pull/12' }] }])])
+      const [p] = await plan()
+      const { toPlainPost } = await vi.importActual<typeof import('@/app/lib/telegram/city-posts')>('@/app/lib/telegram/city-posts')
+      const plain = toPlainPost(p.message)
+      expect(plain).toContain('(PR #12)')
+      expect(plain).not.toContain('](<')
+    })
+  })
+})
+
+describe('formatAgendaMessage with a review block', () => {
+  const START = new Date('2026-10-22T15:00:00Z')
+  const long = (c: string) => c.repeat(150)
+  const items = (n: number, withLink = true) =>
+    Array.from({ length: n }, (_, i) => ({ marker: '✅' as const, text: `${i} ${long('x')} (owner: ${'o'.repeat(40)})`, ...(withLink ? { link: `[PR #${i}](<https://github.com/o/r/pull/${i}>)` } : {}) }))
+  const bullets = Array.from({ length: 7 }, (_, i) => ({ kind: 'priority' as const, text: `High priority: ${i} ${'t'.repeat(110)}` }))
+  const base = { crewLabel: 'Ops', startsAt: NOW, crewUrl: 'https://x/crew/ops' }
+  const review = (n: number, more = 0) => ({ startedAt: START, items: items(n), more, moreUrl: 'https://x/calls/rec1' })
+
+  it('stays within 2000 characters with maximum fixtures, keeping heading and crew link', () => {
+    const m = formatAgendaMessage({ ...base, bullets, review: review(8) })
+    expect(m.length).toBeLessThanOrEqual(2000)
+    expect(m.split('\n')[0]).toContain('Ops call agenda')
+    expect(m.split('\n').at(-1)).toBe('Crew page: https://x/crew/ops')
+  })
+
+  it('gives up links first, then items from the end, then task bullets', () => {
+    const count = (m: string, c: string) => m.split('\n').filter((l) => l.startsWith(c)).length
+    // Links alone push it over: links go from the last item upward until it fits, every item stays.
+    const linksOut = formatAgendaMessage({ ...base, bullets: [], review: review(8) })
+    expect(linksOut.length).toBeLessThanOrEqual(2000)
+    expect(linksOut).toContain('[PR #0]')
+    expect(linksOut).not.toContain('[PR #7]')
+    expect(count(linksOut, '✅')).toBe(8)
+    expect(linksOut).not.toContain('more:')
+    // Longer items: links go, then items from the end; the "+N more" line carries the call page URL.
+    const itemsOut = formatAgendaMessage({ ...base, bullets: [], review: { ...review(8), items: items(8).map((i) => ({ ...i, text: i.text + 'q'.repeat(120) })) } })
+    expect(itemsOut.length).toBeLessThanOrEqual(2000)
+    expect(itemsOut).not.toContain('](<')
+    const kept = count(itemsOut, '✅')
+    expect(kept).toBeLessThan(8)
+    expect(itemsOut).toContain(`+${8 - kept} more: https://x/calls/rec1`)
+    // Task bullets go last, from the end: only when no review item is left to drop.
+    const long = Array.from({ length: 7 }, (_, i) => ({ kind: 'priority' as const, text: `High priority: ${i} ${'t'.repeat(400)}` }))
+    const tasksOut = formatAgendaMessage({ ...base, bullets: long, review: { ...review(0), more: 5 } })
+    expect(tasksOut.length).toBeLessThanOrEqual(2000)
+    expect(tasksOut).toContain('+5 more:')
+    expect(tasksOut).toContain('High priority: 0')
+    expect(tasksOut).not.toContain('High priority: 6')
+    // With both: the review items go before any task does.
+    const both = formatAgendaMessage({ ...base, bullets: long.slice(0, 2), review: { ...review(8), items: items(8) } })
+    expect(both).toContain('High priority: 1')
+  })
+
+  it('shows the +N more line with the call page url and the sub-heading only with both parts', () => {
+    const a = formatAgendaMessage({ ...base, bullets: [], review: review(2, 3) })
+    expect(a).toContain('+3 more: https://x/calls/rec1')
+    expect(a).not.toContain('Up next')
+    const b = formatAgendaMessage({ ...base, bullets: bullets.slice(0, 1), review: review(2) })
+    expect(b).toContain('**Up next**')
   })
 })

@@ -22,7 +22,10 @@ import { toggleEnabled } from '@/app/lib/settings/toggles'
 import { DISCORD_ONLY, importedAllowed } from '@/app/lib/calls/imported'
 import { loadSettings } from '@/app/lib/settings'
 import { enqueueMirror } from '@/app/lib/telegram/city-posts'
+import { resolveToggle } from '@/app/lib/settings/toggles'
+import { recapUrl } from '@/app/lib/calls/recap'
 import { agendaLeadMs, agendaLimits, buildAgendaBullets, formatAgendaMessage, parseActionItems, parseAgendaLinks, type ActionItem, type AgendaBullet } from './rank'
+import { loadAgendaReview, type AgendaReviewData, type ReviewResult, type ReviewSkip } from './review'
 
 const API = 'https://discord.com/api/v10'
 export const DEFAULT_CALL_VOICE_CHANNEL_ID = '823956905739026442'
@@ -135,6 +138,10 @@ export interface PlannedAgenda {
   excluded: boolean
   /** Tasks / last-call items left out of the agenda by the blocked-term filter. */
   filteredOut: number
+  /** The "Since last call" block (only while calls.agendaReviewEnabled is on and the crew has a recent call to review). */
+  review?: AgendaReviewData
+  /** Why the review block is missing while the setting is on (admin preview). */
+  reviewNote?: ReviewSkip
 }
 
 /** A rescheduled event keeps its id but changes startsAt; treat a post within this of the new start as the same call. */
@@ -145,7 +152,7 @@ export function crewPageUrl(crewId: string): string {
 }
 
 /** Build the agendas for upcoming calls within `horizonMs`. Never posts. */
-export async function planAgendas(o: { now?: Date; horizonMs: number; fetchImpl?: typeof fetch; filter?: PostFilter }): Promise<PlannedAgenda[]> {
+export async function planAgendas(o: { now?: Date; horizonMs: number; fetchImpl?: typeof fetch; filter?: PostFilter; forPost?: boolean }): Promise<PlannedAgenda[]> {
   const now = o.now ?? new Date()
   // Throws when the filter cannot be read: better no agenda than an unfiltered one.
   const filter = o.filter ?? (await loadPostFilter())
@@ -157,6 +164,9 @@ export async function planAgendas(o: { now?: Date; horizonMs: number; fetchImpl?
   const { crews } = await getCrewMappings()
   const byId = new Map<string, CrewOption>(crews.map((c) => [c.id, c]))
   const plans: PlannedAgenda[] = []
+  const reviewOn = resolveToggle('calls.agendaReviewEnabled', settings)
+  // One load per crew per run, even with two events in the window.
+  const reviews = new Map<string, Promise<ReviewResult>>()
   for (const ev of events) {
     const hit = resolveCrewForEvent(crews.map((c) => ({ id: c.id, label: c.label, event: c.event })), { eventId: ev.id, eventName: ev.name })
     const crew = hit ? byId.get(hit.crewId) : undefined
@@ -181,8 +191,23 @@ export async function planAgendas(o: { now?: Date; horizonMs: number; fetchImpl?
     // Drop tasks / last-call items that mention a blocked term before ranking.
     const tasks = sheet.tasks.filter((t) => !mentionsBlockedTerm(t.label, filter))
     const items = actionItems.filter((a) => !mentionsBlockedTerm(a.text, filter) && !mentionsBlockedTerm(a.owner, filter))
-    const filteredOut = sheet.tasks.length - tasks.length + actionItems.length - items.length
-    const bullets = buildAgendaBullets({ tasks, actionItems: items, now, limits })
+    // The review block lists last call's items itself, so the old "From last call" bullets would repeat them.
+    // The cron path skips the load for an occurrence that is already posted; the preview still shows it.
+    let reviewResult: ReviewResult | null = null
+    if (reviewOn && !(o.forPost && posted)) {
+      let pending = reviews.get(crew.id)
+      if (!pending) {
+        pending = loadAgendaReview(crew.id, { now, eventStart: ev.startsAt, filter, settings, chars: limits.chars })
+        reviews.set(crew.id, pending)
+      }
+      reviewResult = await pending
+    }
+    const review = reviewResult?.review ?? undefined
+    // With the block shown, the old follow-up bullets are off, so only the block's own drops count for last-call items.
+    const filteredOut = review
+      ? sheet.tasks.length - tasks.length + (reviewResult?.filteredOut ?? 0)
+      : sheet.tasks.length - tasks.length + actionItems.length - items.length
+    const bullets = buildAgendaBullets({ tasks, actionItems: items, now, limits: review ? { ...limits, followups: 0 } : limits })
     const link = links.get(crew.id.toLowerCase())
     const crewUrl = link?.url ?? crewPageUrl(crew.id)
     plans.push({
@@ -194,11 +219,16 @@ export async function planAgendas(o: { now?: Date; horizonMs: number; fetchImpl?
       channelRaw: crew.channel ?? null,
       crewUrl,
       bullets,
-      message: formatAgendaMessage({ crewLabel: crew.label, startsAt: ev.startsAt, bullets, crewUrl, linkLabel: link?.label }),
+      message: formatAgendaMessage({
+        crewLabel: crew.label, startsAt: ev.startsAt, bullets, crewUrl, linkLabel: link?.label,
+        review: review ? { startedAt: review.startedAt, items: review.items, more: review.more, moreUrl: recapUrl(review.recordingId) } : undefined,
+      }),
       alreadyPosted: !!posted,
       sheetError: sheet.error,
       excluded: false,
       filteredOut,
+      ...(review ? { review } : {}),
+      ...(reviewResult?.skipped ? { reviewNote: reviewResult.skipped } : {}),
     })
   }
   return plans
@@ -235,7 +265,7 @@ async function processPlan(p: PlannedAgenda, token: string): Promise<AgendaOutco
   // Sheet unreadable: do not claim, so the next run retries (an empty list from a healthy sheet is 'no-items').
   if (p.sheetError) return { ...base, status: 'sheet-error' }
   // Nothing urgent: say nothing rather than post filler. Not recorded, so it is re-checked next run.
-  if (p.bullets.length === 0) return { ...base, status: 'no-items' }
+  if (p.bullets.length === 0 && !p.review) return { ...base, status: 'no-items' }
   const channelId = await resolveCrewChannel(p.channelRaw ?? undefined)
   if (!channelId) return { ...base, status: 'no-channel' }
   // Claim first: concurrent or repeated runs lose the unique constraint and skip.
@@ -271,7 +301,7 @@ async function processPlan(p: PlannedAgenda, token: string): Promise<AgendaOutco
 export async function runCallAgenda(o: { now?: Date; fetchImpl?: typeof fetch } = {}): Promise<RunResult> {
   if (!(await callAgendaEnabled())) return { status: 'disabled', outcomes: [] }
   const token = process.env.DISCORD_BOT_TOKEN?.trim() ?? ''
-  const plans = await planAgendas({ now: o.now, horizonMs: agendaLeadMs(await loadSettings()), fetchImpl: o.fetchImpl })
+  const plans = await planAgendas({ now: o.now, horizonMs: agendaLeadMs(await loadSettings()), fetchImpl: o.fetchImpl, forPost: true })
   const outcomes: AgendaOutcome[] = []
   for (const p of plans) {
     try {

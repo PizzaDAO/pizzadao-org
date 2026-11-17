@@ -44,11 +44,12 @@ export default async function AgendaPreview() {
                             {p.filteredOut > 0 && <p className="m-0 text-sm text-tomato">{t("agendaOmitted", { count: p.filteredOut })}</p>}
                             {p.excluded ? (
                                 <p className="m-0 text-foreground/60">{t("agendaExcludedNote")}</p>
-                            ) : p.bullets.length === 0 ? (
+                            ) : p.bullets.length === 0 && !p.review ? (
                                 <p className="m-0 text-foreground/60">{t("agendaNoItems")}</p>
                             ) : (
                                 <pre className="m-0 whitespace-pre-wrap text-sm font-sans">{p.message}</pre>
                             )}
+                            {!p.excluded && p.reviewNote && <p className="m-0 text-sm text-foreground/60">{t(p.reviewNote === "stale-redactions" ? "agendaReviewStale" : p.reviewNote === "filtered" ? "agendaReviewFiltered" : "agendaReviewNone")}</p>}
                             {!p.excluded && <UpdatesScriptPanel crewId={p.crewId} />}
                         </article>
                     ))}
