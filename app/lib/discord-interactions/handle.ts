@@ -18,6 +18,7 @@ import type { IncomeResult } from '../pep-earn/income'
 import type { BlackjackMove, BlackjackStart, BlackjackView } from '../pep-games/blackjack'
 import { SLOT_EMOJI, type SlotSymbol } from '../pep-games/slots'
 import { EPHEMERAL, InteractionType, ResponseType } from './commands'
+import { sliceUnits } from '../display-name'
 import { authorFor, displayName, makeEmbed, numbered, roleLabel, type Embed, type EmbedAuthor, type EmbedField, type Tone } from './embeds'
 import { handleReviewButton, handleReviewModal, type MissionReviewDeps } from './mission-review'
 import type { MemberCommandJob, MemberCommandName } from './member-commands'
@@ -85,6 +86,8 @@ type Spin<T> = Promise<({ ok: true; bet: number; balance: number; payout: number
 
 export interface HandlerDeps {
   guildId: string | undefined
+  /** PizzaDAO member name for a Discord id (null if none). Optional; used for the embed author line. */
+  memberName?: (discordId: string) => Promise<string | null>
   /** Currency label, e.g. the guild's <:pepperoni:...> emoji. */
   currency?: string
   getWallet: (discordId: string) => Promise<number>
@@ -248,7 +251,7 @@ const NO_PINGS: AllowedMentions = { parse: [] }
 
 /** Builds replies with the invoking member as the embed author. */
 class Out {
-  constructor(private readonly author: EmbedAuthor | undefined) {}
+  constructor(readonly author: EmbedAuthor | undefined) {}
 
   embed(tone: Tone, headline: string, body?: string, fields?: EmbedField[]): Embed {
     return makeEmbed(tone, headline, body, { author: this.author, fields })
@@ -294,9 +297,35 @@ class Out {
 
 const opt = (i: Interaction, name: string) => i.data?.options?.find((o) => o.name === name)?.value
 
+const MEMBER_NAME_BUDGET_MS = 300
+
+/** Member-name lookup with a hard time budget; null on timeout, error, or no name. */
+async function lookupMemberName(fn: (id: string) => Promise<string | null>, id: string): Promise<string | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    const name = await Promise.race([
+      fn(id),
+      new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), MEMBER_NAME_BUDGET_MS) }),
+    ])
+    return typeof name === 'string' && name.trim() ? name.trim() : null
+  } catch {
+    return null
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
 export async function handleInteraction(i: Interaction, deps: HandlerDeps): Promise<InteractionResponse> {
   if (i.type === InteractionType.PING) return { type: ResponseType.PONG }
-  const out = new Out(authorFor(i.member ? { ...i.member, guildId: i.guild_id } : i.user ? { user: i.user } : undefined))
+  const invoker = i.member ? { ...i.member, guildId: i.guild_id } : i.user ? { user: i.user } : undefined
+  const author = authorFor(invoker)
+  // DM follow-up / reminder buttons build their own replies, so they skip the name lookup.
+  const dmButton = (i.type === InteractionType.MESSAGE_COMPONENT || i.type === InteractionType.MODAL_SUBMIT) && (isFollowUpInteraction(i) || isReminderInteraction(i))
+  if (author && deps.memberName && invoker?.user?.id && i.type !== InteractionType.AUTOCOMPLETE && !dmButton) {
+    const name = await lookupMemberName(deps.memberName, invoker.user.id)
+    if (name) author.name = sliceUnits(name, 256)
+  }
+  const out = new Out(author)
   const known: number[] = [
     InteractionType.APPLICATION_COMMAND,
     InteractionType.MESSAGE_COMPONENT,
@@ -376,7 +405,7 @@ async function startLive(i: Interaction, deps: HandlerDeps, out: Out, raw: unkno
     applicationId: i.application_id,
     token: i.token,
     ...(stream ? { stream } : {}),
-    author: authorFor(i.member ? { ...i.member, guildId: i.guild_id } : undefined),
+    author: out.author,
   })
   return { type: ResponseType.DEFERRED_CHANNEL_MESSAGE, data: { flags: EPHEMERAL, allowed_mentions: NO_PINGS } }
 }
@@ -501,7 +530,7 @@ async function command(i: Interaction, userId: string, deps: HandlerDeps, cur: s
         roles: i.member?.roles ?? [],
         applicationId: i.application_id,
         token: i.token,
-        author: authorFor(i.member ? { ...i.member, guildId: i.guild_id } : undefined),
+        author: out.author,
       })
       // "Pepperoni Bot is thinking..." (ephemeral); the result is edited in.
       return { type: ResponseType.DEFERRED_CHANNEL_MESSAGE, data: { flags: EPHEMERAL } }
@@ -526,7 +555,7 @@ async function command(i: Interaction, userId: string, deps: HandlerDeps, cur: s
         ...(typeof target === 'string' ? { targetDiscordId: target } : {}),
         applicationId: i.application_id,
         token: i.token,
-        author: authorFor(i.member ? { ...i.member, guildId: i.guild_id } : undefined),
+        author: out.author,
       })
       // "Metalhead is thinking..." (only you see it); the reply is edited in.
       return { type: ResponseType.DEFERRED_CHANNEL_MESSAGE, data: { flags: EPHEMERAL } }
@@ -542,7 +571,7 @@ async function command(i: Interaction, userId: string, deps: HandlerDeps, cur: s
         applicationId: i.application_id,
         token: i.token,
         ...(typeof crew === 'string' && crew.trim() ? { crew: crew.trim().slice(0, 80) } : {}),
-        author: authorFor(i.member ? { ...i.member, guildId: i.guild_id } : undefined),
+        author: out.author,
       })
       // "Metalhead is thinking..." (public); the report is edited in.
       return { type: ResponseType.DEFERRED_CHANNEL_MESSAGE, data: { allowed_mentions: NO_PINGS } }
@@ -592,7 +621,7 @@ async function command(i: Interaction, userId: string, deps: HandlerDeps, cur: s
         ...(typeof callOpt === 'string' && callOpt.trim() ? { call: callOpt.trim().slice(0, 100) } : {}),
         applicationId: i.application_id,
         token: i.token,
-        author: authorFor(member),
+        author: out.author,
       })
       // "Metalhead is thinking..." (only you see it); the reply is edited in.
       return { type: ResponseType.DEFERRED_CHANNEL_MESSAGE, data: { flags: EPHEMERAL } }
@@ -625,7 +654,7 @@ async function command(i: Interaction, userId: string, deps: HandlerDeps, cur: s
         ...(bountyId ? { bountyId } : {}),
         applicationId: i.application_id,
         token: i.token,
-        author: authorFor(i.member ? { ...i.member, guildId: i.guild_id } : undefined),
+        author: out.author,
       })
       // "Pepperoni Bot is thinking..." (only you see it); the reply is edited in.
       return { type: ResponseType.DEFERRED_CHANNEL_MESSAGE, data: { flags: EPHEMERAL } }
@@ -675,7 +704,7 @@ async function command(i: Interaction, userId: string, deps: HandlerDeps, cur: s
         ...(add && i.id ? { interactionId: i.id } : {}),
         applicationId: i.application_id,
         token: i.token,
-        author: authorFor(i.member ? { ...i.member, guildId: i.guild_id } : undefined),
+        author: out.author,
       })
       // "Pepperoni Bot is thinking..." (only you see it); the reply is edited in.
       return { type: ResponseType.DEFERRED_CHANNEL_MESSAGE, data: { flags: EPHEMERAL } }
