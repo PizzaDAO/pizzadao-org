@@ -11,6 +11,7 @@ vi.mock("next/headers", () => ({ cookies: async () => ({ has: () => state.hasCoo
 vi.mock("@/app/api/profile-summary/[id]/route", () => ({
     composeProfileSummary: vi.fn(async () => ({ hero: { name: "Light" }, crewIds: [], about: {} })),
     getPublicProfileSummary: vi.fn(async () => ({ hero: { name: "Full" } })),
+    isIncompleteSummary: (s: { incomplete?: boolean } | null) => !!s?.incomplete,
     withDeadline: async (p: Promise<unknown>) => (state.timedOut ? { value: null, timedOut: true } : { value: await p, timedOut: false }),
 }));
 vi.mock("./profile-page-data", () => ({
@@ -43,6 +44,13 @@ describe("profile page first paint", () => {
         const p = await render();
         expect(p.initialSummary).toEqual({ hero: { name: "Full" } });
         expect(afterFn).not.toHaveBeenCalled();
+    });
+
+    it("marks an incomplete summary (a deadline was missed) partial so the client refetches at once", async () => {
+        vi.mocked(getPublicProfileSummary).mockResolvedValueOnce({ hero: { name: "Inc" }, incomplete: true } as never);
+        const p = await render();
+        expect(p.initialSummary?.hero.name).toBe("Inc");
+        expect(p.initialSummary?.partial).toBe(true);
     });
 
     it("past the budget paints the light hero as a partial summary and lets the full compose finish", async () => {

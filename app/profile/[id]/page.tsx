@@ -8,7 +8,7 @@
 // handling, owner banner, etc.) lives in <ProfileClient/>.
 
 import type { Metadata } from "next";
-import { composeProfileSummary, getPublicProfileSummary } from "@/app/api/profile-summary/[id]/route";
+import { composeProfileSummary, getPublicProfileSummary, isIncompleteSummary } from "@/app/api/profile-summary/[id]/route";
 import { ProfileClient } from "./ProfileClient";
 import type { ProfileSummaryData } from "@/app/lib/hooks/use-api";
 import { getSession } from "@/app/lib/session";
@@ -122,6 +122,9 @@ export default async function ProfilePage({
         loadProfilePrefill(id, { anonymous: !hasSession }),
     ]);
     let initialSummary = summaryResult.value;
+    // A summary that missed a deadline (rank, member-since, Discord activity) is not final: mark it
+    // partial so the client refetches at once instead of treating it as fresh.
+    if (initialSummary && isIncompleteSummary(initialSummary)) initialSummary = { ...initialSummary, partial: true };
     if (summaryResult.timedOut) after(() => full.then(() => undefined, () => undefined));
     if (!initialSummary) {
         const light = await loadHero(id);

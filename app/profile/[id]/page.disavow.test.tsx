@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 vi.mock("@/app/api/profile-summary/[id]/route", () => ({
     composeProfileSummary: vi.fn(async () => null),
     getPublicProfileSummary: vi.fn(async () => null),
+    isIncompleteSummary: () => false,
     withDeadline: async (p: Promise<unknown>) => ({ value: await p, timedOut: false }),
 }));
 vi.mock("./profile-page-data", () => ({

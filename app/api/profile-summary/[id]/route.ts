@@ -13,7 +13,7 @@
 
 import { NextRequest, NextResponse, after } from "next/server";
 import { getSession } from "@/app/lib/session";
-import { fetchMemberById, fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
+import { fetchMemberById, fetchMemberIdByDiscordId, type MemberSheetData } from "@/app/lib/sheets/member-repository";
 import { getUserProgressSummary } from "@/app/lib/missions";
 import { getMafiaRank } from "@/app/lib/mafia-points";
 import { getVouchCounts } from "@/app/lib/vouches";
@@ -176,10 +176,11 @@ export interface ComposeOptions {
      */
     light?: boolean;
     /**
-     * Do not extend the request with `after()` for lookups that missed their deadline; the caller
-     * does it (via `pendingLookups`). Used inside unstable_cache, where `after()` is not available.
+     * Inputs read by the caller. composeViaSharedCache reads the member row and crew mappings
+     * OUTSIDE unstable_cache and passes them in, because the loaders behind them have their own
+     * cache and Next skips (or forces no-store on) a cache nested inside another one.
      */
-    deferKeepAlive?: boolean;
+    inputs?: { member: MemberSheetData | null; crewMappings: { crews: CrewOption[]; cached: boolean } };
 }
 
 /** How long the profile waits for a cold mafia rank (Discord + Alchemy + POAP calls, ~4s). */
@@ -223,24 +224,23 @@ function keepAlive(p: Promise<unknown>) {
     }
 }
 
-/** Set when the summary was composed without a mafia rank because it was still computing. */
+/** Set when the summary was composed without a lookup that missed its deadline (rank, member-since, Discord activity). */
 const INCOMPLETE = new WeakSet<ProfileSummary>();
-/** Lookups still running for an incomplete summary composed with deferKeepAlive. */
-const PENDING = new WeakMap<ProfileSummary, Promise<unknown>[]>();
+
+/** True for a summary composed with a missed deadline: not cached, and the client must refetch it. */
+export function isIncompleteSummary(s: ProfileSummary | null | undefined): boolean {
+    return !!s && INCOMPLETE.has(s);
+}
 
 export async function composeProfileSummary(
     opts: ComposeOptions
 ): Promise<ProfileSummary | null> {
-    const { memberId, viewerMemberId, light = false, deferKeepAlive = false } = opts;
-    const pending: Promise<unknown>[] = [];
-    const keep = (p: Promise<unknown>) => {
-        if (deferKeepAlive) pending.push(p);
-        else keepAlive(p);
-    };
+    const { memberId, viewerMemberId, light = false, inputs } = opts;
+    const keep = keepAlive;
 
     // Everything below except mission progress is keyed by memberId alone, so it starts now,
     // alongside the member read, instead of waiting for it.
-    const memberPromise = safe(fetchMemberById(memberId), null);
+    const memberPromise = inputs ? Promise.resolve(inputs.member) : safe(fetchMemberById(memberId), null);
 
     // Pull supplementary data in parallel. The cold mafia rank is the slow one, so it gets a
     // deadline: past it the profile renders without the badge and the lookup finishes in the
@@ -292,6 +292,8 @@ export async function composeProfileSummary(
             ),
         light
             ? Promise.resolve({ crews: [] as CrewOption[], cached: false })
+            : inputs
+            ? Promise.resolve(inputs.crewMappings)
             : safe(getCrewMappings(false, { staleWhileRevalidate: true }), { crews: [] as CrewOption[], cached: false }),
         // PR4 — tagline from MemberProfileExtras (Postgres). Wins over the
         // sheet read below when present.
@@ -377,7 +379,6 @@ export async function composeProfileSummary(
     };
     if (mafiaResult.timedOut || sinceResult.timedOut || activityResult.timedOut) {
         INCOMPLETE.add(summary);
-        if (pending.length) PENDING.set(summary, pending);
     }
     return summary;
 }
@@ -395,18 +396,41 @@ class NotCacheable extends Error {
 
 /**
  * Compose through Next's shared data cache. Only a COMPLETE summary is stored: when the compose
- * missed a deadline (INCOMPLETE) or the member does not exist, the value is carried out in a
+ * missed a deadline (INCOMPLETE) or the member does not exist, the value is carried out of a
  * sentinel error, which unstable_cache does not store, and returned to the caller.
  * Cache key ["profile-summary-v1", id]; tags "members" and `profile:<id>`; revalidate 300 s.
+ *
+ * The member row and crew mappings are read here, outside the cached callback: their loaders use
+ * unstable_cache / cached fetches themselves, and Next skips a cache nested in another (every miss
+ * would run a full member table query) and forces no-store on cached fetches inside one. The
+ * callback therefore only composes from what it is given. `after()` works inside it, so lookups
+ * that missed their deadline are kept alive by the compose itself.
+ *
+ * Background revalidation of a stale entry: if that compose is incomplete, throwing would make
+ * Next log a revalidation failure, so the callback returns the stale value that was just served
+ * instead (it was complete; only deadline-missed extras differ) and the entry is simply re-stored.
  */
 async function composeViaSharedCache(id: string): Promise<ProfileSummary | null> {
+    const member = await safe(fetchMemberById(id), null);
+    if (!member) return null; // missing member: never cached
+    const crewMappings = await safe(getCrewMappings(false, { staleWhileRevalidate: true }), {
+        crews: [] as CrewOption[],
+        cached: false,
+    });
     let ran = false;
+    let served: ProfileSummary | null = null;
     let carried: { summary: ProfileSummary | null } | null = null;
     const cached = unstable_cache(
         async (): Promise<ProfileSummary> => {
             ran = true;
-            const base = await composeProfileSummary({ memberId: id, viewerMemberId: null, deferKeepAlive: true });
-            if (!base || INCOMPLETE.has(base)) {
+            const base = await composeProfileSummary({ memberId: id, viewerMemberId: null, inputs: { member, crewMappings } });
+            if (!base) {
+                carried = { summary: base };
+                throw new NotCacheable(base);
+            }
+            if (INCOMPLETE.has(base)) {
+                // A revalidation that runs after the stale value was served: keep serving it, quietly.
+                if (served) return served;
                 carried = { summary: base };
                 throw new NotCacheable(base);
             }
@@ -416,19 +440,17 @@ async function composeViaSharedCache(id: string): Promise<ProfileSummary | null>
         { revalidate: PROFILE_SUMMARY_REVALIDATE_SECONDS, tags: [PROFILE_MEMBERS_TAG, profileTag(id)] },
     );
     try {
-        return await cached();
+        const value = await cached();
+        served = value;
+        return value;
     } catch (err) {
         const out: { summary: ProfileSummary | null } | null =
             carried ?? (err instanceof NotCacheable ? { summary: err.summary } : null);
-        if (out) {
-            const pending = out.summary ? PENDING.get(out.summary) : undefined;
-            if (pending) keepAlive(Promise.allSettled(pending));
-            return out.summary;
-        }
+        if (out) return out.summary;
         // The compose itself failed: surface it. Otherwise the data cache is unavailable here
         // (scripts, tests): compose directly.
         if (ran) throw err;
-        return composeProfileSummary({ memberId: id, viewerMemberId: null });
+        return composeProfileSummary({ memberId: id, viewerMemberId: null, inputs: { member, crewMappings } });
     }
 }
 

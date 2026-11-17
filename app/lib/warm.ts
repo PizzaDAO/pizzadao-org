@@ -46,6 +46,7 @@ export async function runWarm(baseUrl: string, targets: string[], fetchImpl: typ
           headers: { 'user-agent': 'pizzadao-warm/1', 'x-warm': '1' },
           signal: AbortSignal.timeout(WARM_TIMEOUT_MS),
           cache: 'no-store',
+          redirect: 'manual',
         })
         await res.arrayBuffer().catch(() => undefined) // drain, so the page finishes rendering
         return { path, status: res.status, ms: Date.now() - started }

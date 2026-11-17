@@ -110,7 +110,7 @@ export function countKeyMatches(storedKeys: Iterable<string>, liveNames: string[
 export const CHANNEL_NAMES_KEY_PREFIX = "discord:public-channel-names:v1"
 /** Fresh for an hour; kept a day so a cold instance never waits on Discord, while a channel that turns private cannot be served for long. */
 export const CHANNEL_NAMES_FRESH_SECONDS = 60 * 60
-export const CHANNEL_NAMES_KEEP_SECONDS = 24 * 60 * 60
+export const CHANNEL_NAMES_KEEP_SECONDS = 6 * 60 * 60
 const CHANNEL_RETRY_MS = 5 * 60 * 1000
 const failedUntil = new Map<string, number>()
 const inflight = new Map<string, Promise<PublicChannels | null>>()
