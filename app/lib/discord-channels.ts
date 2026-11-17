@@ -35,7 +35,14 @@ export interface DiscordOpts {
   now?: number
 }
 
-type GuildChannel = { id: string; name: string; type: number; parent_id?: string | null }
+type GuildChannel = {
+  id: string
+  name: string
+  type: number
+  parent_id?: string | null
+  /** Only present when Discord returned them (the public channel-name filter reads these). */
+  permission_overwrites?: Array<{ id: string; type: number; allow: string; deny: string }>
+}
 let channelCache: { guildId: string; channels: GuildChannel[]; at: number } | null = null
 let channelFailCache: { guildId: string; at: number } | null = null
 
@@ -44,7 +51,7 @@ export function clearGuildChannelsCache() {
   channelFailCache = null
 }
 
-type GuildRole = { id: string; name: string }
+type GuildRole = { id: string; name: string; permissions?: string }
 let roleCache: { guildId: string; roles: GuildRole[]; at: number } | null = null
 let roleFailCache: { guildId: string; at: number } | null = null
 
@@ -127,6 +134,7 @@ export async function getGuildChannels(opts: DiscordOpts = {}): Promise<GuildCha
     name: String(c.name ?? ''),
     type: Number(c.type),
     parent_id: c.parent_id ? String(c.parent_id) : null,
+    ...(Array.isArray(c.permission_overwrites) ? { permission_overwrites: c.permission_overwrites } : {}),
   }))
   channelCache = { guildId, channels, at: now }
   channelFailCache = null
@@ -148,9 +156,10 @@ export async function getGuildRoles(opts: DiscordOpts = {}): Promise<GuildRole[]
     roleFailCache = { guildId, at: now }
     return stale()
   }
-  const roles = (r.json as Array<{ id: string; name: string }>).map((ro) => ({
+  const roles = (r.json as GuildRole[]).map((ro) => ({
     id: String(ro.id),
     name: String(ro.name ?? ''),
+    ...(typeof ro.permissions === 'string' ? { permissions: ro.permissions } : {}),
   }))
   roleCache = { guildId, roles, at: now }
   roleFailCache = null

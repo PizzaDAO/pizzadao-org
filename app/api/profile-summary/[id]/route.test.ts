@@ -39,6 +39,10 @@ vi.mock("@/app/lib/db", () => ({
     },
 }));
 
+vi.mock("@/app/lib/discord-activity-public", () => ({
+    getPublicDiscordActivity: vi.fn(),
+}));
+
 vi.mock("@/app/lib/session", () => ({
     getSession: vi.fn(),
 }));
@@ -55,12 +59,13 @@ vi.mock("fs", async () => {
     return { ...mocked, default: mocked };
 });
 
-import { composeProfileSummary, withDeadline, SENSITIVE_SHEET_KEYS, PROFILE_SUMMARY_CACHE_HEADERS } from "./route";
+import { composeProfileSummary, getPublicProfileSummary, withDeadline, DISCORD_ACTIVITY_BUDGET_MS, SENSITIVE_SHEET_KEYS, PROFILE_SUMMARY_CACHE_HEADERS } from "./route";
 import { fetchMemberById } from "@/app/lib/sheets/member-repository";
 import { getUserProgressSummary } from "@/app/lib/missions";
 import { getMafiaRank } from "@/app/lib/mafia-points";
 import { getVouchCounts } from "@/app/lib/vouches";
 import { getCrewMappings } from "@/app/lib/crew-mappings";
+import { getPublicDiscordActivity } from "@/app/lib/discord-activity-public";
 import { prisma } from "@/app/lib/db";
 import { getMemberTagline } from "@/app/api/profile-extras/[id]/route";
 
@@ -121,6 +126,7 @@ function setupHappyPath() {
     });
     // Default: no Postgres tagline → composer falls back to the sheet column.
     (getMemberTagline as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    (getPublicDiscordActivity as ReturnType<typeof vi.fn>).mockResolvedValue(null);
 }
 
 describe("profile-summary caching", () => {
@@ -380,5 +386,51 @@ describe("cold-load budget", () => {
         expect(getUserProgressSummary).not.toHaveBeenCalled();
         expect(getVouchCounts).not.toHaveBeenCalled();
         expect(getCrewMappings).not.toHaveBeenCalled();
+    });
+});
+
+describe("discord activity deadline", () => {
+    const ACTIVITY = { messages: 12, since: "2024-01-01", lastActive: "2026-11-01", activeMonths: 5, topChannels: ["general"] };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        setupHappyPath();
+    });
+
+    it("drops a slow activity block at the deadline and does not cache the incomplete summary", async () => {
+        vi.useFakeTimers();
+        try {
+            let finish!: (v: typeof ACTIVITY) => void;
+            (getPublicDiscordActivity as ReturnType<typeof vi.fn>).mockReturnValueOnce(
+                new Promise((r) => { finish = r; }),
+            );
+            const p = getPublicProfileSummary("slow-activity");
+            await vi.advanceTimersByTimeAsync(DISCORD_ACTIVITY_BUDGET_MS + 50);
+            const summary = await p;
+            expect(summary!.hero.name).toBe("Turkey Sausage");
+            expect(summary!.discordActivity).toBeNull();
+            finish(ACTIVITY);
+
+            // Not memoised: the next load composes again and picks the block up.
+            (getPublicDiscordActivity as ReturnType<typeof vi.fn>).mockResolvedValueOnce(ACTIVITY);
+            const again = await getPublicProfileSummary("slow-activity");
+            expect(again!.discordActivity).toEqual(ACTIVITY);
+            expect(getPublicDiscordActivity).toHaveBeenCalledTimes(2);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("keeps an in-time activity block and caches the complete summary", async () => {
+        (getPublicDiscordActivity as ReturnType<typeof vi.fn>).mockResolvedValue(ACTIVITY);
+        const first = await getPublicProfileSummary("fast-activity");
+        expect(first!.discordActivity).toEqual(ACTIVITY);
+        await getPublicProfileSummary("fast-activity");
+        expect(getPublicDiscordActivity).toHaveBeenCalledTimes(1);
+    });
+
+    it("reads crew mappings stale-while-revalidate", async () => {
+        await composeProfileSummary({ memberId: "69", viewerMemberId: null });
+        expect(getCrewMappings).toHaveBeenCalledWith(false, { staleWhileRevalidate: true });
     });
 });

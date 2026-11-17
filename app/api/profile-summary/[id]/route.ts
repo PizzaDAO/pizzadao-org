@@ -169,6 +169,9 @@ export interface ComposeOptions {
 /** How long the profile waits for a cold mafia rank (Discord + Alchemy + POAP calls, ~4s). */
 export const MAFIA_RANK_BUDGET_MS = 1200;
 
+/** How long the profile waits for the public Discord activity block (channel names come from Discord). */
+export const DISCORD_ACTIVITY_BUDGET_MS = 500;
+
 const NO_VOUCHES = { total: 0, pizzadao: 0, farcaster: 0, twitter: 0, followers: 0, pizzadaoFollowers: 0 };
 
 /**
@@ -230,6 +233,7 @@ export async function composeProfileSummary(
         ? Promise.resolve(null)
         : memberPromise.then((m) => (m ? getPublicDiscordActivity(String(m.discordId || "").trim() || null) : null)).catch(() => null);
     const sinceDeadline = withDeadline(sincePromise, 800, null as Date | null);
+    const activityDeadline = withDeadline(activityPromise, DISCORD_ACTIVITY_BUDGET_MS, null as PublicDiscordActivity | null);
     const mafiaPromise = light
         ? Promise.resolve(null)
         : getMafiaRank(memberId).then(
@@ -265,17 +269,19 @@ export async function composeProfileSummary(
             ),
         light
             ? Promise.resolve({ crews: [] as CrewOption[], cached: false })
-            : safe(getCrewMappings(), { crews: [] as CrewOption[], cached: false }),
+            : safe(getCrewMappings(false, { staleWhileRevalidate: true }), { crews: [] as CrewOption[], cached: false }),
         // PR4 — tagline from MemberProfileExtras (Postgres). Wins over the
         // sheet read below when present.
         safe(getMemberTagline(memberId), null as string | null),
     ]);
-    const [member, sinceResult, discordActivity] = await Promise.all([memberPromise, sinceDeadline, activityPromise]);
+    const [member, sinceResult, activityResult] = await Promise.all([memberPromise, sinceDeadline, activityDeadline]);
+    const discordActivity = activityResult.value;
     if (!member) return null;
     const memberSince = sinceResult.value;
     if (sinceResult.timedOut) keepAlive(sincePromise);
     const mafia = mafiaResult.value;
     if (mafiaResult.timedOut) keepAlive(mafiaPromise);
+    if (activityResult.timedOut) keepAlive(activityPromise);
 
     const publicMember = publicMemberView(member);
 
@@ -346,7 +352,7 @@ export async function composeProfileSummary(
         viewerId: viewerMemberId,
         isOwner,
     };
-    if (mafiaResult.timedOut || sinceResult.timedOut) INCOMPLETE.add(summary);
+    if (mafiaResult.timedOut || sinceResult.timedOut || activityResult.timedOut) INCOMPLETE.add(summary);
     return summary;
 }
 
