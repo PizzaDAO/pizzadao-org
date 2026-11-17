@@ -37,6 +37,7 @@ import { progressEnabled, runProgressCommand } from "@/app/lib/calls/progress-co
 import { getCrewMappings } from "@/app/lib/crew-mappings";
 import { runMemberCommand, type MemberCommandJob } from "@/app/lib/discord-interactions/member-commands";
 import { runBountyCommand, type BountyJob, type BountyRow } from "@/app/lib/discord-interactions/bounty-command";
+import { bountyPickChoices } from "@/app/lib/discord-interactions/bounty-choices";
 import { claimBounty, getClaimedBounties, getCrewLabelMap, getOpenBounties, giveUpBounty } from "@/app/lib/bounties";
 import { requireOnboarded } from "@/app/lib/economy";
 import { giveVouch } from "@/app/lib/give-vouch";
@@ -216,27 +217,10 @@ function deferBounty(job: BountyJob) {
   });
 }
 
-/** `#id · N $PEP · description`, at most 100 characters (Discord's limit for a choice name). */
-const bountyChoice = (b: { id: number; reward: number; description: string }) => ({
-  name: `#${b.id} · ${b.reward.toLocaleString("en-US")} $PEP · ${b.description.replace(/\s+/g, " ").trim()}`.slice(0, 100),
-  value: b.id,
-});
-
 /** Autocomplete for /bounty: crews (list), open bounties that aren't yours (claim), your claims (giveup). */
 async function bountyChoices(kind: "crew" | "claim" | "giveup", discordId: string, query: string): Promise<Array<{ name: string; value: string | number }>> {
   if (kind === "crew") return progressCrewChoices(query);
-  const q = query.trim().toLowerCase().replace(/^#/, "");
-  const textMatch = q ? [{ description: { contains: q, mode: "insensitive" as const } }, ...(/^\d{1,9}$/.test(q) ? [{ id: Number(q) }] : [])] : undefined;
-  const rows = await prisma.bounty.findMany({
-    where:
-      kind === "claim"
-        ? { status: "OPEN", createdBy: { not: discordId }, ...(textMatch ? { OR: textMatch } : {}) }
-        : { claimedBy: discordId, status: { in: ["CLAIMED", "SUBMITTED"] }, ...(textMatch ? { OR: textMatch } : {}) },
-    orderBy: { createdAt: "desc" },
-    take: 25,
-    select: { id: true, reward: true, description: true },
-  });
-  return rows.map(bountyChoice);
+  return bountyPickChoices(kind, discordId, query);
 }
 
 /** Autocomplete for the /progress crew option: crews whose label or id contains the query. */

@@ -65,7 +65,9 @@ const n = (v: number) => v.toLocaleString('en-US')
 /** One line of text: newlines flattened, cut to about 90 characters, then escaped. */
 function short(description: string): string {
   const flat = description.replace(/\s+/g, ' ').trim()
-  return esc(flat.length > DESCRIPTION_CHARS ? `${flat.slice(0, DESCRIPTION_CHARS - 1).trimEnd()}…` : flat)
+  // Cut by code points, so an emoji is never split in half.
+  const chars = Array.from(flat)
+  return esc(chars.length > DESCRIPTION_CHARS ? `${chars.slice(0, DESCRIPTION_CHARS - 1).join('').trimEnd()}…` : flat)
 }
 
 /** Where a bounty lives on the site: the crew's bounty board, or /pep for a general one. */

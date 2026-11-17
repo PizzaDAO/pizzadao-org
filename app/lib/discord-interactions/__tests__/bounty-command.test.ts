@@ -59,6 +59,12 @@ describe('renderers', () => {
     expect(body).toContain('…')
   })
 
+  it('truncates by code points, so an emoji is never split', () => {
+    const e = renderList([row(1, { description: '🍕'.repeat(200) })], APP, labels)
+    expect(e.description).not.toMatch(/[\ud800-\udbff](?![\udc00-\udfff])/)
+    expect(e.description).toContain('🍕'.repeat(89) + '…')
+  })
+
   it('caps at 10 with "N more on the website" and stays under 4,000 characters', () => {
     const rows = Array.from({ length: 14 }, (_, i) => row(i + 1, { description: 'y'.repeat(300) }))
     const e = renderList(rows, APP, labels)

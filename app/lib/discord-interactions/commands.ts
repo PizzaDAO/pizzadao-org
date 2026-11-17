@@ -177,7 +177,7 @@ export const PEP_COMMANDS = [
     description: 'Open bounties: see them, claim one, see yours or give one up (only you see the reply)',
     options: [
       { type: SUB_COMMAND, name: 'list', description: 'Open bounties, newest first', options: [{ type: STRING, name: 'crew', description: 'Only this crew’s bounties', required: false, autocomplete: true, max_length: 80 }] },
-      { type: SUB_COMMAND, name: 'claim', description: 'Claim an open bounty', options: [{ type: INTEGER, name: 'bounty', description: 'Which bounty (pick one or type its #id)', required: true, autocomplete: true, min_value: 1 }] },
+      { type: SUB_COMMAND, name: 'claim', description: 'Claim an open bounty', options: [{ type: INTEGER, name: 'bounty', description: 'Which bounty (pick one or type its id number)', required: true, autocomplete: true, min_value: 1 }] },
       { type: SUB_COMMAND, name: 'mine', description: 'Bounties you have claimed' },
       { type: SUB_COMMAND, name: 'giveup', description: 'Give up a bounty you claimed', options: [{ type: INTEGER, name: 'bounty', description: 'Which bounty', required: true, autocomplete: true, min_value: 1 }] },
     ],
