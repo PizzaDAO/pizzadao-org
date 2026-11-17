@@ -3,6 +3,8 @@ import { getSession } from '@/app/lib/session'
 import { prisma } from '@/app/lib/db'
 import { fetchMemberIdByDiscordId } from '@/app/lib/sheets/member-repository'
 import { saveWalletForMember } from '@/app/lib/wallet-lookup'
+import { after } from 'next/server'
+import { refreshRsvEventsIfEnabled } from '@/app/lib/events-attended/rsv'
 import { getTicketSummary, scanMembers } from '@/app/lib/unlock/scan'
 
 export const runtime = 'nodejs'
@@ -29,7 +31,10 @@ export async function GET() {
       where: { memberId, walletAddress: { equals: walletAddress, mode: 'insensitive' } },
       select: { id: true },
     })
-    if (!existingWallet) await saveWalletForMember(memberId, walletAddress, 'unlock', session.discordId)
+    if (!existingWallet) {
+      await saveWalletForMember(memberId, walletAddress, 'unlock', session.discordId)
+      after(() => refreshRsvEventsIfEnabled(memberId))
+    }
 
     try {
       await scanMembers([memberId], [{ memberId, wallet: walletAddress }])

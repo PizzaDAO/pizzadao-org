@@ -12,6 +12,7 @@ export const CLIENT_NAMESPACES = [
   "callsPage",
   "collectPep",
   "collectionStats",
+  "eventsAttended",
   "common",
   "communityTerms",
   "crewBounties",

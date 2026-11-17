@@ -86,8 +86,19 @@ describe('settings registry', () => {
       ['telegram.hostMatchRecheckDays', 14],
       ['telegram.hostMatchDailyHashes', 1000],
     ])
+    // Events attended: off by default, tickets shown, weekly re-check, rsv.pizza endpoints and audience.
+    expect(SETTING_KEYS.filter((k) => k.startsWith('profile.eventsAttended.')).map((k) => [k, SETTINGS[k].default])).toEqual([
+      ['profile.eventsAttended.enabled', 0],
+      ['profile.eventsAttended.countTickets', 1],
+      ['profile.eventsAttended.rsvRecheckDays', 7],
+      ['profile.eventsAttended.rsvLinkUrl', 'https://rsv.pizza/link/pizzadao'],
+      ['profile.eventsAttended.rsvApiUrl', 'https://api.rsv.pizza'],
+      ['profile.eventsAttended.rsvJwksUrl', 'https://api.rsv.pizza/.well-known/jwks.json'],
+      ['profile.eventsAttended.rsvLinkIssuer', 'https://api.rsv.pizza'],
+      ['profile.eventsAttended.rsvLinkAudience', 'pizzadao.org'],
+    ])
     // And the literal values today (a change here is a deliberate, reviewed change).
-    expect(SETTING_KEYS.filter((k) => !k.startsWith('guide.') && !k.startsWith('followups.') && !k.startsWith('payments.') && !k.startsWith('proposals.') && !k.startsWith('telegram.') && !k.startsWith('sheets.') && !k.startsWith('map.') && !k.startsWith('reminders.') && !k.startsWith('crews.') && !k.startsWith('members.') && !k.startsWith('calls.updates') && k !== 'discord.metalheadCommandEnabled' && !ECONOMY_KEYS.has(k)).map((k) => [k, SETTINGS[k].default])).toEqual([
+    expect(SETTING_KEYS.filter((k) => !k.startsWith('guide.') && !k.startsWith('followups.') && !k.startsWith('payments.') && !k.startsWith('proposals.') && !k.startsWith('telegram.') && !k.startsWith('sheets.') && !k.startsWith('map.') && !k.startsWith('reminders.') && !k.startsWith('crews.') && !k.startsWith('members.') && !k.startsWith('profile.eventsAttended.') && !k.startsWith('calls.updates') && k !== 'discord.metalheadCommandEnabled' && !ECONOMY_KEYS.has(k)).map((k) => [k, SETTINGS[k].default])).toEqual([
       ['calls.transcriptMinLevel', 6],
       ['calls.summaryMinLevel', 5],
       ['calls.actionItemsMinLevel', 4],

@@ -22,6 +22,7 @@ vi.mock('@/app/lib/slices/mint-queue', () => ({
   processMintQueue: vi.fn(async () => ({ status: 'skipped', reason: 'disabled' })),
 }))
 vi.mock('@/app/lib/passport/scrub', () => ({ scrubCoordinates: vi.fn(async () => 4) }))
+vi.mock('@/app/lib/events-attended/cron', () => ({ runRsvEventsRefresh: vi.fn(async () => ({ enabled: true, due: 0, checked: 0, failed: 0, timedOut: false })) }))
 
 vi.mock('@/app/lib/followups/send', () => ({ processDue: vi.fn(async () => ({ held: 1 })) }))
 vi.mock('@/app/lib/reminders/cron', () => ({ runRemindersNow: vi.fn(async () => ({ dryRun: true, occurrences: 0, due: 0, sent: 0 })) }))
@@ -54,6 +55,8 @@ import { GET as traineeNicksGET } from './trainee-nicks/route'
 import { GET as slicesMintGET } from './slices-mint/route'
 import { GET as passportScrubGET } from './passport-scrub/route'
 import { scrubCoordinates } from '@/app/lib/passport/scrub'
+import { GET as rsvEventsGET } from './rsv-events/route'
+import { runRsvEventsRefresh } from '@/app/lib/events-attended/cron'
 
 import { GET as followupsGET } from './followups/route'
 import { GET as remindersGET } from './reminders/route'
@@ -90,6 +93,7 @@ describe.each([
   ['/api/cron/trainee-nicks', traineeNicksGET, () => runTraineeNicks],
   ['/api/cron/slices-mint', slicesMintGET, () => processMintQueue],
   ['/api/cron/passport-scrub', passportScrubGET, () => scrubCoordinates],
+  ['/api/cron/rsv-events', rsvEventsGET, () => runRsvEventsRefresh],
 
   ['/api/cron/followups', followupsGET, () => processDue],
   ['/api/cron/reminders', remindersGET, () => runRemindersNow],

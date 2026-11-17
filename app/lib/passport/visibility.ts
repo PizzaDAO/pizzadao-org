@@ -1,19 +1,11 @@
 /** What a viewer may see of someone's passport (plans/pizza-passport.md, D7). */
 
-export type PassportVisibility = 'public' | 'members' | 'private'
+import type { SectionVisibility, Viewer } from '@/app/lib/profile/visibility'
 
-export function parseVisibility(v: unknown): PassportVisibility {
-  return v === 'members' || v === 'private' || v === 'public' ? v : 'public'
-}
-
-export type Viewer = 'owner' | 'member' | 'anonymous'
-
-export function canView(visibility: PassportVisibility, viewer: Viewer): boolean {
-  if (viewer === 'owner') return true
-  if (visibility === 'private') return false
-  if (visibility === 'members') return viewer === 'member'
-  return true
-}
+export type PassportVisibility = SectionVisibility
+// parseVisibility / canView / Viewer live in app/lib/profile/visibility.ts; re-exported for passport callers.
+export { parseVisibility, canView } from '@/app/lib/profile/visibility'
+export type { Viewer } from '@/app/lib/profile/visibility'
 
 /** Month-only date for other people's eyes: "2026-10". */
 export function monthOnly(d: Date): string {

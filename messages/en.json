@@ -1733,6 +1733,7 @@
       "label": "Send me the weekly PizzaDAO email",
       "saveError": "Couldn't save your email preference. Try again?",
       "saved": "Saved",
+      "verifyNudge": "Verifying also shows your rsv.pizza parties on your profile.",
       "emailLabel": "Email address",
       "optIn": "Get a weekly PizzaDAO digest",
       "save": "Save",
@@ -2639,6 +2640,33 @@
     "copyLink": "Copy link",
     "copied": "Link copied",
     "copyFailed": "Couldn't copy the link"
+  },
+  "eventsAttended": {
+    "overline": "§ 06 · Out in the world",
+    "title": "Events attended",
+    "badge": {
+      "attended": "Attended",
+      "ticket": "Ticket",
+      "organizer": "Organizer"
+    },
+    "promptNone": "Add your email to see the parties you've been to.",
+    "promptNoneLink": "Add email",
+    "promptUnverified": "Check your inbox to confirm your email.",
+    "promptUnverifiedLink": "Manage email",
+    "emailOnlyUsedFor": "Your email is only used to find your rsv.pizza check-ins.",
+    "empty": "No events yet. Verify your email or link your rsv.pizza account to see the parties you've been to.",
+    "showAll": "Show all ({count})",
+    "linked": "Linked to rsv.pizza",
+    "unlink": "Unlink",
+    "linkButton": "Link rsv.pizza account",
+    "visibilityLabel": "Who can see this section",
+    "visibility": {
+      "public": "Everyone",
+      "members": "Members only",
+      "private": "Only me"
+    },
+    "linkedNote": "rsv.pizza account linked.",
+    "linkFailed": "Couldn't link your rsv.pizza account. Please try again, and if the sign-in link opens in a new tab, use the 6-digit code option instead."
   },
   "collectionStats": {
     "aria": "Collection totals",

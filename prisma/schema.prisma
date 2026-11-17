@@ -1059,6 +1059,9 @@ model MemberProfileExtras {
   reengageEmailOptIn           Boolean   @default(false) // explicit opt-in to the weekly digest
   // ===== Pizza Passport (plans/pizza-passport.md): who may see this member's stamps =====
   passportVisibility           String    @default("public") @db.VarChar(8) // public | members | private
+  eventsVisibility             String    @default("public") @db.VarChar(8) // public | members | private (Events attended)
+  rsvLinkedEmailHash           String?   @db.VarChar(64) // sha256 of the email the member signed in with on rsv.pizza (never the address)
+  rsvLinkedAt                  DateTime?
   // ===== Member since: the Discord server join date, captured from the guild member =====
   discordJoinedAt              DateTime? // guild member joined_at; shown as "member since" when it is the earliest known date
   discordJoinedCheckedAt       DateTime? // last Discord lookup (throttles retries for people not in the server)
@@ -3337,4 +3340,35 @@ model MemberLane {
 
   @@id([discordId, laneSlug])
   @@index([discordId, pinnedAt])
+}
+
+// Events attended (plans/profile-events-attended.md): checked-in rsv.pizza parties matched to a member.
+// Filled by a background refresh, never on profile view. No data about other guests.
+model MemberRsvEvent {
+  id              Int       @id @default(autoincrement())
+  memberId        String
+  rsvEventId      String    @db.VarChar(100)
+  name            String    @db.VarChar(200)
+  date            DateTime?
+  city            String?   @db.VarChar(120)
+  url             String?   @db.VarChar(300)
+  matchedBy       String    @db.VarChar(16) // 'email' | 'wallet'
+  guestListHidden Boolean   @default(false) // shown to the owner only
+  fetchedAt       DateTime  @default(now())
+
+  @@unique([memberId, rsvEventId])
+  @@index([memberId])
+}
+
+// Single-use record of rsv.pizza account-link tokens (jti) until they expire.
+model RsvLinkJti {
+  jti       String   @id @db.VarChar(200)
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}
+
+model MemberRsvCheck {
+  memberId  String   @id
+  checkedAt DateTime
 }

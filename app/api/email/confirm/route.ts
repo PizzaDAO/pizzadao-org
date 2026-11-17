@@ -5,9 +5,10 @@
 // the member id, the exact address currently on file, and a 7-day expiry, so a
 // stale link cannot verify a changed address. Sets emailVerifiedAt. POST only,
 // so mail scanners that GET the link cannot verify anything.
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/lib/db";
 import { verifyConfirm } from "@/app/lib/reengage/unsub-sig";
+import { refreshRsvEventsIfEnabled } from "@/app/lib/events-attended/rsv";
 import { internalError } from "@/app/lib/errors/error-response";
 
 export const runtime = "nodejs";
@@ -36,6 +37,8 @@ export async function POST(req: NextRequest) {
       data: { emailVerifiedAt: new Date() },
       select: { memberId: true },
     });
+    // Newly verified: look up rsv.pizza check-ins for this address (background, no-op unless enabled).
+    after(() => refreshRsvEventsIfEnabled(memberId));
   } catch (err) {
     if ((err as { code?: string })?.code === "P2002") {
       return NextResponse.json({ error: "Invalid or expired link" }, { status: 400 });

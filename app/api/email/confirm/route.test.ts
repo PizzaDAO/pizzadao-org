@@ -5,6 +5,10 @@ import { NextRequest } from "next/server";
 const ex = vi.hoisted(() => ({ findUnique: vi.fn(), findFirst: vi.fn(), update: vi.fn(async () => ({})) }));
 vi.mock("@/app/lib/db", () => ({ prisma: { memberProfileExtras: ex } }));
 
+const rsv = vi.hoisted(() => ({ refreshRsvEventsIfEnabled: vi.fn(async () => undefined) }));
+vi.mock("@/app/lib/events-attended/rsv", () => rsv);
+vi.mock("next/server", async (orig) => ({ ...(await orig<typeof import("next/server")>()), after: (fn: () => unknown) => void fn() }));
+
 import { POST } from "./route";
 import { signConfirm } from "@/app/lib/reengage/unsub-sig";
 
@@ -21,6 +25,7 @@ describe("POST /api/email/confirm", () => {
     const res = await POST(post("42", signConfirm("42", "a@x.io")!));
     expect(res.status).toBe(303);
     expect(ex.update).toHaveBeenCalledWith(expect.objectContaining({ where: { memberId: "42" } }));
+    expect(rsv.refreshRsvEventsIfEnabled).toHaveBeenCalledWith("42"); // look up rsv.pizza check-ins for the new address
   });
   it("rejects a second verification of an address already verified on another member", async () => {
     ex.findUnique.mockResolvedValue({ email: "a@x.io" });
@@ -29,6 +34,7 @@ describe("POST /api/email/confirm", () => {
     expect(res.status).toBe(400);
     expect((await res.json()).error).toBe("Invalid or expired link"); // generic: does not reveal the other owner
     expect(ex.update).not.toHaveBeenCalled();
+    expect(rsv.refreshRsvEventsIfEnabled).not.toHaveBeenCalled();
   });
   it("maps a unique-index violation (race) to the same generic error", async () => {
     ex.findUnique.mockResolvedValue({ email: "a@x.io" });
