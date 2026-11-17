@@ -13,6 +13,7 @@ vi.mock('@/app/lib/mission-verify/review-cards', async (importOriginal) => ({
 vi.mock('@/app/lib/session', () => ({ getSession: vi.fn() }))
 vi.mock('@/app/lib/discord', () => ({ getUserRoles: vi.fn() }))
 vi.mock('@/app/lib/db', () => ({ prisma: { appSetting: { findMany: vi.fn(async () => []) } } }))
+vi.mock('@/app/lib/profile-summary-invalidate', () => ({ invalidateProfileSummaryForDiscord: vi.fn(async () => undefined) }))
 vi.mock('@/app/lib/mission-cache', () => ({ invalidateProgressCache: vi.fn() }))
 // Names: the sheet knows member-1 (member #42); Discord knows member-2; nobody knows the rest.
 vi.mock('@/app/lib/people', () => ({
@@ -55,6 +56,7 @@ import { POST } from './route'
 import { syncReviewCard } from '@/app/lib/mission-verify/review-cards'
 import { GET as PENDING } from '../pending/route'
 import { getSession } from '@/app/lib/session'
+import { invalidateProfileSummaryForDiscord } from '@/app/lib/profile-summary-invalidate'
 import { getUserRoles } from '@/app/lib/discord'
 import { approveMission, rejectMission, getCompletionForReview, getPendingSubmissions } from '@/app/lib/missions'
 import { getFlaggedCompletions, getSignalViews } from '@/app/lib/mission-verify/review-extras'
@@ -93,6 +95,23 @@ describe('POST /api/missions/review', () => {
     as('mafia', [PEP_MAFIA])
     expect((await review(1, 'reject')).status).toBe(200)
     expect(rejectMission).toHaveBeenCalledWith('mafia', 1, undefined)
+  })
+
+  it("expires the owner's cached profile after an approve and after a reject", async () => {
+    target(3)
+    as('capo', [CAPO])
+    await review(1)
+    expect(invalidateProfileSummaryForDiscord).toHaveBeenCalledWith('member-1')
+    vi.mocked(invalidateProfileSummaryForDiscord).mockClear()
+    await review(1, 'reject')
+    expect(invalidateProfileSummaryForDiscord).toHaveBeenCalledWith('member-1')
+  })
+
+  it('does not expire the profile when the review is refused', async () => {
+    target(1)
+    as('someone', ['123456789'])
+    await review(1)
+    expect(invalidateProfileSummaryForDiscord).not.toHaveBeenCalled()
   })
 
   it('only Dread Pizza Roberts can approve L8', async () => {
