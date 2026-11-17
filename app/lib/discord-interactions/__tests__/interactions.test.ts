@@ -100,6 +100,35 @@ describe('handleInteraction', () => {
     expect(await handleInteraction({ type: 1 }, deps())).toEqual({ type: 1 })
   })
 
+  describe('PizzaDAO member name in the author line', () => {
+    const authorName = async (d: HandlerDeps) => embed(await handleInteraction(cmd('work'), d))?.author?.name
+
+    it('uses the member name when found', async () => {
+      const memberName = vi.fn(async () => 'Test Chef')
+      expect(await authorName(deps({ memberName }))).toBe('Test Chef')
+      expect(memberName).toHaveBeenCalledWith(USER)
+    })
+
+    it('falls back to the Discord name on timeout', async () => {
+      vi.useFakeTimers()
+      try {
+        const p = authorName(deps({ memberName: () => new Promise<string | null>(() => {}) }))
+        await vi.advanceTimersByTimeAsync(400)
+        expect(await p).toBe('Snax')
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('falls back to the Discord name on error', async () => {
+      expect(await authorName(deps({ memberName: async () => { throw new Error('db down') } }))).toBe('Snax')
+    })
+
+    it('falls back when there is no member name', async () => {
+      expect(await authorName(deps({ memberName: async () => null }))).toBe('Snax')
+    })
+  })
+
   it('every reply is an embed authored by the invoking member', async () => {
     const r = await handleInteraction(cmd('work'), deps())
     expect(r.data?.content).toBeUndefined()

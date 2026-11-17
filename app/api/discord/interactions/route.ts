@@ -33,6 +33,7 @@
 //      and PEP_ADMIN_LOG_CHANNEL_ID (audit post via the bot token).
 import { after, NextResponse } from "next/server";
 import { verifyDiscordRequest } from "@/app/lib/discord-interactions/verify";
+import { memberNamesByDiscordId } from "@/app/lib/member-names";
 import { handleInteraction, type HandlerDeps, type Interaction, type MetalheadJob, type ProgressJob } from "@/app/lib/discord-interactions/handle";
 import { liveCallChoices, metalheadEnabled, runMetalheadCommand } from "@/app/lib/call-updates/command";
 import { progressEnabled, runProgressCommand } from "@/app/lib/calls/progress-command";
@@ -353,6 +354,7 @@ const reminders: ReminderInteractionDeps = {
 function deps(guildId: string | undefined, settings: Settings): HandlerDeps {
   return {
     guildId,
+    memberName: async (id) => (await memberNamesByDiscordId([id])).get(id)?.name ?? null,
     currency: process.env.PEP_EMOJI?.trim() || "$PEP",
     getWallet,
     doWork,
