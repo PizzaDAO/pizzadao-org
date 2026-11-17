@@ -20,6 +20,7 @@
  */
 
 import { revalidateTag } from "next/cache";
+import { profileL1 } from "../profile-summary-cache";
 import { findHeaderRowIndex } from "../gviz-parser";
 import { findColumnIndex } from "../sheet-utils";
 import type { GvizCell, GvizRow, GvizTable } from "../types/gviz";
@@ -346,6 +347,8 @@ export async function fetchMemberByDiscordId(
 export function invalidateMembersCache(): void {
   parseMemo = null;
   dbMemo = null;
+  // The composed profile summaries are tagged "members" too (shared cache); drop this instance's memory layer.
+  profileL1.clear();
   try {
     // `expire: 0` expires immediately (the "max" profile would serve stale data
     // once while revalidating in the background).

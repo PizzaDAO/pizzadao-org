@@ -20,11 +20,16 @@ interface ApiResponse {
 
 const VISIBLE = 6;
 
-export function PassportBlock({ memberId }: { memberId: string }) {
+/**
+ * `initialData` is the anonymous view, prefilled by the server only for a request without a session
+ * cookie. Anyone signed in (or when it is missing) fetches their own viewer-aware copy as before.
+ */
+export function PassportBlock({ memberId, initialData = null }: { memberId: string; initialData?: ApiResponse | null }) {
     const t = useTranslations("passport");
-    const [data, setData] = useState<ApiResponse | null>(null);
+    const [data, setData] = useState<ApiResponse | null>(initialData);
 
     useEffect(() => {
+        if (initialData) return;
         let cancelled = false;
         fetch(`/api/passport/${encodeURIComponent(memberId)}`, { cache: "no-store" })
             .then((r) => (r.ok ? r.json() : null))
@@ -35,6 +40,7 @@ export function PassportBlock({ memberId }: { memberId: string }) {
         return () => {
             cancelled = true;
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [memberId]);
 
     if (!data?.enabled) return null;

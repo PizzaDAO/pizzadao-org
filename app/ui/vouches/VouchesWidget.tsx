@@ -10,20 +10,31 @@ type VouchSummary = {
   city: string;
 };
 
+/** The /api/vouches?limit=5 body, as prefilled by the profile page. */
+export type VouchesInitial = { vouches?: unknown[]; counts?: { total?: number } };
+
 type VouchesWidgetProps = {
   memberId: string;
+  initialData?: VouchesInitial | null;
 };
+
+const toSummaries = (raw: unknown[] | undefined): VouchSummary[] =>
+  (raw || []).map((v) => {
+    const o = v as { memberId?: string; name?: string; city?: string };
+    return { memberId: String(o.memberId ?? ""), name: o.name || "", city: o.city || "" };
+  });
 
 const displayFont =
   "var(--font-display), var(--font-sans), system-ui, sans-serif";
 
-export function VouchesWidget({ memberId }: VouchesWidgetProps) {
+export function VouchesWidget({ memberId, initialData = null }: VouchesWidgetProps) {
   const t = useTranslations("dashboard.vouches");
-  const [vouches, setVouches] = useState<VouchSummary[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loaded, setLoaded] = useState(false);
+  const [vouches, setVouches] = useState<VouchSummary[]>(initialData ? toSummaries(initialData.vouches) : []);
+  const [total, setTotal] = useState(initialData?.counts?.total || 0);
+  const [loaded, setLoaded] = useState(!!initialData);
 
   useEffect(() => {
+    if (initialData) return; // arrived with the page
     (async () => {
       try {
         const res = await fetch(
@@ -46,6 +57,7 @@ export function VouchesWidget({ memberId }: VouchesWidgetProps) {
         setLoaded(true);
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [memberId]);
 
   if (!loaded) return null;

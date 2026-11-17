@@ -30,13 +30,16 @@ interface AttendanceCardProps {
    *   parent owns the section chrome (e.g. inside a `CollapsibleSection`).
    */
   variant?: "standalone" | "inline";
+  /** Server-prefilled result (public, viewer-independent); without it the card fetches on mount. */
+  initialData?: AttendanceResult | null;
 }
 
-export function AttendanceCard({ memberId, variant = "standalone" }: AttendanceCardProps) {
-  const [data, setData] = useState<AttendanceResult | null>(null);
-  const [loading, setLoading] = useState(true);
+export function AttendanceCard({ memberId, variant = "standalone", initialData = null }: AttendanceCardProps) {
+  const [data, setData] = useState<AttendanceResult | null>(initialData);
+  const [loading, setLoading] = useState(!initialData);
 
   useEffect(() => {
+    if (initialData) return;
     async function fetchAttendance() {
       try {
         const res = await fetch(`/api/attendance/${memberId}`);
@@ -53,6 +56,7 @@ export function AttendanceCard({ memberId, variant = "standalone" }: AttendanceC
     if (memberId) {
       fetchAttendance();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [memberId]);
 
   // Don't render anything if loading, error, or zero calls

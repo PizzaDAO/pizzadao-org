@@ -4,6 +4,7 @@
 // POST   { base: {kind, url?}, layers: [{assetId, x, y, scale, rotation}] } -> composes + saves.
 //        The server re-checks every layer against the member's unlocks; the GET list is display only.
 // DELETE -> reset to the original PFP (drops the composed image).
+import { invalidateProfileSummary } from '@/app/lib/profile-summary-cache'
 import { del } from '@vercel/blob'
 import { prisma } from '@/app/lib/db'
 import { isOwnBlobUrl } from '@/app/lib/blob-url'
@@ -99,6 +100,7 @@ export const POST = memberPfpRoute(async (req, { memberId, discordId }) => {
 export const DELETE = memberPfpRoute(async (_req, { memberId }) => {
   const row = await prisma.memberPfp.findUnique({ where: { memberId }, select: { composedUrl: true } })
   await prisma.memberPfp.deleteMany({ where: { memberId } })
+  invalidateProfileSummary(memberId)
   if (row?.composedUrl && isOwnBlobUrl(row.composedUrl)) await del(row.composedUrl).catch(() => undefined)
   return { ok: true }
 })

@@ -74,11 +74,47 @@ const discordActivityFlushSeconds: SettingDef<number> = {
   input: { type: 'int', min: 60, max: 3600, unit: 'seconds' },
 }
 
+const warmEnabled: SettingDef<boolean> = {
+  key: 'members.warmEnabled',
+  area: 'members',
+  label: 'Keep the site warm (5-minute prewarm)',
+  help: 'Every 5 minutes a job requests the home page, the pages below and a few member profiles over the public URL so they stay fast for visitors (no cold start). It only reads pages, never writes anything. Off stops it.',
+  schema: z.boolean(),
+  default: true,
+  onReadFailure: { value: false },
+  input: { type: 'bool' },
+}
+
+const warmProfileIds: SettingDef<string> = {
+  key: 'members.warmProfileIds',
+  area: 'members',
+  label: 'Prewarm: member ids',
+  help: 'One member id per line (digits only, at most 10): the profile pages (and their data) the prewarm job requests. Any existing member id works for warming the profile code; pick a few popular ones.',
+  schema: z.string().max(200).refine((v) => v.split('\n').every((l) => l.trim() === '' || /^\d{1,10}$/.test(l.trim())), 'Use one numeric member id per line'),
+  default: '1\n2\n3',
+  onReadFailure: { value: '' },
+  input: { type: 'text', multiline: true, maxLength: 200, placeholder: '1' },
+}
+
+const warmPaths: SettingDef<string> = {
+  key: 'members.warmPaths',
+  area: 'members',
+  label: 'Prewarm: pages',
+  help: 'One site path per line (starting with /, at most 20), requested by the prewarm job in addition to the member profiles, for example / or /missions.',
+  schema: z.string().max(1000).refine((v) => v.split('\n').every((l) => l.trim() === '' || /^\/(?!\/)\S*$/.test(l.trim())), 'Use one path per line, starting with /'),
+  default: '/\n/missions',
+  onReadFailure: { value: '' },
+  input: { type: 'text', multiline: true, maxLength: 1000, placeholder: '/missions' },
+}
+
 export const MEMBERS_SETTINGS = {
   'members.discordActivityShow': discordActivityShow,
   'members.discordActivityCount': discordActivityCount,
   'members.discordActivityPublicRoleIds': discordActivityPublicRoleIds,
   'members.discordActivityFlushSeconds': discordActivityFlushSeconds,
+  'members.warmEnabled': warmEnabled,
+  'members.warmProfileIds': warmProfileIds,
+  'members.warmPaths': warmPaths,
   'members.nameReminderText': nameReminderText,
   'members.nameReminderCooldownDays': nameReminderCooldownDays,
 } as const satisfies Record<string, SettingDef>

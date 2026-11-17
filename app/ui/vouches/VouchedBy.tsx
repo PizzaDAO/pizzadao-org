@@ -6,18 +6,27 @@ import { useTranslations } from "next-intl";
 
 type Voucher = { memberId: string; name: string; city: string };
 
-type VouchedByProps = { memberId: string };
+/** The /api/vouches/vouchers body, as prefilled by the profile page. */
+export type VouchersInitial = { enabled?: boolean; total?: number; vouchers?: unknown[] };
+
+type VouchedByProps = { memberId: string; initialData?: VouchersInitial | null };
 
 /**
  * Profile block: how many members vouched for this member, and who. Renders nothing while the
  * setting vouches.showVouchersEnabled is off (the API then answers { enabled: false }) or if the
  * list cannot be loaded.
  */
-export function VouchedBy({ memberId }: VouchedByProps) {
+export function VouchedBy({ memberId, initialData = null }: VouchedByProps) {
   const t = useTranslations("dashboard.vouches");
-  const [data, setData] = useState<{ total: number; vouchers: Voucher[] } | null>(null);
+  const prefilled = initialData && typeof initialData.enabled === "boolean" ? initialData : null;
+  const [data, setData] = useState<{ total: number; vouchers: Voucher[] } | null>(
+    prefilled?.enabled === true
+      ? { total: Number(prefilled.total) || 0, vouchers: Array.isArray(prefilled.vouchers) ? (prefilled.vouchers as Voucher[]) : [] }
+      : null,
+  );
 
   useEffect(() => {
+    if (prefilled) return; // arrived with the page
     let cancelled = false;
     (async () => {
       try {
@@ -34,6 +43,7 @@ export function VouchedBy({ memberId }: VouchedByProps) {
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [memberId]);
 
   if (!data) return null;

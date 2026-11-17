@@ -260,7 +260,7 @@ export function useAttendance(memberId: string | undefined) {
 
 // ============ Articles ============
 
-export function useArticlesByMember(memberId: string | undefined) {
+export function useArticlesByMember(memberId: string | undefined, initialData?: { articles: unknown[] } | null) {
   return useQuery({
     queryKey: ['articles-by-member', memberId],
     queryFn: async () => {
@@ -270,6 +270,8 @@ export function useArticlesByMember(memberId: string | undefined) {
     },
     enabled: !!memberId,
     staleTime: 30 * 60 * 1000,
+    // Prefilled on the server with the page: fresh for the stale window, so no refetch on mount.
+    ...(initialData ? { initialData, initialDataUpdatedAt: Date.now() } : {}),
   })
 }
 
@@ -439,6 +441,8 @@ export interface ProfileSummaryData {
   crewOptions: unknown[]
   viewerId: string | null
   isOwner: boolean
+  /** The server painted from light data only (the full summary was still composing): refetch to complete it. */
+  partial?: boolean
 }
 
 /**
@@ -467,9 +471,12 @@ export function useProfileSummary(memberId: string | undefined, initialData?: Pr
     staleTime: 60_000,
     gcTime: 10 * 60 * 1000,
     retry: false,
-    // Server-prefilled public summary: render it at once, then refetch right away so the
-    // viewer-specific fields (isOwner, viewerId) arrive.
-    ...(initialData ? { initialData, initialDataUpdatedAt: 0 } : {}),
+    // Server-prefilled public summary: render it at once. A complete one is fresh (the viewer
+    // comes from useSession), so there is no immediate refetch. A partial one (painted from the
+    // light data) refetches right away to fill in level, rank, member-since and Discord activity.
+    ...(initialData
+      ? { initialData, initialDataUpdatedAt: initialData.partial ? 0 : Date.now() }
+      : {}),
   })
 }
 

@@ -16,11 +16,15 @@
 
 import { useArticlesByMember } from "../../lib/hooks/use-api";
 import ArticleCard, { type ArticleCardData } from "../articles/ArticleCard";
-import { VouchesWidget } from "../vouches/VouchesWidget";
-import { VouchedBy } from "../vouches/VouchedBy";
+import { VouchesWidget, type VouchesInitial } from "../vouches/VouchesWidget";
+import { VouchedBy, type VouchersInitial } from "../vouches/VouchedBy";
 
 interface ContributionsBlockProps {
     memberId: string;
+    /** Server-prefilled data (public, viewer-independent). A missing piece is fetched on the client as before. */
+    initialArticles?: { articles: unknown[] } | null;
+    initialVouches?: VouchesInitial | null;
+    initialVouchers?: VouchersInitial | null;
 }
 
 type RawArticle = {
@@ -47,8 +51,8 @@ const CARD_STYLE: React.CSSProperties = {
     boxShadow: "var(--shadow-soft, 0 8px 30px hsl(var(--ink) / 0.06))",
 };
 
-export function ContributionsBlock({ memberId }: ContributionsBlockProps) {
-    const { data: articlesData } = useArticlesByMember(memberId);
+export function ContributionsBlock({ memberId, initialArticles = null, initialVouches = null, initialVouchers = null }: ContributionsBlockProps) {
+    const { data: articlesData } = useArticlesByMember(memberId, initialArticles);
     const articles: RawArticle[] = articlesData?.articles ?? [];
     const top = articles.slice(0, 3);
 
@@ -57,8 +61,8 @@ export function ContributionsBlock({ memberId }: ContributionsBlockProps) {
         return (
             <section className={CARD_CLASS} style={CARD_STYLE}>
                 <p className="overline text-tomato mb-3">§ 04 · The work</p>
-                <VouchedBy memberId={memberId} />
-                <VouchesWidget memberId={memberId} />
+                <VouchedBy memberId={memberId} initialData={initialVouchers} />
+                <VouchesWidget memberId={memberId} initialData={initialVouches} />
             </section>
         );
     }
@@ -104,8 +108,8 @@ export function ContributionsBlock({ memberId }: ContributionsBlockProps) {
             </div>
 
             <div className="rule pt-4">
-                <VouchedBy memberId={memberId} />
-                <VouchesWidget memberId={memberId} />
+                <VouchedBy memberId={memberId} initialData={initialVouchers} />
+                <VouchesWidget memberId={memberId} initialData={initialVouches} />
             </div>
         </section>
     );

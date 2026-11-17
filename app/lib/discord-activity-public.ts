@@ -5,7 +5,10 @@
 //   guild cannot be read, no channel names are shown at all,
 // - the block is hidden when the switch (members.discordActivityShow) is off or there is no row.
 
+import { createHash } from "node:crypto"
 import { prisma as realPrisma } from "./db"
+import { cacheDel } from "@/app/api/lib/cache"
+import { swrGet } from "./swr-cache"
 import { getSetting } from "./settings"
 import { toggleEnabled } from "./settings/toggles"
 import { monthPrecisionIso } from "./member-since"
@@ -103,20 +106,33 @@ export function countKeyMatches(storedKeys: Iterable<string>, liveNames: string[
   return out
 }
 
-const CHANNEL_CACHE_MS = 60 * 60 * 1000
+/** Shared (KV) cache of the already-vetted public channel names. */
+export const CHANNEL_NAMES_KEY_PREFIX = "discord:public-channel-names:v1"
+/** Fresh for an hour; kept a day so a cold instance never waits on Discord, while a channel that turns private cannot be served for long. */
+export const CHANNEL_NAMES_FRESH_SECONDS = 60 * 60
+export const CHANNEL_NAMES_KEEP_SECONDS = 6 * 60 * 60
 const CHANNEL_RETRY_MS = 5 * 60 * 1000
-let channelCache: { at: number; names: PublicChannels | null } | null = null
-let channelInflight: Promise<PublicChannels | null> | null = null
+const failedUntil = new Map<string, number>()
+const inflight = new Map<string, Promise<PublicChannels | null>>()
+const usedKeys = new Set<string>()
+
+/** KV key for one allow-list: a changed role setting yields a different key, so an old allow-list is never served. */
+export function channelNamesKey(roleIds: string[]): string {
+  const h = createHash("sha1").update([...roleIds].sort().join(",")).digest("hex").slice(0, 12)
+  return `${CHANNEL_NAMES_KEY_PREFIX}:${h}`
+}
 
 /** Test hook. */
 export function clearPublicChannelCache() {
-  channelCache = null
-  channelInflight = null
+  failedUntil.clear()
+  inflight.clear()
+  for (const k of usedKeys) void cacheDel(k)
+  usedKeys.clear()
   clearGuildChannelsCache()
   clearGuildRolesCache()
 }
 
-async function loadPublicChannelNames(fetchImpl: typeof fetch): Promise<PublicChannels | null> {
+async function loadPublicChannelNames(fetchImpl: typeof fetch, wanted: string[]): Promise<PublicChannels | null> {
   const guildId = process.env.DISCORD_GUILD_ID
   const token = process.env.DISCORD_BOT_TOKEN
   if (!guildId || !token) return null
@@ -128,7 +144,6 @@ async function loadPublicChannelNames(fetchImpl: typeof fetch): Promise<PublicCh
     const [roles, channels] = await Promise.all([getGuildRoles({ fetchImpl }), getGuildChannels({ fetchImpl })])
     if (roles && channels) {
       const everyone = roles.find((r) => r.id === guildId)
-      const wanted = parsePublicRoleIds(await getSetting("members.discordActivityPublicRoleIds").catch(() => ""))
       if (everyone) names = publicChannelNames(guildId, everyone.permissions ?? "0", channels as GuildChannel[], roles.filter((r) => wanted.includes(r.id)))
     }
   } catch {
@@ -138,22 +153,45 @@ async function loadPublicChannelNames(fetchImpl: typeof fetch): Promise<PublicCh
   return names
 }
 
-/** The public channel names (cached one hour), or null when Discord cannot be read: show no names then. */
+/**
+ * The public channel names, or null when they cannot be vetted (show no names then). Served from the
+ * shared KV cache, stale-while-revalidate: a cold instance reads one key and never waits on Discord
+ * unless nothing is stored yet. The stored value is only the already-filtered public names (never raw
+ * channels or permissions), keyed by the configured role ids. A failed refresh keeps the stored list.
+ */
 export async function getPublicChannelNames(fetchImpl: typeof fetch = fetch): Promise<PublicChannels | null> {
-  const now = Date.now()
-  if (channelCache && now - channelCache.at < (channelCache.names ? CHANNEL_CACHE_MS : CHANNEL_RETRY_MS)) return channelCache.names
+  const wanted = parsePublicRoleIds(await getSetting("members.discordActivityPublicRoleIds").catch(() => ""))
+  const key = channelNamesKey(wanted)
+  usedKeys.add(key)
+  if ((failedUntil.get(key) ?? 0) > Date.now()) return null
   // Single flight: concurrent cold requests share one lookup.
-  if (!channelInflight) {
-    channelInflight = loadPublicChannelNames(fetchImpl)
-      .then((names) => {
-        channelCache = { at: Date.now(), names }
-        return names
+  let p = inflight.get(key)
+  if (!p) {
+    p = swrGet<Array<[string, string]>>(
+      key,
+      async () => {
+        const names = await loadPublicChannelNames(fetchImpl, wanted)
+        if (!names) throw new Error("public channel names unavailable")
+        return [...names]
+      },
+      {
+        freshSeconds: CHANNEL_NAMES_FRESH_SECONDS,
+        keepSeconds: CHANNEL_NAMES_KEEP_SECONDS,
+        serveStale: true,
+        isValid: (v) => Array.isArray(v) && v.every((e) => Array.isArray(e) && typeof e[0] === "string" && typeof e[1] === "string"),
+      },
+    )
+      .then(({ value }) => new Map(value) as PublicChannels)
+      .catch(() => {
+        failedUntil.set(key, Date.now() + CHANNEL_RETRY_MS)
+        return null
       })
       .finally(() => {
-        channelInflight = null
+        inflight.delete(key)
       })
+    inflight.set(key, p)
   }
-  return channelInflight
+  return p
 }
 
 export interface PublicActivityRow {

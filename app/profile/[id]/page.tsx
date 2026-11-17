@@ -8,7 +8,7 @@
 // handling, owner banner, etc.) lives in <ProfileClient/>.
 
 import type { Metadata } from "next";
-import { composeProfileSummary, getPublicProfileSummary } from "@/app/api/profile-summary/[id]/route";
+import { composeProfileSummary, getPublicProfileSummary, isIncompleteSummary } from "@/app/api/profile-summary/[id]/route";
 import { ProfileClient } from "./ProfileClient";
 import type { ProfileSummaryData } from "@/app/lib/hooks/use-api";
 import { getSession } from "@/app/lib/session";
@@ -17,17 +17,40 @@ import { canViewDisavowList } from "@/app/lib/disavow/access";
 import { findActiveListingFor } from "@/app/lib/disavow/match";
 import { getDisavowTranslator } from "@/app/lib/disavow/messages";
 import { getBuddyRecognition } from "@/app/lib/buddy/recognition";
+import { BuddyRecognitionBlock } from "@/app/ui/profile/BuddyRecognitionBlock";
+import { COOKIE_NAME } from "@/app/lib/session";
+import { cache, Suspense } from "react";
+import { cookies } from "next/headers";
+import { after } from "next/server";
+import { withDeadline } from "@/app/api/profile-summary/[id]/route";
+import { loadProfilePrefill, partialSummaryFromLight, PROFILE_PAGE_BUDGET_MS } from "./profile-page-data";
 
 export const runtime = "nodejs";
 
 // Pull the same in-memory cache the API route uses by calling the composer
 // directly. That avoids a self-HTTP round-trip during SSR and keeps the
 // metadata path resilient to upstream sheet flakiness.
-async function loadHero(id: string) {
+// React cache(): generateMetadata and the page share one light compose (one member and pfp read) per request.
+const loadHero = cache(async (id: string) => {
     try {
         return await composeProfileSummary({ memberId: id, viewerMemberId: null, light: true });
     } catch {
         return null;
+    }
+});
+
+/** Public buddy recognition, streamed on its own so it never holds up the hero. */
+async function BuddySlot({ id }: { id: string }) {
+    const recognition = await getBuddyRecognition(id).catch(() => null);
+    return recognition ? <BuddyRecognitionBlock recognition={recognition} /> : null;
+}
+
+/** Whether the request carries a session cookie at all (unverified; used only to skip viewer-specific prefill). */
+async function hasSessionCookie(): Promise<boolean> {
+    try {
+        return (await cookies()).has(COOKIE_NAME);
+    } catch {
+        return true; // cannot tell: treat as signed in, so nothing viewer-specific is prefilled
     }
 }
 
@@ -87,19 +110,37 @@ export default async function ProfilePage({
     params: Promise<{ id: string }>;
 }) {
     const { id } = await params;
-    // Load the public summary here (same code and cache as /api/profile-summary) so the page
-    // paints without a client fetch; the client refetches to add owner-only fields.
-    const [buddyRecognition, initialSummary, disavowWarning] = await Promise.all([
-        getBuddyRecognition(id).catch(() => null),
-        getPublicProfileSummary(id).catch(() => null),
+    // Everything starts at once. The full public summary (shared cache, then compose) gets an
+    // overall budget; past it the hero paints from the light data generateMetadata already loaded
+    // and the client completes it. Buddy recognition streams separately (Suspense).
+    const full = getPublicProfileSummary(id).catch(() => null);
+    const hasSession = await hasSessionCookie();
+    // Above-the-fold sections ride along with the HTML (each capped; the client fetches any that miss).
+    const [summaryResult, disavowWarning, prefill] = await Promise.all([
+        withDeadline(full, PROFILE_PAGE_BUDGET_MS, null),
         loadDisavowWarning(id),
+        loadProfilePrefill(id, { anonymous: !hasSession }),
     ]);
+    let initialSummary = summaryResult.value;
+    // A summary that missed a deadline (rank, member-since, Discord activity) is not final: mark it
+    // partial so the client refetches at once instead of treating it as fresh.
+    if (initialSummary && isIncompleteSummary(initialSummary)) initialSummary = { ...initialSummary, partial: true };
+    if (summaryResult.timedOut) after(() => full.then(() => undefined, () => undefined));
+    if (!initialSummary) {
+        const light = await loadHero(id);
+        if (light) initialSummary = partialSummaryFromLight(light);
+    }
     return (
         <ProfileClient
             id={id}
             disavowWarning={disavowWarning}
-            buddyRecognition={buddyRecognition}
+            buddySlot={
+                <Suspense fallback={null}>
+                    <BuddySlot id={id} />
+                </Suspense>
+            }
             initialSummary={initialSummary as unknown as ProfileSummaryData | null}
+            prefill={prefill}
         />
     );
 }
