@@ -17,7 +17,8 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 | pineapple-84122 | Auto-Invite member to event or one is near their city | todo | P2 |  |  |  | plans/pineapple-84122-nearby-event-invites.md |  |  |
 | pineapple-71302 | add a email claiming system for memebes to claim a unique pizzadao emails | todo | P3 |  |  |  | plans/pineapple-71302-pizzadao-emails.md |  | 2026-10-17: on hold, not yet (Snax) |
 | neapolitan-96018 | Crew page with start crew call button | todo | P2 |  |  |  |  |  | moved back from Done 2026-11-14: no evidence it shipped |
-| diavola-24729 | Fix pep jobs so they don't have ugly discord names etc | todo | P2 |  |  |  |  |  | moved back from Done 2026-11-14: no evidence it shipped |
+| diavola-24729 | Fix pep jobs so they don't have ugly discord names etc | doing | P2 |  |  |  | plans/diavola-24729.md |  | moved back from Done 2026-11-14: no evidence it shipped |
+| discord-guild-channels-timeout | Discord: GET /guilds/{id}/channels times out in prod | todo | P2 |  |  |  |  |  | found in plans/diavola-24729.md: GET /guilds/{id}/channels times out in prod; blanks public channel names on profiles and recaps |
 
 ## Done
 

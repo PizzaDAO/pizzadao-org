@@ -112,6 +112,22 @@ describe("<Discover />", () => {
         expect(screen.getByText("#partner-suggestions")).toBeInTheDocument();
     });
 
+    it("shows a job's raw type slug as a pretty label", async () => {
+        renderWithIntl(
+            <Discover
+                bounties={BOUNTIES}
+                jobs={[{ id: 21, description: "Make a post", crew: "content_creation" }]}
+                articles={ARTICLES}
+                calls={CALLS}
+            />,
+        );
+        await act(async () => {
+            fireEvent.click(screen.getByRole("tab", { name: /Jobs/ }));
+        });
+        expect(screen.getByText("Content creation")).toBeInTheDocument();
+        expect(screen.queryByText("content_creation")).toBeNull();
+    });
+
     it("renders a bounty description's Discord markup as plain styled text, not a nested link, and uses a plain-text aria-label", () => {
         const bountiesWithMarkup: DiscoverBounty[] = [
             { id: 30, description: "Check <#1099323056012394556> for details", reward: 100, status: "OPEN" },

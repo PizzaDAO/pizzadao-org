@@ -35,7 +35,6 @@ export async function GET() {
         id: job.id,
         description: descriptions[i],
         type: job.type,
-        assignees: job.assignees,
         completed: completedJobIds.includes(job.id)
       })),
       resetAt: resetAt.toISOString(),

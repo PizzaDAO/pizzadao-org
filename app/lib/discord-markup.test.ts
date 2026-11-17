@@ -8,6 +8,7 @@ import {
   formatDiscordTimestamp,
   isValidDiscordTimestamp,
 } from "./discord-markup"
+import { cleanChannelName, cleanGuildName } from "./discord-names"
 
 describe("parseDiscordMarkup", () => {
   it("returns a single text token for plain text", () => {
@@ -200,7 +201,7 @@ describe("parseDiscordMarkup", () => {
 
     it("discordTextToPlainText never throws and drops an out-of-range timestamp to nothing", () => {
       expect(() => discordTextToPlainText("due <t:9999999999999> soon")).not.toThrow()
-      expect(discordTextToPlainText("due <t:9999999999999> soon")).toBe("due  soon")
+      expect(discordTextToPlainText("due <t:9999999999999> soon")).toBe("due soon")
     })
   })
 
@@ -247,12 +248,12 @@ describe("parseDiscordMarkup", () => {
     ])
   })
 
-  it("drops an emoji tag inside markdown link text down to :name:", () => {
+  it("drops an emoji tag inside markdown link text (no :name:, spaces collapsed)", () => {
     const tokens = parseDiscordMarkup(
       "[Nice <:frankpepe_trade:1234826199080112138> job](https://pizzadao.xyz)",
     )
     expect(tokens).toEqual([
-      { type: "link", href: "https://pizzadao.xyz", text: "Nice :frankpepe_trade: job" },
+      { type: "link", href: "https://pizzadao.xyz", text: "Nice job" },
     ])
   })
 
@@ -309,7 +310,7 @@ describe("discordMarkupToPlainText / discordTextToPlainText", () => {
       channels: { "1099323056012394556": "partner-suggestions" },
     })
     expect(plain).toBe(
-      "Now tag @Partnerships in #partner-suggestions, hi @user, nice :pizza:, see the treasury, ignore ",
+      "Now tag @Partnerships in #partner-suggestions, hi @member, nice , see the treasury, ignore",
     )
   })
 
@@ -338,7 +339,7 @@ describe("discordMarkupToPlainText / discordTextToPlainText", () => {
     })
 
     it("still drops a malformed timestamp tag even with keepTimestamps set", () => {
-      expect(discordTextToPlainText("due <t:123:Z>", {}, { keepTimestamps: true })).toBe("due ")
+      expect(discordTextToPlainText("due <t:123:Z>", {}, { keepTimestamps: true })).toBe("due")
     })
   })
 
@@ -424,11 +425,69 @@ describe("user mention names", () => {
     expect(t[0]).toEqual({ type: "user", id: "100000000000000001", name: "Alex", memberId: "m-1" })
     expect(t[2]).toEqual({ type: "user", id: "100000000000000002", name: null })
   })
-  it("flattens to @Name when known, @user otherwise (also via the fallback maps)", () => {
-    expect(discordTextToPlainText("hi <@100000000000000001> and <@100000000000000002>", { users })).toBe("hi @Alex and @user")
+  it("flattens to @Name when known, @member otherwise (also via the fallback maps)", () => {
+    expect(discordTextToPlainText("hi <@100000000000000001> and <@100000000000000002>", { users })).toBe("hi @Alex and @member")
     expect(discordMarkupToPlainText(parseDiscordMarkup("<@100000000000000001>"), { users })).toBe("@Alex")
   })
   it("extracts user ids", () => {
     expect(extractMentionIds("<@100000000000000001> <@!100000000000000002> <@&100000000000000003>").userIds).toEqual(["100000000000000001", "100000000000000002"])
+  })
+})
+
+describe("backslash-escaped tags", () => {
+  it("renders an escaped emoji and channel tag as tokens with no stray backslash", () => {
+    const t = parseDiscordMarkup("a \\<:pizza:111111111111> b \\<#222222222222>")
+    expect(t).toEqual([
+      { type: "text", text: "a " },
+      { type: "emoji", id: "111111111111", name: "pizza", animated: false },
+      { type: "text", text: " b " },
+      { type: "channel", id: "222222222222", name: null },
+    ])
+  })
+  it("leaves a double backslash and a backslash before plain text alone", () => {
+    expect(parseDiscordMarkup("x \\\\<#222222222222>")[0]).toEqual({ type: "text", text: "x \\\\" })
+    expect(parseDiscordMarkup("a \\text")).toEqual([{ type: "text", text: "a \\text" }])
+  })
+  it("still extracts ids from escaped tags", () => {
+    expect(extractMentionIds("\\<#222222222222>").channelIds).toEqual(["222222222222"])
+  })
+})
+
+describe("plain text without emoji names, keepUnresolved", () => {
+  it("drops custom emoji and collapses spaces", () => {
+    expect(discordTextToPlainText("hi <:pizza:111111111111> there")).toBe("hi there")
+    expect(discordTextToPlainText("<a:wave:111111111111> hello")).toBe("hello")
+  })
+  it("keepUnresolved writes unresolved mentions back as raw tags", () => {
+    const opts = { keepUnresolved: true }
+    expect(discordTextToPlainText("<#222222222222> <@&333333333333> <@444444444444>", {}, opts)).toBe(
+      "<#222222222222> <@&333333333333> <@444444444444>",
+    )
+    expect(discordTextToPlainText("<#222222222222>", { channels: { "222222222222": "general" } }, opts)).toBe("#general")
+  })
+})
+
+describe("cleanChannelName / cleanGuildName", () => {
+  it("strips decoration around channel names", () => {
+    expect(cleanChannelName("🍕・general")).toBe("general")
+    expect(cleanChannelName("general┃chat")).toBe("general┃chat")
+    expect(cleanChannelName("┃general")).toBe("general")
+    expect(cleanChannelName("show-and-tell")).toBe("show-and-tell")
+  })
+  it("falls back to the raw name when nothing is left", () => {
+    expect(cleanChannelName("🍕・")).toBe("🍕・")
+  })
+  it("skips the trainee placeholder and sanitizes", () => {
+    expect(cleanGuildName("Pizza Trainee", "Glob_X 🍕", "ux")).toBe("Glob X")
+    expect(cleanGuildName("🍕", null, "user_9")).toBe("user 9")
+    expect(cleanGuildName(null, null, null)).toBeNull()
+  })
+})
+
+describe("masked link with an emoji-only label", () => {
+  it("falls back to the URL host", () => {
+    expect(parseDiscordMarkup("[<:pizza:111111111111>](https://example.org/x)")).toEqual([
+      { type: "link", href: "https://example.org/x", text: "example.org" },
+    ])
   })
 })

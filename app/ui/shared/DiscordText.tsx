@@ -165,7 +165,7 @@ export function DiscordText({
             );
 
           case "user": {
-              const label = token.name ? `@${token.name}` : "@user";
+              const label = token.name ? `@${token.name}` : "@member";
               if (interactive && token.memberId) {
                 return (
                   <Link

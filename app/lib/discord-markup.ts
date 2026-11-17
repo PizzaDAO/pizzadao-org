@@ -75,6 +75,13 @@ export interface PlainTextOptions {
    * formats it fresh, every time it's shown.
    */
   keepTimestamps?: boolean
+  /**
+   * Write an unresolved channel / role / user mention back as its raw tag
+   * (`<#id>`, `<@&id>`, `<@id>`) instead of `#channel` / `@role` / `@member`.
+   * For write-time memo storage: a later display-time render can still resolve
+   * the name, where a frozen placeholder never could.
+   */
+  keepUnresolved?: boolean
 }
 
 // The largest magnitude (in ms) `Date` can represent — ECMA-262 bounds it to
@@ -154,6 +161,14 @@ function trimTrailingPunctuation(url: string): string {
   return url.slice(0, end)
 }
 
+function hostLabel(href: string): string {
+  try {
+    return new URL(href).host || "link"
+  } catch {
+    return "link"
+  }
+}
+
 /** Parse `text` into renderable tokens, resolving mentions via `maps` when possible. */
 export function parseDiscordMarkup(text: string, maps: DiscordMarkupMaps = {}): DiscordMarkupToken[] {
   const tokens: DiscordMarkupToken[] = []
@@ -171,8 +186,14 @@ export function parseDiscordMarkup(text: string, maps: DiscordMarkupMaps = {}): 
       continue
     }
 
+    // Groups 5-9: emoji id, channel, role, user, timestamp.
+    const isRecognisedTag = [5, 6, 7, 8, 9].some((g) => match?.[g] !== undefined)
     if (match.index > lastIndex) {
-      tokens.push({ type: "text", text: text.slice(lastIndex, match.index) })
+      let before = text.slice(lastIndex, match.index)
+      // `\<#id>` etc.: Discord shows the tag literally, a web page should show
+      // the resolved name. Drop one escaping backslash (but not the second of `\\`).
+      if (isRecognisedTag && before.endsWith("\\") && !before.endsWith("\\\\")) before = before.slice(0, -1)
+      if (before) tokens.push({ type: "text", text: before })
     }
 
     const [
@@ -197,7 +218,8 @@ export function parseDiscordMarkup(text: string, maps: DiscordMarkupMaps = {}): 
       // The link TEXT can itself contain markup (a mention, an emoji tag,
       // ...) — flatten it to plain text so nothing raw shows inside the
       // anchor's label.
-      const cleanedText = discordMarkupToPlainText(parseDiscordMarkup(linkText, maps), maps)
+      // An emoji-only label flattens to nothing: fall back to the URL host.
+      const cleanedText = discordMarkupToPlainText(parseDiscordMarkup(linkText, maps), maps) || hostLabel(linkHref)
       tokens.push({ type: "link", href: linkHref, text: cleanedText })
     } else if (emojiId !== undefined) {
       tokens.push({ type: "emoji", id: emojiId, name: emojiName, animated: emojiAnimated === "a" })
@@ -315,8 +337,8 @@ export function formatDiscordTimestamp(
 }
 
 /**
- * Flatten parsed tokens to a plain-text string — `#name`, `@name` (role or user; `@user` when unresolved),
- * a link's text, `:name:` for an emoji, a formatted date/time for a
+ * Flatten parsed tokens to a plain-text string — `#name`, `@name` (role or user; `@member` for an unresolved user),
+ * a link's text, nothing for a custom emoji (spaces are then collapsed and the result trimmed), a formatted date/time for a
  * timestamp (or, with `opts.keepTimestamps`, the timestamp's original
  * `<t:unix[:style]>` tag, unresolved — see `PlainTextOptions`), and nothing
  * for a dropped/unknown tag. For use anywhere a description needs to go
@@ -335,14 +357,20 @@ export function discordMarkupToPlainText(
       switch (token.type) {
         case "text":
           return token.text
-        case "channel":
-          return `#${token.name ?? maps.channels?.[token.id] ?? "channel"}`
-        case "role":
-          return `@${token.name ?? maps.roles?.[token.id] ?? "role"}`
-        case "user":
-          return `@${token.name ?? maps.users?.[token.id]?.name ?? "user"}`
+        case "channel": {
+          const name = token.name ?? maps.channels?.[token.id]
+          return name ? `#${name}` : opts.keepUnresolved ? `<#${token.id}>` : "#channel"
+        }
+        case "role": {
+          const name = token.name ?? maps.roles?.[token.id]
+          return name ? `@${name}` : opts.keepUnresolved ? `<@&${token.id}>` : "@role"
+        }
+        case "user": {
+          const name = token.name ?? maps.users?.[token.id]?.name
+          return name ? `@${name}` : opts.keepUnresolved ? `<@${token.id}>` : "@member"
+        }
         case "emoji":
-          return `:${token.name}:`
+          return ""
         case "link":
           return token.text
         case "timestamp":
@@ -354,6 +382,8 @@ export function discordMarkupToPlainText(
       }
     })
     .join("")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim()
 }
 
 /** Parse `text` and flatten it to plain text in one step (see `discordMarkupToPlainText`). */

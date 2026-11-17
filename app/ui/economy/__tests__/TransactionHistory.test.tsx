@@ -141,6 +141,23 @@ describe('TransactionHistory', () => {
       expect(screen.getByText('Completed job: Weekly standup notes')).toBeInTheDocument()
     })
 
+    it('shows the transfer counterparty name instead of the id in the memo', async () => {
+      mockFetchSuccess(
+        [
+          makeTx({ id: 1, type: 'TRANSFER_SENT', amount: -5, description: 'Transfer to 100000000000000009', counterpartName: 'Sample Person', counterpartMemberId: 'm-9' }),
+          makeTx({ id: 2, type: 'TRANSFER_RECEIVED', amount: 5, description: 'Transfer from 100000000000000010', counterpartName: 'a member', counterpartMemberId: null }),
+        ],
+        2,
+      )
+      render(<TransactionHistory />)
+
+      await waitFor(() => {
+        expect(screen.getByText('Transfer to Sample Person')).toBeInTheDocument()
+      })
+      expect(screen.getByText('Transfer from a member')).toBeInTheDocument()
+      expect(screen.queryByText(/100000000000000009/)).toBeNull()
+    })
+
     it('renders Discord markup in a memo as plain styled text, not a nested link (the row is itself a button)', async () => {
       ;(global.fetch as Mock).mockResolvedValue({
         ok: true,

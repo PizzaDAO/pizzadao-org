@@ -20,14 +20,14 @@ import { resolveDiscordMentions } from './discord-mention-resolve'
  * Resolve any <#channelId> / <@&roleId> Discord mentions in `description` so
  * a ledger memo (escrow/reward/refund) stores plain text, not raw markup —
  * same pattern as the job-reward memo in jobs.ts. resolveDiscordMentions
- * never throws (a failed Discord lookup just falls back to "#channel" /
- * "@role" instead of a name). keepTimestamps: true keeps a `<t:...>` tag
+ * never throws (a failed Discord lookup keeps the raw tag in the memo, which
+ * history rendering can still resolve later). keepTimestamps: true keeps a `<t:...>` tag
  * raw in the memo rather than freezing it to today's formatted
  * date/relative string — display-time rendering formats it fresh.
  */
 async function plainMemoDescription(description: string): Promise<string> {
   const { channels, roles, users } = await resolveDiscordMentions([description])
-  return discordTextToPlainText(description, { channels, roles, users }, { keepTimestamps: true })
+  return discordTextToPlainText(description, { channels, roles, users }, { keepTimestamps: true, keepUnresolved: true })
 }
 
 /**

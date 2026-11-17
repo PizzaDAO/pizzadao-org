@@ -189,22 +189,19 @@ export async function isTodaysDailyJob(jobId: number): Promise<boolean> {
 }
 
 /**
- * Get all jobs with their assignments
+ * Get all active jobs
  */
 export async function getJobs() {
   const jobs = await prisma.job.findMany({
     where: { isActive: true },
-    include: {
-      assignments: true
-    },
+    select: { id: true, description: true, type: true },
     orderBy: { id: 'asc' }
   })
 
-  return jobs.map((job: any) => ({
+  return jobs.map((job) => ({
     id: job.id,
     description: job.description,
     type: job.type,
-    assignees: job.assignments.map((a: any) => a.userId)
   }))
 }
 
@@ -341,12 +338,12 @@ export async function completeJob(userId: string, reward: number, grantedBy?: st
   // Resolve any <#channelId> / <@&roleId> Discord mentions in the job
   // description so the ledger memo stores plain text, not raw markup
   // (resolveDiscordMentions never throws — a failed Discord lookup just
-  // means the memo falls back to "#channel"/"@role" instead of a name).
+  // means the memo keeps the raw tag, which display-time rendering can still resolve).
   // keepTimestamps: true — a <t:...> tag shouldn't be frozen to today's
   // formatted date/relative string at write time; keep it raw so
   // display-time rendering (DiscordText) formats it fresh.
   const { channels, roles, users } = await resolveDiscordMentions([assignment.job.description])
-  const plainDescription = discordTextToPlainText(assignment.job.description, { channels, roles, users }, { keepTimestamps: true })
+  const plainDescription = discordTextToPlainText(assignment.job.description, { channels, roles, users }, { keepTimestamps: true, keepUnresolved: true })
 
   // Remove the assignment and pay the reward (with its ledger row) in one DB
   // transaction. The delete is conditional, so concurrent completions of the

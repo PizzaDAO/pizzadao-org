@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import {
+  getChannel,
+  fetchChannel,
   getGuildChannels,
   getGuildRoles,
   clearGuildChannelsCache,
@@ -79,5 +81,20 @@ describe("getGuildChannels / getGuildRoles negative cache", () => {
     const second = await getGuildRoles({ ...OPTS, now: 10_000, fetchImpl })
     expect(second).toBeNull()
     expect(fetchImpl).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe("getChannel / fetchChannel", () => {
+  const ID = "1099323056012394556"
+
+  it("getChannel includes the name, guild and permission overwrites", async () => {
+    const ow = [{ id: "999", type: 0, allow: "0", deny: "1024" }]
+    const fetchImpl = vi.fn(async () => res(200, { id: ID, name: "general", type: 0, guild_id: "999", permission_overwrites: ow }))
+    expect(await getChannel(ID, { ...OPTS, fetchImpl })).toMatchObject({ id: ID, name: "general", guildId: "999", permissionOverwrites: ow })
+  })
+
+  it("fetchChannel reports Retry-After on a 429", async () => {
+    const fetchImpl = vi.fn(async () => new Response("{}", { status: 429, headers: { "retry-after": "7" } }))
+    expect(await fetchChannel(ID, { ...OPTS, fetchImpl })).toEqual({ ok: false, status: 429, retryAfterMs: 7000 })
   })
 })

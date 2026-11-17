@@ -10,7 +10,6 @@ type Job = {
   id: number;
   description: string;
   type: string | null;
-  assignees: string[];
   completed: boolean;
 };
 

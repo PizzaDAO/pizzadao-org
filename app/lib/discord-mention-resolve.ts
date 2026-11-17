@@ -7,17 +7,23 @@
  * discord.com/channels/... links), restricted to the ids actually
  * referenced, so a response doesn't leak the whole guild's channel/role list.
  *
- * Channel and role lists are fetched once per hour and cached in memory by
- * `discord-channels.ts` (getGuildChannels / getGuildRoles), so calling this
- * on every request is cheap.
+ * Roles come from one cached guild list (getGuildRoles). Channel names are
+ * looked up one id at a time (getPublicChannelName, cached in memory and KV): the
+ * full guild channel list times out in production, and jobs only mention a
+ * handful of channels. Only PUBLIC channels of our guild get a name: the text
+ * can be member-written, so a private channel's name must never leak.
  */
 import { extractMentionIdsFromAll, type ResolvedUser } from "./discord-markup"
-import { getGuildChannels, getGuildRoles, getGuildMemberName, type DiscordOpts } from "./discord-channels"
-import { prisma } from "./db"
+import { getGuildRoles, getGuildMemberCleanName, type DiscordOpts } from "./discord-channels"
+import { getPublicChannelName } from "./discord-channel-name"
+import { cleanChannelName } from "./discord-names"
+import { memberNamesByDiscordId } from "./member-names"
 
 // Most distinct non-member ids looked up via the bot per call (each is one
-// cached REST call); the rest fall back to "@user".
+// cached REST call); the rest fall back to "@member".
 const MAX_BOT_USER_LOOKUPS = 25
+// Most distinct channels looked up via the bot per call (one cached REST call each).
+const MAX_BOT_CHANNEL_LOOKUPS = 25
 
 export interface ResolvedMentionMaps {
   channels: Record<string, string>
@@ -34,20 +40,10 @@ export interface ResolvedMentionMaps {
 async function resolveUsers(userIds: string[], opts: DiscordOpts): Promise<Record<string, ResolvedUser>> {
   const users: Record<string, ResolvedUser> = {}
   if (userIds.length === 0) return users
-  try {
-    const rows = await prisma.member.findMany({
-      where: { discordId: { in: userIds }, mergedInto: null },
-      select: { id: true, discordId: true, name: true },
-    })
-    for (const row of rows) {
-      const name = (row.name ?? "").trim()
-      if (row.discordId && name && !users[row.discordId]) users[row.discordId] = { name, memberId: row.id }
-    }
-  } catch {
-    // DB unavailable: fall through to the Discord lookup.
-  }
+  const members = await memberNamesByDiscordId(userIds)
+  for (const [id, m] of members) users[id] = { name: m.name, memberId: m.memberId }
   const rest = userIds.filter((id) => !users[id]).slice(0, MAX_BOT_USER_LOOKUPS)
-  const names = await Promise.all(rest.map((id) => getGuildMemberName(id, opts).catch(() => null)))
+  const names = await Promise.all(rest.map((id) => getGuildMemberCleanName(id, opts).catch(() => null)))
   rest.forEach((id, i) => {
     const name = names[i]
     if (name) users[id] = { name }
@@ -70,19 +66,17 @@ export async function resolveDiscordMentions(
     return { channels, roles, users: {}, guildId }
   }
 
-  const [channelList, roleList, users] = await Promise.all([
-    channelIds.length > 0 ? getGuildChannels(opts) : Promise.resolve(null),
+  const channelLookups = channelIds.slice(0, MAX_BOT_CHANNEL_LOOKUPS)
+  const [channelNames, roleList, users] = await Promise.all([
+    Promise.all(channelLookups.map((id) => getPublicChannelName(id, opts).catch(() => null))),
     roleIds.length > 0 ? getGuildRoles(opts) : Promise.resolve(null),
     resolveUsers(userIds, opts).catch(() => ({}) as Record<string, ResolvedUser>),
   ])
 
-  if (channelList) {
-    const byId = new Map(channelList.map((c) => [c.id, c.name]))
-    for (const id of channelIds) {
-      const name = byId.get(id)
-      if (name) channels[id] = name
-    }
-  }
+  channelLookups.forEach((id, i) => {
+    const name = channelNames[i]
+    if (name) channels[id] = cleanChannelName(name)
+  })
 
   if (roleList) {
     const byId = new Map(roleList.map((r) => [r.id, r.name]))

@@ -22,6 +22,9 @@ type TransactionData = {
   balance: number;
   description: string;
   createdAt: string;
+  /** Transfer rows: the other side's name (server-resolved) and, for members, their profile id. */
+  counterpartName?: string;
+  counterpartMemberId?: string | null;
 };
 
 const CREDIT_COLOR = "hsl(142 71% 32%)";   // emerald, used for incoming
@@ -329,7 +332,11 @@ export function TransactionHistory({ refreshKey }: { refreshKey?: number }) {
                                 real <a> (e.g. a channel mention link) can't nest inside
                                 it, so mentions/links render as styled, non-interactive
                                 text instead. */}
-                            <DiscordText text={tx.description} channels={channels} roles={roles} users={users} guildId={guildId} interactive={false} />
+                            {tx.counterpartName ? (
+                              <>{tx.type === "TRANSFER_SENT" ? "Transfer to" : "Transfer from"} {tx.counterpartName}</>
+                            ) : (
+                              <DiscordText text={tx.description} channels={channels} roles={roles} users={users} guildId={guildId} interactive={false} />
+                            )}
                           </span>
                           <span
                             className="ui mt-1 block text-[10px] uppercase tracking-[0.22em]"

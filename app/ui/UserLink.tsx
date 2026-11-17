@@ -11,24 +11,28 @@ type UserLinkProps = {
   // the per-user `/api/member-lookup/{discordId}` round-trip, and we never
   // fall back to /profile/{discordSnowflake}.
   memberId?: string | null;
+  // If the parent already knows the display name (server-resolved), pass it in
+  // and the per-user lookup fetch is skipped.
+  name?: string | null;
   style?: React.CSSProperties;
 };
 
 // Simple in-memory cache for user names and member IDs
 const nameCache: Record<string, string> = {};
 const memberIdCache: Record<string, string> = {};
+const UNKNOWN_NAME = "a member";
 
 /**
  * Text link to a member's profile. Uses foreground color by default,
  * shifts to tomato on hover with a 2px underline offset to match the
  * pizzadao.org link treatment.
  */
-export function UserLink({ discordId, memberId: providedMemberId, style }: UserLinkProps) {
-  const [name, setName] = useState<string | null>(nameCache[discordId] || null);
+export function UserLink({ discordId, memberId: providedMemberId, name: providedName, style }: UserLinkProps) {
+  const [name, setName] = useState<string | null>(providedName || nameCache[discordId] || null);
   const [memberId, setMemberId] = useState<string | null>(
     providedMemberId || memberIdCache[discordId] || null,
   );
-  const [loading, setLoading] = useState(!nameCache[discordId]);
+  const [loading, setLoading] = useState(!providedName && !nameCache[discordId]);
 
   // Seed the shared cache so other instances rendering the same Discord ID
   // also pick up the server-provided memberId without a fetch.
@@ -40,6 +44,11 @@ export function UserLink({ discordId, memberId: providedMemberId, style }: UserL
   }, [discordId, providedMemberId]);
 
   useEffect(() => {
+    if (providedName) {
+      setName(providedName);
+      setLoading(false);
+      return;
+    }
     if (nameCache[discordId]) {
       setName(nameCache[discordId]);
       if (!providedMemberId) {
@@ -65,20 +74,20 @@ export function UserLink({ discordId, memberId: providedMemberId, style }: UserL
             if (!providedMemberId) setMemberId(String(data.memberId));
           }
         } else {
-          // Fallback to truncated ID
-          setName(discordId.slice(0, 8) + "...");
+          // Neutral fallback, never an id
+          setName(UNKNOWN_NAME);
         }
       } catch {
-        setName(discordId.slice(0, 8) + "...");
+        setName(UNKNOWN_NAME);
       } finally {
         setLoading(false);
       }
     };
 
     fetchName();
-  }, [discordId, providedMemberId]);
+  }, [discordId, providedMemberId, providedName]);
 
-  const displayName = loading ? discordId.slice(0, 8) + "..." : name;
+  const displayName = loading ? "…" : name ?? UNKNOWN_NAME;
   // spinach-65462: prefer the server-provided memberId, then the cached
   // memberId resolved via /api/member-lookup. ONLY fall back to discordId
   // when neither is known — and in that case, render a non-link span so we

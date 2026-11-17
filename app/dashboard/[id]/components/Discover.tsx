@@ -18,6 +18,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { prettyLabel } from "@/app/lib/pretty-label";
 import { ArrowUpRight } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { DiscordText } from "@/app/ui/shared/DiscordText";
@@ -171,7 +172,7 @@ function BountyItem({
     // description render as styled, non-interactive text (interactive
     // nested inside this <Link> would be invalid HTML and fight the
     // tile's own click target) — same pattern as JobItem below.
-    const plainDescription = discordTextToPlainText(b.description, { channels, roles, users });
+    const plainDescription = discordTextToPlainText(b.description, { channels, roles, users }) || "Discord message";
     return (
         <Link
             href={`/pep`}
@@ -259,7 +260,7 @@ function JobItem({
     // description render as styled, non-interactive text (interactive
     // nested inside this <Link> would be invalid HTML and fight the
     // tile's own click target).
-    const plainDescription = discordTextToPlainText(j.description, { channels, roles, users });
+    const plainDescription = discordTextToPlainText(j.description, { channels, roles, users }) || "Discord message";
     return (
         <Link
             href={`/pep`}
@@ -308,7 +309,7 @@ function JobItem({
                         color: "hsl(var(--muted-foreground))",
                     }}
                 >
-                    {j.crew}
+                    {prettyLabel(j.crew)}
                 </div>
             )}
         </Link>
