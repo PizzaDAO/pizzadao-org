@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
+import { RouteMessages } from "@/app/lib/i18n/RouteMessages";
 import { proposalsEnabled } from "@/app/lib/proposals/constants";
 import { toggleEnabled } from "@/app/lib/settings/toggles";
 
@@ -17,5 +18,5 @@ export default async function ProposalsLayout({ children }: { children: ReactNod
         toggleEnabled("proposals.historyEnabled").catch(() => false),
     ]);
     if (!voting && !history) notFound();
-    return <>{children}</>;
+    return <RouteMessages route="proposals">{children}</RouteMessages>;
 }

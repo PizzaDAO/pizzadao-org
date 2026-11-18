@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { OnboardingWizard } from "./ui/onboarding";
+import { RouteMessages } from "@/app/lib/i18n/RouteMessages";
 
 export const metadata: Metadata = {
   title: { absolute: "Join PizzaDAO" },
@@ -7,6 +8,7 @@ export const metadata: Metadata = {
 
 export default function Page() {
   return (
+    <RouteMessages route="">
     <main className="bg-background text-foreground min-h-screen">
       {/* Subtle warm gradient backdrop reminiscent of pizzadao.org hero */}
       <div
@@ -21,5 +23,6 @@ export default function Page() {
         <OnboardingWizard />
       </div>
     </main>
+    </RouteMessages>
   );
 }
