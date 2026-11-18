@@ -10,6 +10,12 @@ vi.mock('@/app/lib/pfp-assets/compose', async (orig) => ({
   composeMemberPfp: vi.fn(),
   availableBases: vi.fn(async () => ({ static: null, discord: null, mafia: null })),
 }))
+vi.mock('@/app/lib/pfp-assets/access', () => ({
+  assertCanEdit: vi.fn(async () => undefined),
+  assertBaseKindAllowed: vi.fn(async () => undefined),
+  allowedBaseKinds: vi.fn(async () => ['mafia', 'restyle']),
+  loadEditAccess: vi.fn(async () => ({ allowed: true, completed: 2, minLevel: 2, bypass: false })),
+}))
 vi.mock('@/app/lib/pfp-assets/catalog', () => ({
   listAssets: vi.fn(async () => []),
   hintLookups: vi.fn(async () => ({})),
@@ -21,6 +27,7 @@ vi.mock('@/app/lib/pfp-assets/context', () => ({
 import { getSession } from '@/app/lib/session'
 import { fetchMemberIdByDiscordId } from '@/app/lib/sheets/member-repository'
 import { composeMemberPfp } from '@/app/lib/pfp-assets/compose'
+import { assertBaseKindAllowed, assertCanEdit } from '@/app/lib/pfp-assets/access'
 import { ForbiddenError } from '@/app/lib/errors/api-errors'
 import { prisma } from '@/app/lib/db'
 import { del } from '@vercel/blob'
@@ -39,6 +46,24 @@ beforeEach(() => {
   m(getSession).mockResolvedValue({ discordId: '400000000000000001' })
   m(fetchMemberIdByDiscordId).mockResolvedValue('42')
   m(composeMemberPfp).mockResolvedValue({ composedUrl: 'https://s.public.blob.vercel-storage.com/pfp-composed/42-ab.webp', layers: [] })
+})
+
+describe('/api/pfp/compose rules', () => {
+  it('refuses a disallowed base or a member below the level, composing nothing', async () => {
+    m(assertBaseKindAllowed).mockRejectedValueOnce(new ForbiddenError('no'))
+    expect((await POST(post({ base: { kind: 'upload', url: 'https://x/u.png' }, layers: [] }))).status).toBe(403)
+    m(assertCanEdit).mockRejectedValueOnce(new ForbiddenError('Reach level 2 to make your PFP.'))
+    expect((await POST(post({ base: { kind: 'mafia' }, layers: [] }))).status).toBe(403)
+    expect(composeMemberPfp).not.toHaveBeenCalled()
+    expect((await POST(post({ base: { kind: 'mafia' }, layers: [] }))).status).toBe(200)
+    expect(assertBaseKindAllowed).toHaveBeenCalledWith('mafia')
+  })
+
+  it('GET reports the allowed bases and the level access for the locked page', async () => {
+    const body = await (await GET(new Request('https://app.test/api/pfp/compose'))).json()
+    expect(body.allowedBaseKinds).toEqual(['mafia', 'restyle'])
+    expect(body.access).toMatchObject({ allowed: true, minLevel: 2 })
+  })
 })
 
 describe('/api/pfp/compose auth', () => {

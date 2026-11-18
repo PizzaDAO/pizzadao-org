@@ -16,6 +16,7 @@ import { unlockedAssetIds } from '@/app/lib/pfp-assets/unlocks'
 import { lockHint } from '@/app/lib/pfp-assets/types'
 import { availableBases, composeMemberPfp, isBaseKind } from '@/app/lib/pfp-assets/compose'
 import { ValidationError } from '@/app/lib/errors/api-errors'
+import { allowedBaseKinds, assertBaseKindAllowed, assertCanEdit, loadEditAccess } from '@/app/lib/pfp-assets/access'
 import { toggleEnabled } from '@/app/lib/settings/toggles'
 import { evaluateAllowance, loadRestyleSettings, loadUsage, usageByOutfit } from '@/app/lib/pfp-assets/restyle'
 
@@ -30,6 +31,7 @@ function parseBase(v: unknown): { kind: import('@/app/lib/pfp-assets/compose').B
 }
 
 export const GET = memberPfpRoute(async (_req, { memberId, discordId }) => {
+  const [access, baseKinds] = await Promise.all([loadEditAccess(discordId), allowedBaseKinds()])
   const [assets, ctx, bases, current, outfitOverlay, restyleSettings, used] = await Promise.all([
     listAssets({ activeOnly: true }),
     loadUnlockContext(discordId),
@@ -47,6 +49,8 @@ export const GET = memberPfpRoute(async (_req, { memberId, discordId }) => {
   const lookups = await hintLookups(assets.filter((a) => !unlocked.has(a.id)))
   return {
     level: ctx.level,
+    allowedBaseKinds: baseKinds,
+    access: { allowed: access.allowed, minLevel: access.minLevel, completed: access.bypass ? ctx.level : access.completed },
     outfitOverlay,
     restyle: {
       enabled: restyleSettings.enabled,
@@ -87,6 +91,9 @@ export const POST = memberPfpRoute(async (req, { memberId, discordId }) => {
   const body = await jsonBody(req)
   const base = body.base as { kind?: unknown; url?: unknown } | undefined
   if (!base || !isBaseKind(base.kind)) throw new ValidationError('Choose a base picture', 'base')
+  await assertCanEdit(discordId)
+  await assertBaseKindAllowed(base.kind)
+  await assertBaseKindAllowed((body.original as { kind?: unknown } | undefined)?.kind)
   const res = await composeMemberPfp({
     memberId,
     discordId,

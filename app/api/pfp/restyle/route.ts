@@ -5,6 +5,7 @@
 import { memberPfpRoute } from '@/app/lib/pfp-assets/member-route'
 import { jsonBody } from '@/app/lib/pfp-assets/admin-route'
 import { isBaseKind } from '@/app/lib/pfp-assets/compose'
+import { assertBaseKindAllowed, assertCanEdit } from '@/app/lib/pfp-assets/access'
 import { restyleForMember } from '@/app/lib/pfp-assets/restyle'
 import { ValidationError } from '@/app/lib/errors/api-errors'
 
@@ -19,6 +20,8 @@ export const POST = memberPfpRoute(
     if (!Number.isInteger(outfitId) || outfitId < 1) throw new ValidationError('Pick an outfit', 'outfitId')
     const base = body.base as { kind?: unknown; url?: unknown } | undefined
     if (!base || !isBaseKind(base.kind)) throw new ValidationError('Choose a base picture', 'base')
+    await assertCanEdit(discordId)
+    await assertBaseKindAllowed(base.kind)
     return restyleForMember({
       memberId,
       discordId,

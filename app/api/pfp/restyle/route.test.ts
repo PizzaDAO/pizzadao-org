@@ -7,6 +7,12 @@ vi.mock('@/app/lib/pfp-assets/restyle', async (orig) => ({
   ...(await orig<typeof import('@/app/lib/pfp-assets/restyle')>()),
   restyleForMember: vi.fn(),
 }))
+vi.mock('@/app/lib/pfp-assets/access', () => ({
+  assertCanEdit: vi.fn(async () => undefined),
+  assertBaseKindAllowed: vi.fn(async () => undefined),
+  allowedBaseKinds: vi.fn(async () => ['mafia', 'restyle']),
+  loadEditAccess: vi.fn(async () => ({ allowed: true, completed: 2, minLevel: 2, bypass: false })),
+}))
 vi.mock('@/app/lib/db', () => ({ prisma: {} }))
 vi.mock('@/app/lib/settings', () => ({ getSetting: vi.fn() }))
 vi.mock('@/app/lib/settings/toggles', () => ({ toggleEnabled: vi.fn() }))
@@ -14,6 +20,7 @@ vi.mock('@/app/lib/settings/toggles', () => ({ toggleEnabled: vi.fn() }))
 import { getSession } from '@/app/lib/session'
 import { fetchMemberIdByDiscordId } from '@/app/lib/sheets/member-repository'
 import { restyleForMember } from '@/app/lib/pfp-assets/restyle'
+import { assertBaseKindAllowed, assertCanEdit } from '@/app/lib/pfp-assets/access'
 import { ApiError } from '@/app/lib/errors/api-errors'
 import { POST } from './route'
 
@@ -30,6 +37,20 @@ beforeEach(() => {
   m(getSession).mockResolvedValue({ discordId: '400000000000000009' })
   m(fetchMemberIdByDiscordId).mockResolvedValue('42')
   m(restyleForMember).mockResolvedValue({ url: 'https://x/restyle.png', outfitRemaining: 1, dailyRemaining: 2 })
+})
+
+describe('POST /api/pfp/restyle rules', () => {
+  it('refuses a disallowed base or a member below the level, generating nothing', async () => {
+    const { ForbiddenError } = await import('@/app/lib/errors/api-errors')
+    m(fetchMemberIdByDiscordId).mockResolvedValue('77')
+    m(assertBaseKindAllowed).mockRejectedValueOnce(new ForbiddenError('no'))
+    expect((await POST(post({ outfitId: 1, base: { kind: 'upload', url: 'https://x/u.png' } }))).status).toBe(403)
+    m(assertCanEdit).mockRejectedValueOnce(new ForbiddenError('Reach level 2 to make your PFP.'))
+    expect((await POST(post({ outfitId: 1, base: { kind: 'mafia' } }))).status).toBe(403)
+    expect(restyleForMember).not.toHaveBeenCalled()
+    expect((await POST(post({ outfitId: 1, base: { kind: 'mafia' } }))).status).toBe(200)
+    expect(restyleForMember).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('POST /api/pfp/restyle', () => {
