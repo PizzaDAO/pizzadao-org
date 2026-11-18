@@ -1,4 +1,6 @@
+import Image from "next/image";
 import Link from "next/link";
+import { isOptimizableImage } from "@/app/lib/image-hosts";
 import { MemberHoverCard } from "../profile/MemberHoverCard";
 import type { Attendee } from "@/app/lib/calls/attendees";
 
@@ -11,8 +13,7 @@ function Chip({ a }: { a: Attendee }) {
     const body = (
         <>
             {a.pfpUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={a.pfpUrl} alt="" width={28} height={28} loading="lazy" className="h-7 w-7 shrink-0 rounded-full object-cover" />
+                <Image src={a.pfpUrl} alt="" width={28} height={28} loading="lazy" unoptimized={!isOptimizableImage(a.pfpUrl)} className="h-7 w-7 shrink-0 rounded-full object-cover" />
             ) : (
                 <span aria-hidden className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-foreground/10 text-xs font-bold">
                     {Array.from(a.name)[0]?.toUpperCase() ?? "?"}

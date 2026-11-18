@@ -84,7 +84,6 @@ const DRAG_MAX = 22;
 interface FrameProps {
   photo: PizzaPhoto;
   slot: Slot;
-  index: number;
   onOpen: (photo: PizzaPhoto) => void;
 }
 
@@ -94,7 +93,7 @@ interface FrameProps {
  * Also supports a small tactile drag (constrained), and a click to
  * open the cinematic lightbox.
  */
-const ArchivalFrame = ({ photo, slot, index, onOpen }: FrameProps) => {
+const ArchivalFrame = ({ photo, slot, onOpen }: FrameProps) => {
   const ref = useRef<HTMLElement | null>(null);
   const [drift, setDrift] = useState(0);
   const [current, setCurrent] = useState(photo);
@@ -233,7 +232,7 @@ const ArchivalFrame = ({ photo, slot, index, onOpen }: FrameProps) => {
           key={current.src}
           src={current.src}
           alt={`${current.city}, ${current.country} - PizzaDAO gathering`}
-          loading={index < 3 ? "eager" : "lazy"}
+          loading="lazy"
           decoding="async"
           draggable={false}
           className={`absolute inset-0 h-full w-full object-cover transition-transform duration-[1600ms] ease-out group-hover:scale-[1.025] ${filter}`}
@@ -508,7 +507,6 @@ const ArchivalWall = () => {
             <ArchivalFrame
               key={i}
               slot={slot}
-              index={i}
               photo={photo}
               onOpen={setOpen}
             />

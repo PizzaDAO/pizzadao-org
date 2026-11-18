@@ -120,7 +120,7 @@ const PageHero = ({
                     <Image sizes="(min-width: 768px) 40vw, 100vw" width={1200} height={1500}
                       src={tapedImage.src}
                       alt={tapedImage.alt}
-                      loading="eager"
+                      loading="lazy"
                       className="mk-grain photo-hover block aspect-[4/5] w-full object-cover"
                     />
                   </div>

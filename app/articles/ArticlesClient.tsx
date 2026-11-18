@@ -14,7 +14,11 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
-import { ArticleList, TagBadge, type ArticleCardData, type ViewMode } from "@/app/ui/articles";
+// Import the files directly, not the "@/app/ui/articles" barrel: the barrel re-exports ArticleRenderer
+// (react-markdown + remark-gfm), which the list page never renders.
+import ArticleList, { type ViewMode } from "@/app/ui/articles/ArticleList";
+import TagBadge from "@/app/ui/articles/TagBadge";
+import type { ArticleCardData } from "@/app/ui/articles/ArticleCard";
 
 interface Pagination {
   page: number;
