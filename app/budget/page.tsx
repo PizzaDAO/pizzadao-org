@@ -4,6 +4,7 @@
 // `payments.*` settings; nothing is hard-coded in the prose. If the settings cannot be read, the
 // amounts are hidden rather than showing the strict failure values.
 
+import { completedLevel } from "@/app/lib/level-display";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
@@ -67,7 +68,7 @@ export default async function BudgetPage() {
                             {t("fastBody", {
                                 paid: p.fastTrackMinPaidRequests,
                                 accountDays: p.fastTrackMinAccountDays,
-                                level: p.fastTrackMinLevel,
+                                level: completedLevel(p.fastTrackMinLevel),
                                 fastMax: usd(p.fastTrackMaxUsd),
                             })}
                         </p>

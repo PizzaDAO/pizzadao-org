@@ -6,6 +6,7 @@
 
 "use client";
 
+import { completedLevel } from "@/app/lib/level-display";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 
@@ -108,7 +109,7 @@ export function BuddyCard({ initial }: { initial?: BuddyState | null }) {
                 </div>
             ))}
 
-            {locked ? <p className="mt-3 text-sm text-foreground/80">{t("locked", { level: state.minLevel ?? 0 })}</p> : null}
+            {locked ? <p className="mt-3 text-sm text-foreground/80">{t("locked", { level: completedLevel(state.minLevel ?? 0) })}</p> : null}
             {state.eligible && !profile?.active ? (
                 <div className="mt-3">
                     <p className="text-sm text-foreground/80">{t("invite")}</p>

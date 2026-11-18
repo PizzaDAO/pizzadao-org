@@ -76,12 +76,12 @@ export function renderDigestEmail(d: Digest, opts: RenderOptions): RenderedEmail
   }
   if (d.allDone) {
     lines.push({ kind: "p", text: t("allCaught") });
-  } else if (d.nextLevel && d.remaining > 0) {
+  } else if (d.goalLevel && d.remaining > 0) {
     lines.push({
       kind: "p",
-      text: d.nextLevelTitle
-        ? t("levelProgressTitled", { remaining: d.remaining, nextLevel: d.nextLevel, levelTitle: d.nextLevelTitle })
-        : t("levelProgress", { remaining: d.remaining, nextLevel: d.nextLevel }),
+      text: d.goalLevelTitle
+        ? t("levelProgressTitled", { remaining: d.remaining, level: d.goalLevel, levelTitle: d.goalLevelTitle })
+        : t("levelProgress", { remaining: d.remaining, level: d.goalLevel }),
     });
   }
   if (d.calls.length > 0) {

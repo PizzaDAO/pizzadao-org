@@ -5,6 +5,7 @@
  */
 import type { MissionHold } from '@prisma/client'
 import { makeEmbed, type Embed, type EmbedAuthor } from '../discord-interactions/embeds'
+import { completedLevel } from '../level-display'
 import type { RunReport } from './engine'
 import { holdLabel, type HoldPolicy } from './policy'
 
@@ -25,6 +26,8 @@ export interface MissionsView {
   enabled: boolean
   currentLevel: number
   levelTitle: string | null
+  /** Title of the highest level completed (null when none or untitled). */
+  completedTitle?: string | null
   maxLevel: number
   earned: number
   missions: MissionLine[]
@@ -42,6 +45,7 @@ type OverviewLike = {
   paidLevels?: number[]
   levels: Array<{
     level: number
+    title?: string | null
     reward: number
     missions: Array<{ id: number; title: string; progress: { status: string; holdReason?: string | null } | null }>
   }>
@@ -92,6 +96,7 @@ export function buildMissionsView(overview: OverviewLike, report: RunReport): Mi
     enabled: report.enabled,
     currentLevel: overview.currentLevel,
     levelTitle: overview.levelTitle,
+    completedTitle: overview.levels.find((l) => l.level === completedLevel(overview.currentLevel))?.title ?? null,
     maxLevel,
     earned,
     missions,
@@ -126,8 +131,12 @@ export function renderMissionsEmbed(view: MissionsView, opts: { author?: EmbedAu
   const cur = opts.currency ?? '$PEP'
   const n = (v: number) => v.toLocaleString('en-US')
   const done = view.currentLevel > view.maxLevel
+  const completed = completedLevel(view.currentLevel)
+  const completedTitle = view.completedTitle ?? null
   const head: string[] = [
-    done ? '**All levels complete.**' : `Level **${view.currentLevel}**${view.levelTitle ? ` · ${view.levelTitle}` : ''}`,
+    done
+      ? `**All levels complete.** Level **${completed}**${completedTitle ? ` · ${completedTitle}` : ''}`
+      : `Completed: Level **${completed}**${completedTitle ? ` · ${completedTitle}` : ''}\nNext: Level **${view.currentLevel}**${view.levelTitle ? ` · ${view.levelTitle}` : ''}`,
     `Earned from missions: ${cur} ${n(view.earned)}`,
   ]
   if (!view.enabled) head.push('', '_Automatic checks are not switched on yet: this shows your progress only._')

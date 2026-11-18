@@ -120,8 +120,12 @@ export interface DashboardSummary {
      */
     levelCard: {
         enabled: boolean;
+        /** The level being worked on (progress below is for it). */
         level: number;
         title: string | null;
+        /** Highest level completed (0 = none) and its title: what the card heading shows. */
+        completed: number;
+        completedTitle: string | null;
         isMax: boolean;
         done: number;
         total: number;
@@ -456,6 +460,8 @@ export async function GET(request: NextRequest) {
             enabled: levelCardEnabled,
             level: levelInfo.level,
             title: levelInfo.title,
+            completed: levelInfo.completed,
+            completedTitle: levelInfo.completedTitle,
             isMax: levelInfo.isMax,
             done: levelInfo.done,
             total: levelInfo.total,

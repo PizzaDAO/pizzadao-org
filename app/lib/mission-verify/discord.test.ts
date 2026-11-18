@@ -35,7 +35,7 @@ const overview = {
   currentLevel: 2,
   levelTitle: 'Pizza Noob',
   levels: [
-    { level: 1, reward: 69, missions: [{ id: 1, title: 'Link X', progress: { status: 'APPROVED' } }] },
+    { level: 1, title: 'Pizza Trainee', reward: 69, missions: [{ id: 1, title: 'Link X', progress: { status: 'APPROVED' } }] },
     {
       level: 2,
       reward: 420,
@@ -155,7 +155,8 @@ describe('renderMissionsEmbed', () => {
     )
     const e = renderMissionsEmbed(view, { currency: '$PEP', appUrl: 'https://app.pizzadao.org' })
     expect(e.description).toMatch(/^⏳ No new completions yet\./)
-    expect(e.description).toContain('Level **2** · Pizza Noob')
+    expect(e.description).toContain('Completed: Level **1** · Pizza Trainee')
+    expect(e.description).toContain('Next: Level **2** · Pizza Noob')
     expect(e.description).toContain('Earned from missions: $PEP 69')
     expect(e.description).toContain('▫️ Say hi on a call: 0/1 Join a community call')
     expect(e.description).toContain('⏳ Post about PizzaDAO (pending review)')

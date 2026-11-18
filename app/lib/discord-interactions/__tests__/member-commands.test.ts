@@ -161,7 +161,7 @@ describe('/level reply', () => {
     expect(t).not.toContain('Selfie')
   })
   it('MAX and non-members', async () => {
-    expect(await text(job('level'), mdeps({ levelInfo: vi.fn(async () => ({ ...INFO, isMax: true, level: 9 })) }))).toContain('MAX level')
+    expect(await text(job('level'), mdeps({ levelInfo: vi.fn(async () => ({ ...INFO, isMax: true, level: 9, completed: 8, completedTitle: 'Don of Dons' })) }))).toContain('level 8: Don of Dons')
     expect(await text(job('level', '100000000000000555'), mdeps())).toMatch(/isn't a PizzaDAO member/)
   })
 })
