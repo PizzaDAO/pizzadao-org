@@ -115,7 +115,7 @@ function fakeDb() {
   const rows = new Map<string, ActivityRow>()
   const batches = new Set<string>()
   const tx = {
-    $queryRaw: async () => [],
+    $executeRaw: async () => 0,
     discordActivity: {
       findMany: async (a: unknown) => {
         const ids = (a as { where: { discordId: { in: string[] } } }).where.discordId.in
