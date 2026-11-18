@@ -226,79 +226,86 @@ export async function getUserJob(userId: string) {
   return assignment?.job || null
 }
 
-/**
- * Assign a specific job to a user
- */
-export async function assignJob(userId: string, jobId: number) {
-  // Check if user already has a job
-  const existing = await getUserJob(userId)
-  if (existing) {
-    throw new Error('You already have an active job')
-  }
+/** Advisory-lock namespace for per-user job assignment (first key of the two-key lock). */
+export const JOB_ASSIGN_LOCK_NAMESPACE = 742019342
 
-  // Check if job exists and is active
-  const job = await prisma.job.findUnique({
-    where: { id: jobId }
-  })
+type JobTx = Pick<typeof prisma, '$executeRaw' | '$queryRaw' | 'jobAssignment' | 'job'>
 
-  if (!job || !job.isActive) {
-    throw new Error('Job not found or inactive')
-  }
-
-  await prisma.jobAssignment.create({
-    data: { jobId, userId }
-  })
-
-  return job
+/** Serialize this user's assignments; held until the surrounding transaction ends. */
+async function lockUserAssignment(tx: JobTx, userId: string) {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${JOB_ASSIGN_LOCK_NAMESPACE}::int, hashtext(${userId}))`
 }
 
 /**
- * Assign a random job using round-robin
+ * Assign a specific job to a user. The "already has a job" check and the insert run in one
+ * transaction under a per-user lock, so two simultaneous requests cannot both succeed.
+ */
+export async function assignJob(userId: string, jobId: number) {
+  return prisma.$transaction(async (tx) => {
+    await lockUserAssignment(tx, userId)
+
+    const existing = await tx.jobAssignment.findFirst({ where: { userId } })
+    if (existing) {
+      throw new Error('You already have an active job')
+    }
+
+    // Check if job exists and is active
+    const job = await tx.job.findUnique({
+      where: { id: jobId }
+    })
+
+    if (!job || !job.isActive) {
+      throw new Error('Job not found or inactive')
+    }
+
+    await tx.jobAssignment.create({
+      data: { jobId, userId }
+    })
+
+    return job
+  })
+}
+
+/**
+ * Assign a random job using round-robin. Same per-user lock and in-transaction check as
+ * assignJob; the shared counter is advanced with a single atomic upsert-increment, so
+ * concurrent callers by different users each get a distinct slot.
  */
 export async function assignRandomJob(userId: string) {
-  // Check if user already has a job
-  const existing = await getUserJob(userId)
-  if (existing) {
-    throw new Error('You already have an active job')
-  }
+  return prisma.$transaction(async (tx) => {
+    await lockUserAssignment(tx, userId)
 
-  // Get all active jobs
-  const jobs = await prisma.job.findMany({
-    where: { isActive: true },
-    orderBy: { id: 'asc' }
-  })
+    const existing = await tx.jobAssignment.findFirst({ where: { userId } })
+    if (existing) {
+      throw new Error('You already have an active job')
+    }
 
-  if (jobs.length === 0) {
-    throw new Error('No jobs available')
-  }
-
-  // Get or create cycle tracker
-  let cycle = await prisma.jobCycle.findUnique({
-    where: { id: 1 }
-  })
-
-  if (!cycle) {
-    cycle = await prisma.jobCycle.create({
-      data: { id: 1, currentIndex: 0 }
+    // Get all active jobs
+    const jobs = await tx.job.findMany({
+      where: { isActive: true },
+      orderBy: { id: 'asc' }
     })
-  }
 
-  // Get next job in round-robin
-  const jobIndex = cycle.currentIndex % jobs.length
-  const job = jobs[jobIndex]
+    if (jobs.length === 0) {
+      throw new Error('No jobs available')
+    }
 
-  // Update cycle index
-  await prisma.jobCycle.update({
-    where: { id: 1 },
-    data: { currentIndex: (cycle.currentIndex + 1) % jobs.length }
+    // The counter holds the next index. Advance it atomically and derive the slot just taken
+    // (a fresh row starts at 0, so its first caller takes slot 0).
+    const n = jobs.length
+    const rows = await tx.$queryRaw<Array<{ currentIndex: number }>>`
+      INSERT INTO "JobCycle" ("id", "currentIndex") VALUES (1, ${1 % n})
+      ON CONFLICT ("id") DO UPDATE SET "currentIndex" = ("JobCycle"."currentIndex" + 1) % ${n}
+      RETURNING "currentIndex"`
+    const job = jobs[(Number(rows[0].currentIndex) - 1 + n) % n]
+
+    // Assign the job
+    await tx.jobAssignment.create({
+      data: { jobId: job.id, userId }
+    })
+
+    return job
   })
-
-  // Assign the job
-  await prisma.jobAssignment.create({
-    data: { jobId: job.id, userId }
-  })
-
-  return job
 }
 
 /**

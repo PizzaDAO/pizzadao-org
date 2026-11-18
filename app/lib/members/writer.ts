@@ -18,6 +18,8 @@ async function membersFromDb(): Promise<boolean> {
   return usesDb('members')
 }
 
+/** DB mode: claim checks run under MEMBER_WRITE_LOCK. */
+
 /** Serializes database member writes (and keeps them apart from id allocation, which uses ...331). */
 const MEMBER_WRITE_LOCK = 742019332
 
@@ -92,6 +94,10 @@ export async function postMemberWrite(payload: Record<string, unknown>, env: Nod
         console.error('[members] sheet copy failed', e instanceof Error ? e.message : e)
       }
     }
+  }
+
+  if (!result.ok && result.conflict) {
+    return { status: 409, text: JSON.stringify({ ok: false, error: result.error, crewSync: result }) }
   }
 
   const crewSync = result.ok && !result.skipped ? { ok: true, action: result.action, sheet: 'db', id: result.id } : result

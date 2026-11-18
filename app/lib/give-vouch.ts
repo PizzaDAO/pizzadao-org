@@ -14,7 +14,8 @@
  * and a "vouch from their profile" answer in Discord (see discord-interactions/member-commands.ts).
  */
 import { prisma } from '@/app/lib/db'
-import { addVouch, notifyVouchAdded } from '@/app/lib/vouches'
+import { notifyVouchAdded } from '@/app/lib/vouches'
+import { invalidateProfileSummary } from '@/app/lib/profile-summary-cache'
 import { fetchMemberById } from '@/app/lib/sheets/member-repository'
 import { findMemberByDiscordId } from '@/app/lib/member-utils'
 import { emitMissionEvent } from '@/app/lib/mission-verify/events'
@@ -33,10 +34,13 @@ export interface GiveVouchDeps {
   fetchTarget: (memberId: string) => Promise<Record<string, unknown> | null>
   /** Whether this pair already has a vouch (checked before the daily limit, so a repeat is a 409, never a 429). */
   exists: (followerId: string, followeeId: string) => Promise<boolean>
-  /** Vouches this member gave since `since`. */
-  countRecent: (memberId: string, since: Date) => Promise<number>
   dailyLimit: () => Promise<number>
-  create: (followerId: string, followeeId: string) => Promise<unknown>
+  /**
+   * Count the voucher's vouches since `since` and create this one, atomically (one transaction under a
+   * per-voucher lock), so concurrent requests cannot all pass the same count. Resolves false when the
+   * limit is already reached (nothing created). A lost duplicate race throws a unique violation.
+   */
+  createWithinLimit: (followerId: string, followeeId: string, limit: number, since: Date) => Promise<boolean>
   emit: (discordId: string, event: 'vouch_created' | 'vouch_received', memberId: string) => Promise<unknown>
   /** Mark the voucher's own "vouch for me" request from the target read (fail-soft). */
   clearRequest: (voucherDiscordId: string, targetMemberId: string) => Promise<unknown>
@@ -48,13 +52,28 @@ export const defaultGiveVouchDeps: GiveVouchDeps = {
   findVoucher: findMemberByDiscordId,
   fetchTarget: (id) => fetchMemberById(id) as Promise<Record<string, unknown> | null>,
   exists: async (followerId, followeeId) => (await prisma.vouch.count({ where: { followerId, followeeId } })) > 0,
-  countRecent: (memberId, since) => prisma.vouch.count({ where: { followerId: memberId, createdAt: { gte: since } } }),
   dailyLimit: () => getSetting('vouches.dailyLimit'),
-  create: (followerId, followeeId) => addVouch(followerId, followeeId),
+  createWithinLimit: createVouchWithinLimit,
   emit: (discordId, event, memberId) => emitMissionEvent(discordId, event, { memberId }),
   clearRequest: clearVouchRequestNotification,
   notify: notifyVouchAdded,
   now: () => new Date(),
+}
+
+/** Advisory-lock namespace for per-voucher vouch creation (first key of the two-key lock). */
+export const VOUCH_LOCK_NAMESPACE = 742019341
+
+/** Count + create under a per-giver advisory lock, in one transaction (no schema change needed). */
+export async function createVouchWithinLimit(followerId: string, followeeId: string, limit: number, since: Date): Promise<boolean> {
+  const created = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${VOUCH_LOCK_NAMESPACE}::int, hashtext(${followerId}))`
+    const recent = await tx.vouch.count({ where: { followerId, createdAt: { gte: since } } })
+    if (recent >= limit) return false
+    await tx.vouch.create({ data: { followerId, followeeId } })
+    return true
+  })
+  if (created) invalidateProfileSummary(followeeId)
+  return created
 }
 
 const isUniqueViolation = (err: unknown) => typeof err === 'object' && err !== null && (err as { code?: string }).code === 'P2002'
@@ -85,11 +104,9 @@ export async function giveVouch(
   }
 
   const limit = await deps.dailyLimit()
-  const recent = await deps.countRecent(voucher.memberId, new Date(deps.now().getTime() - DAY_MS))
-  if (recent >= limit) return { ok: false, reason: 'limit', limit }
-
   try {
-    await deps.create(voucher.memberId, input.targetMemberId)
+    const created = await deps.createWithinLimit(voucher.memberId, input.targetMemberId, limit, new Date(deps.now().getTime() - DAY_MS))
+    if (!created) return { ok: false, reason: 'limit', limit }
   } catch (err) {
     if (isUniqueViolation(err)) {
       defer(clearRequest)
