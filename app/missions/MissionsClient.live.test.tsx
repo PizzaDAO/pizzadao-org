@@ -67,7 +67,7 @@ describe("live updates on /missions", () => {
   });
 
   it("does not refetch or toast for an unrelated change flag", async () => {
-    const f = vi.fn(async () => new Response("{}", { status: 404 }));
+    const f = vi.fn(async (_url: string) => new Response("{}", { status: 404 }));
     vi.stubGlobal("fetch", f);
     render(<MissionsClient initial={snapshot("PENDING") as never} />);
     await act(async () => live.onChange?.({ mine: false, queue: false }));
