@@ -117,7 +117,9 @@ const nextConfig: NextConfig = {
     const appEntry = ["/app", "/api"].map((source) => ({ source, destination: "/start", permanent: false }));
     // The Community Call is not a crew: its old crew page goes to the call list, filtered to it, before the page renders.
     const communityCall = [...NON_ROSTER_CREW_IDS].map((id) => ({ source: `/crew/${id}`, destination: `/calls?crew=${COMMUNITY_CALL_ATTENDANCE_ID}`, permanent: false }));
-    const legacy = [...appEntry, ...communityCall, ...legacyDashboardRedirects(), ...legacyAssetRedirects()];
+    // Retired legacy poll voting (/vote/<pollId>): voting lives in the proposals system now.
+    const retiredVote = ["/vote", "/vote/:path*"].map((source) => ({ source, destination: "/proposals", permanent: true }));
+    const legacy = [...appEntry, ...retiredVote, ...communityCall, ...legacyDashboardRedirects(), ...legacyAssetRedirects()];
     return marketingHomeAtRoot() ? [...wizardParamRedirects(), ...legacy, { source: "/home", destination: "/", permanent: false }] : legacy;
   },
   async headers() {
