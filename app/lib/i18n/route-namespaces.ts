@@ -63,6 +63,7 @@ export const ROUTE_NAMESPACES: Record<string, readonly string[]> = {
   spotlight: ["spotlight"],
   start: ["onboarding"],
   "tax-form": ["taxForm"],
+  trivia: ["trivia"],
 };
 
 /** Segments whose layout loads its own catalog instead of using RouteMessages (so nobody else receives it). */
