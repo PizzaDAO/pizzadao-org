@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { knownLoggedOut } from "@/app/lib/auth-hint";
 import { clearFailed, flushDue, flushOnPageHide, listFailed, pruneClosedProposals, QUEUE_EVENT } from "@/app/lib/proposals/vote-queue";
 import { clearLegacyUnsaved, noteServerDate, loadBallot, parseMine, prepareBallot } from "@/app/lib/proposals/client";
 
@@ -51,6 +52,8 @@ export function GlobalBallotPreparer() {
         let cancelled = false;
         // Nothing in here may throw or reject: this runs in the root layout on every page, and a failure must be silent.
         (async () => {
+            // The browser knows there is no session: nothing to prepare. Unknown or "1" still checks.
+            if (knownLoggedOut()) return;
             // The check runs at most every few minutes.
             try {
                 const last = Number(sessionStorage.getItem(CHECKED_KEY) || 0);

@@ -2,7 +2,7 @@ import { SIGNUP_DRAFT_COOKIE, SIGNUP_DRAFT_TTL_SECONDS } from "@/app/lib/signup-
 import { REF_COOKIE, refCookieOptions } from "@/app/lib/referral-cookie";
 import { NextResponse } from "next/server";
 import { verifyMagicToken } from "@/app/lib/magic-login";
-import { createSessionToken, getSessionCookieOptions, COOKIE_NAME } from "@/app/lib/session";
+import { createSessionToken, getSessionCookieOptions, setSessionCookies } from "@/app/lib/session";
 import { syncRolesOnLogin } from "@/app/lib/sync-roles-on-login";
 import { fetchMemberByDiscordId } from "@/app/lib/sheets/member-repository";
 import { loginReturnPath } from "@/app/lib/login-return";
@@ -96,7 +96,7 @@ export async function GET(req: Request) {
   res.headers.set("Cache-Control", "no-store");
   res.headers.set("Referrer-Policy", "no-referrer");
   const cookieOpts = getSessionCookieOptions(req);
-  res.cookies.set(COOKIE_NAME, sessionToken, cookieOpts);
+  setSessionCookies(res, sessionToken, req);
   if (result.draft && result.tokenHash && !memberId) {
     res.cookies.set(SIGNUP_DRAFT_COOKIE, result.tokenHash, { ...cookieOpts, maxAge: SIGNUP_DRAFT_TTL_SECONDS });
     if (result.draft.invitedBy?.viaLink) res.cookies.set(REF_COOKIE, result.draft.invitedBy.memberId, refCookieOptions(req));

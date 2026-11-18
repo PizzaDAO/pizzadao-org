@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { proposalsEnabledFor } from "@/app/lib/proposals/pilot";
 import { toggleEnabled } from "@/app/lib/settings/toggles";
-import { getSession } from "@/app/lib/session";
+import { getSession, getSessionCookieOptions } from "@/app/lib/session";
+import { setAuthHint } from "@/app/lib/auth-hint";
 import {
   fetchMemberByDiscordId,
   fetchMemberById,
@@ -22,107 +23,118 @@ export async function GET() {
   if (!session?.discordId) {
     // The public proposal history gets a nav entry for signed-out visitors too.
     const historyOn = await toggleEnabled("proposals.historyEnabled").catch(() => false);
-    return NextResponse.json({ authenticated: false, ...(historyOn ? { showProposals: true } : {}) }, { status: 401 });
+    const res = NextResponse.json({ authenticated: false, ...(historyOn ? { showProposals: true } : {}) }, { status: 401 });
+    setAuthHint(res, "0", getSessionCookieOptions());
+    return res;
   }
 
-  // Resolve member data from shared cache (Phase 2)
-  let memberId: string | null = null;
-  let memberName: string | null = null;
-  let crews: string[] = [];
-  let isAdmin = false;
+  // The independent lookups run concurrently; each fails closed on its own.
+  const memberChain = async () => {
+    let memberId: string | null = null;
+    let memberName: string | null = null;
+    let crews: string[] = [];
+    let pfpPath: string | null = null;
+    try {
+      const member = await fetchMemberByDiscordId(session.discordId);
+      if (member) {
+        memberId = member.memberId;
+        memberName = member.name;
 
-  try {
-    const member = await fetchMemberByDiscordId(session.discordId);
-    if (member) {
-      memberId = member.memberId;
-      memberName = member.name;
+        // Get full member data for crews
+        const fullData = await fetchMemberById(memberId);
+        if (fullData) {
+          const crewsStr = String(fullData["Crews"] || "").trim();
+          crews =
+            crewsStr && crewsStr !== "None"
+              ? crewsStr
+                  .split(",")
+                  .map((c) => c.trim())
+                  .filter(Boolean)
+              : [];
+        }
+      }
+    } catch {
+      // Silently fail - memberId will be null
+    }
 
-      // Get full member data for crews
-      const fullData = await fetchMemberById(memberId);
-      if (fullData) {
-        const crewsStr = String(fullData["Crews"] || "").trim();
-        crews =
-          crewsStr && crewsStr !== "None"
-            ? crewsStr
-                .split(",")
-                .map((c) => c.trim())
-                .filter(Boolean)
-            : [];
+    // PFP is a quick fs check - include it to avoid a separate request
+    if (memberId) {
+      const fs = await import("fs");
+      const path = await import("path");
+      const pfpDir = path.join(process.cwd(), "public", "pfp");
+
+      if (fs.existsSync(path.join(pfpDir, `${memberId}.jpg`))) {
+        pfpPath = `/pfp/${memberId}.jpg`;
+      } else if (fs.existsSync(path.join(pfpDir, `${memberId}.png`))) {
+        pfpPath = `/pfp/${memberId}.png`;
+      }
+      // A composed PFP (unlockable assets) wins over the static file.
+      try {
+        const { prisma } = await import("@/app/lib/db");
+        const composed = await prisma.memberPfp.findUnique({ where: { memberId: String(memberId) }, select: { composedUrl: true } });
+        if (composed?.composedUrl) pfpPath = composed.composedUrl;
+      } catch {
+        // table missing or DB down: keep the static answer
       }
     }
-  } catch {
-    // Silently fail - memberId will be null
-  }
+    return { memberId, memberName, crews, pfpPath };
+  };
 
   // Admin + mission-reviewer status from one guild-roles lookup (fails closed).
   // canReviewMissions (not isAdmin) gates the /missions review panel: the
   // reviewer roles are wider than the admin roles (mission-review-access.ts).
   // canManageShop: the /add-money rule (admin roles + Pepperoni Mafia), for
   // the /admin/shop link; the page and its API check it again server-side.
-  let canReviewMissions = false;
-  let canManageShop = false;
-  try {
-    const roles = await getUserRoles(session.discordId);
-    isAdmin = roles.some((r) => (ADMIN_ROLE_IDS as readonly string[]).includes(r));
-    [canReviewMissions, canManageShop] = await Promise.all([
-      canReviewAnyMission(roles),
-      canManageShopRoles(roles),
-    ]);
-  } catch {
-    isAdmin = false;
-    canReviewMissions = false;
-    canManageShop = false;
-  }
+  const rolesChain = async () => {
+    try {
+      const roles = await getUserRoles(session.discordId);
+      const isAdmin = roles.some((r) => (ADMIN_ROLE_IDS as readonly string[]).includes(r));
+      const [canReviewMissions, canManageShop] = await Promise.all([
+        canReviewAnyMission(roles),
+        canManageShopRoles(roles),
+      ]);
+      return { isAdmin, canReviewMissions, canManageShop };
+    } catch {
+      return { isAdmin: false, canReviewMissions: false, canManageShop: false };
+    }
+  };
 
   // Disavow list: only computed while the feature flag is on; fails closed.
   // Never present (not even false) when the flag is off, so nothing hints at it.
-  let disavowFlags: { canViewDisavow: true; canVoteDisavow: boolean; disavowNavLabel: string } | null = null;
-  if (await disavowEnabled()) {
-    // Cached 60s per user: this endpoint is polled. Data guards never use the cache.
-    const v = await disavowViewerCached(session.discordId);
-    if (v.allowed) {
-      // Present only for eligible viewers (never a `false`), with the label
-      // localized server-side: the disavow strings are not in the root catalog.
-      let label = "Disavow list";
-      try {
-        label = (await getDisavowTranslator())("navLabel");
-      } catch { /* keep the English fallback */ }
-      disavowFlags = { canViewDisavow: true, canVoteDisavow: v.isDPR, disavowNavLabel: label };
+  const disavowChain = async () => {
+    let flags: { canViewDisavow: true; canVoteDisavow: boolean; disavowNavLabel: string } | null = null;
+    if (await disavowEnabled()) {
+      // Cached 60s per user: this endpoint is polled. Data guards never use the cache.
+      const v = await disavowViewerCached(session.discordId);
+      if (v.allowed) {
+        // Present only for eligible viewers (never a `false`), with the label
+        // localized server-side: the disavow strings are not in the root catalog.
+        let label = "Disavow list";
+        try {
+          label = (await getDisavowTranslator())("navLabel");
+        } catch { /* keep the English fallback */ }
+        flags = { canViewDisavow: true, canVoteDisavow: v.isDPR, disavowNavLabel: label };
+      }
     }
-  }
+    return flags;
+  };
 
-  // Proposals nav entry: shown while voting or the proposal history is switched on (fails closed).
-  const [votingOn, historyOn] = await Promise.all([
+  const [member, roleFlags, disavowFlags, votingOn, historyOn, sessionsOn] = await Promise.all([
+    memberChain(),
+    rolesChain(),
+    disavowChain().catch(() => null),
     proposalsEnabledFor(session.discordId).catch(() => false),
     toggleEnabled("proposals.historyEnabled").catch(() => false),
+    // Sessions nav entry: shown while the public /learn page is switched on (fails closed).
+    toggleEnabled("education.publicListingEnabled").catch(() => false),
   ]);
+  const { memberId, memberName, crews, pfpPath } = member;
+  const { isAdmin, canReviewMissions, canManageShop } = roleFlags;
+  // Proposals nav entry: shown while voting or the proposal history is switched on (fails closed).
   const showProposals = votingOn || historyOn;
-  // Sessions nav entry: shown while the public /learn page is switched on (fails closed).
-  const showSessions = await toggleEnabled("education.publicListingEnabled").catch(() => false);
+  const showSessions = sessionsOn;
 
-  // PFP is a quick fs check - include it to avoid a separate request
-  let pfpPath: string | null = null;
-  if (memberId) {
-    const fs = await import("fs");
-    const path = await import("path");
-    const pfpDir = path.join(process.cwd(), "public", "pfp");
-
-    if (fs.existsSync(path.join(pfpDir, `${memberId}.jpg`))) {
-      pfpPath = `/pfp/${memberId}.jpg`;
-    } else if (fs.existsSync(path.join(pfpDir, `${memberId}.png`))) {
-      pfpPath = `/pfp/${memberId}.png`;
-    }
-    // A composed PFP (unlockable assets) wins over the static file.
-    try {
-      const { prisma } = await import("@/app/lib/db");
-      const composed = await prisma.memberPfp.findUnique({ where: { memberId: String(memberId) }, select: { composedUrl: true } });
-      if (composed?.composedUrl) pfpPath = composed.composedUrl;
-    } catch {
-      // table missing or DB down: keep the static answer
-    }
-  }
-
-  return NextResponse.json(
+  const res = NextResponse.json(
     {
       authenticated: true,
       discordId: session.discordId,
@@ -143,4 +155,7 @@ export async function GET() {
       headers: { "Cache-Control": "private, max-age=300" },
     },
   );
+  // Backfills the hint for sessions that predate it.
+  setAuthHint(res, "1", getSessionCookieOptions());
+  return res;
 }

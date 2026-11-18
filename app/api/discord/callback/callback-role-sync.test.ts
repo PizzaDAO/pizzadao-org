@@ -23,6 +23,10 @@ vi.mock("@/app/lib/session", () => ({
     path: "/",
     maxAge: 2592000,
   }),
+  setSessionCookies: (res: { cookies: { set: (n: string, v: string, o: object) => void } }, token: string) => {
+    res.cookies.set("pizzadao_session", token, { httpOnly: true, secure: false, sameSite: "lax", path: "/" });
+    return res;
+  },
   COOKIE_NAME: "pizzadao_session",
 }));
 

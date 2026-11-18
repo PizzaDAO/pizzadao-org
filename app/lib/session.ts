@@ -2,6 +2,7 @@
 // Secure session handling with signed cookies
 import { cookies } from "next/headers";
 import { createHmac } from "crypto";
+import { setAuthHint, type CookieJar } from "@/app/lib/auth-hint";
 
 const COOKIE_NAME = "pizzadao_session";
 
@@ -102,6 +103,25 @@ export function getSessionCookieOptions(req?: Request) {
         path: "/",
         maxAge: SESSION_MAX_AGE_SECONDS,
     };
+}
+
+/**
+ * The one place a session cookie is set. Also writes the non-httpOnly hint cookie ("1") so the
+ * browser knows a session may exist. Every login path goes through here.
+ */
+export function setSessionCookies<T extends CookieJar>(res: T, token: string, req?: Request): T {
+    const opts = getSessionCookieOptions(req);
+    res.cookies.set(COOKIE_NAME, token, opts);
+    setAuthHint(res, "1", opts);
+    return res;
+}
+
+/** The one place the session cookie is cleared. Clears the session and writes hint "0". */
+export function clearSessionCookies<T extends CookieJar>(res: T, req?: Request): T {
+    const opts = getSessionCookieOptions(req);
+    res.cookies.set(COOKIE_NAME, "", { ...opts, maxAge: 0 });
+    setAuthHint(res, "0", opts);
+    return res;
 }
 
 export { COOKIE_NAME };

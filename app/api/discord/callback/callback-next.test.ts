@@ -9,6 +9,10 @@ vi.mock("@/app/lib/sheets/member-repository", () => ({
 vi.mock("@/app/lib/session", () => ({
   createSessionToken: vi.fn().mockReturnValue("tok"),
   getSessionCookieOptions: vi.fn().mockReturnValue({ path: "/" }),
+  setSessionCookies: (res: { cookies: { set: (n: string, v: string, o: object) => void } }, token: string) => {
+    res.cookies.set("pizzadao_session", token, { path: "/" });
+    return res;
+  },
   COOKIE_NAME: "pizzadao_session",
 }));
 const mockDecode = vi.fn();

@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, type QueryClient } from "@tanstack/react-query";
+import { knownLoggedOut, markHintLoggedOut } from "@/app/lib/auth-hint";
 
 export interface SessionData {
   authenticated: boolean;
@@ -50,18 +51,35 @@ export function markLoggedOut(queryClient: QueryClient) {
   queryClient.removeQueries({ queryKey: ["me"] });
 }
 
+function loggedOutFrom(body: { showProposals?: boolean }): SessionData {
+  return body.showProposals === true ? { ...LOGGED_OUT_SESSION, showProposals: true } : LOGGED_OUT_SESSION;
+}
+
+/**
+ * When the hint cookie says there is no session ("0"), skip /api/session and use the CDN-cacheable
+ * /api/session/public. Unknown or "1" always does the real check; a stale "1" gets a 401 and flips to "0".
+ */
+export async function fetchSession(): Promise<SessionData> {
+  if (knownLoggedOut()) {
+    const pub = await fetch("/api/session/public").catch(() => null);
+    if (pub?.ok) {
+      return loggedOutFrom((await pub.json().catch(() => ({}))) as { showProposals?: boolean });
+    }
+    // The public endpoint failed: fall through to the real check.
+  }
+  const res = await fetch("/api/session");
+  if (res.status === 401) {
+    markHintLoggedOut();
+    return loggedOutFrom((await res.json().catch(() => ({}))) as { showProposals?: boolean });
+  }
+  if (!res.ok) throw new Error("Session fetch failed");
+  return res.json();
+}
+
 export function useSession() {
   return useQuery<SessionData>({
     queryKey: ["session"],
-    queryFn: async () => {
-      const res = await fetch("/api/session");
-      if (res.status === 401) {
-        const body = (await res.json().catch(() => ({}))) as { showProposals?: boolean };
-        return body.showProposals === true ? { ...LOGGED_OUT_SESSION, showProposals: true } : LOGGED_OUT_SESSION;
-      }
-      if (!res.ok) throw new Error("Session fetch failed");
-      return res.json();
-    },
+    queryFn: fetchSession,
     staleTime: 5 * 60 * 1000, // 5 min
     retry: false,
   });

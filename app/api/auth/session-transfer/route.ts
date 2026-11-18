@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createSessionToken, getSessionCookieOptions, COOKIE_NAME } from "@/app/lib/session";
+import { createSessionToken, setSessionCookies } from "@/app/lib/session";
 import { readCookie, verifyTransferToken } from "@/app/lib/oauth-proxy";
 import { loginReturnPath } from "@/app/lib/login-return";
 import { toggleEnabled } from "@/app/lib/settings/toggles";
@@ -85,8 +85,7 @@ export async function GET(req: Request) {
   const redirectUrl = new URL(next ?? "/", url.origin);
 
   const res = NextResponse.redirect(redirectUrl.toString());
-  const cookieOpts = getSessionCookieOptions(req);
-  res.cookies.set(COOKIE_NAME, sessionToken, cookieOpts);
+  setSessionCookies(res, sessionToken, req);
 
   return bridgeResponse(res, url.origin, !!transfer.jti);
 }

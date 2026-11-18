@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/app/lib/magic-login", () => ({ verifyMagicToken: vi.fn() }));
-vi.mock("@/app/lib/session", () => ({ createSessionToken: vi.fn(() => "test-session"), getSessionCookieOptions: vi.fn(() => ({ httpOnly: true, path: "/", sameSite: "lax" })), COOKIE_NAME: "pizzadao_session" }));
+vi.mock("@/app/lib/session", () => ({ createSessionToken: vi.fn(() => "test-session"), getSessionCookieOptions: vi.fn(() => ({ httpOnly: true, path: "/", sameSite: "lax" })), setSessionCookies: (res: { cookies: { set: (n: string, v: string, o: object) => void } }, token: string) => { res.cookies.set("pizzadao_session", token, { httpOnly: true, path: "/", sameSite: "lax" }); return res; }, COOKIE_NAME: "pizzadao_session" }));
 vi.mock("@/app/lib/sync-roles-on-login", () => ({ syncRolesOnLogin: vi.fn(async () => {}) }));
 vi.mock("@/app/lib/sheets/member-repository", () => ({ fetchMemberByDiscordId: vi.fn() }));
 vi.hoisted(() => { process.env.SESSION_SECRET ||= "test-secret"; });
