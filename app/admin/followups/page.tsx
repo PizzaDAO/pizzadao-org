@@ -3,6 +3,7 @@
 // Approval queue for follow-up messages drafted from calls (plans/metalhead-followups.md).
 // Dread Pizza Roberts only (the call-review gate); the API routes enforce the same check.
 
+import { completedLevel } from "@/app/lib/level-display";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
@@ -67,7 +68,7 @@ export default async function AdminFollowUpsPage() {
     labels["filter.replies"] = t("filterReplies");
     labels.viaTelegram = t("viaTelegram");
     labels.viaDiscord = t("viaDiscord");
-    labels.replyHidden = t("replyHidden", { level: await replyMinLevel().catch(() => 7) });
+    labels.replyHidden = t("replyHidden", { level: completedLevel(await replyMinLevel().catch(() => 7)) });
 
     return (
         <main className="min-h-screen bg-background text-foreground p-5 md:p-10">

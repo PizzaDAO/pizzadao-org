@@ -49,9 +49,9 @@ export interface Digest {
   nextMission: { level: number; title: string } | null;
   /** Missions left in the current level (including ones awaiting review). 0 when none. */
   remaining: number;
-  /** The level reached by finishing the current one, when there is one. */
-  nextLevel: number | null;
-  nextLevelTitle: string | null;
+  /** The level being worked on (the one finishing the open missions completes), null when all done. */
+  goalLevel: number | null;
+  goalLevelTitle: string | null;
   /** Every mission available is approved. */
   allDone: boolean;
   calls: { crew: string; at: Date }[];
@@ -67,10 +67,9 @@ export function computeDigest(input: DigestInput): Digest {
   const open = inLevel.filter((m) => !approvedIds.has(m.id));
   const first = open.find((m) => !pendingIds.has(m.id)) ?? null;
   const allDone = level > maxLevel;
-  const hasNext = !allDone && level < maxLevel;
-  const nextLevel = hasNext ? level + 1 : null;
-  const nextLevelTitle = nextLevel
-    ? (missions.find((m) => m.level === nextLevel && m.levelTitle)?.levelTitle ?? null)
+  const goalLevel = allDone ? null : level;
+  const goalLevelTitle = goalLevel
+    ? (missions.find((m) => m.level === goalLevel && m.levelTitle)?.levelTitle ?? null)
     : null;
 
   const timezone = input.timezone || "UTC";
@@ -94,11 +93,11 @@ export function computeDigest(input: DigestInput): Digest {
     level,
     nextMission: first ? { level: first.level, title: first.title } : null,
     remaining: open.length,
-    nextLevel,
-    nextLevelTitle,
+    goalLevel,
+    goalLevelTitle,
     allDone,
     calls,
-    hasContent: !!first || calls.length > 0 || allDone || (hasNext && open.length > 0),
+    hasContent: !!first || calls.length > 0 || allDone || (goalLevel !== null && open.length > 0),
   };
 }
 

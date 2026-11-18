@@ -237,16 +237,16 @@ describe('OpenAI edit call', () => {
     expect(p).not.toMatch(/keep any existing text/i)
   })
 
-  it('falls back from gpt-image-1 to gpt-image-1.5 and sends both references', async () => {
+  it('falls back from gpt-image-1.5 to gpt-image-1 when the first does not exist, and sends both references', async () => {
     const seen: string[] = []
     const f = vi.fn(async (_u: string, init: { body: FormData }) => {
       seen.push(String(init.body.get('model')))
       expect(init.body.getAll('image[]')).toHaveLength(2)
-      if (seen.length === 1) return new Response(JSON.stringify({ error: { message: "The model 'gpt-image-1' does not exist." } }), { status: 400 })
+      if (seen.length === 1) return new Response(JSON.stringify({ error: { message: "The model 'gpt-image-1.5' does not exist." } }), { status: 400 })
       return new Response(JSON.stringify({ data: [{ b64_json: png.toString('base64') }] }), { status: 200 })
     })
     const out = await openAiEdit(png, png, buildPrompt('Dark suit'), { fetchImpl: f as never, apiKey: 'k' })
-    expect(seen).toEqual(['gpt-image-1', 'gpt-image-1.5'])
+    expect(seen).toEqual(['gpt-image-1.5', 'gpt-image-1'])
     expect(out.length).toBeGreaterThan(10)
   })
 

@@ -12,6 +12,7 @@ import { ApiError, ForbiddenError, ValidationError } from '@/app/lib/errors/api-
 import { getSetting } from '@/app/lib/settings'
 import { toggleEnabled } from '@/app/lib/settings/toggles'
 import { sniffImageType } from '@/app/lib/image-sniff'
+import { DEFAULT_IMAGE_MODELS, isModelMissing, loadImageModels } from '@/app/lib/ai-image-models'
 import { listAssets } from './catalog'
 import { loadUnlockContext } from './context'
 import { unlockedAssetIds } from './unlocks'
@@ -19,7 +20,6 @@ import { fetchImageBytes, loadBase, MAX_PIXELS, type BaseChoice } from './compos
 import { pruneBaseUploads } from './upload-base'
 import { CANVAS_SIZE } from './types'
 
-export const IMAGE_MODELS = ['gpt-image-1', 'gpt-image-1.5']
 export const FRIENDLY_REFUSAL = 'The image service could not dress this picture up. Try a different base picture or outfit.'
 /** Per-attempt timeout; two attempts plus the image fetches fit under the route's maxDuration (180s). */
 export const ATTEMPT_TIMEOUT_MS = 70_000
@@ -153,7 +153,7 @@ export async function openAiEdit(
   const apiKey = opts.apiKey ?? process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) throw new ApiError('Dress up is not configured', 503, 'UNAVAILABLE')
   const f = opts.fetchImpl ?? fetch
-  const models = opts.models ?? IMAGE_MODELS
+  const models = opts.models ?? [...DEFAULT_IMAGE_MODELS]
   const [baseP, outfitP] = await Promise.all([toSquarePng(base), toSquarePng(outfit)])
   const started = Date.now()
   for (let i = 0; i < models.length; i++) {
@@ -184,7 +184,8 @@ export async function openAiEdit(
     } | null
     if (!res.ok) {
       if (isRefusal(res.status, body)) throw new RestyleRefused(body?.error?.message ?? 'refused')
-      if (/does not exist/i.test(body?.error?.message ?? '') && i + 1 < models.length) continue
+      // A missing model never ran, so nothing was billed: retry with the next one, cost untouched.
+      if (isModelMissing(body?.error?.message) && i + 1 < models.length) continue
       throw new ApiError('Dress up failed. Try again in a moment.', 502, 'UPSTREAM')
     }
     const b64 = body?.data?.[0]?.b64_json
@@ -255,7 +256,7 @@ export async function restyleForMember(args: {
   try {
     const baseImg = await loadBase(memberId, discordId, args.base, args.fetchImpl)
     const outfitBytes = await fetchImageBytes(outfit.imageUrl, args.fetchImpl)
-    png = await (args.generate ?? openAiEdit)(baseImg.bytes, outfitBytes, buildPrompt(outfit.name), { fetchImpl: args.fetchImpl })
+    png = await (args.generate ?? openAiEdit)(baseImg.bytes, outfitBytes, buildPrompt(outfit.name), { fetchImpl: args.fetchImpl, models: await loadImageModels() })
   } catch (e) {
     if (e instanceof RestyleRefused) {
       await finish('refused', { costCents: 0 })

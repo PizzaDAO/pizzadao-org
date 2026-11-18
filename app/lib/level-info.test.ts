@@ -14,6 +14,16 @@ const M = [
 ]
 
 describe('buildLevelInfo', () => {
+  it('exposes the highest completed level and its title, leaving level as the working-on one', () => {
+    const info = buildLevelInfo(3, M, [])
+    expect(info.level).toBe(3)
+    expect(info.completed).toBe(2)
+    expect(info.completedTitle).toBe('Line Cook')
+    const fresh = buildLevelInfo(1, M, [])
+    expect(fresh.completed).toBe(0)
+    expect(fresh.completedTitle).toBeNull()
+  })
+
   it('lists the current level with each mission done / pending / todo', () => {
     const info = buildLevelInfo(2, M, [
       { missionId: 2, status: 'APPROVED' },

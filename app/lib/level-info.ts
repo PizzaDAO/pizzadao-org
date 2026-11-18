@@ -4,6 +4,7 @@
  * "Needs" = the missions of the member's current level: finishing every one of them is what moves
  * them up (see computeCurrentLevel in missions.ts). Mission rules are untouched.
  */
+import { completedLevel } from '@/app/lib/level-display'
 import { getCurrentLevel, getMissionsByLevel, getUserMissionProgress } from '@/app/lib/missions'
 
 export type LevelMissionState = 'done' | 'pending' | 'todo'
@@ -17,6 +18,9 @@ export interface LevelMissionRow {
 export interface LevelInfo {
   level: number
   title: string | null
+  /** Highest level COMPLETED (0 = none), and its title. Display only; `level` is the working-on level. */
+  completed: number
+  completedTitle: string | null
   /** Highest level with an active mission; level > maxLevel means MAX. */
   maxLevel: number
   isMax: boolean
@@ -49,6 +53,8 @@ export function buildLevelInfo(
   return {
     level,
     title: title(level),
+    completed: completedLevel(level),
+    completedTitle: title(completedLevel(level)),
     maxLevel,
     isMax: level > maxLevel,
     missions: rows,

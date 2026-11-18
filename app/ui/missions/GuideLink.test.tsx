@@ -25,9 +25,9 @@ describe('mission guide links', () => {
 })
 
 describe('LevelUpModal what next link', () => {
-  it('links to the new level in the levels chapter', () => {
+  it('links to the next level in the levels chapter', () => {
     renderWithIntl(<LevelUpModal level={4} levelTitle="T" reward={10} onDismiss={() => {}} />)
-    expect(screen.getByTestId('level-up-whats-next').getAttribute('href')).toBe('/handbook/levels#level-4')
+    expect(screen.getByTestId('level-up-whats-next').getAttribute('href')).toBe('/handbook/levels#level-5')
   })
 
   it('has no link on the final level', () => {

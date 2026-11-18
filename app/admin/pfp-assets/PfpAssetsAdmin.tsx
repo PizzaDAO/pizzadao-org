@@ -46,7 +46,7 @@ function RulesEditor({ rules, options, onChange }: { rules: Rule[]; options: Opt
             onChange={(e) => set(i, { kind: e.target.value as RuleKind, params: {} })}
             aria-label="Rule type"
           >
-            <option value="level">Reach level</option>
+            <option value="level">Complete level</option>
             <option value="role">Has Discord role</option>
             <option value="mission">Completed mission</option>
             <option value="item">Owns item</option>
@@ -54,10 +54,10 @@ function RulesEditor({ rules, options, onChange }: { rules: Rule[]; options: Opt
           </select>
           {r.kind === "level" && (
             <select className="rounded border px-2 py-1 bg-background" value={String(r.params.minLevel ?? "")}
-              onChange={(e) => set(i, { ...r, params: { minLevel: Number(e.target.value) } })} aria-label="Minimum level">
+              onChange={(e) => set(i, { ...r, params: { minLevel: Number(e.target.value) } })} aria-label="Minimum completed level">
               <option value="">Pick a level</option>
               {options.levels.map((l) => (
-                <option key={l.level} value={l.level}>Level {l.level}{l.title ? ` - ${l.title}` : ""} and up</option>
+                <option key={l.level} value={l.level}>{completedOptionLabel(l.level, options.levels)}</option>
               ))}
             </select>
           )}
@@ -251,4 +251,15 @@ export function PfpAssetsAdmin() {
       </ul>
     </div>
   );
+}
+
+/**
+ * The rule stores the minimum working-on level M (what the unlock check compares). It reads as
+ * "after completing level M-1": level 1 needs nothing.
+ */
+function completedOptionLabel(min: number, levels: { level: number; title: string | null }[]): string {
+  const done = Math.max(0, min - 1);
+  if (done === 0) return "Everyone (no level needed)";
+  const title = levels.find((l) => l.level === done)?.title;
+  return `After completing level ${done}${title ? ` - ${title}` : ""}`;
 }

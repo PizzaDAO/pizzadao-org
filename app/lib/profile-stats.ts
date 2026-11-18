@@ -14,6 +14,9 @@ export interface ProfileStats {
   crews: string[]
   level: number
   levelTitle: string | null
+  /** Highest level completed (0 = none) and its title; what /profile shows. */
+  completed: number
+  completedTitle: string | null
   isMax: boolean
   vouchesReceived: number
   vouchesGiven: number
@@ -40,6 +43,8 @@ export async function getProfileStats(discordId: string): Promise<ProfileStats |
     crews: splitCrews(row?.['Crews']),
     level: level.level,
     levelTitle: level.title,
+    completed: level.completed,
+    completedTitle: level.completedTitle,
     isMax: level.isMax,
     vouchesReceived: counts.followers,
     vouchesGiven: counts.total,

@@ -174,7 +174,7 @@ export function mergeActivity(existing: ActivityRow | null, u: ActivityUserBatch
 
 /** The slice of Prisma used here (narrow so tests can fake it). */
 export interface ActivityTx {
-  $queryRaw(strings: TemplateStringsArray, ...values: unknown[]): Promise<unknown>
+  $executeRaw(strings: TemplateStringsArray, ...values: unknown[]): Promise<number>
   discordActivity: {
     findMany(args: unknown): Promise<ActivityRow[]>
     upsert(args: unknown): Promise<unknown>
@@ -209,7 +209,7 @@ export async function applyActivityBatch(
       async (tx) => {
         // One batch at a time across processes (backfill + live, two recorders during a deploy): increments are
         // read-modify-write, so concurrent batches would lose counts. Released at commit.
-        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext('discord_activity'))`
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('discord_activity'))`
         try {
           await tx.discordActivityBatch.create({ data: { id: batch.batchId, appliedAt: now } })
         } catch (e) {

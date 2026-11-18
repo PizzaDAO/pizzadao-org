@@ -19,7 +19,6 @@ vi.mock("@/app/lib/activation", () => ({
 vi.mock("@/app/lib/mafia-portrait/generate", () => ({
   PortraitUnavailable: class PortraitUnavailable extends Error {},
   generatePortrait: (...a: unknown[]) => generatePortrait(...a),
-  portraitModelId: () => "gpt-image-1",
 }));
 vi.mock("@/app/lib/rate-limit", async (orig) => {
   const actual = await orig<typeof import("@/app/lib/rate-limit")>();

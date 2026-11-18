@@ -1,4 +1,5 @@
 import { after } from 'next/server'
+import { completedLevel, titleForLevel } from '@/app/lib/level-display'
 import { prisma } from './db'
 import { PIZZA_NOOB_GRADUATE_LEVEL } from './trainee-nick'
 import { Prisma, type ReviewAction } from '@prisma/client'
@@ -946,6 +947,9 @@ export async function getUserProgressSummary(discordId: string) {
   )
   const currentLevel = computeCurrentLevel(missions ?? [], approvedIds, paidLevels)
   const levelTitle = (titleRows ?? []).find(r => r.level === currentLevel)?.levelTitle ?? null
+  // Display only: the highest level completed (0 = none) and its title.
+  const completed = completedLevel(currentLevel)
+  const completedTitle = titleForLevel(titleRows ?? [], completed)
 
   // Calculate total missions and approved count
   const totalMissions = missions.length
@@ -963,6 +967,9 @@ export async function getUserProgressSummary(discordId: string) {
     /** Highest level with an active mission; currentLevel > maxLevel means "MAX". */
     maxLevel: maxMissionLevel(missions),
     levelTitle,
+    /** Highest level completed (display only; 0 = none). */
+    completed,
+    completedTitle,
     totalMissions,
     approvedCount,
     currentLevelMissions: currentLevelMissions.length,

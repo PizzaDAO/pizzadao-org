@@ -34,6 +34,16 @@ const base = {
 };
 
 describe("ProfileHero", () => {
+    it("shows the completed level and its title", () => {
+        render(<ProfileHero {...base} level={7} levelTitle="Made Mafia" mode="public" viewerId={null} />);
+        expect(screen.getByText(/Lv\. 7 · Made Mafia/)).toBeTruthy();
+    });
+
+    it("shows Lv. 0 with no title when nothing is completed", () => {
+        render(<ProfileHero {...base} level={0} levelTitle="" mode="public" viewerId={null} />);
+        expect(screen.getByText(/Lv\. 0/)).toBeTruthy();
+    });
+
     beforeEach(() => {
         // Ensure each test starts with a clean localStorage so the owner
         // banner re-renders predictably.

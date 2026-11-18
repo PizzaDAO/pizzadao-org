@@ -67,6 +67,15 @@ describe("dashboard in Spanish", () => {
         expect(screen.getByRole("link").getAttribute("href")).toBe("/crews");
     });
 
+    it("HeroBlock badge shows the completed level and its title, Lv.0 when none", () => {
+        const props = { name: "Pepperoni", pfpUrl: null, pepBalance: 1, city: "Rome", idValue: "42", onSendPep: () => {} };
+        renderWithIntl(<HeroBlock {...props} levelBadge={{ level: 7, title: "Made Mafia" }} />, { locale: "en" as const });
+        expect(screen.getByText(/Lv\.7 · Made Mafia/)).toBeInTheDocument();
+        cleanup();
+        renderWithIntl(<HeroBlock {...props} levelBadge={{ level: 0, title: "" }} />, { locale: "en" as const });
+        expect(screen.getByText(/Lv\.0/)).toBeInTheDocument();
+    });
+
     it("HeroBlock translates CTAs, badge and formats PEP with the es locale", () => {
         renderWithIntl(
             <HeroBlock
@@ -261,8 +270,8 @@ describe("dashboard in Spanish", () => {
             <LevelUpModal level={2} levelTitle="Pizza Noob" reward={13370} onDismiss={() => {}} />,
             ES,
         );
-        expect(screen.getByRole("dialog", { name: "Alcanzaste el nivel 2" })).toBeInTheDocument();
-        expect(screen.getByText("Nivel 2")).toBeInTheDocument();
+        expect(screen.getByRole("dialog", { name: "Completaste el nivel 2" })).toBeInTheDocument();
+        expect(screen.getByText("Nivel 2 completado")).toBeInTheDocument();
         expect(screen.getByText("+13.370 $PEP ganados")).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "Continuar" })).toBeInTheDocument();
     });

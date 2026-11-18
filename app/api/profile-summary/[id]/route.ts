@@ -50,6 +50,9 @@ export interface ProfileSummary {
         /** 1..8 numeric, "MAX" when >8, or null when no progress yet. */
         level: number | string | null;
         levelTitle: string;
+        /** Highest level COMPLETED (display badge); 0 when none yet, null when unknown. `level` is the one being worked on. */
+        levelCompleted: number | null;
+        levelCompletedTitle: string;
         /** Pizza Mafia rank tier (e.g. "Made Man"). null when not yet ranked. */
         mafiaRank: { rank: number; tier: string } | null;
         /** Inbound vouches (people who have vouched for this profile). */
@@ -329,6 +332,8 @@ export async function composeProfileSummary(
     // pre-PR3 client-side rule.
     let level: number | string | null = null;
     let levelTitle = "";
+    let levelCompleted: number | null = null;
+    let levelCompletedTitle = "";
     if (
         mission &&
         typeof mission.currentLevel === "number" &&
@@ -337,6 +342,11 @@ export async function composeProfileSummary(
         const maxLevel = typeof mission.maxLevel === "number" && mission.maxLevel > 0 ? mission.maxLevel : 8;
         level = mission.currentLevel > maxLevel ? "MAX" : mission.currentLevel;
         levelTitle = mission.levelTitle ?? "";
+    }
+    // Level 0 (nothing completed) still shows: the badge is the highest level completed.
+    if (mission && typeof mission.completed === "number") {
+        levelCompleted = mission.completed;
+        levelCompletedTitle = mission.completedTitle ?? "";
     }
 
     // Mafia rank: surface the tier name + the level (we don't have a numeric
@@ -361,6 +371,8 @@ export async function composeProfileSummary(
             city,
             level,
             levelTitle,
+            levelCompleted,
+            levelCompletedTitle,
             mafiaRank,
             vouchInCount: vouchCounts.followers ?? 0,
             memberSince: monthPrecisionIso(memberSince),

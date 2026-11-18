@@ -257,6 +257,7 @@ describe('settings registry', () => {
       ['pfp.restyleMonthlyBudgetUsd', 50],
       ['pfp.restyleRefusalDailyLimit', 3],
       ['pfp.restyleCostCents', 20],
+      ['ai.imageModels', ['gpt-image-1.5', 'gpt-image-1']],
       ['pfp.outfitOverlayEnabled', false],
       ['jobs.verifyPosts', true],
       ['jobs.unverifiableJobsPayOnClick', true],

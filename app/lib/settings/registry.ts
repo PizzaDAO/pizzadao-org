@@ -2150,6 +2150,16 @@ export const SETTINGS = {
     default: 20,
     unit: 'cents',
   }),
+  'ai.imageModels': {
+    key: 'ai.imageModels',
+    area: 'features',
+    label: 'AI image models (in order)',
+    help: 'OpenAI image models for dress-up and mafia portraits, one per line. The first is used; the next is tried only when an account does not have the one before it. The MAFIA_PORTRAIT_MODEL env var, when set, still wins for portraits.',
+    schema: z.array(z.string().trim().regex(/^[a-z0-9][a-z0-9._-]{1,59}$/i, 'Not a valid model id')).min(1).max(5),
+    default: ['gpt-image-1.5', 'gpt-image-1'] as string[],
+    onReadFailure: { value: ['gpt-image-1.5', 'gpt-image-1'] as string[] },
+    input: { type: 'stringList', maxItems: 5, maxLength: 60 },
+  } as SettingDef<string[]>,
   'pfp.outfitOverlayEnabled': boolSetting({
     key: 'pfp.outfitOverlayEnabled',
     area: 'features',

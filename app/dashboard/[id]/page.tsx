@@ -14,6 +14,7 @@
 //   * app/me/wallets/page.tsx
 "use client";
 
+import { completedLevel } from "@/app/lib/level-display";
 import { use, useEffect, useState } from "react";
 import LiveCallBanner from "../../ui/calls/LiveCallBanner";
 import Link from "next/link";
@@ -120,6 +121,21 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
         : missionsData?.currentLevel != null
             ? { level: missionsData.currentLevel as number, title: (missionsData.levelTitle as string) || "" }
             : null;
+
+    // The badge shows the highest level COMPLETED (Lv. 0 when none); missionLevel above is the level
+    // being worked on and still drives StartHere.
+    const levelBadge = (() => {
+        if (summary?.level?.current != null) {
+            const done = summary.level.completed ?? completedLevel(summary.level.current as number);
+            return { level: done as number, title: (summary.level.completedTitle as string) || "" };
+        }
+        if (missionsData?.currentLevel != null) {
+            const done = completedLevel(missionsData.currentLevel as number);
+            const title = (missionsData.levels as any[] | undefined)?.find((l) => l.level === done)?.title;
+            return { level: done, title: (title as string) || "" };
+        }
+        return null;
+    })();
 
     const crewOptions: CrewOption[] = (() => {
         const crews = crewMappingsData?.crews;
@@ -253,11 +269,10 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                     <HeroBlock
                         name={name}
                         pfpUrl={pfpUrl}
-                        levelBadge={missionLevel}
+                        levelBadge={levelBadge}
                         pepBalance={pepBalance}
                         city={city}
                         idValue={idValue}
-                        missionLevel={missionLevel}
                         onSendPep={() => setShowSendModal(true)}
                         profileCompletion={summary?.profileCompletion}
                     />
