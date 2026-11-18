@@ -98,6 +98,26 @@ describe('held calls', () => {
   })
 })
 
+describe('capo scope (removed, early and sensitive calls)', () => {
+  it('a capo never gets a REJECTED, RECORDED or PROCESSING call, or one without a summary; the owner does', () => {
+    for (const status of ['REJECTED', 'RECORDED', 'PROCESSING']) {
+      expect(canActOnCall('capo', 'view', { ...REC, status }, EMPTY), status).toBe(false)
+      expect(canActOnCall('owner', 'view', { ...REC, status }, EMPTY), status).toBe(true)
+    }
+    expect(canActOnCall('capo', 'view', { ...REC, summary: null }, EMPTY)).toBe(false)
+    expect(canActOnCall('capo', 'view', { ...REC, summary: '  ' }, EMPTY)).toBe(false)
+    expect(canActOnCall('capo', 'view', { ...REC, status: 'PUBLISHED' }, EMPTY)).toBe(true)
+  })
+  it('the filter scans the event name, crew label and the visible transcript, not hidden lines', () => {
+    const seg = (text: string, over: Record<string, unknown> = {}) => ({ discordId: '111111111111111111', startMs: 0, endMs: 1, text, ...over })
+    expect(autoHoldReason({ ...REC, transcript: [seg('we talked about the Sensitive thing')] }, FILTER)).toBe('term')
+    expect(autoHoldReason({ ...REC, eventName: 'sensitive call' }, FILTER)).toBe('term')
+    expect(autoHoldReason({ ...REC, crewLabel: 'The Sensitive Crew' }, FILTER)).toBe('term')
+    expect(autoHoldReason({ ...REC, transcript: [seg('sensitive')], redactedSpeakerIds: ['111111111111111111'] }, FILTER)).toBeNull()
+    expect(canActOnCall('capo', 'view', { ...REC, transcript: [seg('sensitive')] }, FILTER)).toBe(false)
+  })
+})
+
 describe('canActOnCall matrix', () => {
   const capoActions: CallAction[] = ['view', 'publish', 'unpublish', 'editSummary', 'regenerate', 'hide', 'hold']
   const ownerOnly: CallAction[] = ['restore', 'reject', 'audio', 'retryTranscription', 'recapRepost', 'followups', 'bulk', 'postFilters', 'releaseHold', 'admin']

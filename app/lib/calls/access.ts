@@ -19,6 +19,7 @@ import { toggleEnabled } from '@/app/lib/settings/toggles'
 import { prisma } from '@/app/lib/db'
 import { containsWord, loadPostFilter, type PostFilter } from '@/app/lib/calls/post-filters'
 import { normalizeCrewId } from '@/app/lib/crew-id'
+import { segmentKey } from '@/app/lib/calls/chat'
 
 export function canReviewCalls(discordId: string): Promise<boolean> {
   return isDreadPizzaRoberts(discordId)
@@ -80,6 +81,12 @@ export async function callReviewRole(who: Reviewer): Promise<CallRole | null> {
 
 export interface HoldView {
   source?: string | null
+  status?: string | null
+  eventName?: string | null
+  crewLabel?: string | null
+  transcript?: unknown
+  redactedSpeakerIds?: readonly string[] | null
+  redactedSegmentIds?: readonly string[] | null
   reviewHoldAt?: Date | null
   crewId?: string | null
   title?: string | null
@@ -103,7 +110,18 @@ export function autoHoldReason(rec: HoldView, filter: PostFilter | null): 'crew'
   if (crew && (filter.ownerOnlyCrewIds ?? []).some((x) => normalizeCrewId(x) === crew)) return 'crew'
   const terms = filter.ownerOnlyTerms ?? []
   if (terms.length === 0) return null
-  const texts: string[] = [rec.title ?? '', rec.summary ?? '']
+  const texts: string[] = [rec.title ?? '', rec.summary ?? '', rec.eventName ?? '', rec.crewLabel ?? '']
+  // The visible transcript lines too (hidden speakers and lines are not public text, so they are not scanned).
+  const hiddenSpeakers = new Set(rec.redactedSpeakerIds ?? [])
+  const hiddenLines = new Set(rec.redactedSegmentIds ?? [])
+  for (const seg of asList(rec.transcript)) {
+    try {
+      if (hiddenSpeakers.has(String(seg.discordId ?? '')) || hiddenLines.has(segmentKey(seg as never))) continue
+    } catch {
+      // an odd line: scan it anyway (fail closed)
+    }
+    texts.push(String(seg.text ?? ''))
+  }
   for (const a of asList(rec.actionItems)) texts.push(String(a.text ?? ''), String(a.owner ?? ''))
   for (const c of asList(rec.chapters)) texts.push(String(c.title ?? ''))
   return texts.some((t) => !!t && terms.some((term) => containsWord(t, term))) ? 'term' : null
@@ -121,6 +139,9 @@ export function canActOnCall(role: CallRole | null, action: CallAction, rec: Hol
   if (role !== 'capo') return false
   if (!CAPO_ACTIONS.has(action)) return false
   if (rec.source !== 'DISCORD') return false
+  // Only calls that are in review or published and already have a summary; never removed, recorded or processing ones.
+  if (rec.status !== 'IN_REVIEW' && rec.status !== 'PUBLISHED') return false
+  if (!rec.summary?.trim()) return false
   return heldReason(rec, filter) === null
 }
 
@@ -138,6 +159,11 @@ const ACCESS_SELECT = {
   redactionsUpdatedAt: true,
   summaryGeneratedAt: true,
   summaryEditedAt: true,
+  eventName: true,
+  crewLabel: true,
+  transcript: true,
+  redactedSpeakerIds: true,
+  redactedSegmentIds: true,
 } as const
 
 export type AccessRecording = {
@@ -153,6 +179,11 @@ export type AccessRecording = {
   redactionsUpdatedAt: Date | null
   summaryGeneratedAt: Date | null
   summaryEditedAt: Date | null
+  eventName: string | null
+  crewLabel: string | null
+  transcript: unknown
+  redactedSpeakerIds: string[]
+  redactedSegmentIds: string[]
 }
 
 export type CallAccessResult =

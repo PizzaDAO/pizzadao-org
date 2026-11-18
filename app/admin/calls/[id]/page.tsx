@@ -14,6 +14,7 @@ import { HoldControl } from "../HoldControl";
 import { asSegments, getRecording } from "@/app/lib/calls/recordings";
 import { loadPostFilter } from "@/app/lib/calls/post-filters";
 import { loadSettings } from "@/app/lib/settings";
+import { resolveMemberNames } from "@/app/lib/calls/live-members";
 import { toggleEnabled } from "@/app/lib/settings/toggles";
 import { buildRecapParts, loadRecapPeople, recapActionViews, recapCrewExcluded, recapLimits, recapFilteredCount, recapPostingEnabled, redactionsNewerThanSummary, resolveRecapChannel } from "@/app/lib/calls/recap";
 import { formatClock } from "@/app/lib/calls/summarize";
@@ -75,6 +76,7 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
     const auditRows = !capoOn ? [] : await prisma.callReviewEvent
         .findMany({ where: { recordingId: rec.id }, orderBy: { createdAt: "desc" }, take: 8, select: { id: true, actorId: true, action: true, via: true, createdAt: true } })
         .catch(() => []);
+    const actorNames = await resolveMemberNames(auditRows.map((e) => e.actorId));
     const tAudit = (action: string) =>
         action === "publish" ? t("auditPublish") : action === "unpublish" ? t("auditUnpublish") : action === "reject" ? t("auditReject") : action === "hold" ? t("auditHold") : action === "release" ? t("auditRelease")
         : action === "auto_hold" ? t("auditAuto_hold") : action === "summary_edit" ? t("auditSummary_edit") : action === "regenerate" ? t("auditRegenerate") : action === "redact" ? t("auditRedact") : action === "card_posted" ? t("auditCard_posted") : action;
@@ -116,8 +118,9 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
     const recapText = recapParts?.text ?? null;
     const recapChannel = recapText ? await resolveRecapChannel(rec.crewId).catch(() => null) : null;
     const recapEnabled = await recapPostingEnabled();
-    const recapExcluded = postFilter ? recapCrewExcluded(rec, postFilter) : false;
-    const recapOmitted = postFilter ? recapFilteredCount(rec, postFilter) : 0;
+    // How the owner-only post filter treats this call is not shown to a capo.
+    const recapExcluded = isOwner && postFilter ? recapCrewExcluded(rec, postFilter) : false;
+    const recapOmitted = isOwner && postFilter ? recapFilteredCount(rec, postFilter) : 0;
     const recapStale = redactionsNewerThanSummary(rec);
     const transcribeGaveUp = !rec.transcribedAt && rec.transcribeAttempts >= 3 && !PERMANENT_TRANSCRIBE_ERRORS.includes(rec.transcribeError ?? "");
     // A run that stopped mid-track after a failed chunk leaves the (sanitized) error here; the next run resumes.
@@ -133,7 +136,7 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
     // Items without a key yet are offered as "#N" (their A-label number): the server hands out the keys when a link is saved, so this page never writes.
     const linkItems = actionItems.filter((a) => a.text).map((a, i) => ({ key: a.key ?? `#${i + 1}`, label: `A${i + 1}`, text: a.text as string }));
     const followUpStates: Record<string, "in_progress" | "done"> = {};
-    if (actionViews) {
+    if (actionViews && isOwner) {
         for (const it of keyedItems) {
             const mine = followUpRows.filter((f) => f.actionKey === it.key);
             if (mine.some((f) => f.status === "IN_PROGRESS" || f.status === "NEEDS_HELP")) followUpStates[it.key] = "in_progress";
@@ -473,7 +476,7 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                         <h2 className="text-xl font-bold m-0">{t("auditHeading")}</h2>
                         <ul className="m-0 pl-5 grid gap-1 text-sm">
                             {auditRows.map((e) => (
-                                <li key={e.id}>{t("auditLine", { action: tAudit(e.action), actor: e.actorId, via: e.via, time: when.format(e.createdAt) })}</li>
+                                <li key={e.id}>{t("auditLine", { action: tAudit(e.action), actor: actorNames.get(e.actorId) ?? e.actorId, via: e.via, time: when.format(e.createdAt) })}</li>
                             ))}
                         </ul>
                     </section>

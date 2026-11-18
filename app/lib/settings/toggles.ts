@@ -33,9 +33,9 @@ export const TOGGLES = {
   'missions.verifiersEnabled': { env: 'MISSION_VERIFIERS_ENABLED', legacy: ON_WORDS },
   'missions.reviewCardsEnabled': { env: 'MISSION_REVIEW_CARDS_ENABLED', legacy: ON_WORDS },
   'calls.recapPostEnabled': { env: 'CALL_RECAP_POST_ENABLED', legacy: ON_WORDS },
-  // On unless the env var is an explicit off (the kill switch): recap mentions notify the people they name.
   // Off unless turned on: Pizza Capos can review and publish calls on the website (plans/capo-recap-approval).
   'calls.capoReviewEnabled': { env: 'CALL_CAPO_REVIEW_ENABLED', legacy: ON_WORDS },
+  // On unless the env var is an explicit off (the kill switch): recap mentions notify the people they name.
   'calls.recapMentionPing': { env: 'CALL_RECAP_MENTION_PING_ENABLED', legacy: (raw) => !envKillsToggle(raw) },
   // Off unless turned on: follow-up status (in progress / done), members' finished-work links and automatic edits of the posted recap.
   'calls.recapLiveStatusEnabled': { env: 'CALL_RECAP_LIVE_STATUS_ENABLED', legacy: ON_WORDS },

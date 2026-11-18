@@ -147,26 +147,21 @@ describe('toggle on: capos may use the widened routes', () => {
 })
 
 describe('capo publish guard', () => {
-  it('refuses with a 409 when lines were hidden after the summary was written, without publishing', async () => {
+  it('a capo publish asks publishRecording to check the stale redactions on its own fresh row; the refusal is a 409 with no recap and no audit', async () => {
     as('capo', true)
-    m(db.callRecording.findUnique).mockResolvedValue({ ...REC, redactionsUpdatedAt: new Date('2026-11-02T10:00:00Z') })
+    m(publishRecording).mockResolvedValue('stale-redactions')
     const res = await publishPOST(req({ action: 'publish' }), ctx)
+    expect(publishRecording).toHaveBeenCalledWith('rec1', '9', undefined, { refuseStaleRedactions: true })
     expect(res.status).toBe(409)
-    expect(publishRecording).not.toHaveBeenCalled()
     expect(postCallRecap).not.toHaveBeenCalled()
+    expect(recordCallReviewEvent).not.toHaveBeenCalled()
   })
-  it('publishes once the summary was edited after the hide', async () => {
-    as('capo', true)
-    m(db.callRecording.findUnique).mockResolvedValue({ ...REC, redactionsUpdatedAt: new Date('2026-11-02T10:00:00Z'), summaryEditedAt: new Date('2026-11-03T10:00:00Z') })
-    expect((await publishPOST(req({ action: 'publish' }), ctx)).status).toBe(200)
-    expect(publishRecording).toHaveBeenCalledWith('rec1', '9')
+  it('the owner publishes without the option (as today)', async () => {
+    as('owner', true)
+    await publishPOST(req({ action: 'publish' }), ctx)
+    expect(publishRecording).toHaveBeenCalledWith('rec1', '9', undefined, {})
   })
-  it('an unpublish is not blocked by newer redactions', async () => {
-    as('capo', true)
-    m(db.callRecording.findUnique).mockResolvedValue({ ...REC, redactionsUpdatedAt: new Date('2026-11-02T10:00:00Z') })
-    expect((await publishPOST(req({ action: 'unpublish' }), ctx)).status).toBe(200)
-  })
-  it('the owner is not blocked (as today: the recap just reports stale-redactions)', async () => {
+  it('the owner is not blocked by the capo check (the recap just reports stale-redactions)', async () => {
     as('owner', true)
     m(postCallRecap).mockResolvedValue('stale-redactions')
     const res = await publishPOST(req({ action: 'publish' }), ctx)

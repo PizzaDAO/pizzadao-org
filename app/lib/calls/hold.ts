@@ -44,7 +44,7 @@ export async function dropAutoHeld<T extends { id: string }>(rows: T[], filter: 
   if ((filter.ownerOnlyTerms ?? []).length === 0 && (filter.ownerOnlyCrewIds ?? []).length === 0) return rows
   const texts = await prisma.callRecording.findMany({
     where: { id: { in: rows.map((r) => r.id) } },
-    select: { id: true, crewId: true, title: true, summary: true, actionItems: true, chapters: true },
+    select: { id: true, crewId: true, title: true, summary: true, actionItems: true, chapters: true, eventName: true, crewLabel: true, transcript: true, redactedSpeakerIds: true, redactedSegmentIds: true },
   })
   const held = new Set(texts.filter((t) => autoHoldReason(t, filter) !== null).map((t) => t.id))
   return rows.filter((r) => !held.has(r.id))

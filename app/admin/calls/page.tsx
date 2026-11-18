@@ -58,13 +58,16 @@ export default async function AdminCallsPage({ searchParams }: { searchParams: P
     const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
     // A capo only ever sees Discord calls (imported ones are the owner's backlog).
     const source = isOwner ? (SOURCES.find((x) => x === one(sp.source)) ?? "all") : "discord";
-    const status = STATUSES.find((x) => x === one(sp.status));
+    // A capo only sees calls in review or published (no removed, recorded or processing ones).
+    const statusOptions = isOwner ? STATUSES : STATUSES.filter((x) => x === "IN_REVIEW" || x === "PUBLISHED");
+    const status = statusOptions.find((x) => x === one(sp.status));
     const cursorRaw = one(sp.cursor);
-    const opts: ListRecordingsOpts = { source, status, cursor: cursorRaw && CURSOR.test(cursorRaw) ? cursorRaw : null, ...(isOwner ? {} : { excludeHeld: true }) };
+    const opts: ListRecordingsOpts = { source, status, cursor: cursorRaw && CURSOR.test(cursorRaw) ? cursorRaw : null, ...(isOwner ? {} : { excludeHeld: true, capoScope: true }) };
     const [listed, bulkMax] = await Promise.all([listRecordingsPage(opts), isOwner ? bulkActionMax() : Promise.resolve(1)]);
-    const { nextCursor } = listed;
     // A capo's list also leaves out calls the private owner-only filter holds (an unreadable filter hides them all).
     const rows = isOwner ? listed.rows : await dropAutoHeld(listed.rows, await loadPostFilter().catch(() => null));
+    // The next page starts after the last row the viewer can see (the last fetched row may be a held call).
+    const nextCursor = listed.nextCursor && !isOwner && rows.length > 0 ? rows[rows.length - 1].id : listed.nextCursor;
     const href = (over: { source?: string; status?: string | null; cursor?: string | null }) => {
         const q = new URLSearchParams();
         const src = over.source ?? source;
@@ -137,7 +140,7 @@ export default async function AdminCallsPage({ searchParams }: { searchParams: P
                     <Link href={href({ status: null, cursor: null })} aria-current={!status ? "page" : undefined} className={!status ? "font-bold underline" : "underline text-foreground/70"}>
                         {t("statusAll")}
                     </Link>
-                    {STATUSES.map((x) => (
+                    {statusOptions.map((x) => (
                         <Link key={x} href={href({ status: x, cursor: null })} aria-current={x === status ? "page" : undefined} className={x === status ? "font-bold underline" : "underline text-foreground/70"}>
                             {t(`status.${x}`)}
                         </Link>
