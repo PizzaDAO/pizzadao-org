@@ -251,7 +251,7 @@ export const CONTENT_SETTINGS = {
     min: 1, max: 24, default: 6, unit: 'months',
   }),
   'missions.celebrationMinLevel': num({
-    key: 'missions.celebrationMinLevel', area: 'missions', label: 'First level that gets a celebration', help: 'Reaching this level or higher shows the level-up celebration. 10 turns it off (finishing the last level counts as level 9). Cosmetic.',
+    key: 'missions.celebrationMinLevel', area: 'missions', label: 'First level that gets a celebration', help: 'The level-up celebration shows once a member has finished this many levels or more, plus one (the value is the level they move up to). 2 celebrates completing level 1 and up; 10 turns it off. Cosmetic.',
     min: 1, max: 10, default: 2,
   }),
 

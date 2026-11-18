@@ -90,8 +90,8 @@ describe("computeDigest", () => {
     expect(d.level).toBe(1);
     expect(d.nextMission).toEqual({ level: 1, title: "Say hi" });
     expect(d.remaining).toBe(1);
-    expect(d.nextLevel).toBe(2);
-    expect(d.nextLevelTitle).toBe("Cook");
+    expect(d.goalLevel).toBe(1);
+    expect(d.goalLevelTitle).toBe("Trainee");
   });
   it("skips a mission already awaiting review", () => {
     const d = computeDigest(base({ approvedIds: new Set([1]), pendingIds: new Set([2]) }));
@@ -101,7 +101,7 @@ describe("computeDigest", () => {
   it("reports allDone and no progress line when everything is approved", () => {
     const d = computeDigest(base({ approvedIds: new Set([1, 2, 3]) }));
     expect(d.allDone).toBe(true);
-    expect(d.nextLevel).toBeNull();
+    expect(d.goalLevel).toBeNull();
   });
   it("includes only crew calls within 7 days", () => {
     const crews = [

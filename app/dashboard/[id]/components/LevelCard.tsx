@@ -15,6 +15,9 @@ export interface LevelCardData {
     enabled: boolean;
     level: number;
     title: string | null;
+    /** Highest level completed (0 = none) and its title: the heading. `level` is the one in progress. */
+    completed?: number;
+    completedTitle?: string | null;
     isMax: boolean;
     done: number;
     total: number;
@@ -29,6 +32,9 @@ export function LevelCard({ card }: { card?: LevelCardData | null }) {
     const t = useTranslations("dashboard.levelCard");
     if (!card || !card.enabled) return null;
 
+    // The heading is the highest level completed (the top level when MAX); `level` is the one in progress.
+    const shownLevel = card.completed ?? Math.max(0, card.level - 1);
+    const shownTitle = card.completedTitle ?? null;
     const pct = card.total > 0 ? Math.min(100, Math.round((card.done / card.total) * 100)) : 0;
 
     return (
@@ -39,9 +45,15 @@ export function LevelCard({ card }: { card?: LevelCardData | null }) {
         >
             <p className="overline">{t("overline")}</p>
             <h2 className="font-display mt-1 text-2xl font-bold">
-                {card.isMax ? t("max") : t("level", { level: card.level })}
-                {card.title && !card.isMax ? <span className="text-foreground/65">{` · ${card.title}`}</span> : null}
+                {t("level", { level: shownLevel })}
+                {shownTitle ? <span className="text-foreground/65">{` · ${shownTitle}`}</span> : null}
             </h2>
+            {!card.isMax ? (
+                <p className="mt-1 text-[13px] text-foreground/65">
+                    {t("working", { level: card.level })}
+                    {card.title ? ` · ${card.title}` : ""}
+                </p>
+            ) : null}
 
             {card.isMax ? (
                 <p className="mt-2 text-sm leading-relaxed text-foreground/80">{t("maxBody")}</p>

@@ -23,6 +23,9 @@ export interface MemberCard {
     /** 1..8, "MAX" past the top level, or null when there is no approved progress yet. */
     level: number | string | null;
     levelTitle: string;
+    /** Highest level COMPLETED (what badges show); 0 when none yet, null when unknown. */
+    levelCompleted: number | null;
+    levelCompletedTitle: string;
     mafiaRank: string | null;
     crews: { id: string; label: string; emoji?: string }[];
     /** ISO date for "member since" (earliest of Discord join, first call, site signup), or null. */
@@ -32,7 +35,7 @@ export interface MemberCard {
 }
 
 /** Exactly these keys may appear in the response. Asserted in the tests. */
-export const MEMBER_CARD_KEYS = ["memberId", "name", "pfpUrl", "level", "levelTitle", "mafiaRank", "crews", "memberSince", "discordActivity"] as const;
+export const MEMBER_CARD_KEYS = ["memberId", "name", "pfpUrl", "level", "levelTitle", "levelCompleted", "levelCompletedTitle", "mafiaRank", "crews", "memberSince", "discordActivity"] as const;
 
 export const MEMBER_CARD_CACHE_HEADERS = {
     "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
@@ -98,10 +101,17 @@ export async function composeMemberCard(memberId: string): Promise<MemberCard | 
 
     let level: MemberCard["level"] = null;
     let levelTitle = "";
+    let levelCompleted: MemberCard["levelCompleted"] = null;
+    let levelCompletedTitle = "";
     if (mission && typeof mission.currentLevel === "number" && (mission.approvedCount ?? 0) > 0) {
         const maxLevel = typeof mission.maxLevel === "number" && mission.maxLevel > 0 ? mission.maxLevel : 8;
         level = mission.currentLevel > maxLevel ? "MAX" : mission.currentLevel;
         levelTitle = mission.levelTitle ?? "";
+    }
+    // Level 0 (nothing completed) still shows: the badge is the highest level completed.
+    if (mission && typeof mission.completed === "number") {
+        levelCompleted = mission.completed;
+        levelCompletedTitle = mission.completedTitle ?? "";
     }
 
     const crewIds = withoutNonCrewIds(
@@ -123,6 +133,8 @@ export async function composeMemberCard(memberId: string): Promise<MemberCard | 
         pfpUrl,
         level,
         levelTitle,
+        levelCompleted,
+        levelCompletedTitle,
         mafiaRank: rank?.rank?.name ?? null,
         crews,
         memberSince: monthPrecisionIso(since),

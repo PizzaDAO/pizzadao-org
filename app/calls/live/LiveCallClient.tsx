@@ -1,5 +1,6 @@
 "use client";
 
+import { completedLevel } from "@/app/lib/level-display";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
@@ -425,7 +426,7 @@ function ItemsSection({ items, locked }: { items: LiveItemView[]; locked: number
     return (
         <Section title={t("actionItems")}>
             {locked !== null ? (
-                <p className="m-0 text-foreground/70">{t("itemsLocked", { level: locked })}</p>
+                <p className="m-0 text-foreground/70">{t("itemsLocked", { level: completedLevel(locked) })}</p>
             ) : items.length === 0 ? (
                 <p className="m-0 text-foreground/70">{t("itemsEmpty")}</p>
             ) : (

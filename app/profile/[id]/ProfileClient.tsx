@@ -169,8 +169,8 @@ export function ProfileClient({ id, disavowWarning = null, buddySlot = null, ini
                     pfpUrl={data.hero.pfpUrl}
                     tagline={data.hero.tagline}
                     city={data.hero.city}
-                    level={data.hero.level}
-                    levelTitle={data.hero.levelTitle}
+                    level={data.hero.levelCompleted ?? null}
+                    levelTitle={data.hero.levelCompletedTitle ?? ""}
                     mafiaRank={data.hero.mafiaRank?.tier ?? null}
                     memberSince={data.hero.memberSince ?? null}
                     mode={mode}

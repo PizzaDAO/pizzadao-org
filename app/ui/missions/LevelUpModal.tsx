@@ -177,7 +177,7 @@ export function LevelUpModal({ level, levelTitle, reward, onDismiss, isFinal }: 
 
         {!isFinalLevel && (
           <Link
-            href={`/handbook/levels#level-${level}`}
+            href={`/handbook/levels#level-${level + 1}`}
             data-testid="level-up-whats-next"
             style={{ fontSize: 14, fontWeight: 600, textDecoration: "underline", textUnderlineOffset: 3, color: "hsl(var(--foreground))" }}
           >

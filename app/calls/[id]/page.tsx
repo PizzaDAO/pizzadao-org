@@ -7,6 +7,7 @@
 // published and nothing here references it. Unpublished, rejected and unknown
 // ids are a 404. Metadata is generic and noindex so nothing leaks to crawlers.
 
+import { completedLevel } from "@/app/lib/level-display";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -96,7 +97,7 @@ export default async function PublishedCallPage({ params }: Params) {
                 {!showSummary ? (
                     <section className={`${paperCard} p-5 grid gap-3`}>
                         <h2 className="font-display text-xl font-black m-0">{t("summary")}</h2>
-                        <p className="m-0 text-sm text-foreground/60">{t("summaryRestricted", { level: access?.summary.minLevel ?? 10 })}</p>
+                        <p className="m-0 text-sm text-foreground/60">{t("summaryRestricted", { level: completedLevel(access?.summary.minLevel ?? 10) })}</p>
                     </section>
                 ) : rec.summary && (
                     <section className={`${paperCard} p-5 grid gap-3`}>
@@ -108,7 +109,7 @@ export default async function PublishedCallPage({ params }: Params) {
                 {!showActionItems && (
                     <section className="grid gap-2">
                         <h2 className="font-display text-xl font-black m-0">{t("actionItems")}</h2>
-                        <p className="m-0 text-sm text-foreground/60">{t("actionItemsRestricted", { level: access?.actionItems.minLevel ?? 10 })}</p>
+                        <p className="m-0 text-sm text-foreground/60">{t("actionItemsRestricted", { level: completedLevel(access?.actionItems.minLevel ?? 10) })}</p>
                     </section>
                 )}
 
@@ -191,7 +192,7 @@ export default async function PublishedCallPage({ params }: Params) {
                 {!showChapters && (
                     <section className="grid gap-2">
                         <h2 className="font-display text-xl font-black m-0">{t("chapters")}</h2>
-                        <p className="m-0 text-sm text-foreground/60">{t("chaptersRestricted", { level: access?.chapters.minLevel ?? 10 })}</p>
+                        <p className="m-0 text-sm text-foreground/60">{t("chaptersRestricted", { level: completedLevel(access?.chapters.minLevel ?? 10) })}</p>
                     </section>
                 )}
 
@@ -211,7 +212,7 @@ export default async function PublishedCallPage({ params }: Params) {
                 <section className="grid gap-3">
                     <h2 className="font-display text-xl font-black m-0">{t("transcript")}</h2>
                     {!showTranscript ? (
-                        <p className="m-0 text-sm text-foreground/60">{t("transcriptRestricted", { level: minLevel })}</p>
+                        <p className="m-0 text-sm text-foreground/60">{t("transcriptRestricted", { level: completedLevel(minLevel) })}</p>
                     ) : (<>
                     <p className="m-0 text-sm text-foreground/60">{t("transcriptNote")}</p>
                     <ol className="m-0 p-0 list-none grid gap-3">

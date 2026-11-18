@@ -53,7 +53,7 @@ export async function loadProfilePrefill(memberId: string, opts: { anonymous: bo
  */
 export function partialSummaryFromLight(light: ProfileSummary): ProfileSummary {
     return {
-        hero: { ...light.hero, level: null, levelTitle: "", mafiaRank: null, vouchInCount: 0, memberSince: null },
+        hero: { ...light.hero, level: null, levelTitle: "", levelCompleted: null, levelCompletedTitle: "", mafiaRank: null, vouchInCount: 0, memberSince: null },
         about: { ...light.about, xAccount: null },
         discordActivity: null,
         crewIds: withoutNonCrewIds(light.crewIds, []),

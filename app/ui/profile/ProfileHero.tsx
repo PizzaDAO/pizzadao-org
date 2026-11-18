@@ -29,7 +29,7 @@ interface ProfileHeroProps {
     /** Free-form one-liner from the member's profile; "" or undefined renders nothing. */
     tagline?: string | null;
     city?: string | null;
-    /** Numeric mission level (1–8), "MAX" for >8, or null if no level. */
+    /** Highest mission level COMPLETED (1–8), or null if none yet (no badge). */
     level?: number | string | null;
     levelTitle?: string | null;
     mafiaRank?: string | null;

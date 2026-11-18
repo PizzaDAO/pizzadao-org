@@ -1,10 +1,12 @@
 // Which level-up (if any) the member has not been shown yet.
 //
+import { completedLevel } from "@/app/lib/level-display";
+
 // `currentLevel` is "highest completed level + 1" and `lastCelebratedLevel`
 // is stored in the same units (the level reached when the last celebration
 // fired). Every level L with lastCelebratedLevel <= L < currentLevel is a
 // level the member got past since then, e.g. approved by a reviewer while they
-// weren't on the page. They are folded into ONE modal: the level reached, its
+// weren't on the page. They are folded into ONE modal: the level completed, its
 // title, and the PEP those levels actually paid. When the snapshot carries
 // `paidLevels` (the MISSION_REWARD ledger), only levels in it count toward the
 // PEP shown, so a level whose payout is still pending, or a mission added to an
@@ -23,7 +25,7 @@ export type LevelUpSnapshot = {
 };
 
 export type LevelUp = {
-  /** The level reached (same as currentLevel). */
+  /** The level COMPLETED (currentLevel - 1), whose title `levelTitle` is. */
   level: number;
   levelTitle: string | null;
   /** Total reward of the levels completed since the last celebration. */
@@ -44,10 +46,12 @@ export function levelUpToCelebrate(snapshot: LevelUpSnapshot, lastCelebratedLeve
     .reduce((sum, l) => sum + (Number.isFinite(l.reward) ? l.reward : 0), 0);
   const maxLevel = levels.reduce((max, l) => Math.max(max, l.level), 0);
 
+  const completed = completedLevel(currentLevel);
   return {
-    level: currentLevel,
-    levelTitle: levels.find((l) => l.level === currentLevel)?.title ?? snapshot.levelTitle ?? null,
+    level: completed,
+    levelTitle: levels.find((l) => l.level === completed)?.title ?? null,
     reward,
-    isFinal: maxLevel > 0 && currentLevel >= maxLevel,
+    // The member finished the top level.
+    isFinal: maxLevel > 0 && completed >= maxLevel,
   };
 }

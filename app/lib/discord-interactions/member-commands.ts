@@ -53,27 +53,27 @@ const ICON = { done: '✅', pending: '⏳', todo: '⬜' } as const
 
 /** The member's own level with what the next one needs. */
 export function renderOwnLevel(info: LevelInfo, appUrl: string, author?: EmbedAuthor): Embed {
-  const head = info.isMax ? 'You are at MAX level' : `You are level ${info.level}${info.title ? `: ${esc(info.title)}` : ''}`
+  const head = `You are level ${info.completed}${info.completedTitle ? `: ${esc(info.completedTitle)}` : ''}`
   if (info.isMax) return makeEmbed('success', head, `That is every level there is. See ${link('your missions', `${appUrl}/missions`)}.`, { author })
   const lines = info.missions.map((m) => `${ICON[m.state]} ${esc(m.title)}`)
-  const next = info.nextTitle ? `\n\nNext up: **${esc(info.nextTitle)}**` : ''
+  const next = info.title ? `\n\nNext up: **${esc(info.title)}**` : ''
   return makeEmbed(
     'success',
     head,
-    `${info.done}/${info.total} done to reach level ${info.level + 1}.\n\n${lines.join('\n')}${next}\n\n${link('Open your missions', `${appUrl}/missions`)}`,
+    `${info.done}/${info.total} done to complete level ${info.level}.\n\n${lines.join('\n')}${next}\n\n${link('Open your missions', `${appUrl}/missions`)}`,
     { author },
   )
 }
 
 /** Another member's level: level and title only. */
 export function renderOtherLevel(targetDiscordId: string, info: LevelInfo, author?: EmbedAuthor): Embed {
-  const level = info.isMax ? 'MAX level' : `level ${info.level}${info.title ? `: ${esc(info.title)}` : ''}`
+  const level = `level ${info.completed}${info.completedTitle ? `: ${esc(info.completedTitle)}` : ''}`
   return makeEmbed('success', `<@${targetDiscordId}> is ${level}`, undefined, { author })
 }
 
 export function renderProfile(stats: ProfileStats, appUrl: string, author?: EmbedAuthor): Embed {
   const fields = [
-    { name: 'Level', value: stats.isMax ? 'MAX' : `${stats.level}${stats.levelTitle ? `: ${esc(stats.levelTitle)}` : ''}`, inline: true },
+    { name: 'Level', value: `${stats.completed}${stats.completedTitle ? `: ${esc(stats.completedTitle)}` : ''}`, inline: true },
     { name: 'Vouched for by', value: String(stats.vouchesReceived), inline: true },
     { name: 'Vouched for', value: String(stats.vouchesGiven), inline: true },
   ]

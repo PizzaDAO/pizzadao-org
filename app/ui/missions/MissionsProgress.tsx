@@ -8,6 +8,7 @@
 // strikethrough for approved missions and a handwritten "ongoing" margin
 // hint. Fetching/state logic untouched.
 
+import { completedLevel } from "@/app/lib/level-display";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
@@ -73,8 +74,10 @@ export function MissionsProgress({ summary }: MissionsProgressProps = {}) {
 
   if (loading || !data || !data.isAuthenticated) return null;
 
-  const { currentLevel, levelTitle, levels } = data;
+  const { currentLevel, levels } = data;
   const currentLevelData = levels.find((l) => l.level === currentLevel);
+  // The header badge shows the highest level completed; currentLevel is the one being worked on.
+  const completedTitle = levels.find((l) => l.level === completedLevel(currentLevel))?.title ?? null;
 
   // Calculate current level progress
   const currentMissions = currentLevelData?.missions || [];
@@ -176,16 +179,16 @@ export function MissionsProgress({ summary }: MissionsProgressProps = {}) {
             color: "hsl(var(--tomato))",
           }}
         >
-          {allDone ? t("maxLevel") : (
+          {(
             <>
               <span style={{ color: "hsl(var(--foreground) / 0.35)", fontWeight: 700 }}>
                 {t("levelPrefix")}
               </span>
-              {currentLevel}
+              {completedLevel(currentLevel)}
             </>
           )}
         </span>
-        {levelTitle && (
+        {completedTitle && (
           <span
             style={{
               fontSize: 15,
@@ -194,7 +197,7 @@ export function MissionsProgress({ summary }: MissionsProgressProps = {}) {
               color: "hsl(var(--foreground))",
             }}
           >
-            <span className="circle-scribble">{levelTitle}</span>
+            <span className="circle-scribble">{completedTitle}</span>
           </span>
         )}
         {allDone && (

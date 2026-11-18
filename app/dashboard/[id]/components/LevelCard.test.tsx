@@ -47,9 +47,9 @@ describe("<LevelCard />", () => {
         expect(screen.getByText(/Waiting for review/)).toBeInTheDocument();
     });
 
-    it("MAX level has no progress bar", () => {
-        renderWithIntl(<LevelCard card={card({ isMax: true, level: 9 })} />);
-        expect(screen.getByText("MAX level")).toBeInTheDocument();
+    it("MAX level shows the top completed level and no progress bar", () => {
+        renderWithIntl(<LevelCard card={card({ isMax: true, level: 9, completed: 8, completedTitle: "Don of Dons" })} />);
+        expect(screen.getByText("Level 8")).toBeInTheDocument();
         expect(screen.queryByRole("progressbar")).toBeNull();
     });
 });

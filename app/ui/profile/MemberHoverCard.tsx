@@ -257,7 +257,7 @@ function CardBody({ card }: { card: MemberCard }) {
     const locale = useLocale();
     const sinceText = formatMemberSince(card.memberSince, locale);
     const meta: string[] = [];
-    if (card.level !== null) meta.push(t("level", { level: String(card.level) }));
+    if (card.levelCompleted != null) meta.push(t("level", { level: String(card.levelCompleted) }));
     if (card.mafiaRank) meta.push(card.mafiaRank);
     return (
         <span className="grid gap-2">
