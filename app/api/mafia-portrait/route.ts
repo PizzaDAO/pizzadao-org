@@ -33,7 +33,7 @@ import { activationActor, recordActivationLater } from "@/app/lib/activation";
 import { verifyNameOrigin } from "@/app/lib/name-origin-sig";
 import { NAME_ORIGIN_KINDS } from "@/app/lib/name-origin";
 import { isKnownTopping } from "@/app/lib/topping-images";
-import { PortraitUnavailable, generatePortrait, portraitModelId } from "@/app/lib/mafia-portrait/generate";
+import { PortraitUnavailable, generatePortrait } from "@/app/lib/mafia-portrait/generate";
 import { canonicalCrews, canonicalTurtles, portraitCacheKey } from "@/app/lib/mafia-portrait/prompt";
 
 export const runtime = "nodejs";
@@ -182,7 +182,7 @@ export async function POST(req: Request) {
         filmKey: "",
         variant,
         animal: "",
-        model: drawn.model || portraitModelId(),
+        model: drawn.model,
         url: drawn.url,
         discordId: discordId ?? null,
       },
