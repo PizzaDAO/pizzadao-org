@@ -6,7 +6,7 @@
 import { prisma } from '@/app/lib/db'
 import { recordCallReviewEvent, type CallReviewVia } from '@/app/lib/calls/review-audit'
 import { queueCallReviewCardSync } from '@/app/lib/calls/review-cards'
-import { autoHoldReason } from '@/app/lib/calls/access'
+import { autoHoldReason } from '@/app/lib/calls/hold-rules'
 import type { PostFilter } from '@/app/lib/calls/post-filters'
 
 export const HOLD_NOTE_MAX = 300
