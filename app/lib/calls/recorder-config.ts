@@ -14,6 +14,8 @@ import { END_SONG_CREW_LINE } from '@/app/lib/settings/registry'
 import { normalizeCrewId } from '@/app/lib/crew-id'
 import { normalizeKeyterms } from '@/app/lib/calls/keyterms'
 import { liveConfigFrom } from '@/app/lib/calls/live-items'
+import { triviaLive } from '@/app/lib/trivia/enabled'
+import { resolveTriviaChannel } from '@/app/lib/trivia/channel'
 import { parseCrewVoiceChannels, VOICE_CHANNEL_ID_LINE } from '@/app/lib/settings/registry'
 
 export interface RecorderConfig {
@@ -48,6 +50,11 @@ export interface RecorderConfig {
   liveView: { enabled: boolean; pushSeconds: number; afterRecordingEmptySeconds: number; maxHours: number }
   /** Live Discord message counting for the profile "Discord activity" block (members.discordActivityCount / ...FlushSeconds). */
   discordActivity: { enabled: boolean; flushSeconds: number }
+  /**
+   * Discord trivia answer forwarding (plans/trivia.md section 7): on only in production with trivia.enabled on,
+   * and only for the trivia channel (an id: it survives a rename). Everything else is decided by the app.
+   */
+  trivia: { enabled: boolean; channelIds: string[] }
 }
 
 export const RECORDER_CONFIG_OFF: RecorderConfig = {
@@ -68,6 +75,7 @@ export const RECORDER_CONFIG_OFF: RecorderConfig = {
   voiceChannels: { allowed: [], byEvent: [] },
   liveView: { enabled: false, pushSeconds: 20, afterRecordingEmptySeconds: 120, maxHours: 4 },
   discordActivity: { enabled: false, flushSeconds: 300 },
+  trivia: { enabled: false, channelIds: [] },
 }
 
 /** Discord event ids of the given crews (normalized ids). A mapping read failure gives none. */
@@ -151,6 +159,18 @@ export async function buildRecorderConfig(): Promise<RecorderConfig> {
       enabled: resolveToggle('members.discordActivityCount', settings),
       flushSeconds: settings.get('members.discordActivityFlushSeconds'),
     },
+    trivia: await triviaConfig(),
+  }
+}
+
+/** Forwarding is off (and the channel is not even looked up) unless trivia is live: see app/lib/trivia/enabled.ts. */
+async function triviaConfig(): Promise<RecorderConfig['trivia']> {
+  try {
+    if (!(await triviaLive())) return RECORDER_CONFIG_OFF.trivia
+    const channelId = await resolveTriviaChannel()
+    return channelId ? { enabled: true, channelIds: [channelId] } : RECORDER_CONFIG_OFF.trivia
+  } catch {
+    return RECORDER_CONFIG_OFF.trivia
   }
 }
 

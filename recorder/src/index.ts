@@ -16,6 +16,7 @@ import { createR2Uploader } from './storage.js'
 import { postIngestWithRetry } from './ingest.js'
 import { handleDm, postFollowupInbound, type DmMessage } from './dm-forward.js'
 import { RemoteConfigClient } from './remote-config.js'
+import { postTriviaAnswer, TriviaForwarder, type TriviaMessage } from './trivia-forward.js'
 import { ActivityCounter, postActivityBatch, toActivityEvent, type MessageLike } from './discord-activity.js'
 
 const log = (msg: string) => console.log(`${new Date().toISOString()} ${msg}`)
@@ -129,6 +130,16 @@ client.on('messageCreate', (m) => {
     log(`discord activity count failed: ${err instanceof Error ? err.message : String(err)}`)
   }
 })
+// Discord trivia: typed answers in the trivia channel go to the app (off unless the app's remote config turns it on). Its own
+// per-channel queue, separate from the recording chain above, so trivia can never delay or break recording.
+const trivia = new TriviaForwarder({
+  config: () => remote.get().trivia,
+  post: (b) => postTriviaAnswer(cfg.appBaseUrl, cfg.recorderApiKey, b),
+  sleep: (ms) => new Promise<void>((r) => setTimeout(r, ms)),
+  log,
+  guildId: cfg.guildId,
+})
+client.on('messageCreate', (m) => trivia.onMessage(m as unknown as TriviaMessage))
 if (cfg.followupDmForward) {
   // Own handler: fire and forget (retries run in the background), so it can never delay or break recording.
   const dmDeps = {

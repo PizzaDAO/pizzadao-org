@@ -2,8 +2,9 @@
 // scripts/pep-concurrency-local.mjs — `npm run test:pep-concurrency`
 //
 // Runs the real-Postgres $PEP concurrency suites
-// (app/lib/pep-economy.concurrency.test.ts and the /admin/shop suite,
-// app/lib/shop-admin.concurrency.test.ts) against a throwaway local Postgres:
+// (app/lib/pep-economy.concurrency.test.ts, the /admin/shop suite,
+// app/lib/shop-admin.concurrency.test.ts, and the Discord trivia suite,
+// app/lib/trivia/trivia.concurrency.test.ts) against a throwaway local Postgres:
 //   1. starts postgres:17 in docker on 127.0.0.1:$PEP_IT_PG_PORT (tmpfs, --rm),
 //      or uses PEP_IT_DATABASE_URL if it points at localhost
 //   2. creates the schema with `prisma db push` (same as e2e:local)
@@ -61,6 +62,6 @@ process.on("exit", cleanup);
 
 const env = { ...process.env, DATABASE_URL: databaseUrl, PEP_IT_DATABASE_URL: databaseUrl, NODE_OPTIONS: "" };
 run("npx", ["prisma", "db", "push", "--accept-data-loss"], { env });
-const r = spawnSync("npx", ["vitest", "run", "app/lib/pep-economy.concurrency.test.ts", "app/lib/shop-admin.concurrency.test.ts", "--no-file-parallelism", ...process.argv.slice(2)], { cwd: ROOT, stdio: "inherit", env });
+const r = spawnSync("npx", ["vitest", "run", "app/lib/pep-economy.concurrency.test.ts", "app/lib/shop-admin.concurrency.test.ts", "app/lib/trivia/trivia.concurrency.test.ts", "--no-file-parallelism", ...process.argv.slice(2)], { cwd: ROOT, stdio: "inherit", env });
 cleanup();
 process.exit(r.status ?? 1);

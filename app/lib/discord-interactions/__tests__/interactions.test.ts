@@ -420,7 +420,7 @@ describe('handleInteraction', () => {
   it('registers the live commands (/bounty has a handler but is deliberately not registered)', () => {
     expect(PEP_COMMANDS.map((c) => c.name)).toEqual([
       'balance', 'work', 'collect-income', 'pay', 'leaderboard', 'blackjack', 'roulette', 'slots', 'shop', 'buy',
-      'add-money', 'remove-money', 'missions', 'vouch', 'level', 'profile', 'progress', 'live', 'metalhead', 'task',
+      'add-money', 'remove-money', 'missions', 'vouch', 'level', 'profile', 'progress', 'live', 'metalhead', 'task', 'trivia',
     ])
   })
 })

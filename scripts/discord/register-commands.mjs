@@ -5,7 +5,7 @@
  *
  * Commands: /balance /work /collect-income /pay /leaderboard /blackjack
  * /roulette /slots /shop /buy /add-money /remove-money /missions /vouch /level
- * /profile /progress /live /metalhead /task (list, claim, mine, drop, add). /task answers "not enabled" until discord.taskCommandEnabled. /bounty is deliberately NOT registered (see BOUNTY_COMMAND in commands.ts). /live answers "not enabled" until calls.liveAnnounceCommandEnabled; /metalhead
+ * /profile /progress /live /metalhead /task (list, claim, mine, drop, add) /trivia (leaderboard, start, skip). /trivia answers "not enabled" until trivia.enabled is on (production only); start and skip are admin only. /task answers "not enabled" until discord.taskCommandEnabled. /bounty is deliberately NOT registered (see BOUNTY_COMMAND in commands.ts). /live answers "not enabled" until calls.liveAnnounceCommandEnabled; /metalhead
  * until discord.metalheadCommandEnabled (and calls.updatesEnabled). /vouch, /level, /profile and /progress answer "not enabled"
  * until discord.vouchCommandEnabled / levelCommandEnabled / profileCommandEnabled /
  * calls.progressReportEnabled. The games

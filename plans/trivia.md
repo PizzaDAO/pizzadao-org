@@ -1,6 +1,6 @@
 # PizzaDAO Trivia: Discord bot + pizzadao.org/trivia + vetted question bank
 
-**Status:** decisions approved by Snax (2026-11-18, §13). Phase 1 implemented on branch `oregano-27514-trivia` (task `oregano-27514`); phases 2-3 not started.
+**Status:** decisions approved by Snax (2026-11-18, §13). Phase 1 merged (PR #410). Phase 2 (the Discord loop) implemented on branch `oregano-27514-trivia-discord` (task `oregano-27514`); phase 3 not started.
 **Question bank:** [`data/trivia/questions.json`](../data/trivia/questions.json) (moved from `plans/` in phase 1): 95 entries (90 approved, 4 flagged, 1 rejected), each with sources. `fun-002` was approved by Snax; each approved entry carries a `pool` (see §8.1).
 **Owner repo:** `PizzaDAO/pizzadao-org` (this repo). It serves `pizzadao.org` today (`app.pizzadao.org` 307s to the apex), runs the $PEP economy, the Discord HTTP-interactions bot and the Railway gateway worker (`recorder/`, "Metalhead").
 
@@ -282,7 +282,7 @@ model TriviaReport { id Int @id @default(autoincrement()); questionId String; di
 | Key | Default | Notes |
 |---|---|---|
 | `trivia.discordEnabled` (toggle, env `TRIVIA_DISCORD`) | off | Master switch for posting + paying in Discord. OFF on previews |
-| `trivia.channelId` | none | **Snax decision** (§12) |
+| `trivia.channelId` | none (falls back to the `#work` / mission review channel and saves its id) | §13.2 |
 | `trivia.roundsPerDay` | 3 | Posted at random minutes inside `trivia.windowsUtc` |
 | `trivia.windowsUtc` | `["14:00-16:00","18:00-20:00","23:00-01:00"]` | Spread across US/EU/Asia evenings. The cron picks a random slot inside each window once per day (seeded by date, so reruns are stable) |
 | `trivia.roundMinutes` | 10 | Then reveal: "⏰ Time's up! The answer was **X**." + explanation + source link |
@@ -315,7 +315,7 @@ model TriviaReport { id Int @id @default(autoincrement()); questionId String; di
 **Anti-spam:**
 - The bot is ignored, as are other bots and webhooks.
 - Per user per round: the attempt cap above, plus at most 1 message per 2 s (`checkKeyedRateLimit('trivia-msg', id)`); extra messages are ignored silently.
-- Recommend Discord **slowmode 3 s** on the trivia channel (Snax sets it).
+- No slowmode (trivia shares `#work`, §13.2): the 2 s per-user throttle above is the only limit, and nothing in code sets channel permissions or slowmode.
 - Wrong answers get no reply (keeps the channel readable). Optional ❌ reaction behind `trivia.reactWrong` (default off; reactions cost API calls).
 - Answers sent before the question's snowflake, or edited messages, don't count. Only `messageCreate` is forwarded.
 
@@ -467,7 +467,7 @@ Every approved question has an explicit `pool` field in the bank:
 Snax approved every recommendation below. The original question stays for context; **Decision** is what is built.
 
 1. **Reward currency and amount.** **Decision: $PEP, 20 per win, at most 3 wins per user per day** (no difficulty multiplier at launch: `trivia.difficultyMultiplier` stays off). "toppings" is NFT art, not a currency.
-2. **Channel.** **Decision: a new `#trivia` channel with a 3 s slowmode** (Snax creates it and sets the slowmode; its id goes into `trivia.channelId` in phase 2).
+2. **Channel.** **Decision (revised 2026-11-18): trivia runs in the existing `#work` channel; there is no new `#trivia` channel and no code sets slowmode or channel permissions.** Snax plans to rename `#work`, so the channel is always an *id*: `trivia.channelId` defaults to the mission review channel (saved id, else `MISSION_REVIEW_CHANNEL_ID`, else the channel named "work") and its id is then saved into the setting. The same fix makes every other name lookup (`resolveConfiguredChannel`: mission review cards, level-ups, SLA digest, nightly verify) save the id it found, so a rename cannot silently stop them (`app/lib/settings/channels.ts`, `pinChannelId`). The 3 s slowmode of the original decision is dropped (it would hurt normal work chat); the per-user 2 s throttle of §6 (`trivia-msg`) is the only rate limit.
 3. **Frequency.** **Decision: 3 rounds a day in the US / EU / Asia windows (`trivia.windowsUtc`), 10-minute rounds.**
 4. **Web rewards.** **Decision: no web PEP at launch** (`trivia.webDailyRewardPep` = 0; streaks and the leaderboard only).
 5. **Sybil / eligibility.** **Decision: only onboarded members win $PEP (`trivia.requireMember` = true), and the Discord account must be at least 7 days old (`trivia.minAccountAgeDays` = 7).** Bounded at 60 PEP/day per real member (3 wins x 20).
@@ -518,3 +518,14 @@ Rejected (`bt-000`) and flagged entries are left as they are in the bank. They m
   - Newswire 2023: <https://www.newswire.com/news/pizzadao-celebrates-third-annual-global-pizza-party-22042669>
   - Rare Pizzas: <https://cryptoslate.com/nft-project-mints-10000-digital-pizzas-in-throwback-to-bitcoin/>, <https://thespoon.tech/the-creators-behind-rare-pizzas-want-to-use-pizza-art-nfts-to-fund-a-global-real-world-pizza-party/>, <https://harvest.art/barn/1/0x4ae57798aef4af99ed03818f83d2d8aca89952c7>
   - Repo data: `data/gpp-contracts.json`, `content/handbook/getting-started/en.ts`, `toppings/src/app/page.tsx`
+
+## 16. Phase 2 as built (Discord loop)
+
+- **Settings (`trivia.*`, all off by default):** `trivia.enabled` (toggle, env `TRIVIA_DISCORD_ENABLED`), `trivia.dryRun` (rounds judged, nothing paid; env `TRIVIA_DRY_RUN` on forces it), `trivia.rewardPep` (20, max 50), `trivia.channelId`, `trivia.roundsPerDay` (3). Fixed in `app/lib/trivia/config.ts`: 10-minute rounds, 3 wins/member/day, onboarded members only, account age 7 days, windows `14:00-16:00`, `18:00-20:00`, `23:00-01:00` UTC, reveal when nobody wins, discord pool only (never `fun-*`).
+- **Production only:** `app/lib/trivia/enabled.ts` (`triviaLive`) is true only when `VERCEL_ENV === "production"` and the switch is on. The cron, the answer route, `/trivia` and the recorder config all use it, so a preview does nothing (no read, post or payout) even though it shares the production database.
+- **Round flow:** `/api/cron/trivia` every 5 min → `expireRounds` (reveal once; a round that expired more than 30 min ago while the loop was off closes silently) → `dueSlot` (day-seeded random minutes inside the windows; a slot fires once, up to 90 min late) → `openDiscordRound` (advisory lock + the one-open-round-per-channel index; a failed question post cancels the round). `/trivia start` uses the same opener on the configured channel, `/trivia skip` cancels with no payout.
+- **Answers:** recorder `trivia-forward.ts` (off unless remote config `trivia.enabled`; per-channel serial queue, in-place retries, own queue separate from recording) → `POST /api/trivia/discord/answer` (`RECORDER_API_KEY`) → `processAnswer` → `claimWin`.
+- **claimWin:** replayed message id returns the stored verdict; attempt caps (1 for true/false and multiple choice, 3 for short answer); then one conditional `UPDATE ... WHERE status = 'OPEN' AND closesAt > now`; the winner is paid with `creditInTx(... 'TRIVIA_REWARD' ...)` in the same transaction. A correct answer from a non-member or a young account, or a 4th win in a UTC day, does **not** win: it is told so once as a reply and the round stays open for others (a decision where §6 left it open).
+- **Not built (by design):** the snowflake tie-break log of §7 (the serial queue makes it unreachable; the single conditional UPDATE is the real guard), `trivia.windowsUtc` / `trivia.roundMinutes` / `trivia.disabledQuestionIds` as editable settings (constants for launch), the web daily ensure step in the cron (the web page already creates its round on first view).
+- **Rename-proofing:** see §13.2.
+- **Go-live checklist:** see the PR description.

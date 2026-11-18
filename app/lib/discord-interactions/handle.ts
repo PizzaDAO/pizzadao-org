@@ -24,6 +24,7 @@ import { handleReviewButton, handleReviewModal, type MissionReviewDeps } from '.
 import type { MemberCommandJob, MemberCommandName } from './member-commands'
 import { BOUNTY_SUBCOMMANDS, type BountyJob } from './bounty-command'
 import { TASK_SUBCOMMANDS, type TaskJob } from './task-command'
+import { TRIVIA_ADMIN_SUBCOMMANDS, TRIVIA_SUBCOMMANDS, type TriviaJob } from './trivia-command'
 import { cleanTaskText, parseDue, parsePriority } from './task-add'
 import { CREW_ID_PATTERN, normalizeCrewId } from '../crew-id'
 import { handleFollowUpInteraction, isFollowUpInteraction, type FollowUpInteractionDeps } from './followups'
@@ -190,6 +191,17 @@ export interface HandlerDeps {
     choices: (kind: 'crew' | 'claim' | 'drop' | 'addCrew', discordId: string, query: string, roles?: string[]) => Promise<Array<{ name: string; value: string | number }>>
     /** The clock (tests). */
     now?: () => Date
+  }
+  /**
+   * /trivia leaderboard | start | skip (./trivia-command.ts, trivia.enabled, production only). start and skip are
+   * admin only (isAdmin on the member's roles) and are refused before anything else is checked. `enabled` is
+   * checked next so a disabled command uses no rate limit. `defer` does the work and edits the deferred reply;
+   * it must not block (route: after()).
+   */
+  trivia?: {
+    enabled: () => Promise<boolean>
+    rateLimit: (discordId: string) => Promise<Date | null>
+    defer: (job: TriviaJob) => void
   }
   /** Mission review card buttons and the Reject modal (./mission-review.ts). */
   missionReview?: MissionReviewDeps
@@ -708,6 +720,32 @@ async function command(i: Interaction, userId: string, deps: HandlerDeps, cur: s
       })
       // "Pepperoni Bot is thinking..." (only you see it); the reply is edited in.
       return { type: ResponseType.DEFERRED_CHANNEL_MESSAGE, data: { flags: EPHEMERAL } }
+    }
+
+    case 'trivia': {
+      if (!deps.trivia) return out.error("/trivia isn't enabled yet.")
+      const subOpt = i.data?.options?.[0] as { name?: string; options?: Option[] } | undefined
+      const sub = TRIVIA_SUBCOMMANDS.find((s) => s === subOpt?.name)
+      if (!sub) return out.error('Pick one of: leaderboard, start, skip.')
+      // Admin gate first, so non-admins learn nothing else (same as /add-money).
+      if (TRIVIA_ADMIN_SUBCOMMANDS.includes(sub) && !(await deps.isAdmin(i.member?.roles ?? []).catch(() => false))) {
+        return out.error('Only admins can use this command.')
+      }
+      if (!(await deps.trivia.enabled())) return out.error("/trivia isn't enabled yet.")
+      if (!i.application_id || !i.token) return out.error('Could not start the command. Please try again.')
+      const readyAt = await deps.trivia.rateLimit(userId)
+      if (readyAt) return out.wait('Slow down.', `You can use /trivia again ${rel(readyAt)}.`)
+      const isPublic = sub === 'leaderboard' && subOpt?.options?.find((o) => o.name === 'public')?.value === true
+      deps.trivia.defer({
+        sub,
+        discordId: userId,
+        ...(isPublic ? { public: true } : {}),
+        applicationId: i.application_id,
+        token: i.token,
+        author: out.author,
+      })
+      // "Pepperoni Bot is thinking..." (only you see it, unless the leaderboard is public); the reply is edited in.
+      return { type: ResponseType.DEFERRED_CHANNEL_MESSAGE, ...(isPublic ? {} : { data: { flags: EPHEMERAL } }) }
     }
 
     default:

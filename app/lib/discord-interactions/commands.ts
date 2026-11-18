@@ -18,6 +18,7 @@
 const SUB_COMMAND = 1
 const STRING = 3
 const INTEGER = 4
+const BOOLEAN = 5
 const USER = 6
 
 const bet = { type: INTEGER, name: 'bet', description: 'How much $PEP to bet', required: true, min_value: 1 } as const
@@ -192,6 +193,23 @@ export const PEP_COMMANDS = [
           { type: STRING, name: 'due', description: 'Due date, month first: 2026-12-05, 12/5 or Dec 5', required: false, max_length: 20 },
         ],
       },
+    ],
+    dm_permission: false,
+  },
+  {
+    // Deferred (type 5). Answers "not enabled" until trivia.enabled is on (production only). start and skip are
+    // admin only (checked by the handler, like /add-money). The answers themselves are typed in the trivia channel.
+    name: 'trivia',
+    description: 'Discord trivia: the leaderboard (admins can also start or skip a round)',
+    options: [
+      {
+        type: SUB_COMMAND,
+        name: 'leaderboard',
+        description: 'Top trivia winners',
+        options: [{ type: BOOLEAN, name: 'public', description: 'Show it to everyone in the channel (default: only you)', required: false }],
+      },
+      { type: SUB_COMMAND, name: 'start', description: 'Admins: start a trivia round now in the trivia channel' },
+      { type: SUB_COMMAND, name: 'skip', description: 'Admins: cancel the open trivia round (no $PEP is paid)' },
     ],
     dm_permission: false,
   },

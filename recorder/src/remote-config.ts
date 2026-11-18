@@ -41,6 +41,8 @@ export interface RemoteConfig {
   liveView: { enabled: boolean; pushSeconds: number; afterRecordingEmptySeconds: number; maxHours: number }
   /** Count server messages (no content) and send the totals to the app in batches every flushSeconds. */
   discordActivity: { enabled: boolean; flushSeconds: number }
+  /** Forward typed answers from these channels to the app (Discord trivia). Off unless the app says so. */
+  trivia: { enabled: boolean; channelIds: string[] }
 }
 
 export const REMOTE_CONFIG_OFF: RemoteConfig = {
@@ -61,6 +63,7 @@ export const REMOTE_CONFIG_OFF: RemoteConfig = {
   voiceChannels: VOICE_CHANNELS_OFF,
   liveView: { enabled: false, pushSeconds: 20, afterRecordingEmptySeconds: 120, maxHours: 4 },
   discordActivity: { enabled: false, flushSeconds: 300 },
+  trivia: { enabled: false, channelIds: [] },
 }
 
 export const REMOTE_CONFIG_TIMEOUT_MS = 5_000
@@ -81,6 +84,7 @@ export function parseRemoteConfig(raw: unknown, previous?: RemoteConfig | null):
   const d = REMOTE_CONFIG_OFF
   const l = (o.liveItems && typeof o.liveItems === 'object' ? o.liveItems : {}) as Record<string, unknown>
   const lv = (o.liveView && typeof o.liveView === 'object' ? o.liveView : {}) as Record<string, unknown>
+  const tv = (o.trivia && typeof o.trivia === 'object' ? o.trivia : {}) as Record<string, unknown>
   const da = (o.discordActivity && typeof o.discordActivity === 'object' ? o.discordActivity : {}) as Record<string, unknown>
   const strings = (v: unknown, max: number, len: number): string[] =>
     Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.trim().length > 0).map((x) => x.trim().slice(0, len)).slice(0, max) : []
@@ -141,6 +145,10 @@ export function parseRemoteConfig(raw: unknown, previous?: RemoteConfig | null):
       enabled: da.enabled === true,
       flushSeconds: int(da.flushSeconds, d.discordActivity.flushSeconds, 60, 3600),
     },
+    trivia: (() => {
+      const channelIds = strings(tv.channelIds, 5, 25).filter((x) => /^\d{15,25}$/.test(x))
+      return { enabled: tv.enabled === true && channelIds.length > 0, channelIds }
+    })(),
   }
 }
 
