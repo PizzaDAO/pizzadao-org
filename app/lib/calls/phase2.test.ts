@@ -525,6 +525,28 @@ describe('publish gating', () => {
     expect(await publishRecording('rec1', '9', undefined, { refuseStaleRedactions: true })).toBe('ok')
   })
 
+  it('expectVersion / requireNotHeld (Discord Confirm): an edit, a new title or a hold since the preview is a conflict, nothing written', async () => {
+    const { cardVersion } = await import('./review-cards')
+    const row = { id: 'rec1', status: 'IN_REVIEW', title: 'T', summary: 'S', transcript: [{ discordId: ANN, startMs: 0, endMs: 1, text: 'a' }], summaryGeneratedAt: new Date('2026-11-01T10:00:00Z'), summaryEditedAt: null, redactionsUpdatedAt: null, reviewHoldAt: null }
+    const v = cardVersion(row)
+    db.callRecording.findUnique.mockResolvedValue(row)
+    db.callRecording.updateMany.mockResolvedValue({ count: 1 })
+    expect(await publishRecording('rec1', '9', undefined, { expectVersion: v, requireNotHeld: true })).toBe('ok')
+    expect(db.callRecording.updateMany.mock.calls.at(-1)![0].where).toMatchObject({ reviewHoldAt: null })
+    db.callRecording.updateMany.mockClear()
+    // Title-only edit (no stamp changes): the version still moves.
+    db.callRecording.findUnique.mockResolvedValue({ ...row, title: 'Changed' })
+    expect(await publishRecording('rec1', '9', undefined, { expectVersion: v })).toBe('conflict')
+    // Summary edited since.
+    db.callRecording.findUnique.mockResolvedValue({ ...row, summaryEditedAt: new Date('2026-11-02T10:00:00Z') })
+    expect(await publishRecording('rec1', '9', undefined, { expectVersion: v })).toBe('conflict')
+    // Held since (a capo): refused; the owner (no requireNotHeld) is not.
+    db.callRecording.findUnique.mockResolvedValue({ ...row, reviewHoldAt: new Date() })
+    expect(await publishRecording('rec1', '9', undefined, { expectVersion: v, requireNotHeld: true })).toBe('conflict')
+    expect(db.callRecording.updateMany).not.toHaveBeenCalled()
+    expect(await publishRecording('rec1', '9', undefined, { expectVersion: v })).toBe('ok')
+  })
+
   it('409 without a summary, and for a REJECTED or merely RECORDED call', async () => {
     asReviewer()
     db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'IN_REVIEW', summary: null, transcript: [{ discordId: ANN, startMs: 0, endMs: 1, text: 'a' }] })

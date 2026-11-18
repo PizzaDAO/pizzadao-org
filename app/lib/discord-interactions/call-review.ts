@@ -42,6 +42,8 @@ export interface CallReviewJob {
   recordingId: string
   userId: string
   role: CallReviewRole
+  /** Confirm: the card version the reviewer saw; the publish refuses if the call moved on. */
+  version?: string
   applicationId: string
   token: string
 }
@@ -61,7 +63,7 @@ export interface CallReviewDeps {
 
 type Refuse = (headline: string, body?: string) => InteractionResponse
 
-export const CALL_BUTTON_ID = /^cr:(approve|confirm):([A-Za-z0-9_-]{8,40}):([0-9a-z]{1,12})$/
+export const CALL_BUTTON_ID = /^cr:(approve|confirm):([A-Za-z0-9_-]{8,40}):([0-9a-z]{1,16})$/
 export const CALL_HOLD_ID = /^cr:hold:([A-Za-z0-9_-]{8,40})$/
 export const CALL_CANCEL_ID = /^cr:cancel:([A-Za-z0-9_-]{8,40})$/
 
@@ -111,9 +113,9 @@ async function check(i: Interaction, id: string, version: string | null, action:
   return { ok: true, target, role }
 }
 
-function job(i: Interaction, userId: string, id: string, action: CallReviewAction, role: CallReviewRole): CallReviewJob | null {
+function job(i: Interaction, userId: string, id: string, action: CallReviewAction, role: CallReviewRole, version?: string): CallReviewJob | null {
   if (!i.application_id || !i.token) return null
-  return { action, recordingId: id, userId, role, applicationId: i.application_id, token: i.token }
+  return { action, recordingId: id, userId, role, ...(version ? { version } : {}), applicationId: i.application_id, token: i.token }
 }
 
 /** A click on a call review card or on its preview. */
@@ -141,7 +143,7 @@ export async function handleCallReviewButton(i: Interaction, userId: string, dep
   const action = m[1] as 'approve' | 'confirm'
   const c = await check(i, m[2], m[3], action, deps, refuse)
   if (!c.ok) return c.res
-  const j = job(i, userId, m[2], action, c.role)
+  const j = job(i, userId, m[2], action, c.role, action === 'confirm' ? m[3] : undefined)
   if (!j) return refuse('Could not record that. Please try again.')
   deps.run(j)
   // Approve opens a new private preview; Confirm edits the preview it was clicked on.

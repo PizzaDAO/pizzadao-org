@@ -117,7 +117,8 @@ export function callReviewRunDeps(appUrl: string): CallReviewRunDeps {
   return {
     preview: buildRecapPreview,
     // A capo may not publish over lines hidden after the summary (the same guard as the website).
-    publish: (id, reviewerId, role) => publishRecording(id, reviewerId, undefined, role === 'capo' ? { refuseStaleRedactions: true } : {}),
+    publish: (id, reviewerId, role, version) => publishRecording(id, reviewerId, undefined, { ...(role === 'capo' ? { refuseStaleRedactions: true, requireNotHeld: true } : {}), ...(version ? { expectVersion: version } : {}) }),
+    current: (id) => prisma.callRecording.findUnique({ where: { id }, select: { status: true, reviewedBy: true } }),
     recap: (id) => postCallRecap(id),
     audit: ({ recordingId, actorId, recap }) => recordCallReviewEvent({ recordingId, actorId, action: 'publish', via: 'discord', ...(recap ? { metadata: { recap } } : {}) }),
     hold: (id, actorId) => setHold(id, actorId, null, 'discord'),

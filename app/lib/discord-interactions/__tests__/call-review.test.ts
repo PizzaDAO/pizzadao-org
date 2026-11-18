@@ -97,6 +97,14 @@ describe('call review buttons: accepted clicks', () => {
     expect(r).toMatchObject({ type: 5, data: { flags: 64 } })
     expect(jobs).toEqual([{ action: 'approve', recordingId: ID, userId: '111111111111111111', role: 'capo', applicationId: 'app1', token: 'tok1' }])
   })
+  it('confirm carries the confirmed version into the job; approve does not', async () => {
+    const a = makeDeps()
+    await handleCallReviewButton(click(`cr:confirm:${ID}:${V}`), 'u', a.deps, refuse)
+    expect(a.jobs[0].version).toBe(V)
+    const b = makeDeps()
+    await handleCallReviewButton(click(`cr:approve:${ID}:${V}`), 'u', b.deps, refuse)
+    expect(b.jobs[0].version).toBeUndefined()
+  })
   it('confirm is a deferred update', async () => {
     const { deps, jobs } = makeDeps()
     const r = await handleCallReviewButton(click(`cr:confirm:${ID}:${V}`), 'u', deps, refuse)
@@ -125,15 +133,16 @@ describe('call review buttons: accepted clicks', () => {
   })
 })
 
-function makeRun(o: { publish?: PublishOutcome; recap?: RecapOutcome; preview?: Awaited<ReturnType<CallReviewRunDeps['preview']>> } = {}) {
+function makeRun(o: { publish?: PublishOutcome; recap?: RecapOutcome; preview?: Awaited<ReturnType<CallReviewRunDeps['preview']>>; current?: Awaited<ReturnType<CallReviewRunDeps['current']>> } = {}) {
   const order: string[] = []
   const edits: Array<{ embeds: Array<{ description: string }>; components: unknown[] }> = []
   const audits: unknown[] = []
   const deps: CallReviewRunDeps = {
     preview: async () => (o.preview === undefined ? { text: 'RECAP TEXT', channelLabel: '#crew', postingOn: true, willSkip: false, version: V } : o.preview),
-    publish: async (id, by, role) => (order.push(`publish:${role}:${by}`), o.publish ?? 'ok'),
+    publish: async (id, by, role, version) => (order.push(`publish:${role}:${by}:${version ?? '-'}`), o.publish ?? 'ok'),
     recap: async () => (order.push('recap'), o.recap ?? 'posted'),
     audit: async (ev) => void (order.push('audit'), audits.push(ev)),
+    current: async () => o.current === undefined ? { status: 'IN_REVIEW', reviewedBy: null } : o.current,
     hold: async () => 'ok',
     syncCard: async () => void order.push('sync'),
     edit: async (_a, _t, body) => void (order.push('edit'), edits.push(body as never)),
@@ -141,7 +150,7 @@ function makeRun(o: { publish?: PublishOutcome; recap?: RecapOutcome; preview?: 
   }
   return { deps, order, edits, audits }
 }
-const jobOf = (action: CallReviewJob['action'], role: CallReviewRole = 'capo'): CallReviewJob => ({ action, recordingId: ID, userId: '111111111111111111', role, applicationId: 'a', token: 't' })
+const jobOf = (action: CallReviewJob['action'], role: CallReviewRole = 'capo'): CallReviewJob => ({ action, recordingId: ID, userId: '111111111111111111', role, ...(action === 'confirm' ? { version: V } : {}), applicationId: 'a', token: 't' })
 
 describe('runCallReview', () => {
   it('approve: the preview shows the exact recap and target with Confirm carrying the version', async () => {
@@ -169,7 +178,7 @@ describe('runCallReview', () => {
   it('confirm: publish (capo guard), then recap, audit, card sync, then the reply, in that order', async () => {
     const { deps, order, edits, audits } = makeRun()
     expect(await runCallReview(jobOf('confirm'), deps)).toBe('published')
-    expect(order).toEqual(['publish:capo:111111111111111111', 'recap', 'audit', 'sync', 'edit'])
+    expect(order).toEqual([`publish:capo:111111111111111111:${V}`, 'recap', 'audit', 'sync', 'edit'])
     expect(audits).toEqual([{ recordingId: ID, actorId: '111111111111111111', recap: 'posted' }])
     expect(edits[0].embeds[0].description).toContain('Published.')
     expect(edits[0].embeds[0].description).toContain('recap was posted')
@@ -178,7 +187,7 @@ describe('runCallReview', () => {
   it('confirm: the owner publishes without the capo guard', async () => {
     const { deps, order } = makeRun()
     await runCallReview(jobOf('confirm', 'owner'), deps)
-    expect(order[0]).toBe('publish:owner:111111111111111111')
+    expect(order[0]).toBe(`publish:owner:111111111111111111:${V}`)
   })
   it('confirm: a conflict shows the retry copy and posts nothing', async () => {
     const { deps, order, edits, audits } = makeRun({ publish: 'conflict' })
@@ -187,6 +196,22 @@ describe('runCallReview', () => {
     expect(audits).toHaveLength(0)
     expect(edits[0].embeds[0].description).toContain('changed while publishing')
     expect(edits[0].embeds[0].description).toContain('/admin/calls/')
+  })
+  it('a losing double Confirm does not overwrite the winner\'s "Published." reply', async () => {
+    for (const result of ['conflict', 'already'] as const) {
+      const { deps, edits, order } = makeRun({ publish: result, current: { status: 'PUBLISHED', reviewedBy: '111111111111111111' } })
+      expect(await runCallReview(jobOf('confirm'), deps)).toBe('already')
+      expect(edits).toHaveLength(0)
+      expect(order).not.toContain('recap')
+    }
+    // Published by someone else meanwhile: say so, still no error copy and no recap.
+    const other = makeRun({ publish: 'conflict', current: { status: 'PUBLISHED', reviewedBy: '999999999999999999' } })
+    expect(await runCallReview(jobOf('confirm'), other.deps)).toBe('already')
+    expect(other.edits[0].embeds[0].description).toContain('Already published')
+    // A real conflict (still in review) keeps the retry copy.
+    const real = makeRun({ publish: 'conflict', current: { status: 'IN_REVIEW', reviewedBy: null } })
+    await runCallReview(jobOf('confirm'), real.deps)
+    expect(real.edits[0].embeds[0].description).toContain('changed while publishing')
   })
   it('confirm: every other refusal posts nothing and links the website', async () => {
     for (const result of ['stale-redactions', 'transcribing', 'incomplete', 'not-allowed', 'not-found'] as const) {

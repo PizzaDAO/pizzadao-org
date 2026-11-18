@@ -32,7 +32,10 @@ export type RecapOutcome = 'posted' | 'disabled' | 'already-posted' | 'not-publi
 export interface CallReviewRunDeps {
   /** The recap preview and the card version it belongs to; null: the call is gone or has no summary. */
   preview: (id: string) => Promise<(RecapPreview & { version: string }) | null>
-  publish: (id: string, reviewerId: string, role: 'owner' | 'capo') => Promise<PublishOutcome>
+  /** `version`: the card version confirmed; the publish refuses (conflict) when the call has moved on, and a capo's also when it is held. */
+  publish: (id: string, reviewerId: string, role: 'owner' | 'capo', version?: string) => Promise<PublishOutcome>
+  /** The call's status and who reviewed it, read fresh (to tell a lost double-Confirm from a real refusal). */
+  current: (id: string) => Promise<{ status: string; reviewedBy: string | null } | null>
   recap: (id: string) => Promise<RecapOutcome>
   audit: (ev: { recordingId: string; actorId: string; recap: RecapOutcome | null }) => Promise<void>
   hold: (id: string, actorId: string) => Promise<'ok' | 'already' | 'not-found'>
@@ -96,7 +99,7 @@ export async function runCallReview(job: CallReviewJob, deps: CallReviewRunDeps)
     }
 
     // confirm
-    const result = await deps.publish(job.recordingId, job.userId, job.role)
+    const result = await deps.publish(job.recordingId, job.userId, job.role, job.version)
     if (result === 'ok') {
       // Only a fresh publish posts the recap, exactly like the website (a double confirm sees 'already').
       const recap = await deps.recap(job.recordingId).catch((err): RecapOutcome => {
@@ -109,6 +112,15 @@ export async function runCallReview(job: CallReviewJob, deps: CallReviewRunDeps)
       return 'published'
     }
     await deps.syncCard(job.recordingId).catch(() => undefined)
+    if (result === 'conflict' || result === 'already') {
+      // A double Confirm: the other click published it and wrote "Published." onto this same reply. Do not overwrite that.
+      const now = await deps.current(job.recordingId).catch(() => null)
+      if (now?.status === 'PUBLISHED') {
+        if (now.reviewedBy === job.userId) return 'already'
+        await reply(makeEmbed('success', 'Already published.', `Someone else published this call just now.${siteLink(deps, job.recordingId)}`))
+        return 'already'
+      }
+    }
     const [headline, body] = refusalCopy(result)
     await reply(makeEmbed('error', headline, `${body}${siteLink(deps, job.recordingId)}`.trim()))
     return result

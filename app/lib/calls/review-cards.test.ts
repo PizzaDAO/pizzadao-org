@@ -33,6 +33,7 @@ function view(o: Partial<CallCardView> = {}): CallCardView {
     actionItems: [{ text: 'Write the doc', owner: 'Sam' }],
     held: null,
     staleRedactions: false,
+    interactive: true,
     version: 'abc',
     reviewedBy: null,
     reviewedAt: null,
@@ -92,6 +93,14 @@ describe('renderCallReviewCard', () => {
 
   it('a version change changes the render hash (the card is edited so an old Approve is refused)', () => {
     expect(renderHash(renderCallReviewCard(view({ version: 'abd' }), { appUrl: APP }))).not.toBe(renderHash(renderCallReviewCard(view(), { appUrl: APP })))
+  })
+
+  it('without capo review on (not interactive) an open card has only the link, and the hash differs', () => {
+    const off = renderCallReviewCard(view({ interactive: false }), { appUrl: APP })
+    const buttons = (off.components[0] as { components: Array<{ custom_id?: string }> }).components
+    expect(buttons).toHaveLength(1)
+    expect(buttons[0].custom_id).toBeUndefined()
+    expect(renderHash(off)).not.toBe(renderHash(renderCallReviewCard(view(), { appUrl: APP })))
   })
 
   it('resolved and held cards have only the link button', () => {
@@ -161,12 +170,15 @@ describe('state and version helpers', () => {
     expect(cardState({ status: 'PUBLISHED', held: 'manual' })).toBe('published')
     expect(cardState({ status: 'REJECTED', held: null })).toBe('removed')
   })
-  it('cardVersion is the newest of the three stamps, base36', () => {
+  it('cardVersion: the newest of the three stamps in base36 plus a title hash; [0-9a-z] only, fits a custom id', () => {
     const a = new Date('2026-11-01T00:00:00Z')
     const b = new Date('2026-11-02T00:00:00Z')
-    expect(cardVersion({ summaryGeneratedAt: a })).toBe(a.getTime().toString(36))
-    expect(cardVersion({ summaryGeneratedAt: a, summaryEditedAt: b })).toBe(b.getTime().toString(36))
-    expect(cardVersion({})).toBe('0')
+    expect(cardVersion({ summaryGeneratedAt: a, title: 'T' }).startsWith(a.getTime().toString(36))).toBe(true)
+    expect(cardVersion({ summaryGeneratedAt: a, summaryEditedAt: b, title: 'T' }).startsWith(b.getTime().toString(36))).toBe(true)
+    expect(cardVersion({ summaryGeneratedAt: a, title: 'T' })).not.toBe(cardVersion({ summaryGeneratedAt: a, title: 'T2' }))
+    expect(cardVersion({ summaryGeneratedAt: a, title: 'T' })).toBe(cardVersion({ summaryGeneratedAt: a, title: 'T' }))
+    expect(cardVersion({ summaryGeneratedAt: a, title: 'T' })).toMatch(/^[0-9a-z]{1,16}$/)
+    expect(cardVersion({})).toMatch(/^0[0-9a-z]{4}$/)
   })
   it('needsNewCard: discord, in review, summarized, not held, in the age window', () => {
     expect(needsNewCard(view(), NOW, 14)).toBe(true)
