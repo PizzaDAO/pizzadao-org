@@ -30,7 +30,7 @@ export type MemberWriteRaw = Record<string, unknown>
 export type UpsertResult =
   | { ok: true; skipped: true; reason: string }
   | { ok: true; skipped?: false; action: 'updated' | 'updated_by_discord' | 'inserted'; targetId: string; previousId: string | null; cells: MemberCells; id: string }
-  | { ok: false; error: string }
+  | { ok: false; error: string; conflict?: true }
 
 export function normHeader(h: unknown): string {
   return String(h ?? '').trim().toLowerCase().replace(/[#\s\-_]+/g, '')
@@ -112,6 +112,17 @@ export function planMemberUpsert(headers: readonly string[], members: readonly M
   if (action !== 'inserted' && raw.discordId !== undefined && !mayReassignDiscord && colDiscord !== null && target) {
     const currentDiscord = cellString(target.cells[colDiscord])
     if (currentDiscord && currentDiscord !== discordId) return { ok: false, error: 'DiscordId conflict: row is linked to a different Discord account.' }
+  }
+
+  // Claims: the caller's own pre-checks read the row before the write lock, so repeat them here, on the
+  // rows read under the lock. Two people claiming one row, or one person claiming two rows at once, lose here.
+  if (mayReassignDiscord && action !== 'inserted' && target && discordId && colDiscord !== null) {
+    const currentDiscord = cellString(target.cells[colDiscord])
+    if (currentDiscord && currentDiscord !== discordId) {
+      return { ok: false, conflict: true, error: 'DiscordId conflict: row is already claimed by another Discord account.' }
+    }
+    const owned = members.find((m) => m.id !== target!.id && cellString(m.cells[colDiscord]) === discordId)
+    if (owned) return { ok: false, conflict: true, error: 'DiscordId conflict: this Discord account is already linked to a member.' }
   }
 
   const cells: MemberCells = Array.from({ length: headers.length }, (_, i) => (target?.cells[i] ? { ...target.cells[i]! } : null))

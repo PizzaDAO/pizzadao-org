@@ -28,9 +28,16 @@ const { count, limit, existing } = vi.hoisted(() => {
     limit: { value: 50 },
   }
 })
-vi.mock('@/app/lib/db', () => ({
-  prisma: { vouch: { count: (q: { where?: { followeeId?: string } }) => (q?.where?.followeeId ? Promise.resolve(existing.value ? 1 : 0) : count(q)) } },
-}))
+vi.mock('@/app/lib/db', async () => {
+  const { addVouch } = await import('@/app/lib/vouches')
+  const vouch = {
+    count: (q: { where?: { followeeId?: string } }) => (q?.where?.followeeId ? Promise.resolve(existing.value ? 1 : 0) : count(q)),
+    // The create now runs inside the per-voucher transaction; keep asserting it through the addVouch mock.
+    create: ({ data }: { data: { followerId: string; followeeId: string } }) => addVouch(data.followerId, data.followeeId),
+  }
+  const tx = { vouch, $executeRaw: async () => 1 }
+  return { prisma: { vouch, $transaction: async (fn: (t: typeof tx) => unknown) => fn(tx) } }
+})
 vi.mock('@/app/lib/settings', () => ({ getSetting: vi.fn(async () => limit.value) }))
 
 import { POST } from './route'

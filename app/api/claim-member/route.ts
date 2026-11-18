@@ -179,6 +179,14 @@ export async function POST(req: Request) {
             parsed = JSON.parse(text);
         } catch { }
 
+        // Lost a concurrent claim (the write lock saw the row or account already taken).
+        if (sheetStatus === 409) {
+            return NextResponse.json(
+                { error: parsed?.error ?? "This member or Discord account is already claimed." },
+                { status: 409 }
+            );
+        }
+
         if (sheetStatus < 200 || sheetStatus >= 300 || parsed?.ok === false) {
             return NextResponse.json(
                 {
