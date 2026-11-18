@@ -1013,6 +1013,22 @@ export const SETTINGS = {
     help: 'Let Pizza Capos review and publish Discord calls on the website (view, publish, unpublish, edit or regenerate the summary, hide lines, hold a call for the owner). Audio, removing a call, restoring hidden lines, follow-ups, filters and bulk actions stay owner-only. The CALL_CAPO_REVIEW_ENABLED env var set to off always wins.',
     confirmOn: 'Pizza Capos can review and publish calls on the website.',
   }),
+  'calls.reviewCardsEnabled': boolSetting({
+    key: 'calls.reviewCardsEnabled',
+    area: 'calls',
+    label: 'Capo review cards',
+    help: 'Post a review card for each recorded Discord call that is waiting for review to the private capo review channel (set below), and keep it up to date. Cards show the unreviewed summary, so the channel must be hidden from everyone but capos: nothing is posted otherwise. Held calls show no summary. The CALL_REVIEW_CARDS_ENABLED env var set to off always wins.',
+    confirmOn: 'The bot will post call review cards, with the unreviewed summary, to the capo review channel.',
+  }),
+  'calls.reviewCardMaxAgeDays': intSetting({
+    key: 'calls.reviewCardMaxAgeDays',
+    area: 'calls',
+    label: 'Review card age limit (days)',
+    help: 'Calls that started longer ago than this never get a new review card (existing cards are still kept up to date).',
+    min: 1,
+    max: 60,
+    default: 14,
+  }),
   'calls.recapMentionPing': boolSetting({
     key: 'calls.recapMentionPing',
     area: 'calls',
@@ -2193,6 +2209,14 @@ export const SETTINGS = {
     label: 'Mission review channel',
     help: 'Where review cards, the daily digest and the nightly summary are posted.',
   }),
+  'discord.callReviewChannelId': {
+    ...channelSetting({
+      key: 'discord.callReviewChannelId',
+      label: 'Capo call review channel',
+      help: 'Private capo channel for call review cards. Empty: no cards. No environment or name fallback. The channel must deny View Channel to @everyone or nothing is posted. Cards show the summary before review (the recap word filters do not apply to them).',
+    }),
+    help: 'Private capo channel for call review cards. Empty: no cards (there is no environment or name fallback). The channel must deny View Channel to @everyone or nothing is posted. Cards show the summary before review, so the recap word filters do not apply to them. Checked against the server when saved.',
+  },
   'discord.missionsAnnounceChannelId': channelSetting({
     key: 'discord.missionsAnnounceChannelId',
     label: 'Level-up announcement channel',

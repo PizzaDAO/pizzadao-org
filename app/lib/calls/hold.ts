@@ -5,6 +5,7 @@
  */
 import { prisma } from '@/app/lib/db'
 import { recordCallReviewEvent, type CallReviewVia } from '@/app/lib/calls/review-audit'
+import { queueCallReviewCardSync } from '@/app/lib/calls/review-cards'
 import { autoHoldReason } from '@/app/lib/calls/access'
 import type { PostFilter } from '@/app/lib/calls/post-filters'
 
@@ -18,6 +19,7 @@ export async function setHold(id: string, actorId: string, note: string | null |
   const res = await prisma.callRecording.updateMany({ where: { id, reviewHoldAt: null }, data: { reviewHoldAt: new Date(), reviewHoldBy: actorId, reviewHoldNote: clean } })
   if (res.count === 1) {
     await recordCallReviewEvent({ recordingId: id, actorId, action: 'hold', via }, { always: true })
+    queueCallReviewCardSync(id)
     return 'ok'
   }
   const exists = await prisma.callRecording.findUnique({ where: { id }, select: { id: true } })
@@ -28,6 +30,7 @@ export async function releaseHold(id: string, actorId: string, via: CallReviewVi
   const res = await prisma.callRecording.updateMany({ where: { id, reviewHoldAt: { not: null } }, data: { reviewHoldAt: null, reviewHoldBy: null, reviewHoldNote: null } })
   if (res.count === 1) {
     await recordCallReviewEvent({ recordingId: id, actorId, action: 'release', via }, { always: true })
+    queueCallReviewCardSync(id)
     return 'ok'
   }
   const exists = await prisma.callRecording.findUnique({ where: { id }, select: { id: true } })
