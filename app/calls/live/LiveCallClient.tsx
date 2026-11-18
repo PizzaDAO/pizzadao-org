@@ -85,13 +85,21 @@ export default function LiveCallClient() {
     useEffect(() => {
         let timer: ReturnType<typeof setTimeout> | null = null;
         let stopped = false;
+        // Only one loop may run: a loop mid-request will schedule its own
+        // next tick, so a visibility change must not start a second one.
+        let inFlight = false;
         const loop = async () => {
-            if (stopped) return;
-            if (!document.hidden) await refresh();
+            if (stopped || inFlight) return;
+            inFlight = true;
+            try {
+                if (!document.hidden) await refresh();
+            } finally {
+                inFlight = false;
+            }
             if (!stopped) timer = setTimeout(loop, Math.max(5, pollRef.current) * 1000);
         };
         const onVisible = () => {
-            if (!document.hidden) {
+            if (!document.hidden && !inFlight) {
                 if (timer) clearTimeout(timer);
                 void loop();
             }

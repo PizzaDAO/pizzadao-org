@@ -257,3 +257,34 @@ describe("WalletManager — delete the connected wallet", () => {
     });
   });
 });
+
+describe("WalletManager - failed load", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useDisconnectMock.mockReturnValue({ disconnectAsync: disconnectAsyncMock });
+    useConnectModalMock.mockReturnValue({ openConnectModal: vi.fn() });
+    useAccountMock.mockReturnValue({ address: CONNECTED_ADDRESS, isConnected: true });
+  });
+
+  it("shows a retry state instead of 'No wallets' and does not auto-save", async () => {
+    const fetchMock = global.fetch as unknown as ReturnType<typeof vi.fn>;
+    fetchMock.mockImplementation((_url: string, init?: RequestInit) => {
+      if ((init?.method || "GET") === "GET") {
+        return Promise.resolve({ ok: false, status: 500, json: async () => ({}) });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({}) });
+    });
+
+    render(<WalletManager memberId="member-1" />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Couldn.t load your wallets/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/No wallets connected yet/i)).toBeNull();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    const posts = fetchMock.mock.calls.filter(
+      (c: unknown[]) => (c[1] as RequestInit | undefined)?.method === "POST",
+    );
+    expect(posts.length).toBe(0);
+  });
+});

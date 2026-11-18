@@ -47,14 +47,22 @@ export function JobBoard({ onJobCompleted }: JobBoardProps) {
   const [users, setUsers] = useState<Record<string, ResolvedUser>>({});
   const [guildId, setGuildId] = useState<string | null>(null);
 
-  const fetchJobs = async () => {
+  // Resolves to the server's resetAt (ms) on success, or null on failure.
+  const fetchJobs = async (): Promise<number | null> => {
+    let nextResetMs: number | null = null;
     try {
       const res = await fetch("/api/jobs", { cache: "no-store" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to fetch jobs");
       setJobs(data.jobs);
       if (data.resetAt) {
-        setResetAt(new Date(data.resetAt));
+        const next = new Date(data.resetAt);
+        nextResetMs = next.getTime();
+        // Only update when the timestamp actually changed, so an unchanged
+        // response doesn't re-run the countdown effect.
+        setResetAt((prev) =>
+          prev && prev.getTime() === next.getTime() ? prev : next,
+        );
       }
       if (data.rewardAmount) {
         setRewardAmount(data.rewardAmount);
@@ -63,8 +71,11 @@ export function JobBoard({ onJobCompleted }: JobBoardProps) {
       setRoles(data.roles || {});
       setUsers(data.users || {});
       setGuildId(data.guildId ?? null);
+      setError(null);
+      return nextResetMs ?? Date.now();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
+      return null;
     } finally {
       setLoading(false);
     }
@@ -74,18 +85,35 @@ export function JobBoard({ onJobCompleted }: JobBoardProps) {
     fetchJobs();
   }, []);
 
-  // Countdown timer
+  // Countdown timer. Ticks once a second until the reset time passes, then
+  // stops and refreshes jobs, retrying with exponential backoff while the
+  // server keeps returning a stale/past reset time or errors.
   useEffect(() => {
     if (!resetAt) return;
 
+    let interval: ReturnType<typeof setInterval> | null = null;
+    let retry: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
+    let attempt = 0;
+
+    const refreshAfterReset = async () => {
+      const nextResetMs = await fetchJobs();
+      if (cancelled) return;
+      // Success with a new future reset time: setResetAt re-runs this effect.
+      if (nextResetMs !== null && nextResetMs > Date.now()) return;
+      const delay = Math.min(5_000 * 2 ** attempt, 5 * 60_000);
+      attempt += 1;
+      retry = setTimeout(refreshAfterReset, delay);
+    };
+
     const updateCountdown = () => {
-      const now = new Date();
-      const diff = resetAt.getTime() - now.getTime();
+      const diff = resetAt.getTime() - Date.now();
 
       if (diff <= 0) {
-        // Reset has passed, refresh jobs
+        if (interval) clearInterval(interval);
+        interval = null;
         setCountdown("Refreshing...");
-        fetchJobs();
+        void refreshAfterReset();
         return;
       }
 
@@ -93,9 +121,15 @@ export function JobBoard({ onJobCompleted }: JobBoardProps) {
     };
 
     updateCountdown();
-    const interval = setInterval(updateCountdown, 1000);
+    if (resetAt.getTime() - Date.now() > 0) {
+      interval = setInterval(updateCountdown, 1000);
+    }
 
-    return () => clearInterval(interval);
+    return () => {
+      cancelled = true;
+      if (interval) clearInterval(interval);
+      if (retry) clearTimeout(retry);
+    };
   }, [resetAt]);
 
   if (loading) {

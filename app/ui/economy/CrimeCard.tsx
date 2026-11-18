@@ -18,7 +18,15 @@ export function useCountdown(readyAt: number | null): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (!readyAt) return;
-    const t = setInterval(() => setNow(Date.now()), 500);
+    if (readyAt <= Date.now()) {
+      setNow(Date.now());
+      return;
+    }
+    const t = setInterval(() => {
+      const n = Date.now();
+      setNow(n);
+      if (n >= readyAt) clearInterval(t);
+    }, 500);
     return () => clearInterval(t);
   }, [readyAt]);
   return readyAt ? Math.max(0, Math.ceil((readyAt - now) / 1000)) : 0;

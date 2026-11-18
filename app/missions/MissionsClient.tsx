@@ -128,6 +128,7 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
   const canReview = session?.canReviewMissions === true;
   const [loading, setLoading] = useState(!initial);
   const [error, setError] = useState<string | null>(null);
+  const dataLoadedRef = useRef<boolean>(!!initial);
   // Auto-expand current level
   const [expandedLevels, setExpandedLevels] = useState<Set<number>>(
     () => new Set(initial?.currentLevel ? [initial.currentLevel] : []),
@@ -177,6 +178,8 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
       const nextApproved = countApproved(json);
 
       setData(json);
+      dataLoadedRef.current = true;
+      setError(null);
       lastApprovedCountRef.current = nextApproved;
 
       // Auto-expand current level
@@ -189,7 +192,14 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
       // is in.
       if (prevApproved !== null) maybeTriggerCelebration(json, prevApproved, nextApproved);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Unknown error");
+      const message = e instanceof Error ? e.message : "Unknown error";
+      // A failed background refresh must not replace an already-loaded page
+      // with the full error screen; surface it as a toast instead.
+      if (dataLoadedRef.current) {
+        toast.error("Couldn't refresh missions. Showing the last loaded data.");
+      } else {
+        setError(message);
+      }
     } finally {
       setLoading(false);
     }
@@ -434,7 +444,7 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
     );
   }
 
-  if (error || !data) {
+  if (!data) {
     return (
       <div style={pageContainer()}>
         <div style={{ maxWidth: 800, margin: "0 auto" }}>

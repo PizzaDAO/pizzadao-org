@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { goBackOrFallback } from "../lib/go-back";
 import { VouchCard } from "../ui/vouches/VouchCard";
 import { useMe, useVouches } from "../lib/hooks/use-api";
 import {
@@ -169,7 +170,7 @@ export default function VouchesPage() {
       {/* Back Button */}
       <button
         type="button"
-        onClick={() => router.back()}
+        onClick={() => goBackOrFallback(router, "/dashboard")}
         className="overline mb-6 min-h-11 bg-transparent border-0 p-0 cursor-pointer text-muted-foreground hover:text-tomato"
       >
         ← Back
