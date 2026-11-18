@@ -22,6 +22,8 @@
 //      action items and open tasks (app/lib/calls/progress-report.ts), 1 per channel per 2 min.
 // /metalhead (discord.metalheadCommandEnabled on): spoken call updates and their stop / pause / resume / skip
 //      controls, deferred ephemeral replies (app/lib/call-updates/command.ts), 10 per member per minute.
+// /trivia leaderboard | start | skip (trivia.enabled on, production only): deferred replies
+//      (app/lib/discord-interactions/trivia-command.ts); start and skip are admin only. 10 per member per minute.
 // Mission review cards (missions.reviewCardsEnabled on): Approve / Release /
 //      Reject buttons on the #work cards and the Reject modal. Checked with
 //      canReviewMission(member.roles, level), never your own; deferred update,
@@ -42,6 +44,9 @@ import { runMemberCommand, type MemberCommandJob } from "@/app/lib/discord-inter
 import { runBountyCommand, type BountyJob, type BountyRow } from "@/app/lib/discord-interactions/bounty-command";
 import { bountyPickChoices } from "@/app/lib/discord-interactions/bounty-choices";
 import { runTaskCommand, type TaskJob } from "@/app/lib/discord-interactions/task-command";
+import { runTriviaCommand, type TriviaJob } from "@/app/lib/discord-interactions/trivia-command";
+import { adminSkipRound, adminStartRound, discordLeaderboard } from "@/app/lib/trivia/admin";
+import { triviaLive } from "@/app/lib/trivia/enabled";
 import { addCrewChoices, findOpenDuplicate, myCrewTasks, openCrewTasks, taskPickChoices } from "@/app/lib/discord-interactions/task-choices";
 import { createCrewTask } from "@/app/lib/crew-tasks-write";
 import { canManageCrew } from "@/app/lib/crew-leads";
@@ -245,6 +250,19 @@ async function taskAddRateLimit(discordId: string): Promise<Date | null> {
   return r.success ? null : new Date(r.reset);
 }
 
+/** /trivia: 10 per member per minute (the replies are private or cheap; start and skip are admin only). */
+async function triviaRateLimit(discordId: string): Promise<Date | null> {
+  const r = await checkKeyedRateLimit("trivia-command", discordId);
+  return r.success ? null : new Date(r.reset);
+}
+
+/** The deferred /trivia work, after the type-5 reply has gone out. */
+function deferTrivia(job: TriviaJob) {
+  after(async () => {
+    await runTriviaCommand(job, { leaderboard: discordLeaderboard, startRound: () => adminStartRound(), skipRound: () => adminSkipRound() });
+  });
+}
+
 /** Where a crew's tasks live: the database, a Google Sheet, or nowhere (not a real crew). */
 async function taskCrewSource(crewId: string): Promise<"db" | "sheet" | "unknown"> {
   const { crews } = await getCrewMappings();
@@ -389,6 +407,7 @@ function deps(guildId: string | undefined, settings: Settings): HandlerDeps {
         mayRunLive(roles, (r) => isPepAdmin(r, { baseRoleIds: ADMIN_ROLE_IDS, getGuildRoles: async () => (guildId ? getGuildRoles(guildId) : null) })),
       defer: deferLive,
     },
+    trivia: { enabled: () => triviaLive(), rateLimit: triviaRateLimit, defer: deferTrivia },
     metalhead: { enabled: () => metalheadEnabled(), rateLimit: metalheadRateLimit, defer: deferMetalhead, callChoices: liveCallChoices },
     missionReview,
     followups,

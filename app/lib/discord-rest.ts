@@ -24,6 +24,8 @@ export interface DiscordMessageBody {
   components?: unknown[];
   allowed_mentions?: { parse?: Array<"everyone" | "roles" | "users">; users?: string[]; roles?: string[] };
   flags?: number;
+  /** Send as a reply to this message (the trivia winner post). */
+  message_reference?: { message_id: string; fail_if_not_exists?: boolean };
 }
 
 export interface DiscordPostOptions {
