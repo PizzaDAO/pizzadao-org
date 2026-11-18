@@ -106,6 +106,7 @@ describe('settings registry', () => {
       ['missions.humanReleaseMinLevel', 6],
       ['missions.newAccountDays', 30],
       ['missions.dprOnlyMinLevel', 8],
+      ['missions.liveUpdateSeconds', 15],
       ['missions.slaHours', 48],
       ['missions.slaDigestMaxLines', 15],
       ['missions.maxAttempts', 3],
