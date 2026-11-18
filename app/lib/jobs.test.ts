@@ -62,7 +62,7 @@ describe('completeJob', () => {
     })
   })
 
-  it('resolves Discord markup in the job description to plain text in the ledger memo', async () => {
+  it('keeps an unresolved Discord mention raw in the ledger memo', async () => {
     mockFn(prisma.jobAssignment.findFirst).mockResolvedValue({
       ...ASSIGNMENT,
       id: 3,
@@ -73,14 +73,14 @@ describe('completeJob', () => {
     await completeJob('worker-1', 50)
 
     // No Discord bot token configured in tests, so the mention can't be
-    // resolved to a real name — it falls back to "#channel" instead of
-    // leaking the raw <#id> markup into the ledger.
+    // resolved to a real name. It stays raw so display-time rendering
+    // (DiscordText) can still resolve it.
     expect(logTransaction).toHaveBeenCalledWith(
       prisma,
       'worker-1',
       'JOB_REWARD',
       50,
-      'Job reward: Clean #channel now',
+      'Job reward: Clean <#123456789012345678> now',
       { jobId: 7 },
     )
   })
@@ -121,7 +121,7 @@ describe('completeJob', () => {
       'worker-1',
       'JOB_REWARD',
       50,
-      'Job reward: Due ',
+      'Job reward: Due',
       { jobId: 7 },
     )
   })
