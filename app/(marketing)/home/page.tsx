@@ -2,6 +2,10 @@ import Index from "@/app/(marketing)/_site/pages/Index";
 import { pageMeta } from "@/app/(marketing)/_site/meta";
 
 // Served at /home until NEXT_PUBLIC_MARKETING_HOME_AT_ROOT moves it to "/" (see next.config.ts).
+// Prerendered and served from the CDN: force-static empties cookies()/headers() for the whole render, so
+// nothing personal can be cached. Per page, never on the layout (newsletter pages need searchParams).
+export const dynamic = "force-static";
+
 export const metadata = pageMeta({
   path: "/",
   title: "PizzaDAO",
