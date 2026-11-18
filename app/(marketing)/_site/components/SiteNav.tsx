@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { HOME_PATH, Link } from "@/app/(marketing)/_site/lib/router";
 import { useSession } from "@/app/lib/hooks/use-session";
 import { Menu, X } from "lucide-react";
@@ -14,13 +15,18 @@ const NAV = [
   { label: "About", href: "/about" },
   { label: "Partners", href: "/partners" },
   { label: "Community", href: "/community" },
+  { label: "Handbook", href: "/handbook" },
+  { label: "Crews", href: "/crews" },
 ];
+
+const isActive = (pathname: string, href: string) => pathname === href || pathname.startsWith(href + "/");
 
 
 type Props = { solid?: boolean };
 
 const SiteNav = ({ solid = false }: Props) => {
   const [open, setOpen] = useState(false);
+  const pathname = usePathname() || "/";
   // The features link is behind its own switch (features.navLinkEnabled); off, the header is unchanged.
   const [featuresNav, setFeaturesNav] = useState(false);
   useEffect(() => {
@@ -73,11 +79,16 @@ const SiteNav = ({ solid = false }: Props) => {
             <Link
               key={n.label}
               to={n.href}
+              aria-current={isActive(pathname, n.href) ? "page" : undefined}
               onClick={() => track(EVT.NAV_CLICKED, { label: n.label, to: n.href, surface: "desktop" })}
               className={`ui text-sm font-medium tracking-wide transition-colors ${
-                onRed
-                  ? "text-cream/90 hover:text-butter"
-                  : "text-foreground/80 hover:text-tomato"
+                isActive(pathname, n.href)
+                  ? onRed
+                    ? "text-butter underline decoration-2 underline-offset-8"
+                    : "text-tomato underline decoration-2 underline-offset-8"
+                  : onRed
+                    ? "text-cream/90 hover:text-butter"
+                    : "text-foreground/80 hover:text-tomato"
               }`}
             >
               {n.label}
@@ -100,8 +111,8 @@ const SiteNav = ({ solid = false }: Props) => {
             </Link>
           ) : (
             <>
-          <a
-            href="/login"
+          <Link
+            to="/login"
             onClick={() => trackOutbound("Member login", "/login", { surface: "desktop" })}
             className={`mk-btn-pill border ${
               onRed
@@ -110,9 +121,9 @@ const SiteNav = ({ solid = false }: Props) => {
             }`}
           >
             Member login
-          </a>
-          <a
-            href="/join"
+          </Link>
+          <Link
+            to="/join"
             onClick={() => {
               track(EVT.MAFIA_INTENT_CLICKED, { label: "Join", surface: "site_nav_desktop" });
               trackOutbound("Join", "/join", { surface: "desktop" });
@@ -124,7 +135,7 @@ const SiteNav = ({ solid = false }: Props) => {
             }`}
           >
             Join
-          </a>
+          </Link>
             </>
           )}
 
@@ -161,11 +172,14 @@ const SiteNav = ({ solid = false }: Props) => {
               <Link
                 key={n.label}
                 to={n.href}
+                aria-current={isActive(pathname, n.href) ? "page" : undefined}
                 onClick={() => {
                   track(EVT.NAV_CLICKED, { label: n.label, to: n.href, surface: "mobile" });
                   setOpen(false);
                 }}
-                className="font-display group flex min-h-[64px] items-center justify-between border-b border-rule-warm/60 text-[2rem] font-extrabold leading-none tracking-[-0.01em] text-ink transition-colors hover:text-tomato"
+                className={`font-display group flex min-h-[56px] items-center justify-between border-b border-rule-warm/60 text-[1.75rem] font-extrabold leading-none tracking-[-0.01em] transition-colors hover:text-tomato ${
+                  isActive(pathname, n.href) ? "text-tomato" : "text-ink"
+                }`}
                 style={{
                   transitionDelay: open ? `${80 + i * 40}ms` : "0ms",
                 }}
@@ -192,8 +206,8 @@ const SiteNav = ({ solid = false }: Props) => {
               </Link>
             ) : (
               <>
-            <a
-              href="/login"
+            <Link
+              to="/login"
               className="mk-btn-pill-lg border border-ink/30 text-center text-ink/80 hover:border-ink hover:text-ink"
               onClick={() => {
                 trackOutbound("Member login", "/login", { surface: "mobile" });
@@ -201,9 +215,9 @@ const SiteNav = ({ solid = false }: Props) => {
               }}
             >
               Member login
-            </a>
-            <a
-              href="/join"
+            </Link>
+            <Link
+              to="/join"
               onClick={() => {
                 track(EVT.MAFIA_INTENT_CLICKED, { label: "Join the Pizza Mafia", surface: "site_nav_mobile" });
                 trackOutbound("Join the Pizza Mafia", "/join", { surface: "mobile" });
@@ -212,7 +226,7 @@ const SiteNav = ({ solid = false }: Props) => {
               className="mk-btn-pill-lg bg-tomato text-cream text-center hover:bg-ink"
             >
               Join the Pizza Mafia →
-            </a>
+            </Link>
               </>
             )}
 

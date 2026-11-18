@@ -13,6 +13,7 @@ import { loginHrefFrom } from "@/app/lib/login-return";
 type NavItem = { href: string; label: string; proposalsOnly?: boolean; sessionsOnly?: boolean; disavowOnly?: boolean; membersOnly?: boolean; adminOnly?: boolean; analyticsOnly?: boolean; match?: (path: string) => boolean };
 const GROUPS: { key: string; items: NavItem[] }[] = [
   { key: "community", items: [
+    { href: "/about", label: "about" },
     { href: "/crews", label: "crews", match: p => p === "/crews" || p.startsWith("/crew/") },
     { href: "/crew", label: "members", match: p => p === "/crew" },
     { href: "/articles", label: "articles" },
@@ -26,6 +27,7 @@ const GROUPS: { key: string; items: NavItem[] }[] = [
     { href: "/tech/projects", label: "techProjects" },
   ] },
   { key: "resources", items: [
+    { href: "/partners", label: "partners" },
     { href: "/handbook", label: "handbook" },
     { href: "/manuals", label: "manuals" },
     { href: "/turtles", label: "turtles" },
@@ -44,7 +46,7 @@ const GROUPS: { key: string; items: NavItem[] }[] = [
     { href: "/admin/newsletter", label: "newsletterAdmin", adminOnly: true },
   ] },
 ];
-const HIDDEN_ON = new Set(["/join", "/login"]);
+const HIDDEN_ON = new Set(["/join", "/login", "/start"]);
 const activeItem = (item: NavItem, path: string) => item.match ? item.match(path) : path === item.href || path.startsWith(item.href + "/");
 
 export default function SiteHeader() {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Link } from "@/app/(marketing)/_site/lib/router";
 const logoLight = "/marketing/assets/logo-light.svg";
 import { invokeForm, honeypot } from "@/app/(marketing)/_site/lib/forms";
 import Honeypot from "@/app/(marketing)/_site/components/Honeypot";
@@ -11,8 +12,9 @@ import { EVT } from "@/app/(marketing)/_site/lib/analytics/events";
 type FooterItem = { label: string; href: string };
 
 const cols = [
-  { title: "More", items: [{ label: "About", href: "/about" }, { label: "Global Pizza Party", href: "https://globalpizza.party" }, { label: "Partners", href: "/partners" }, { label: "Articles", href: "/articles" }, { label: "Join", href: "/join" }] as FooterItem[] },
-  { title: "Resources", items: [{ label: "Handbook", href: "/handbook" }, { label: "Manuals", href: "/manuals" }] as FooterItem[] },
+  { title: "Start here", items: [{ label: "Join", href: "/join" }, { label: "Get your mafia name", href: "/get-your-mafia-name" }, { label: "Handbook", href: "/handbook" }, { label: "Calls", href: "/calls" }] as FooterItem[] },
+  { title: "More", items: [{ label: "About", href: "/about" }, { label: "Global Pizza Party", href: "https://globalpizza.party" }, { label: "Partners", href: "/partners" }, { label: "Articles", href: "/articles" }] as FooterItem[] },
+  { title: "Resources", items: [{ label: "Manuals", href: "/manuals" }] as FooterItem[] },
   { title: "Press", items: [{ label: "Brand System", href: "/brand-system" }, { label: "Contact", href: "/contact" }, { label: "Inquiries", href: "/contact" }] as FooterItem[] },
   { title: "Elsewhere", items: [{ label: "Instagram", href: "https://www.instagram.com/Pizza_DAO/" }, { label: "X / Twitter", href: "https://x.com/Pizza_DAO" }, { label: "YouTube", href: "https://www.youtube.com/@PizzaDAO" }] as FooterItem[] },
 ];
@@ -46,7 +48,7 @@ const RotatingTagline = () => {
 
   return (
     <span
-      className="ui text-[10px] font-medium uppercase tracking-[0.24em] text-cream/40 transition-opacity duration-500"
+      className="ui text-xs font-medium uppercase tracking-[0.2em] text-cream/70 transition-opacity duration-500"
       style={{ opacity: show ? 1 : 0 }}
     >
       {PHRASES[index]}
@@ -54,7 +56,7 @@ const RotatingTagline = () => {
   );
 };
 
-const NewsletterSignup = () => {
+export const NewsletterSignup = ({ source = "footer", className = "mt-8 max-w-sm", idPrefix = "footer" }: { source?: string; className?: string; idPrefix?: string }) => {
   const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success">("idle");
@@ -63,18 +65,18 @@ const NewsletterSignup = () => {
     e.preventDefault();
     const trimmed = email.trim();
     if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed) || trimmed.length > 320) {
-      track(EVT.NEWSLETTER_FAILED, { source: "footer", reason: "validation" });
+      track(EVT.NEWSLETTER_FAILED, { source, reason: "validation" });
       toast({ title: "Check your email", description: "Please enter a valid email address.", variant: "destructive" });
       return;
     }
     setStatus("loading");
     try {
       const { data, error } = await invokeForm("/api/public/newsletter", {
-        body: { email: trimmed, source: "footer", website: honeypot(e) },
+        body: { email: trimmed, source, website: honeypot(e) },
       });
       if (error || !data?.ok) throw error ?? new Error("Subscribe failed");
-      void identifyByEmail(trimmed, { newsletter_source: "footer" });
-      track(EVT.NEWSLETTER_SUBMITTED, { source: "footer" });
+      void identifyByEmail(trimmed, { newsletter_source: source });
+      track(EVT.NEWSLETTER_SUBMITTED, { source });
       toast({ title: "Check your inbox", description: "We sent a link to confirm your address. You're subscribed once you click it." });
       setStatus("success");
       setEmail("");
@@ -82,7 +84,7 @@ const NewsletterSignup = () => {
     } catch (err) {
       console.error(err);
       track(EVT.NEWSLETTER_FAILED, {
-        source: "footer",
+        source,
         reason: err instanceof Error ? err.message : "unknown",
       });
       toast({ title: "Something went wrong", description: "Please try again in a moment.", variant: "destructive" });
@@ -91,27 +93,30 @@ const NewsletterSignup = () => {
   };
 
   return (
-    <div className="mt-8 max-w-sm">
-      <p className="ui text-[9.5px] font-medium uppercase tracking-[0.24em] text-cream/40">
+    <div className={className}>
+      <p className="ui text-xs font-medium uppercase tracking-[0.2em] text-cream/70">
         Newsletter
       </p>
       <form onSubmit={handleSubmit} className="mt-3 flex items-center gap-2 border-b border-cream/25 pb-2 focus-within:border-butter/70">
         <Honeypot />
+        <label htmlFor={`${idPrefix}-newsletter-email`} className="sr-only">
+          Email address
+        </label>
         <input
+          id={`${idPrefix}-newsletter-email`}
           type="email"
           required
           maxLength={320}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="you@somewhere.com"
-          aria-label="Email address"
-          className="font-serif flex-1 bg-transparent text-[14px] text-cream placeholder:text-cream/35 focus:outline-none"
+          className="font-serif flex-1 bg-transparent text-[14px] text-cream placeholder:text-cream/60 focus:outline-none"
           disabled={status === "loading"}
         />
         <button
           type="submit"
           disabled={status === "loading"}
-          className="ui text-[10px] font-semibold uppercase tracking-[0.22em] text-cream/70 transition-colors hover:text-butter disabled:opacity-50 whitespace-nowrap"
+          className="ui inline-flex min-h-11 items-center px-2 text-xs font-semibold uppercase tracking-[0.18em] text-cream/80 transition-colors hover:text-butter disabled:opacity-50 whitespace-nowrap"
         >
           {status === "loading" ? "…" : status === "success" ? "Thanks" : "Subscribe →"}
         </button>
@@ -146,7 +151,7 @@ const Footer = () => {
             <div className="flex items-center">
               <img src={logoLight} alt="PizzaDAO" className="h-7 w-auto md:h-8" />
             </div>
-            <p className="font-serif mt-5 max-w-sm text-[15px] leading-[1.6] text-cream/60">
+            <p className="font-serif mt-5 max-w-sm text-[15px] leading-[1.6] text-cream/70">
               A global community built around pizza, generosity, and the people who show up.
             </p>
             <NewsletterSignup />
@@ -157,10 +162,10 @@ const Footer = () => {
           </div>
 
           {/* Right: link columns */}
-          <div className="col-span-12 grid grid-cols-2 gap-x-8 gap-y-10 md:col-span-7 md:grid-cols-4">
+          <div className="col-span-12 grid grid-cols-2 gap-x-8 gap-y-10 md:col-span-7 md:grid-cols-3">
             {cols.map((c) => (
               <div key={c.title}>
-                <div className="ui text-[9.5px] font-medium uppercase tracking-[0.24em] text-cream/40">
+                <div className="ui text-xs font-medium uppercase tracking-[0.2em] text-cream/70">
                   {c.title}
                 </div>
                 <ul className="mt-4 space-y-2.5">
@@ -168,12 +173,21 @@ const Footer = () => {
                     const item = i;
                     return (
                       <li key={item.label}>
-                        <a
-                          href={item.href}
-                          className="font-serif text-[14px] text-cream/75 transition-colors duration-300 hover:text-butter"
-                        >
-                          {item.label}
-                        </a>
+                        {/^https?:/.test(item.href) ? (
+                          <a
+                            href={item.href}
+                            className="font-serif text-[14px] text-cream/80 transition-colors duration-300 hover:text-butter"
+                          >
+                            {item.label}
+                          </a>
+                        ) : (
+                          <Link
+                            to={item.href}
+                            className="font-serif text-[14px] text-cream/80 transition-colors duration-300 hover:text-butter"
+                          >
+                            {item.label}
+                          </Link>
+                        )}
                       </li>
                     );
                   })}
@@ -185,12 +199,12 @@ const Footer = () => {
 
         {/* Bottom bar - calm, established */}
         <div className="mt-16 flex flex-col items-start justify-between gap-4 border-t border-cream/8 pt-6 md:flex-row md:items-center">
-          <span className="ui text-[10px] font-medium uppercase tracking-[0.24em] text-cream/35">
+          <span className="ui text-xs font-medium uppercase tracking-[0.2em] text-cream/70">
             © {new Date().getFullYear()} PizzaDAO · A global cultural programme
           </span>
           <div className="flex gap-6">
-            <a href="/privacy" className="ui text-[10px] font-medium uppercase tracking-[0.24em] text-cream/45 transition-colors hover:text-butter">Privacy</a>
-            <a href="/terms" className="ui text-[10px] font-medium uppercase tracking-[0.24em] text-cream/45 transition-colors hover:text-butter">Terms</a>
+            <Link to="/privacy" className="ui text-xs font-medium uppercase tracking-[0.2em] text-cream/70 transition-colors hover:text-butter">Privacy</Link>
+            <Link to="/terms" className="ui text-xs font-medium uppercase tracking-[0.2em] text-cream/70 transition-colors hover:text-butter">Terms</Link>
             
           </div>
         </div>

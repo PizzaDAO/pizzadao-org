@@ -17,6 +17,7 @@ export const metadata: Metadata = {
 export default function LoginPage() {
   return (
     <main className="bg-background text-foreground min-h-screen">
+      <h1 className="sr-only">Log in to PizzaDAO</h1>
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[60vh]"

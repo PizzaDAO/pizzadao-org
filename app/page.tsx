@@ -10,6 +10,7 @@ export default function Page() {
   return (
     <RouteMessages route="">
     <main className="bg-background text-foreground min-h-screen">
+      <h1 className="sr-only">Welcome to PizzaDAO</h1>
       {/* Subtle warm gradient backdrop reminiscent of pizzadao.org hero */}
       <div
         aria-hidden
