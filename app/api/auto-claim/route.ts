@@ -11,7 +11,8 @@ import {
     invalidateMembersCache,
     membersColumn,
 } from "@/app/lib/sheets/member-repository";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
+import { createGovernanceIdentity } from "@/app/lib/governance-identity";
 import { getSession } from "@/app/lib/session";
 import { getDiscordTurtleRoles, mergeTurtles, parseTurtlesFromSheet } from "@/app/lib/discord-roles";
 import { syncDiscordMember } from "@/app/lib/services/discord-api";
@@ -197,25 +198,8 @@ export async function POST(req: Request) {
                 }
             }
 
-            // Create voting identity for the user (fire-and-forget, don't block on failure)
-            try {
-                const governanceUrl = process.env.GOVERNANCE_API_URL || 'http://localhost:3003';
-                fetch(`${governanceUrl}/api/governance/create-identity`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        discordId: sessionDiscordId,
-                        secret,
-                    }),
-                }).then(res => {
-                    if (res.ok) {
-                    } else {
-                    }
-                }).catch(err => {
-                });
-            } catch (err) {
-                // Don't fail the claim if identity creation fails
-            }
+            // Create voting identity (best effort; runs after the response, skipped unless configured)
+            after(() => createGovernanceIdentity(sessionDiscordId));
 
             return NextResponse.json({ ok: true, discord: discordResult });
         }

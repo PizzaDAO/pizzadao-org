@@ -1,7 +1,8 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/app/lib/session', () => ({ getSession: vi.fn() }))
+vi.mock('next/server', async (orig) => ({ ...(await orig<typeof import('next/server')>()), after: vi.fn() }))
+vi.mock('@/app/lib/session',() => ({ getSession: vi.fn() }))
 vi.mock('@/app/lib/rate-limit', () => ({
   checkKeyedRateLimit: vi.fn(async () => ({ success: true, limit: 5, remaining: 4, reset: 0 })),
   rateLimitResponse: vi.fn(() => new Response('{}', { status: 429 })),

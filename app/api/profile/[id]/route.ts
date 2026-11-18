@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { buildPublicProfile } from "@/app/lib/profile/public-profile";
 import { findMemberRow, getMembersSheet } from "@/app/lib/sheets/member-repository";
 
 export const runtime = "nodejs";
@@ -25,24 +26,8 @@ export async function GET(
             return NextResponse.json({ error: "Member not found" }, { status: 404 });
         }
 
-        // Build public profile data (exclude sensitive fields)
-        const sensitiveFields = ["discordid", "discord", "telegram", "email", "wallet", "address"];
-        const data: Record<string, any> = {};
-
-        sheet.headers.forEach((rawKey, idx) => {
-            if (!rawKey) return;
-            const key = rawKey.toLowerCase();
-            // Skip sensitive fields for public profile
-            if (sensitiveFields.includes(key)) return;
-
-            const val = userRow.c?.[idx]?.v ?? userRow.c?.[idx]?.f;
-            data[rawKey] = val;
-        });
-
-        // Add standardized aliases
-        data["Status"] = data["Status"] || data["Frequency"];
-        data["Orgs"] = data["Orgs"] || data["Affiliation"];
-        data["Skills"] = data["Skills"] || data["Specialties"];
+        // Allowlist projection: only fields the public clients use are served.
+        const data = buildPublicProfile(sheet.headers, (idx) => userRow.c?.[idx]?.v ?? userRow.c?.[idx]?.f);
 
         return NextResponse.json(data, { headers: cacheHeaders });
     } catch {
