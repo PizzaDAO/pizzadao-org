@@ -2,7 +2,7 @@
 // /missions review panel.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/app/lib/session', () => ({ getSession: vi.fn() }))
+vi.mock('@/app/lib/session', () => ({ getSession: vi.fn(), getSessionCookieOptions: vi.fn(() => ({ httpOnly: true, secure: false, sameSite: 'lax', path: '/', maxAge: 100 })) }))
 vi.mock('@/app/lib/discord', () => ({ getUserRoles: vi.fn() }))
 vi.mock('@/app/lib/db', () => ({ prisma: { appSetting: { findMany: vi.fn(async () => []) } } }))
 vi.mock('@/app/lib/sheets/member-repository', () => ({
@@ -26,6 +26,21 @@ const flags = async (roles: string[] | Error) => {
   const json = await (await GET()).json()
   return { isAdmin: json.isAdmin, canReviewMissions: json.canReviewMissions }
 }
+
+describe('GET /api/session hint cookie', () => {
+  it('200 backfills hint 1 (not httpOnly); 401 sets hint 0', async () => {
+    vi.mocked(getUserRoles).mockResolvedValue([])
+    const ok = await GET()
+    const okCookie = ok.headers.get('set-cookie') ?? ''
+    expect(okCookie).toMatch(/pizzadao_auth=1/)
+    expect(okCookie).not.toMatch(/httponly/i)
+
+    vi.mocked(getSession).mockResolvedValue(null as never)
+    const no = await GET()
+    expect(no.status).toBe(401)
+    expect(no.headers.get('set-cookie') ?? '').toMatch(/pizzadao_auth=0/)
+  })
+})
 
 describe('GET /api/session reviewer flags', () => {
   it('admins can review', async () => {

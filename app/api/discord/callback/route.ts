@@ -1,7 +1,7 @@
 // app/api/discord/callback/route.ts
 import { loginReturnPath } from "@/app/lib/login-return";
 import { NextResponse } from "next/server";
-import { createSessionToken, getSessionCookieOptions, COOKIE_NAME } from "@/app/lib/session";
+import { createSessionToken, setSessionCookies } from "@/app/lib/session";
 import {
   decodeOAuthState,
   validateReturnTo,
@@ -186,8 +186,7 @@ async function finishLogin(
 
   // Create response and set session cookie
   const res = NextResponse.redirect(redirectUrl.toString());
-  const cookieOpts = getSessionCookieOptions(req);
-  res.cookies.set(COOKIE_NAME, sessionToken, cookieOpts);
+  setSessionCookies(res, sessionToken, req);
 
   return clearOAuthState(req, res);
 }

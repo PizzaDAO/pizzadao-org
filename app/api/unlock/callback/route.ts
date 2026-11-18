@@ -3,8 +3,7 @@ import { recoverMessageAddress } from "viem";
 import {
   getSession,
   createSessionToken,
-  COOKIE_NAME,
-  getSessionCookieOptions,
+  setSessionCookies,
 } from "@/app/lib/session";
 import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
 
@@ -53,7 +52,7 @@ export async function GET(req: NextRequest) {
     redirectUrl.searchParams.set("unlock", "verified");
 
     const response = NextResponse.redirect(redirectUrl);
-    response.cookies.set(COOKIE_NAME, token, getSessionCookieOptions(req));
+    setSessionCookies(response, token, req);
 
     return response;
   } catch (error) {
