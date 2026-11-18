@@ -5,6 +5,7 @@ import { NO_STORE_HEADERS } from '@/app/lib/no-store'
 import { resolveDiscordMentions } from '@/app/lib/discord-mention-resolve'
 import { memberNamesByDiscordId, mapWithLimit } from '@/app/lib/member-names'
 import { getGuildMemberCleanName } from '@/app/lib/discord-channels'
+import { internalError } from '@/app/lib/errors/error-response'
 
 // Most non-member counterparties looked up via the bot per page (one cached REST call each).
 const MAX_COUNTERPART_LOOKUPS = 25
@@ -64,7 +65,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ transactions: rows, total, channels, roles, users, guildId }, { headers: NO_STORE_HEADERS })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 400, headers: NO_STORE_HEADERS })
+    return internalError(error, 'economy/history', 'Internal server error', 400, NO_STORE_HEADERS)
   }
 }

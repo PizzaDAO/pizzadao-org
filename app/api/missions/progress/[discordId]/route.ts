@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserProgressSummary } from '@/app/lib/missions'
 import { getCachedProgress, setCachedProgress } from '@/app/lib/mission-cache'
+import { internalError } from '@/app/lib/errors/error-response'
 
 export const runtime = 'nodejs'
 
@@ -31,7 +32,6 @@ export async function GET(
 
     return NextResponse.json(summary, { headers: CACHE_HEADERS })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return internalError(error, 'missions/progress/[discordId]')
   }
 }

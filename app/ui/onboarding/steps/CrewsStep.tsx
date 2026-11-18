@@ -9,6 +9,7 @@
 
 import { useMemo } from "react";
 import type { CSSProperties } from "react";
+import Image from "next/image";
 import { ArrowLeft, ArrowUpRight, Check, Clock, ExternalLink } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { TURTLES } from "../../constants";
@@ -303,10 +304,12 @@ function CrewCard({
                   const img = TURTLES.find((tu) => tu.id === tId)?.image;
                   if (!img) return null;
                   return (
-                    <img
+                    <Image
                       key={tId}
                       src={img}
                       alt={tId}
+                      width={16}
+                      height={16}
                       style={{
                         width: 16,
                         height: 16,

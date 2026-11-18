@@ -13,6 +13,7 @@ import {
     mintBridge,
 } from "@/app/lib/session-bridge";
 import { SITE_URL } from "@/app/lib/site-url";
+import { loginHrefFrom } from "@/app/lib/login-return";
 
 /**
  * Two jobs.
@@ -24,7 +25,8 @@ import { SITE_URL } from "@/app/lib/site-url";
  *    new origin, so a build with the old env never redirects. 307 until site.hostRedirectPermanent.
  *    With site.sessionBridgeEnabled a signed-in member is handed over to the main site's session
  *    transfer endpoint instead of landing signed out (app/lib/session-bridge.ts).
- * 2. /disavow must answer a real 404 (status and generic page) to everyone who may
+ * 2. /admin/trivia redirects visitors with no session to log in (see below).
+ * 3. /disavow must answer a real 404 (status and generic page) to everyone who may
  *    not use it. The root layout wraps `children` in a Suspense boundary, so by the
  *    time a page or nested layout calls notFound() the 200 status is already sent;
  *    the decision therefore has to be made before rendering starts, here. Flag off,
@@ -36,6 +38,14 @@ export async function proxy(req: NextRequest) {
     const moved = await hostRedirect(req);
     if (moved) return moved;
     const path = req.nextUrl.pathname;
+    // /admin/trivia (read-only, plans/trivia.md): a visitor with no valid session is redirected to log in before any
+    // page renders (a redirect() inside the page would arrive as a 200 stream). The page itself checks the admin role
+    // and answers notFound() to everyone else.
+    if (path === "/admin/trivia") {
+        const session = verifySession(req.cookies.get(COOKIE_NAME)?.value);
+        if (session?.discordId) return NextResponse.next();
+        return NextResponse.redirect(new URL(loginHrefFrom(path), req.url), 307);
+    }
     if (path !== "/disavow" && !path.startsWith("/disavow/")) return NextResponse.next();
     if (await allowed(req)) return NextResponse.next();
     return NextResponse.rewrite(new URL("/_not-found-page", req.url));
@@ -96,6 +106,7 @@ export const config = {
     matcher: [
         "/disavow",
         "/disavow/:path*",
+        "/admin/trivia",
         {
             source: "/((?!api(?:/|$)|_next/|_vercel/|\\.well-known/|.*\\..*).*)",
             has: [{ type: "host", value: "app.pizzadao.org" }],

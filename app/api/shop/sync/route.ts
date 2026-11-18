@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { checkSecret } from '@/app/lib/auth-guards'
 import { shopSheetSyncEnabled, syncShopItemsFromData } from '@/app/lib/shop'
+import { internalError } from '@/app/lib/errors/error-response'
 
 export const runtime = 'nodejs'
 
@@ -50,8 +51,7 @@ export async function POST(request: NextRequest) {
       error: 'No items data provided. Send { items: [...] } in request body.'
     }, { status: 400 })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return internalError(error, 'shop/sync')
   }
 }
 

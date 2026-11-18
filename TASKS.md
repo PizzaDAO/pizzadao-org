@@ -17,6 +17,7 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 | pineapple-71302 | add a email claiming system for memebes to claim a unique pizzadao emails | todo | P3 |  |  |  | plans/pineapple-71302-pizzadao-emails.md |  | 2026-10-17: on hold, not yet (Snax) |
 | neapolitan-96018 | Crew page with start crew call button | todo | P2 |  |  |  |  |  | moved back from Done 2026-11-14: no evidence it shipped |
 | discord-guild-channels-timeout | Discord: GET /guilds/{id}/channels times out in prod | todo | P2 |  |  |  |  |  | found in plans/diavola-24729.md: GET /guilds/{id}/channels times out in prod; blanks public channel names on profiles and recaps |
+| oregano-27514 | Trivia: Discord bot + pizzadao.org/trivia | review | P2 |  | Snax |  | plans/trivia.md |  | phase 1 (bank, web, admin, migration) in review; phases 2-3 (Discord loop, community) still to do. Migration `20261223090000_trivia` must be applied to prod by hand before merge |
 
 ## Done
 

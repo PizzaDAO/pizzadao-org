@@ -130,6 +130,11 @@ export const RATE_LIMITS = {
   "marketing-contact": { limit: 5, windowSec: 10 * 60 },
   // Newsletter confirm (signed link), per IP. Unsubscribe has no IP limit: the HMAC is the gate.
   "newsletter-confirm": { limit: 20, windowSec: 10 * 60 },
+  // Trivia (plans/trivia.md): practice and daily answer checks, per IP and per member; reads and reports per IP.
+  "trivia-practice": { limit: 30, windowSec: 60 },
+  "trivia-daily": { limit: 30, windowSec: 60 },
+  "trivia-read": { limit: 120, windowSec: 60 },
+  "trivia-report": { limit: 5, windowSec: 10 * 60 },
 } as const satisfies Record<string, RateLimitRule>;
 
 export type RateLimitName = keyof typeof RATE_LIMITS;

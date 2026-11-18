@@ -33,6 +33,7 @@ describe("proxy for /disavow", () => {
         expect(config.matcher).toEqual([
             "/disavow",
             "/disavow/:path*",
+            "/admin/trivia",
             {
                 source: "/((?!api(?:/|$)|_next/|_vercel/|\\.well-known/|.*\\..*).*)",
                 has: [{ type: "host", value: "app.pizzadao.org" }],
@@ -84,5 +85,20 @@ describe("no title or text leaks from the layout", () => {
     it("there is no loading.tsx under app/disavow", async () => {
         const { existsSync } = await import("node:fs");
         expect(existsSync(new URL("./app/disavow/loading.tsx", import.meta.url))).toBe(false);
+    });
+});
+
+describe("proxy for /admin/trivia", () => {
+    it("redirects a visitor with no valid session to log in, without rendering the page", async () => {
+        m(verifySession).mockReturnValue(null);
+        const r = await proxy(req("/admin/trivia", ""));
+        expect(r.status).toBe(307);
+        expect(new URL(r.headers.get("location")!).pathname).toBe("/login");
+        expect(new URL(r.headers.get("location")!).searchParams.get("returnTo")).toBe("/admin/trivia");
+    });
+
+    it("lets a signed-in visitor through (the page itself checks the admin role)", async () => {
+        const r = await proxy(req("/admin/trivia"));
+        expect(passed(r)).toBe(true);
     });
 });

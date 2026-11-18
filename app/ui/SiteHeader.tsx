@@ -22,6 +22,7 @@ const GROUPS: { key: string; items: NavItem[] }[] = [
   ] },
   { key: "contribute", items: [
     { href: "/missions", label: "missions" },
+    { href: "/trivia", label: "trivia" },
     { href: "/pep", label: "pep" },
     { href: "/tech/projects", label: "techProjects" },
   ] },

@@ -27,6 +27,7 @@ const STATIC_ROUTES: Array<{ path: string; priority: number; changeFrequency: "d
   { path: "/crew", priority: 0.6, changeFrequency: "daily" },
   { path: "/articles", priority: 0.8, changeFrequency: "daily" },
   { path: "/missions", priority: 0.6, changeFrequency: "weekly" },
+  { path: "/trivia", priority: 0.5, changeFrequency: "daily" },
   { path: "/calls", priority: 0.6, changeFrequency: "daily" },
   { path: "/handbook", priority: 0.7, changeFrequency: "monthly" },
   ...HANDBOOK_PAGES.map((p) => ({ path: `/handbook/${p.slug}`, priority: 0.7, changeFrequency: "monthly" as const })),

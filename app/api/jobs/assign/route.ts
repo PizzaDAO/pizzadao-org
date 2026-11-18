@@ -6,6 +6,7 @@ import { checkKeyedRateLimit, rateLimitResponse } from '@/app/lib/rate-limit'
 import { verifyJobPost, verifyPostsEnabled, unverifiablePayOnClick, parseJobRequirements } from '@/app/lib/jobs-verify'
 import { discordTextToPlainText } from '@/app/lib/discord-markup'
 import { resolveDiscordMentions } from '@/app/lib/discord-mention-resolve'
+import { safeMessageError } from '@/app/lib/errors/error-response'
 
 export const runtime = 'nodejs'
 
@@ -127,7 +128,6 @@ export async function POST(request: NextRequest) {
       }
     })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 400 })
+    return safeMessageError(error, 'jobs/assign', ['You already have an active job', 'Job not found or inactive', 'No jobs available'])
   }
 }

@@ -49,7 +49,7 @@ afterEach(() => vi.unstubAllEnvs());
 describe("proxy matcher", () => {
   it("covers page paths and leaves api, _next, _vercel and .well-known out", async () => {
     const { config } = await load();
-    const rule = config.matcher[2] as { source: string; has: unknown[] };
+    const rule = config.matcher[3] as { source: string; has: unknown[] };
     expect(rule.has).toEqual([{ type: "host", value: "app.pizzadao.org" }]);
     const re = new RegExp("^" + rule.source.replace("/((?!", "/(?!").replace(/\)\.\*\)$/, ").*") + "$");
     expect(re.test("/")).toBe(true);

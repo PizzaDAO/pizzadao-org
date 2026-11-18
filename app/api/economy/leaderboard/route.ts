@@ -4,6 +4,7 @@ import { getSheetData } from '@/app/lib/sheets/member-repository'
 import { NO_STORE_HEADERS } from '@/app/lib/no-store'
 import { memberNamesByDiscordId, mapWithLimit } from '@/app/lib/member-names'
 import { getGuildMemberCleanName } from '@/app/lib/discord-channels'
+import { internalError } from '@/app/lib/errors/error-response'
 
 export const runtime = 'nodejs'
 
@@ -49,7 +50,6 @@ export async function GET() {
       headers: NO_STORE_HEADERS
     })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500, headers: NO_STORE_HEADERS })
+    return internalError(error, 'economy/leaderboard', 'Internal server error', 500, NO_STORE_HEADERS)
   }
 }

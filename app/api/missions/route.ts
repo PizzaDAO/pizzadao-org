@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getSession } from '@/app/lib/session'
 import { getMissionsOverview } from '@/app/lib/missions-overview'
 import { loadHoldPolicy, missionVerifiersEnabled } from '@/app/lib/mission-verify/policy'
+import { internalError } from '@/app/lib/errors/error-response'
 
 export const runtime = 'nodejs'
 
@@ -20,7 +21,6 @@ export async function GET() {
       headers: { 'Cache-Control': 'private, no-store' },
     })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return internalError(error, 'missions')
   }
 }

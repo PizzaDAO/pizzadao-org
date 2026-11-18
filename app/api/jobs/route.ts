@@ -3,6 +3,7 @@ import { getSession } from '@/app/lib/session'
 import { getDailyJobs, getCompletedJobsToday, getJobRewardAmount } from '@/app/lib/jobs'
 import { NO_STORE_HEADERS } from '@/app/lib/no-store'
 import { resolveDiscordMentions } from '@/app/lib/discord-mention-resolve'
+import { internalError } from '@/app/lib/errors/error-response'
 
 export const runtime = 'nodejs'
 
@@ -45,7 +46,6 @@ export async function GET() {
       guildId
     }, { headers: NO_STORE_HEADERS })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500, headers: NO_STORE_HEADERS })
+    return internalError(error, 'jobs', 'Internal server error', 500, NO_STORE_HEADERS)
   }
 }
