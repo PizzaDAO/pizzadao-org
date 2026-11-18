@@ -77,11 +77,18 @@ describe("every login path goes through the helper", () => {
       return statSync(p).isDirectory() ? walk(p) : /\.(ts|tsx)$/.test(f) && !/\.test\./.test(f) ? [p] : [];
     });
 
-  it("no file outside session.ts sets the session cookie directly", () => {
+  it("no file outside session.ts sets or deletes the session cookie directly", () => {
     const root = join(__dirname, "..");
-    const bad = walk(root).filter((f) => {
+    const files = [...walk(root), join(__dirname, "..", "..", "proxy.ts")];
+    const patterns = [
+      /cookies\s*\.\s*(set|delete)\(\s*COOKIE_NAME/,
+      /cookies\s*\.\s*(set|delete)\(\s*["'`]pizzadao_session["'`]/,
+      /cookies\s*\.\s*(set|delete)\(\s*\{[^}]*name\s*:\s*(COOKIE_NAME|["'`]pizzadao_session["'`])/,
+    ];
+    const bad = files.filter((f) => {
       if (f === join(__dirname, "session.ts")) return false;
-      return /cookies\s*\.\s*set\(\s*COOKIE_NAME|cookies\s*\.\s*set\(\s*["']pizzadao_session["']/.test(readFileSync(f, "utf8"));
+      const src = readFileSync(f, "utf8");
+      return patterns.some((re) => re.test(src));
     });
     expect(bad).toEqual([]);
   });
