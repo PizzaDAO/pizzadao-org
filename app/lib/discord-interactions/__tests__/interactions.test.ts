@@ -627,4 +627,48 @@ describe('POST /api/discord/interactions', () => {
       expect(getCompletionForReview).not.toHaveBeenCalled()
     })
   })
+
+  describe('call review card buttons (cr:)', () => {
+    const DPR = '812131585327235113'
+    const after = vi.fn()
+    const CALL_ID = 'cmcall0000000000000000001'
+    const button = (customId: string, roles = [DPR]) => ({
+      type: 3,
+      application_id: 'app-1',
+      token: 'tok-1',
+      guild_id: GUILD,
+      message: { id: '300000000000000001', channel_id: '200000000000000001' },
+      member: { user: { id: USER }, roles },
+      data: { custom_id: customId, component_type: 2 },
+    })
+    beforeEach(() => {
+      after.mockReset()
+      vi.doMock('next/server', async (orig) => ({ ...(await orig<typeof import('next/server')>()), after }))
+    })
+
+    it('401s a click with a bad signature', async () => {
+      expect((await post(button(`cr:approve:${CALL_ID}:abc`), '00'.repeat(64))).status).toBe(401)
+    })
+
+    it('routes cr: ids to the call review handler: with the switches off it answers "turned off", ephemeral, no job', async () => {
+      delete process.env.CALL_REVIEW_CARDS_ENABLED
+      delete process.env.CALL_CAPO_REVIEW_ENABLED
+      const body = await (await post(button(`cr:approve:${CALL_ID}:abc`))).json()
+      expect(body).toMatchObject({ type: 4, data: { flags: 64 } })
+      expect(body.data.embeds[0].description).toMatch(/turned off/)
+      expect(after).not.toHaveBeenCalled()
+    })
+
+    it('an unknown or malformed cr: id is refused without touching the database', async () => {
+      const body = await (await post(button('cr:bogus:thing'))).json()
+      expect(body).toMatchObject({ type: 4, data: { flags: 64 } })
+      expect(body.data.embeds[0].description).toMatch(/Unknown button/)
+      expect(after).not.toHaveBeenCalled()
+    })
+
+    it('a cancel click needs no role and dismisses the preview', async () => {
+      const body = await (await post(button(`cr:cancel:${CALL_ID}`, []))).json()
+      expect(body).toMatchObject({ type: 7, data: { components: [] } })
+    })
+  })
 })

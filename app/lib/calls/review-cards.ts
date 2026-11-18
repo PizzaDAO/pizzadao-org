@@ -31,6 +31,7 @@ import { heldReason, type HeldReason } from '@/app/lib/calls/hold-rules'
 import { neutralizeMentions } from '@/app/lib/calls/recap'
 import { callDateTimeFormat } from '@/app/lib/calls/format-call-time'
 import { CALL_CAPO_ROLE_IDS, DREAD_PIZZA_ROBERTS_ROLE_ID } from '@/app/ui/constants'
+import { callApproveId, callHoldId } from '@/app/lib/discord-interactions/call-review'
 import { SITE_URL } from '@/app/lib/site-url'
 import { createHash } from 'node:crypto'
 
@@ -61,6 +62,8 @@ export interface CallCardView {
   held: HeldReason | null
   /** Lines were hidden after the summary was written. */
   staleRedactions: boolean
+  /** Discord buttons are live (calls.capoReviewEnabled is on too): without it the card only links to the website. */
+  interactive: boolean
   /** Card version (cardVersion): changes whenever the summary text or the hidden lines change. */
   version: string
   reviewedBy: string | null
@@ -83,10 +86,15 @@ export interface CardMessage {
   allowed_mentions: { parse: [] }
 }
 
-/** base36 of the newest of summaryGeneratedAt, summaryEditedAt and redactionsUpdatedAt ('0' when none). */
-export function cardVersion(r: { summaryGeneratedAt?: Date | null; summaryEditedAt?: Date | null; redactionsUpdatedAt?: Date | null }): string {
+/**
+ * The card version: base36 of the newest of summaryGeneratedAt, summaryEditedAt and redactionsUpdatedAt,
+ * plus a short hash of the title (a title-only edit changes neither stamp, but the card and the recap show
+ * it). Lower-case letters and digits only, so it fits a custom id.
+ */
+export function cardVersion(r: { summaryGeneratedAt?: Date | null; summaryEditedAt?: Date | null; redactionsUpdatedAt?: Date | null; title?: string | null }): string {
   const ms = Math.max(r.summaryGeneratedAt?.getTime() ?? 0, r.summaryEditedAt?.getTime() ?? 0, r.redactionsUpdatedAt?.getTime() ?? 0)
-  return ms.toString(36)
+  const h = createHash('sha256').update(r.title ?? '').digest().readUInt32BE(0) % 1679616 // 36^4
+  return ms.toString(36) + h.toString(36).padStart(4, '0')
 }
 
 export function cardState(v: Pick<CallCardView, 'status' | 'held'> & { staleRedactions?: boolean }): CardState {
@@ -121,7 +129,7 @@ function actionLines(items: unknown): string[] {
 
 /**
  * The card: an embed plus a button row. Pure. A held call shows only crew and date; only an open card
- * shows the summary and action items. Phase 2 carries a link button only.
+ * shows the summary and action items. An open card has Approve / Needs owner buttons (handled in discord-interactions/call-review.ts).
  */
 export function renderCallReviewCard(v: CallCardView, opts: { appUrl: string }): CardMessage {
   const state = cardState(v)
@@ -159,7 +167,9 @@ export function renderCallReviewCard(v: CallCardView, opts: { appUrl: string }):
   }
 
   const embed = makeEmbed(tone, headline, body.join('\n'), { fields, footer: { text: `Call review · ${v.id}` } })
-  const components = [{ type: 1, components: [{ type: 2, style: 5, label: 'Open on website', url: link }] }]
+  const open = { type: 2, style: 5, label: 'Open on website', url: link }
+  // An open card carries the Discord buttons (the version binds Approve to the text on the card); a resolved one only the link.
+  const components = [{ type: 1, components: state === 'open' && v.interactive ? [{ type: 2, style: 3, label: 'Approve & publish', custom_id: callApproveId(v.id, v.version) }, { type: 2, style: 2, label: 'Needs owner', custom_id: callHoldId(v.id) }, open] : [open] }]
   return { content: '', embeds: [embed], components, allowed_mentions: { parse: [] } }
 }
 
@@ -443,6 +453,7 @@ export async function loadCallCardView(id: string): Promise<CallCardView | null>
     actionItems: row.actionItems,
     held: heldReason(row, filter),
     staleRedactions: !!row.redactionsUpdatedAt && row.redactionsUpdatedAt.getTime() > Math.max(row.summaryGeneratedAt?.getTime() ?? 0, row.summaryEditedAt?.getTime() ?? 0),
+    interactive: await toggleEnabled('calls.capoReviewEnabled').catch(() => false),
     version: cardVersion(row),
     reviewedBy: row.reviewedBy,
     reviewedAt: row.reviewedAt,

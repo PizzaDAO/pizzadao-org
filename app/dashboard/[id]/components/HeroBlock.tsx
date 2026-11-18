@@ -91,7 +91,13 @@ export function HeroBlock({
             {/* ── Identity row — portrait + name + meta */}
             <div className="mt-5 flex flex-wrap items-start gap-5 md:gap-6">
                 {/* Portrait */}
-                <div className="relative shrink-0">
+                <Link
+                    href={`/profile/${idValue}/pfp`}
+                    aria-label={t("editPfp")}
+                    title={t("editPfp")}
+                    className="relative block shrink-0 rounded-full"
+                    style={{ textDecoration: "none" }}
+                >
                     {pfpUrl ? (
                         <img
                             src={pfpUrl}
@@ -130,7 +136,7 @@ export function HeroBlock({
                     >
                         #{idValue}
                     </span>
-                </div>
+                </Link>
 
                 {/* Name + level + city + PEP */}
                 <div className="min-w-0 flex-1">
@@ -216,6 +222,7 @@ export function HeroBlock({
                     href={`/profile/${idValue}/edit`}
                     className="btn-pill group"
                     style={{
+                        minHeight: 44,
                         background: "hsl(var(--tomato))",
                         color: "hsl(var(--cream))",
                         boxShadow: "var(--shadow-soft)",
@@ -224,6 +231,19 @@ export function HeroBlock({
                 >
                     {t("editProfile")}
                     <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                </Link>
+                <Link
+                    href={`/profile/${idValue}/pfp`}
+                    className="btn-pill"
+                    style={{
+                        minHeight: 44,
+                        background: "transparent",
+                        color: "hsl(var(--foreground))",
+                        border: "1.5px solid hsl(var(--rule-warm) / 0.7)",
+                        textDecoration: "none",
+                    }}
+                >
+                    {t("editPfp")}
                 </Link>
                 <Link
                     href="/me/wallets"

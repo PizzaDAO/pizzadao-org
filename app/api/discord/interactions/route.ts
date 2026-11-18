@@ -93,6 +93,9 @@ import { applyMemberAction, setDoneUrl } from "@/app/lib/followups/actions";
 import { linkOffered } from "@/app/lib/followups/done-url";
 import { notifyApprovers } from "@/app/lib/followups/notify";
 import type { ReminderInteractionDeps } from "@/app/lib/discord-interactions/reminders";
+import { callReviewHandlerDeps, callReviewRunDeps } from "@/app/lib/discord-interactions/call-review-defaults";
+import { runCallReview } from "@/app/lib/discord-interactions/call-review-run";
+import { syncCallReviewCard } from "@/app/lib/calls/review-cards";
 import { stopCallReminders, stopProposalReminders } from "@/app/lib/reminders/prefs";
 import { liveCommandEnabled, mayRunLive, runLiveCommand, type LiveJob } from "@/app/lib/calls/live-announce-command";
 import { SITE_URL } from "@/app/lib/site-url";
@@ -347,6 +350,14 @@ const missionReview: MissionReviewDeps = {
   appUrl: appUrl(),
 };
 
+// Call review card buttons (calls.reviewCardsEnabled + calls.capoReviewEnabled): the preview, the publish
+// and the hold run after the response, within Discord's 3 s window for the answer itself.
+const callReview = callReviewHandlerDeps(
+  appUrl(),
+  (job) => after(() => runCallReview(job, callReviewRunDeps(appUrl())).then(() => undefined, (err) => console.error("[call review] job failed:", err))),
+  (id) => after(() => syncCallReviewCard(id).then(() => undefined)),
+);
+
 const followups: FollowUpInteractionDeps = {
   respond: (a) => applyMemberAction({ ...a, actorId: a.discordId }),
   addLink: (a) => setDoneUrl({ ...a, actorId: a.discordId }),
@@ -410,6 +421,7 @@ function deps(guildId: string | undefined, settings: Settings): HandlerDeps {
     trivia: { enabled: () => triviaLive(), rateLimit: triviaRateLimit, defer: deferTrivia },
     metalhead: { enabled: () => metalheadEnabled(), rateLimit: metalheadRateLimit, defer: deferMetalhead, callChoices: liveCallChoices },
     missionReview,
+    callReview,
     followups,
     reminders,
   };

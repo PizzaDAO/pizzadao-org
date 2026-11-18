@@ -65,6 +65,7 @@ export function ProfileHero({
     suppressOwnerBanner,
 }: ProfileHeroProps) {
     const tSince = useTranslations("memberSince");
+    const tHero = useTranslations("dashboard.hero");
     const locale = useLocale();
     const sinceText = formatMemberSince(memberSince, locale);
     const isOwner = mode === "owner-readonly" || mode === "owner-edit";
@@ -214,10 +215,15 @@ export function ProfileHero({
                             <p className="m-0 mt-2">
                                 <Link
                                     href={`/profile/${memberId}/pfp`}
-                                    className="text-sm underline underline-offset-2"
-                                    style={{ color: "hsl(var(--butter))" }}
+                                    className="inline-flex items-center justify-center rounded-full px-4 text-sm font-semibold"
+                                    style={{
+                                        minHeight: 44,
+                                        color: "hsl(var(--butter))",
+                                        border: "1.5px solid hsl(var(--butter) / 0.55)",
+                                        textDecoration: "none",
+                                    }}
                                 >
-                                    Edit PFP
+                                    {tHero("editPfp")}
                                 </Link>
                             </p>
                         )}
