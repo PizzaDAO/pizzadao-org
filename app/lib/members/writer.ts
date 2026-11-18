@@ -41,6 +41,7 @@ export async function upsertMemberInDb(raw: MemberWriteRaw, actor: string, now: 
       if (!plan.ok || plan.skipped) return plan
       // Ids of merged-away members stay taken (they are hidden from `members`, not gone).
       const tombstones = new Set((await tx.member.findMany({ where: { mergedInto: { not: null } }, select: { id: true } })).map((m) => m.id))
+      // Rename branches below are defensive: planMemberUpsert no longer renames except by letter case.
       if ((plan.action === 'inserted' || (plan.previousId && plan.targetId !== plan.previousId)) && tombstones.has(plan.targetId)) {
         return { ok: false, error: `Member ID ${plan.targetId} is already used by another row.` } as UpsertResult
       }

@@ -111,7 +111,7 @@ export async function GET(req: Request) {
       : allManuals
 
     return NextResponse.json({ manuals }, {
-      headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' }
+      headers: { 'Cache-Control': forceRefresh ? 'private, no-store' : 'public, s-maxage=3600, stale-while-revalidate=86400' }
     })
   } catch (e: unknown) {
     return internalError(e, 'manuals', 'Failed to load manuals')

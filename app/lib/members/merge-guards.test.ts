@@ -51,10 +51,10 @@ describe('merged-away ids stay taken', () => {
     expect(nextMemberId(shown, '999999')).toBe('2')
   })
 
-  it('a rename to a tombstoned id is refused', async () => {
+  it('a rename to a tombstoned id is refused (renames are refused outright)', async () => {
     const res = await upsertMemberInDb({ memberId: '2', discordId: '111111', name: 'x' } as any, 'test')
     expect(res.ok).toBe(false)
-    expect((res as any).error).toMatch(/already used/)
+    expect((res as any).error).toMatch(/cannot be changed/)
   })
 
   it('a signup that carries a tombstoned id is refused', async () => {
