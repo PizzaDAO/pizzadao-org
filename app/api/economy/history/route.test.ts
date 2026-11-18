@@ -168,6 +168,6 @@ describe('GET /api/economy/history', () => {
     const body = await res.json()
 
     expect(res.status).toBe(400)
-    expect(body.error).toBe('Database error')
+    expect(body.error).toBe('Internal server error')
   })
 })

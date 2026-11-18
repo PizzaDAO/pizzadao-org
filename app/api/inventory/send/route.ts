@@ -4,6 +4,7 @@ import { prisma } from '@/app/lib/db'
 import { getOrCreateEconomy } from '@/app/lib/economy'
 import { resolvePepRecipient } from '@/app/lib/pep-recipient'
 import { ValidationError } from '@/app/lib/errors/api-errors'
+import { safeMessageError } from '@/app/lib/errors/error-response'
 
 export const runtime = 'nodejs'
 
@@ -93,7 +94,6 @@ export async function POST(request: NextRequest) {
       message: `Sent ${quantity}x ${senderInventory.item.name} to ${recipientId}`
     })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 400 })
+    return safeMessageError(error, 'inventory/send', ['Insufficient items in inventory'])
   }
 }

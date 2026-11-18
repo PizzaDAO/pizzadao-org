@@ -231,8 +231,12 @@ async function handleCallback(req: Request): Promise<NextResponse> {
           });
         }
       }
-      // If this was a proxy flow, redirect back to the preview origin
-      if (return_to && validateReturnTo(return_to)) {
+      // Only honour return_to once this browser's login nonce has been verified.
+      if (
+        return_to &&
+        verifyOAuthNonce(readCookie(req, OAUTH_STATE_COOKIE), stateNonce) &&
+        validateReturnTo(return_to)
+      ) {
         return NextResponse.redirect(return_to);
       }
       // Otherwise redirect to home page

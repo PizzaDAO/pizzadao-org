@@ -22,6 +22,16 @@ describe('validateReturnTo', () => {
     expect(validateReturnTo('https://onboarding-abc123xyz-pizza-dao.vercel.app')).toBe(true)
     expect(validateReturnTo('https://onboarding-git-feature-x-pizza-dao.vercel.app/')).toBe(true)
     expect(validateReturnTo('https://onboarding-v7lj-abc123xyz-pizza-dao.vercel.app')).toBe(true)
+    expect(validateReturnTo('https://onboarding-v7lj-git-feature-x-pizza-dao.vercel.app')).toBe(true)
+  })
+
+  it('rejects hosts outside the project preview formats', () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    expect(validateReturnTo('https://onboarding-other-project-abc-pizza-dao.vercel.app')).toBe(false)
+    expect(validateReturnTo('https://onboarding-v7lj-other-abc-pizza-dao.vercel.app')).toBe(false)
+    expect(validateReturnTo('https://onboarding-git--pizza-dao.vercel.app')).toBe(false)
+    expect(validateReturnTo('https://onboarding--abc-pizza-dao.vercel.app')).toBe(false)
+    expect(validateReturnTo('https://onboarding-abc-pizza-dao.vercel.app:8443')).toBe(false)
   })
 
   it('does not accept production itself (no plain transfer tokens aimed at it)', () => {
@@ -81,14 +91,28 @@ describe('OAuth state', () => {
     })
   })
 
+  it('rejects a tampered signed state', () => {
+    const nonce = generateOAuthNonce()
+    const encoded = encodeOAuthState({ sessionId: 's', nonce, return_to: 'https://onboarding-abc-pizza-dao.vercel.app' })
+    const [body, sig] = encoded.split('.')
+    const forged = Buffer.from(
+      JSON.stringify({ sessionId: 's', nonce, return_to: 'https://onboarding-zzz-pizza-dao.vercel.app' }),
+    ).toString('base64url')
+    expect(decodeOAuthState(`${forged}.${sig}`)).toEqual({ sessionId: '' })
+    expect(decodeOAuthState(`${body}.${sig.slice(0, -1)}A`)).toEqual({ sessionId: '' })
+    expect(decodeOAuthState(`${body}.`)).toEqual({ sessionId: '' })
+  })
+
   it('treats a legacy plain state as a sessionId with no nonce', () => {
     expect(decodeOAuthState('plain-session')).toEqual({ sessionId: 'plain-session' })
     expect(decodeOAuthState('')).toEqual({ sessionId: '' })
   })
 
-  it('ignores non-string fields from a tampered state', () => {
-    const tampered = Buffer.from(JSON.stringify({ sessionId: 's', nonce: 123, return_to: {} })).toString('base64url')
-    expect(decodeOAuthState(tampered)).toEqual({ sessionId: 's', nonce: undefined, return_to: undefined })
+  it('never trusts fields from an unsigned state', () => {
+    const unsigned = Buffer.from(JSON.stringify({ sessionId: 's', nonce: 'n', return_to: 'x' })).toString('base64url')
+    const d = decodeOAuthState(unsigned)
+    expect(d.nonce).toBeUndefined()
+    expect(d.return_to).toBeUndefined()
   })
 
   it('generates unpredictable nonces', () => {

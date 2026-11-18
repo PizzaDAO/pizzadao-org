@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getSession } from '@/app/lib/session'
 import { quitJob } from '@/app/lib/jobs'
 import { requireOnboarded } from '@/app/lib/economy'
+import { safeMessageError } from '@/app/lib/errors/error-response'
 
 export const runtime = 'nodejs'
 
@@ -21,7 +22,6 @@ export async function POST() {
       message: 'You have quit your job'
     })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 400 })
+    return safeMessageError(error, 'jobs/quit', ['You do not have an active job'])
   }
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/app/lib/session'
 import { markAsRead, markAllAsRead } from '@/app/lib/notifications'
+import { internalError } from '@/app/lib/errors/error-response'
 
 export const runtime = 'nodejs'
 
@@ -45,7 +46,6 @@ export async function POST(request: NextRequest) {
     )
   } catch (error) {
     console.error('Failed to mark notifications as read:', error)
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return internalError(error, 'notifications/read')
   }
 }

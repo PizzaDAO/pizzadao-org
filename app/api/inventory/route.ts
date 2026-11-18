@@ -3,6 +3,7 @@ import { getSession } from '@/app/lib/session'
 import { getInventory } from '@/app/lib/shop'
 import { requireOnboarded } from '@/app/lib/economy'
 import { NO_STORE_HEADERS } from '@/app/lib/no-store'
+import { internalError } from '@/app/lib/errors/error-response'
 
 export const runtime = 'nodejs'
 
@@ -39,7 +40,6 @@ export async function GET() {
       }))
     }, { headers: NO_STORE_HEADERS })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 400, headers: NO_STORE_HEADERS })
+    return internalError(error, 'inventory', 'Internal server error', 400, NO_STORE_HEADERS)
   }
 }

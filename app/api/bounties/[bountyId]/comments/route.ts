@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/app/lib/session'
 import { getBountyComments, addBountyComment, deleteBountyComment } from '@/app/lib/bounties'
 import { requireOnboarded } from '@/app/lib/economy'
-import { withErrorHandling } from '@/app/lib/errors/error-response'
+import { withErrorHandling, internalError } from '@/app/lib/errors/error-response'
 import { UnauthorizedError, ValidationError } from '@/app/lib/errors/api-errors'
 import { NO_STORE_HEADERS } from '@/app/lib/no-store'
 
@@ -32,8 +32,7 @@ export async function GET(
       }))
     }, { headers: NO_STORE_HEADERS })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return internalError(error, 'bounties/[bountyId]/comments')
   }
 }
 

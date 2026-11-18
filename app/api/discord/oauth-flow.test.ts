@@ -376,3 +376,35 @@ describe("session nick ignores the Pizza Trainee placeholder (anchovy-52918)", (
     expect(vi.mocked(createSessionToken).mock.calls[0][0]).toMatchObject({ nick: "Tony" });
   });
 });
+
+describe("/api/discord/callback ?error= return handling", () => {
+  const returnTo = "https://onboarding-abc123xyz-pizza-dao.vercel.app";
+  function errCb(state: string, cookie?: string) {
+    const url = `${ORIGIN}/api/discord/callback?error=access_denied&state=${encodeURIComponent(state)}`;
+    return callback(new Request(url, cookie ? { headers: { cookie } } : undefined));
+  }
+
+  it("goes to the default page when the state nonce does not match", async () => {
+    const res = await errCb(encodeOAuthState({ sessionId: "", return_to: returnTo, nonce: "n1" }), "oauth_state=other");
+    expect(res.headers.get("location")).toBe(`${ORIGIN}/`);
+  });
+
+  it("goes to the default page when there is no cookie", async () => {
+    const res = await errCb(encodeOAuthState({ sessionId: "", return_to: returnTo, nonce: "n1" }));
+    expect(res.headers.get("location")).toBe(`${ORIGIN}/`);
+  });
+
+  it("goes to the default page for a tampered state", async () => {
+    const sig = encodeOAuthState({ sessionId: "", return_to: returnTo, nonce: "n1" }).split(".")[1];
+    const forged = Buffer.from(
+      JSON.stringify({ sessionId: "", return_to: "https://onboarding-evil-pizza-dao.vercel.app", nonce: "n1" }),
+    ).toString("base64url");
+    const res = await errCb(`${forged}.${sig}`, "oauth_state=n1");
+    expect(res.headers.get("location")).toBe(`${ORIGIN}/`);
+  });
+
+  it("returns to the preview origin when state and nonce are valid", async () => {
+    const res = await errCb(encodeOAuthState({ sessionId: "", return_to: returnTo, nonce: "n1" }), "oauth_state=n1");
+    expect(res.headers.get("location")).toBe(`${returnTo}/`);
+  });
+});
