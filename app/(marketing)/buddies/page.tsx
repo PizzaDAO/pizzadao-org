@@ -9,8 +9,10 @@ import { pageMeta } from "@/app/(marketing)/_site/meta";
 import { getTopBuddies } from "@/app/lib/buddy/recognition";
 
 export const runtime = "nodejs";
-// Rendered per request: a build without a database must not bake in a 404.
-export const dynamic = "force-dynamic";
+// Prerendered, refreshed every 5 minutes and on admin saves (see app/lib/revalidate-public.ts). A 404 baked in
+// by a build without a database (or by a switch that is off) heals at the next revalidate.
+export const dynamic = "force-static";
+export const revalidate = 300;
 
 export const metadata = pageMeta({
   path: "/buddies",

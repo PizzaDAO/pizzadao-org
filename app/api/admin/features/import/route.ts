@@ -1,5 +1,6 @@
 import { requireAdmin } from '@/app/lib/auth-guards'
 import { json, rejectUnsafeWrite } from '@/app/lib/admin-guard'
+import { revalidatePublicPage } from '@/app/lib/revalidate-public'
 import { prisma } from '@/app/lib/db'
 import seedJson from '@/data/features-seed.json'
 import { importSeed } from '@/app/lib/features/seed-import'
@@ -21,6 +22,7 @@ export async function POST(request: Request) {
   if (unsafe) return unsafe
   try {
     const summary = await importSeed(prisma, seedJson as unknown as Seed)
+    revalidatePublicPage('features')
     return json(summary)
   } catch (e) {
     console.error('[features] import failed', e instanceof Error ? e.message : e)

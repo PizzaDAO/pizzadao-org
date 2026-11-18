@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { requireAdmin } from '@/app/lib/auth-guards'
 import { json, rejectUnsafeWrite } from '@/app/lib/admin-guard'
+import { revalidatePublicPage } from '@/app/lib/revalidate-public'
 import { prisma } from '@/app/lib/db'
 import { appCreateSchema, appPatchSchema } from '@/app/lib/features/validate'
 
@@ -22,6 +23,7 @@ export async function POST(request: Request) {
   if (!parsed.success) return json({ error: 'Invalid app', issues: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`) }, 400)
   try {
     const row = await prisma.featureApp.create({ data: { ...parsed.data, slug: parsed.data.slug, name: parsed.data.name, updatedBy: auth.session.discordId } })
+    revalidatePublicPage('features')
     return json(row, 201)
   } catch {
     return json({ error: 'Could not create the app (does the slug already exist?)' }, 409)
@@ -38,6 +40,7 @@ export async function PATCH(request: Request) {
   if (!parsed.success) return json({ error: 'Invalid edit', issues: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`) }, 400)
   try {
     const row = await prisma.featureApp.update({ where: { slug: parsed.data.slug }, data: { ...parsed.data.patch, ...(isContentEdit(parsed.data.patch) ? { editedAt: new Date() } : {}), updatedBy: auth.session.discordId } })
+    revalidatePublicPage('features')
     return json(row)
   } catch {
     return json({ error: 'App not found' }, 404)
