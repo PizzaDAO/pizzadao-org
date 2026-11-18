@@ -77,6 +77,9 @@ export const DREAD_PIZZA_ROBERTS_ROLE_ID = "812131585327235113";
 // Pizza Capo: the only role tagged by the daily mission-review SLA digest.
 export const PIZZA_CAPO_ROLE_ID = "839206162837798945";
 
+// Who counts as a capo for call review (besides Dread Pizza Roberts). Pinned role ids, never resolved by name or env.
+export const CALL_CAPO_ROLE_IDS = [PIZZA_CAPO_ROLE_ID] as const;
+
 // Roles notified when a mission needs manual review. Together with
 // ADMIN_ROLE_IDS they may also approve it (L1–L7; L8 is Dread Pizza Roberts
 // only): see app/lib/mission-review-access.ts.

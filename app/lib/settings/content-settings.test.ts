@@ -86,7 +86,7 @@ describe('content settings: lock to today\'s values', () => {
       ['roster.inactiveMonths', 6],
       ['missions.celebrationMinLevel', 2],
     ])
-    expect(SETTINGS['calls.postFilter'].default).toEqual({ excludedCrewIds: [], excludedCrewLabelTerms: [], blockedTerms: [] })
+    expect(SETTINGS['calls.postFilter'].default).toEqual({ excludedCrewIds: [], excludedCrewLabelTerms: [], blockedTerms: [], ownerOnlyTerms: [], ownerOnlyCrewIds: [] })
     expect(SETTINGS['work.prompts'].default).toEqual(DEFAULT_WORK_PROMPTS)
     expect(SETTINGS['mafia.sourcePoints'].default).toEqual(MAFIA_POINT_SOURCES.map((s) => ({ id: s.id, points: s.points })))
     expect(SETTINGS['mafia.ranks'].default).toEqual(MAFIA_RANKS)
@@ -254,7 +254,7 @@ describe('content settings: bounds', () => {
   })
 
   it('the post filter lists are bounded and cleaned', () => {
-    const f = (o: Record<string, unknown>) => ({ excludedCrewIds: [], excludedCrewLabelTerms: [], blockedTerms: [], ...o })
+    const f = (o: Record<string, unknown>) => ({ excludedCrewIds: [], excludedCrewLabelTerms: [], blockedTerms: [], ownerOnlyTerms: [], ownerOnlyCrewIds: [], ...o })
     expect(ok('calls.postFilter', f({}))).toBe(true)
     expect(ok('calls.postFilter', f({ blockedTerms: Array.from({ length: MAX_FILTER_ENTRIES + 1 }, (_, i) => `t${i}`) }))).toBe(false)
     expect(ok('calls.postFilter', f({ blockedTerms: ['x'.repeat(101)] }))).toBe(false)
@@ -306,10 +306,10 @@ describe('private settings', () => {
 
 describe('call post filter: read from the setting only, and fail closed', () => {
   const at = new Date('2026-11-01T00:00:00Z')
-  const f = { excludedCrewIds: ['crew_a'], excludedCrewLabelTerms: [], blockedTerms: ['term-a'] }
+  const f = { excludedCrewIds: ['crew_a'], excludedCrewLabelTerms: [], blockedTerms: ['term-a'], ownerOnlyTerms: [], ownerOnlyCrewIds: [] }
   it('is empty (no filter) while the setting has no saved row', async () => {
     m(prisma.appSetting.findMany).mockResolvedValue([])
-    expect(await loadPostFilter()).toEqual({ excludedCrewIds: [], excludedCrewLabelTerms: [], blockedTerms: [] })
+    expect(await loadPostFilter()).toEqual({ excludedCrewIds: [], excludedCrewLabelTerms: [], blockedTerms: [], ownerOnlyTerms: [], ownerOnlyCrewIds: [] })
   })
   it('uses the saved setting', async () => {
     m(prisma.appSetting.findMany).mockResolvedValue([{ key: 'calls.postFilter', value: f, updatedAt: at, updatedBy: 'x' }])

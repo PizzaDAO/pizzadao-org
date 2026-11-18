@@ -20,9 +20,13 @@ export interface PostFilter {
   excludedCrewIds: string[]
   excludedCrewLabelTerms: string[]
   blockedTerms: string[]
+  /** Calls whose text contains one of these whole-word terms are held for the owner (capos cannot see them). */
+  ownerOnlyTerms?: string[]
+  /** Calls of these crews (crew-mappings slugs) are held for the owner. */
+  ownerOnlyCrewIds?: string[]
 }
 
-export const EMPTY_POST_FILTER: PostFilter = { excludedCrewIds: [], excludedCrewLabelTerms: [], blockedTerms: [] }
+export const EMPTY_POST_FILTER: PostFilter = { excludedCrewIds: [], excludedCrewLabelTerms: [], blockedTerms: [], ownerOnlyTerms: [], ownerOnlyCrewIds: [] }
 
 import { cleanList } from '@/app/lib/calls/post-filter-lists'
 
@@ -31,7 +35,7 @@ export { cleanList, MAX_FILTER_ENTRIES, MAX_FILTER_ENTRY_CHARS } from '@/app/lib
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 /** Whole-word, case-insensitive: the term must not touch another letter or digit on either side. */
-function containsWord(text: string, term: string): boolean {
+export function containsWord(text: string, term: string): boolean {
   const t = term.trim()
   if (!t) return false
   return new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRe(t)}($|[^\\p{L}\\p{N}])`, 'iu').test(text)
@@ -64,6 +68,8 @@ const clean = (v: Partial<PostFilter> | null | undefined): PostFilter => ({
   excludedCrewIds: cleanList(v?.excludedCrewIds),
   excludedCrewLabelTerms: cleanList(v?.excludedCrewLabelTerms),
   blockedTerms: cleanList(v?.blockedTerms),
+  ownerOnlyTerms: cleanList(v?.ownerOnlyTerms),
+  ownerOnlyCrewIds: cleanList(v?.ownerOnlyCrewIds),
 })
 
 /**
@@ -76,9 +82,18 @@ export async function loadPostFilter(now: number = Date.now()): Promise<PostFilt
   return clean(settings.get(KEY))
 }
 
-/** Replace the three lists (saved as the private setting, audited with the values masked). */
+/**
+ * Replace the lists (saved as the private setting, audited with the values masked). A list that is
+ * missing from the input (undefined) keeps its current value, so an older client that only knows the
+ * first three lists never wipes the owner-only ones.
+ */
 export async function savePostFilter(input: Partial<PostFilter>, updatedBy: string): Promise<PostFilter> {
-  const data = clean(input)
+  const current = input.ownerOnlyTerms === undefined || input.ownerOnlyCrewIds === undefined ? await loadPostFilter().catch(() => null) : null
+  const data = clean({
+    ...input,
+    ownerOnlyTerms: input.ownerOnlyTerms ?? current?.ownerOnlyTerms,
+    ownerOnlyCrewIds: input.ownerOnlyCrewIds ?? current?.ownerOnlyCrewIds,
+  })
   await saveSetting(KEY, data, updatedBy)
   clearPostFilterCache()
   return data

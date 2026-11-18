@@ -77,3 +77,28 @@ describe('GET /api/session canManageShop (the /add-money rule)', () => {
     expect(await shop(new Error('down'))).toBe(false)
   })
 })
+
+describe('GET /api/session call review nav entry', () => {
+  const nav = async (roles: string[], env: string | undefined) => {
+    if (env === undefined) delete process.env.CALL_CAPO_REVIEW_ENABLED
+    else process.env.CALL_CAPO_REVIEW_ENABLED = env
+    try {
+      vi.mocked(getUserRoles).mockResolvedValue(roles)
+      return (await (await GET()).json()).canReviewCalls
+    } finally {
+      delete process.env.CALL_CAPO_REVIEW_ENABLED
+    }
+  }
+
+  it('absent for everyone while capo review is off (even the owner)', async () => {
+    expect(await nav(['839206162837798945'], undefined)).toBeUndefined()
+    expect(await nav(['812131585327235113'], undefined)).toBeUndefined()
+  })
+
+  it('shown to a Pizza Capo and the owner while it is on, not to others', async () => {
+    expect(await nav(['839206162837798945'], 'on')).toBe(true)
+    expect(await nav(['812131585327235113'], 'on')).toBe(true)
+    expect(await nav(['823266914834841610'], 'on')).toBeUndefined()
+    expect(await nav(['1234567'], 'on')).toBeUndefined()
+  })
+})

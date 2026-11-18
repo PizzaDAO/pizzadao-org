@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { requireCallReviewer } from '@/app/lib/calls/access'
+import { requireCallAccess } from '@/app/lib/calls/access'
+import { recordCallReviewEvent } from '@/app/lib/calls/review-audit'
 import { updateRecordingText, type RecordingTextEdit } from '@/app/lib/calls/recordings'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { NotFoundError, ValidationError } from '@/app/lib/errors/api-errors'
@@ -55,19 +56,20 @@ function parseTextEdit(body: Record<string, unknown>): RecordingTextEdit {
 
 /**
  * PATCH /api/admin/calls/[id]/summary — reviewer edits of title, summary, action items, chapters.
- * Only fields present are written. Dread Pizza Roberts only.
+ * Only fields present are written. Dread Pizza Roberts, or a Pizza Capo while calls.capoReviewEnabled is on.
  */
 export const PATCH = withErrorHandling(async (request: Request, ctx: { params: Promise<{ id: string }> }) => {
-  const auth = await requireCallReviewer()
+  const { id } = await ctx.params
+  const auth = await requireCallAccess(id, 'editSummary')
   if (!auth.ok) return auth.response
 
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw new ValidationError('Body must be a JSON object')
   const edit = parseTextEdit(body)
 
-  const { id } = await ctx.params
   const result = await updateRecordingText(id, edit)
   if (result === 'not-found') throw new NotFoundError('Recording')
   if (result === 'invalid') throw new ValidationError('This recording cannot be edited that way right now (a published call keeps its title and summary; a processing call is locked)')
+  await recordCallReviewEvent({ recordingId: id, actorId: auth.session.discordId, action: 'summary_edit', via: 'web' })
   return NextResponse.json({ success: true })
 })

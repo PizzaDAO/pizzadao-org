@@ -57,7 +57,7 @@ export function missionReviewerRoleIds(
 /** Who to check: a Discord user id, or the role ids they hold. */
 export type Reviewer = string | readonly string[]
 
-async function resolveRoles(who: Reviewer): Promise<readonly string[]> {
+export async function resolveRoles(who: Reviewer): Promise<readonly string[]> {
   if (typeof who !== 'string') return who
   try {
     return await getUserRoles(who)
@@ -70,7 +70,7 @@ async function resolveRoles(who: Reviewer): Promise<readonly string[]> {
  * Same id-set test as the /add-money gate (isPepAdmin), with only fixed ids:
  * reviewer roles are pinned ids, never resolved by name or env.
  */
-function holdsAny(roles: readonly string[], allowed: readonly string[]): Promise<boolean> {
+export function holdsAny(roles: readonly string[], allowed: readonly string[]): Promise<boolean> {
   return isPepAdmin(roles, { baseRoleIds: allowed, config: { ids: [], names: [] } })
 }
 

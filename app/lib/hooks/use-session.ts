@@ -26,6 +26,8 @@ export interface SessionData {
   showProposals?: boolean;
   /** Sessions nav entry: present (true) only while the public /learn page is on. */
   showSessions?: boolean;
+  /** Call review nav entry: present (true) only while capo review is on and the viewer is a capo or the owner. */
+  canReviewCalls?: boolean;
 }
 
 export const LOGGED_OUT_SESSION: SessionData = {

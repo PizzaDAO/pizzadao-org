@@ -151,6 +151,8 @@ export interface ListRecordingsOpts {
   status?: 'RECORDED' | 'PROCESSING' | 'IN_REVIEW' | 'PUBLISHED' | 'REJECTED'
   /** Id of the last row of the previous page. */
   cursor?: string | null
+  /** Leave out calls on a manual owner hold (a capo's list). Auto-held calls are dropped by the caller (hold.ts dropAutoHeld). */
+  excludeHeld?: boolean
 }
 
 /** One page of the review list, newest first, with an id cursor for the next page (null on the last page). */
@@ -164,6 +166,7 @@ export async function listRecordingsPage(opts: ListRecordingsOpts = {}) {
       : {}),
     ...(opts.source === 'discord' ? { source: 'DISCORD' as const } : opts.source === 'imported' ? { source: { not: 'DISCORD' as const } } : {}),
     ...(opts.status ? { status: opts.status } : {}),
+    ...(opts.excludeHeld ? { reviewHoldAt: null } : {}),
   }
   const rows = await prisma.callRecording.findMany({
     where,
