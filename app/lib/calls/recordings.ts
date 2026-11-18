@@ -14,6 +14,7 @@ import { resolveMemberNames } from './live-members'
 import { assignActionKeys } from './action-keys'
 import { readEvidence } from './evidence'
 import { requestRecapRefresh } from './recap-refresh'
+import { queueCallReviewCardSync } from './review-cards'
 
 /**
  * Crew list for event -> crew mapping. A sheet outage must not lose a
@@ -216,6 +217,7 @@ export async function rejectRecording(id: string, reviewerDiscordId: string, now
     where: { id: rec.id },
     data: { status: 'REJECTED', reviewedBy: reviewerDiscordId, reviewedAt: now, publishedAt: null },
   })
+  queueCallReviewCardSync(rec.id)
   // Action items confirmed during a removed call go too (the cron sweep catches a failure here).
   if (rec.sessionId) {
     try {
@@ -375,7 +377,10 @@ export async function generateAndStoreSummaryResult(id: string, opts: SummaryOpt
       ...(opts.unlessEdited ? { summaryEditedAt: null } : {}),
     }
     const res = await prisma.callRecording.updateMany({ where, data })
-    if (res.count === 1) return 'ok'
+    if (res.count === 1) {
+      queueCallReviewCardSync(id) // best effort: the capo review card (calls.reviewCardsEnabled)
+      return 'ok'
+    }
     // Matched nothing (a summary appeared meanwhile, a reviewer edited, or the call was rejected/published): a deliberate skip, not a failure. Still unstick a fresh row.
     console.log('[calls/summary] skipped: guarded write matched nothing')
     await toReview()
@@ -462,6 +467,7 @@ export async function publishRecording(id: string, reviewerDiscordId: string, no
     where: { id, status: 'IN_REVIEW', updatedAt: rec.updatedAt },
     data: { status: 'PUBLISHED', reviewedBy: reviewerDiscordId, reviewedAt: now, publishedAt: now },
   })
+  if (res.count === 1) queueCallReviewCardSync(id)
   return res.count === 1 ? 'ok' : 'conflict'
 }
 
@@ -474,6 +480,7 @@ export async function unpublishRecording(id: string, reviewerDiscordId: string, 
     where: { id },
     data: { status: 'IN_REVIEW', reviewedBy: reviewerDiscordId, reviewedAt: now, publishedAt: null },
   })
+  queueCallReviewCardSync(id)
   return 'ok'
 }
 
@@ -529,6 +536,7 @@ async function updateRecordingTextIn(db: typeof prisma, id: string, edit: Record
   if (edit.chapters !== undefined) data.chapters = edit.chapters as unknown as Prisma.InputJsonValue
   if (Object.keys(data).length === 0) return { result: 'ok', refresh: false }
   await db.callRecording.update({ where: { id }, data })
+  queueCallReviewCardSync(id)
   const textOnlyEdit = textChanged || (edit.title !== undefined && edit.title !== rec.title)
   return { result: 'ok', refresh: rec.status === 'PUBLISHED' && edit.actionItems !== undefined && !textOnlyEdit && !same(statusOf(rec.actionItems ?? []), statusOf(edit.actionItems)) }
 }
@@ -550,6 +558,7 @@ export async function setSpeakerRedacted(id: string, discordId: string, redacted
       where: { id },
       data: { redactedSpeakerIds: next, redactionsUpdatedAt: new Date(), ...(rec.status === 'PUBLISHED' ? { status: 'IN_REVIEW' as const, publishedAt: null } : {}) },
     })
+    queueCallReviewCardSync(id)
   }
   return asSegments(rec.transcript).filter((seg) => seg.discordId === discordId).length
 }
@@ -570,6 +579,7 @@ export async function setSegmentRedacted(id: string, key: string, redacted: bool
       where: { id },
       data: { redactedSegmentIds: next, redactionsUpdatedAt: new Date(), ...(rec.status === 'PUBLISHED' ? { status: 'IN_REVIEW' as const, publishedAt: null } : {}) },
     })
+    queueCallReviewCardSync(id)
   }
   return true
 }

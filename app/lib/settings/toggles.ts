@@ -35,6 +35,8 @@ export const TOGGLES = {
   'calls.recapPostEnabled': { env: 'CALL_RECAP_POST_ENABLED', legacy: ON_WORDS },
   // Off unless turned on: Pizza Capos can review and publish calls on the website (plans/capo-recap-approval).
   'calls.capoReviewEnabled': { env: 'CALL_CAPO_REVIEW_ENABLED', legacy: ON_WORDS },
+  // Off unless turned on: the bot posts a review card per call to the private capo review channel (needs discord.callReviewChannelId).
+  'calls.reviewCardsEnabled': { env: 'CALL_REVIEW_CARDS_ENABLED', legacy: ON_WORDS },
   // On unless the env var is an explicit off (the kill switch): recap mentions notify the people they name.
   'calls.recapMentionPing': { env: 'CALL_RECAP_MENTION_PING_ENABLED', legacy: (raw) => !envKillsToggle(raw) },
   // Off unless turned on: follow-up status (in progress / done), members' finished-work links and automatic edits of the posted recap.

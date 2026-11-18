@@ -130,6 +130,8 @@ describe('settings registry', () => {
       ['missions.reviewCardsEnabled', false],
       ['calls.recapPostEnabled', false],
       ['calls.capoReviewEnabled', false],
+      ['calls.reviewCardsEnabled', false],
+      ['calls.reviewCardMaxAgeDays', 14],
       ['calls.recapMentionPing', true],
       ['calls.recapLiveStatusEnabled', false],
       ['calls.recapMemberLinksEnabled', true],
@@ -264,6 +266,7 @@ describe('settings registry', () => {
       ['shop.sheetSyncEnabled', false],
       // ...and channels and roles to "not set here" (the env value, then the built-in id, apply).
       ['discord.missionReviewChannelId', ''],
+      ['discord.callReviewChannelId', ''],
       ['discord.missionsAnnounceChannelId', ''],
       ['discord.announceChannelId', ''],
       ['discord.callVoiceChannelId', ''],
