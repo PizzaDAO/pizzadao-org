@@ -5,7 +5,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
-vi.mock('@/app/lib/session', () => ({ getSession: vi.fn() }))
+vi.mock('@/app/lib/session', () => ({
+  getSession: vi.fn(),
+  getSessionCookieOptions: () => ({ httpOnly: true, secure: true, sameSite: 'lax' as const, path: '/', maxAge: 60 }),
+}))
 vi.mock('@/app/lib/discord', () => ({ getUserRoles: vi.fn(async () => []) }))
 vi.mock('@/app/lib/db', () => ({ prisma: { appSetting: { findMany: async () => [] } } }))
 vi.mock('@/app/lib/missions', () => ({ getCurrentLevel: vi.fn(async () => 9) }))
