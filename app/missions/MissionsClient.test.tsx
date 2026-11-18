@@ -66,3 +66,28 @@ describe("<MissionsClient /> error handling", () => {
     expect(await screen.findByText("The file went missing.")).toBeTruthy();
   });
 });
+
+describe("<MissionsClient /> level header", () => {
+  it("shows the completed level and the next goal", async () => {
+    stubFetch(true);
+    const data = {
+      ...initial,
+      levels: [
+        { level: 7, title: "Made Mafia", reward: 1, missions: [] },
+        { level: 8, title: "Don of Dons", reward: 1, missions: [] },
+      ],
+      currentLevel: 8,
+      levelTitle: "Don of Dons",
+    };
+    render(<MissionsClient initial={data} />);
+    expect(await screen.findByText("Made Mafia")).toBeTruthy();
+    expect(screen.getByText("§ Level Completed")).toBeTruthy();
+    expect(screen.getByText(/Next: Level 8\s*· Don of Dons/)).toBeTruthy();
+  });
+
+  it("starts at Lv. 0 with level 1 as the next goal", async () => {
+    stubFetch(true);
+    render(<MissionsClient initial={initial} />);
+    expect(await screen.findByText(/Next: Level 1\s*· Pizza Trainee/)).toBeTruthy();
+  });
+});

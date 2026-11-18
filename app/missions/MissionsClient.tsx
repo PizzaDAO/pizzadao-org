@@ -24,6 +24,7 @@ import { MissionCompleteCelebration } from "../ui/missions/MissionCompleteCelebr
 import { LevelUpModal } from "../ui/missions/LevelUpModal";
 import { HowLevelsWorkLink } from "../ui/missions/GuideLink";
 import { VouchPromptCard } from "../ui/missions/VouchPromptCard";
+import { completedLevel as completedLevelOf } from "@/app/lib/level-display";
 import { levelUpToCelebrate, type LevelUp } from "./level-up";
 
 type MissionData = {
@@ -501,10 +502,12 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
   // Data-driven top level (no hard-coded 8): past it means every level is done.
   const allLevelsDone = levels.length > 0 && currentLevel > Math.max(...levels.map((l) => l.level));
   // The header shows the level the member has completed; currentLevel is the one they're working on.
-  const completedLevel = currentLevel - 1;
+  const completedLevel = completedLevelOf(currentLevel);
   const completedTitle = completedLevel > 0
     ? levels.find((l) => l.level === completedLevel)?.title || LEVEL_TITLES[completedLevel] || null
     : null;
+
+  const nextTitle = levels.find((l) => l.level === currentLevel)?.title || LEVEL_TITLES[currentLevel] || null;
 
   return (
     <div style={pageContainer()}>
@@ -638,7 +641,7 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
               className="overline"
               style={{ color: "hsl(var(--ink) / 0.7)" }}
             >
-              {allLevelsDone ? "§ All levels complete" : "§ Current Level"}
+              {allLevelsDone ? "§ All levels complete" : "§ Level Completed"}
             </span>
             <div
               style={{
@@ -651,7 +654,7 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
                 color: "hsl(var(--tomato))",
               }}
             >
-              {allLevelsDone ? "MAX" : (
+              {(
                 <>
                   <span style={{ color: "hsl(var(--foreground) / 0.35)", fontWeight: 700 }}>
                     Lv.
@@ -660,7 +663,7 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
                 </>
               )}
             </div>
-            {(allLevelsDone ? data.levelTitle : completedTitle) && (
+            {completedTitle && (
               <div
                 style={{
                   fontSize: "clamp(1.05rem, 2.6vw, 1.35rem)",
@@ -670,12 +673,13 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
                   color: "hsl(var(--foreground))",
                 }}
               >
-                <span className="circle-scribble">{allLevelsDone ? data.levelTitle : completedTitle}</span>
+                <span className="circle-scribble">{completedTitle}</span>
               </div>
             )}
             {!allLevelsDone && (
               <div style={{ fontSize: 13, color: "hsl(var(--ink) / 0.7)" }}>
-                Working on Level {currentLevel}
+                Next: Level {currentLevel}
+                {nextTitle ? ` · ${nextTitle}` : ""}
               </div>
             )}
             <div style={{ display: "flex", justifyContent: "center", marginTop: 6 }}>

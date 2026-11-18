@@ -420,6 +420,8 @@ export interface ProfileSummaryData {
     city: string
     level: number | string | null
     levelTitle: string
+    levelCompleted?: number | null
+    levelCompletedTitle?: string
     mafiaRank: { rank: number; tier: string } | null
     vouchInCount: number
     memberSince?: string | null

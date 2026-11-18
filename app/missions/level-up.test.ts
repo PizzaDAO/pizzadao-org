@@ -19,25 +19,25 @@ describe('levelUpToCelebrate', () => {
     expect(levelUpToCelebrate(snap(3), 5)).toBeNull()
   })
 
-  it('a level-up approved while away: the level reached, with the reward that level paid', () => {
-    expect(levelUpToCelebrate(snap(3), 2)).toEqual({ level: 3, levelTitle: null, reward: 420, isFinal: false })
+  it('a level-up approved while away: the level completed, with the reward that level paid', () => {
+    expect(levelUpToCelebrate(snap(3), 2)).toEqual({ level: 2, levelTitle: 'Pizza Noob', reward: 420, isFinal: false })
   })
 
   it('several uncelebrated levels fold into one modal with the summed reward', () => {
-    expect(levelUpToCelebrate(snap(4), 2)).toEqual({ level: 4, levelTitle: null, reward: 420 + 1337, isFinal: true })
+    expect(levelUpToCelebrate(snap(4), 2)).toEqual({ level: 3, levelTitle: null, reward: 420 + 1337, isFinal: false })
     // never celebrated anything: every completed level counts
-    expect(levelUpToCelebrate(snap(3, 'x'), 0)).toEqual({ level: 3, levelTitle: 'x', reward: 69 + 420, isFinal: false })
+    expect(levelUpToCelebrate(snap(3, 'x'), 0)).toEqual({ level: 2, levelTitle: 'Pizza Noob', reward: 69 + 420, isFinal: false })
   })
 
   it('the final level comes from the data, not a hard-coded 8', () => {
-    expect(levelUpToCelebrate(snap(5), 4)?.isFinal).toBe(true) // all 4 done
-    expect(levelUpToCelebrate(snap(2), 1)).toMatchObject({ level: 2, levelTitle: 'Pizza Noob', reward: 69, isFinal: false })
+    expect(levelUpToCelebrate(snap(5), 4)).toMatchObject({ level: 4, isFinal: true }) // all 4 done
+    expect(levelUpToCelebrate(snap(2), 1)).toMatchObject({ level: 1, levelTitle: 'Pizza Trainee', reward: 69, isFinal: false })
   })
 
   it('counts only levels whose reward was really paid (ledger), never an unpaid or old one', () => {
     // Level 3 is done but its payout has not landed; level 1 was paid and celebrated long ago.
-    expect(levelUpToCelebrate({ ...snap(4), paidLevels: [1, 2] }, 3)).toEqual({ level: 4, levelTitle: null, reward: 0, isFinal: true })
-    expect(levelUpToCelebrate({ ...snap(4), paidLevels: [1, 2, 3] }, 3)).toEqual({ level: 4, levelTitle: null, reward: 1337, isFinal: true })
+    expect(levelUpToCelebrate({ ...snap(4), paidLevels: [1, 2] }, 3)).toEqual({ level: 3, levelTitle: null, reward: 0, isFinal: false })
+    expect(levelUpToCelebrate({ ...snap(4), paidLevels: [1, 2, 3] }, 3)).toEqual({ level: 3, levelTitle: null, reward: 1337, isFinal: false })
     expect(levelUpToCelebrate({ ...snap(4), paidLevels: [1, 2] }, 2)).toMatchObject({ reward: 420 })
   })
 })

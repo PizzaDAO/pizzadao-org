@@ -24,6 +24,7 @@ import {
 } from "@/app/lib/missions";
 import { getVouchCounts } from "@/app/lib/vouches";
 import { buildLevelInfo } from "@/app/lib/level-info";
+import { completedLevel } from "@/app/lib/level-display";
 import { resolveToggle } from "@/app/lib/settings/toggles";
 import { startHereMission, type StartHereMission } from "@/app/dashboard/[id]/lib/start-here";
 import { getNotifications, getUnreadCount } from "@/app/lib/notifications";
@@ -66,8 +67,12 @@ export interface DashboardSummary {
         crews: string[];
     };
     level: {
+        /** The level being WORKED ON (gates things). Badges show `completed` instead. */
         current: number;
         title: string | null;
+        /** Highest level completed (display badge); 0 = none. */
+        completed: number;
+        completedTitle: string | null;
         completedThisLevel: number;
         totalThisLevel: number;
         nextMission: { id: number; title: string; fromLane?: true } | null;
@@ -297,6 +302,8 @@ export async function GET(request: NextRequest) {
 
         // --- Level info ---
         const levelTitle = await safe(getLevelTitle(currentLevel), null);
+        const completed = completedLevel(currentLevel);
+        const completedTitle = completed > 0 ? await safe(getLevelTitle(completed), null) : null;
         const currentLevelMissions = ((missionsByLevel as any)[currentLevel] || []).filter((m: { bonus?: boolean }) => !m.bonus);
         const completedThisLevel = currentLevelMissions.filter((m: { id: number }) =>
             progress.some(
@@ -476,6 +483,8 @@ export async function GET(request: NextRequest) {
             level: {
                 current: currentLevel,
                 title: levelTitle,
+                completed,
+                completedTitle,
                 completedThisLevel,
                 totalThisLevel,
                 nextMission,

@@ -86,14 +86,14 @@ describe('handler gating', () => {
 // ---------------------------------------------------------------- replies ---
 
 const INFO: LevelInfo = {
-  level: 3, title: 'Line Cook', maxLevel: 8, isMax: false, done: 1, total: 3, nextTitle: 'Sous Chef',
+  level: 3, title: 'Line Cook', completed: 2, completedTitle: 'Pizza Noob', maxLevel: 8, isMax: false, done: 1, total: 3, nextTitle: 'Sous Chef',
   missions: [
     { id: 1, title: 'Join a crew', state: 'done' },
     { id: 2, title: 'Selfie interview', state: 'pending' },
     { id: 3, title: 'Connect X', state: 'todo' },
   ],
 }
-const STATS: ProfileStats = { memberId: '42', name: 'Don *Pepperoni*', city: 'Rome', crews: ['Ops', 'Art'], level: 3, levelTitle: 'Line Cook', isMax: false, vouchesReceived: 4, vouchesGiven: 2 }
+const STATS: ProfileStats = { memberId: '42', name: 'Don *Pepperoni*', city: 'Rome', crews: ['Ops', 'Art'], level: 3, levelTitle: 'Line Cook', completed: 2, completedTitle: 'Pizza Noob', isMax: false, vouchesReceived: 4, vouchesGiven: 2 }
 
 function mdeps(over: Partial<MemberCommandDeps> = {}): MemberCommandDeps {
   return {
@@ -148,16 +148,16 @@ describe('/vouch reply', () => {
 describe('/level reply', () => {
   it('own: level, title, mission states and next level title', async () => {
     const t = await text(job('level'), mdeps())
-    expect(t).toContain('level 3: Line Cook')
+    expect(t).toContain('level 2: Pizza Noob')
     expect(t).toContain('✅ Join a crew')
     expect(t).toContain('⏳ Selfie interview')
     expect(t).toContain('⬜ Connect X')
-    expect(t).toContain('1/3 done to reach level 4')
-    expect(t).toContain('Sous Chef')
+    expect(t).toContain('1/3 done to complete level 3')
+    expect(t).toContain('Line Cook')
   })
   it("another member's: level and title only, no requirements", async () => {
     const t = await text(job('level', OTHER), mdeps())
-    expect(t).toContain(`<@${OTHER}> is level 3: Line Cook`)
+    expect(t).toContain(`<@${OTHER}> is level 2: Pizza Noob`)
     expect(t).not.toContain('Selfie')
   })
   it('MAX and non-members', async () => {

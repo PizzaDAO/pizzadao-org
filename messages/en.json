@@ -868,12 +868,12 @@
         "nice": "Nice!"
       },
       "levelUp": {
-        "ariaLabel": "Reached level {level}",
+        "ariaLabel": "Completed level {level}",
         "stampFinal": "the top",
         "stamp": "promoted",
         "overlineFinal": "§ Final Level Reached",
         "overline": "§ Level Up!",
-        "heading": "Level {level}",
+        "heading": "Level {level} complete",
         "reward": "+{amount, number} $PEP earned",
         "finalBody": "You reached the top. You are a true Pizza Don.",
         "continue": "Continue",
