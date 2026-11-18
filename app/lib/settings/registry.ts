@@ -473,6 +473,16 @@ export const SETTINGS = {
     looserWhen: 'higher',
     confirm: (from, to) => (to < from ? 'Fewer roles will be able to approve missions at these levels.' : null),
   }),
+  'missions.liveUpdateSeconds': intSetting({
+    key: 'missions.liveUpdateSeconds',
+    area: 'missions',
+    label: 'Live mission updates (seconds)',
+    help: 'How often an open Missions or dashboard tab checks for a new approval or a new submission to review, while the tab is visible. 0 turns live updates off (people refresh the page).',
+    min: 0,
+    max: 300,
+    default: 15,
+    unit: 'seconds',
+  }),
   'missions.slaHours': intSetting({
     key: 'missions.slaHours',
     area: 'missions',

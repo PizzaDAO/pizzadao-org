@@ -25,6 +25,8 @@ import { LevelUpModal } from "../ui/missions/LevelUpModal";
 import { HowLevelsWorkLink } from "../ui/missions/GuideLink";
 import { VouchPromptCard } from "../ui/missions/VouchPromptCard";
 import { levelUpToCelebrate, type LevelUp } from "./level-up";
+import { useLiveVersion } from "@/app/lib/hooks/use-live-version";
+import { missionChangeToasts, QUEUE_TOAST } from "./live-updates";
 
 type MissionData = {
   id: number;
@@ -147,6 +149,21 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
   const [checking, setChecking] = useState(false);
   const [checks, setChecks] = useState<Record<number, MissionCheckInfo>>({});
 
+  // Live updates: bumped when a new submission reaches the reviewer queue.
+  const [queueRefreshKey, setQueueRefreshKey] = useState(0);
+  const snapshotRef = useRef<MissionsResponse | null>(initial);
+  useLiveVersion({
+    enabled: !!data?.isAuthenticated,
+    queue: canReview,
+    onChange: ({ mine, queue }) => {
+      if (mine) void fetchMissions({ live: true });
+      if (queue && canReview) {
+        toast.info(QUEUE_TOAST);
+        setQueueRefreshKey((k) => k + 1);
+      }
+    },
+  });
+
   const levelUpClaimInFlight = useRef(false);
   const initialCelebrationChecked = useRef(false);
 
@@ -166,7 +183,9 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once, when both are loaded
   }, [data, celebrationState]);
 
-  async function fetchMissions() {
+  // `live`: a background refresh from the live-update poll. It keeps the expanded levels and
+  // scroll as they are, says nothing on failure, and toasts what changed.
+  async function fetchMissions(opts: { live?: boolean } = {}) {
     try {
       const res = await fetch("/api/missions", { cache: "no-store" });
       if (!res.ok) throw new Error("Failed to load missions");
@@ -177,13 +196,15 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
       const prevApproved = lastApprovedCountRef.current;
       const nextApproved = countApproved(json);
 
+      const before = snapshotRef.current;
+      snapshotRef.current = json;
       setData(json);
       dataLoadedRef.current = true;
       setError(null);
       lastApprovedCountRef.current = nextApproved;
 
       // Auto-expand current level
-      if (json.currentLevel) {
+      if (json.currentLevel && !opts.live) {
         setExpandedLevels(new Set([json.currentLevel]));
       }
 
@@ -191,7 +212,11 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
       // null) is handled by the initial-check effect once celebration state
       // is in.
       if (prevApproved !== null) maybeTriggerCelebration(json, prevApproved, nextApproved);
+      if (opts.live && before) {
+        for (const t of missionChangeToasts(before, json)) toast[t.kind === "success" ? "success" : "info"](t.message);
+      }
     } catch (e) {
+      if (opts.live) return;
       const message = e instanceof Error ? e.message : "Unknown error";
       // A failed background refresh must not replace an already-loaded page
       // with the full error screen; surface it as a toast instead.
@@ -721,7 +746,7 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
         )}
 
         {/* Admin Review Panel */}
-        {isAuthenticated && canReview && <MissionReviewPanel />}
+        {isAuthenticated && canReview && <MissionReviewPanel refreshKey={queueRefreshKey} />}
 
         {/* ─── Level Accordion ────────────────────────────────────
             Each level group is a "§ NN · Level X" file folder. */}
