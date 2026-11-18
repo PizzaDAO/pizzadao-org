@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { CityTimezoneError, resolveCityTimezone } from "@/app/lib/city-timezone";
+import { enforceRateLimit } from "@/app/lib/rate-limit";
+import { internalError } from "@/app/lib/errors/error-response";
 
 export const runtime = "nodejs";
 
@@ -12,17 +14,17 @@ export const runtime = "nodejs";
  * Logic lives in app/lib/city-timezone.ts; this route stays thin.
  */
 export async function POST(req: Request) {
+  const limited = await enforceRateLimit(req, "city-timezone");
+  if (limited) return limited;
+
   try {
     const body = await req.json().catch(() => null);
     const result = await resolveCityTimezone(String(body?.place_id ?? ""));
     return NextResponse.json(result);
   } catch (e: unknown) {
     if (e instanceof CityTimezoneError) {
-      return NextResponse.json({ error: e.message, details: e.details }, { status: e.status });
+      return NextResponse.json({ error: e.message }, { status: e.status });
     }
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Unknown error" },
-      { status: 500 },
-    );
+    return internalError(e, "city-timezone", "Timezone lookup failed");
   }
 }

@@ -8,6 +8,7 @@ import { cacheDel } from '@/app/api/lib/cache'
 import { GvizTable } from "@/app/lib/types/gviz";
 
 export type { Manual }
+import { isAdminSession } from '@/app/lib/auth-guards'
 import { internalError } from "@/app/lib/errors/error-response";
 
 const MANUALS_SHEET_ID = SHEET_IDS.manuals
@@ -19,8 +20,11 @@ export async function GET(req: Request) {
   try {
     const url = new URL(req.url)
     const crewFilter = url.searchParams.get('crew')?.toLowerCase()
-    const debugMode = url.searchParams.get('debug') === '1'
-    const forceRefresh = url.searchParams.get('fresh') === '1'
+    // Diagnostic and cache-refresh options are admin-only; others get the normal response.
+    const wantsOptions = url.searchParams.get('debug') === '1' || url.searchParams.get('fresh') === '1'
+    const admin = wantsOptions && (await isAdminSession())
+    const debugMode = admin && url.searchParams.get('debug') === '1'
+    const forceRefresh = admin && url.searchParams.get('fresh') === '1'
 
     // Once the index lives in the database (sheets.source.manuals = db), the sheet is not read.
     if (await manualsFromDb()) {
@@ -74,7 +78,7 @@ export async function GET(req: Request) {
         : allManuals
 
       return NextResponse.json({ manuals, _debug: debugInfo }, {
-        headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' }
+        headers: { 'Cache-Control': 'private, no-store' }
       })
     }
 
@@ -107,7 +111,7 @@ export async function GET(req: Request) {
       : allManuals
 
     return NextResponse.json({ manuals }, {
-      headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' }
+      headers: { 'Cache-Control': forceRefresh ? 'private, no-store' : 'public, s-maxage=3600, stale-while-revalidate=86400' }
     })
   } catch (e: unknown) {
     return internalError(e, 'manuals', 'Failed to load manuals')

@@ -30,7 +30,7 @@ export async function POST(req: Request) {
     url.searchParams.set("language", "en");
     url.searchParams.set("key", key);
 
-    const res = await fetch(url.toString());
+    const res = await fetch(url.toString(), { signal: AbortSignal.timeout(5000) });
     const data = await res.json();
 
     if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {

@@ -15,7 +15,7 @@ import { memberWritesConfigured, postMemberWrite } from "@/app/lib/members/write
 import { GvizCell } from "@/app/lib/types/gviz";
 import { withErrorHandling } from "@/app/lib/errors/error-response";
 import { themedNameAllowed, NAME_NOT_THEMED_ERROR } from "@/app/lib/themed-name";
-import { UnauthorizedError, ForbiddenError, ValidationError, ExternalServiceError } from "@/app/lib/errors/api-errors";
+import { UnauthorizedError, ForbiddenError, ValidationError, ExternalServiceError, ConflictError } from "@/app/lib/errors/api-errors";
 import { fetchMemberById, fetchMemberByDiscordId, fetchMemberIdByDiscordId, invalidateMembersCache } from "@/app/lib/sheets/member-repository";
 import { chooseInviter, recordReferral, type RecordReferralResult } from "@/app/lib/referrals";
 import { creditPendingItemGrantsOnLogin } from "@/app/lib/shop-grants";
@@ -226,6 +226,12 @@ const POST_HANDLER = async (req: Request) => {
    */
   let isNewSignup = true; // Track if this is a new signup (for welcome message)
   if (payload.memberId) {
+    // A Discord account that already owns a row can only save to that row.
+    const ownedId = await fetchMemberIdByDiscordId(payload.discordId, { fresh: true });
+    if (ownedId && String(ownedId).trim().toLowerCase() !== payload.memberId.toLowerCase()) {
+      throw new ConflictError("This account already has a member profile. Reload and try again.");
+    }
+
     // Uncached on purpose: this ownership check guards the write below.
     const row = await fetchMemberById(payload.memberId, { fresh: true });
 

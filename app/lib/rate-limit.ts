@@ -34,6 +34,7 @@ export const RATE_LIMITS = {
   "spotlight-upload": { limit: 10, windowSec: 10 * 60 },
   "city-autocomplete": { limit: 60, windowSec: 60 },
   "city-region": { limit: 20, windowSec: 60 },
+  "city-timezone": { limit: 20, windowSec: 60 },
   namegen: { limit: 30, windowSec: 60 },
   "activation": { limit: 30, windowSec: 60 },
   "magic-login": { limit: 5, windowSec: 15 * 60 },

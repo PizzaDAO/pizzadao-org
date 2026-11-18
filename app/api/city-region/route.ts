@@ -33,7 +33,7 @@ export async function POST(req: Request) {
 
     // Call Google Geocoding API with the place_id
     const url = `https://maps.googleapis.com/maps/api/geocode/json?place_id=${encodeURIComponent(placeId)}&key=${encodeURIComponent(key)}`;
-    const res = await fetch(url);
+    const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
     const data = await res.json();
 
     if (data.status !== "OK" || !data.results?.length) {

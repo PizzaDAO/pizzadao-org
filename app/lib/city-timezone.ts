@@ -27,7 +27,6 @@ export class CityTimezoneError extends Error {
   constructor(
     message: string,
     public readonly status: number,
-    public readonly details: string | null = null,
   ) {
     super(message);
     this.name = "CityTimezoneError";
@@ -101,7 +100,7 @@ export async function resolveCityTimezone(
   const key = opts.apiKey ?? process.env.GOOGLE_MAPS_API_KEY;
   if (!key) throw new CityTimezoneError("Missing GOOGLE_MAPS_API_KEY", 500);
 
-  const doFetch: FetchLike = opts.fetchImpl ?? ((url) => fetch(url));
+  const doFetch: FetchLike = opts.fetchImpl ?? ((url) => fetch(url, { signal: AbortSignal.timeout(5000) }));
 
   // 1. place_id → lat/lng
   const geocodeUrl = new URL("https://maps.googleapis.com/maps/api/geocode/json");
@@ -110,7 +109,7 @@ export async function resolveCityTimezone(
   const geo = (await (await doFetch(geocodeUrl.toString())).json()) as GeocodeResponse;
 
   if (geo.status !== "OK" || !geo.results?.length) {
-    throw new CityTimezoneError(`Geocoding failed: ${geo.status}`, 502, geo.error_message ?? null);
+    throw new CityTimezoneError("Geocoding failed", 502);
   }
   const loc = geo.results[0].geometry?.location;
   if (typeof loc?.lat !== "number" || typeof loc?.lng !== "number") {
@@ -126,7 +125,7 @@ export async function resolveCityTimezone(
   const tz = (await (await doFetch(tzUrl.toString())).json()) as TimezoneResponse;
 
   if (tz.status !== "OK" || !tz.timeZoneId) {
-    throw new CityTimezoneError(`Timezone API failed: ${tz.status}`, 502, tz.errorMessage ?? null);
+    throw new CityTimezoneError("Timezone lookup failed", 502);
   }
 
   const utcOffset = formatUtcOffset((tz.rawOffset ?? 0) + (tz.dstOffset ?? 0));

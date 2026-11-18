@@ -104,6 +104,13 @@ describe('member writes follow the web app rules', () => {
     expect(byDiscord).toMatchObject({ ok: true, action: 'updated_by_discord', targetId: '5' })
   })
 
+  it('a save never renames an existing row (Discord match with a different submitted id)', () => {
+    const r = planMemberUpsert(HEADERS, members(), { source: 'web', memberId: '999', discordId: '555555555555555555', mafiaName: 'Eps' }, NOW)
+    expect(r).toMatchObject({ ok: false })
+    const same = planMemberUpsert(HEADERS, members(), { source: 'web', memberId: '5', discordId: '555555555555555555', mafiaName: 'Eps' }, NOW)
+    expect(same).toMatchObject({ ok: true, action: 'updated', targetId: '5' })
+  })
+
   it('turtles sent as text are stored as that text', () => {
     const r = planMemberUpsert(HEADERS, members(), { source: 'onboarding_auto_claim', memberId: '2', discordId: '', turtles: 'Leonardo, Donatello' }, NOW)
     if (r.ok && !r.skipped) expect(r.cells[col('Turtles')]).toEqual({ v: 'Leonardo, Donatello' })
