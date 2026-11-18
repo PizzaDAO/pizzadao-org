@@ -98,6 +98,11 @@ export function planMemberUpsert(headers: readonly string[], members: readonly M
     if (target) action = 'updated_by_discord'
   }
 
+  // A save never renames an existing row: a lookup by Discord ID must agree with the submitted ID.
+  if (action === 'updated_by_discord' && target && memberId && cellString(target.cells[colID]).toLowerCase() !== memberId.toLowerCase()) {
+    return { ok: false, error: 'Member ID cannot be changed by this update.' }
+  }
+
   if (!target) {
     if (isClaim) return { ok: false, error: `Claim failed: Member ID ${memberId} not found.` }
     if (!memberId) return { ok: false, error: 'Insert requires memberId (refusing to create a blank-ID row).' }

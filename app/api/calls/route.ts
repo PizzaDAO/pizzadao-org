@@ -1,12 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/lib/db";
+import { internalError } from "@/app/lib/errors/error-response";
 
 export async function GET(req: NextRequest) {
+  try {
+    return await handleGet(req);
+  } catch (e) {
+    return internalError(e, "calls", "Failed to load calls");
+  }
+}
+
+function intParam(raw: string | null, fallback: number): number {
+  const n = parseInt(raw ?? "", 10);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+async function handleGet(req: NextRequest) {
   const url = req.nextUrl;
   const crewParam = url.searchParams.get("crew"); // comma-separated crew IDs
   const sort = url.searchParams.get("sort") || "newest";
-  const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10));
-  const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get("limit") || "20", 10)));
+  const page = Math.max(1, intParam(url.searchParams.get("page"), 1));
+  const limit = Math.min(100, Math.max(1, intParam(url.searchParams.get("limit"), 20)));
 
   const crewFilter = crewParam
     ? crewParam.split(",").map((c) => c.trim()).filter(Boolean)

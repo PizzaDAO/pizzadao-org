@@ -4,6 +4,7 @@ import { SHEET_IDS } from '@/app/lib/sheets/config'
 import { norm } from '@/app/lib/strings'
 import { getManualLinks, getManualLinksDebug, ManualLinksDebugResult } from '@/app/api/lib/google-sheets'
 import { cacheDel } from '@/app/api/lib/cache'
+import { isAdminSession } from '@/app/lib/auth-guards'
 import { internalError } from '@/app/lib/errors/error-response'
 import { listManualsFromDb, manualsFromDb } from '@/app/lib/manuals'
 
@@ -194,8 +195,11 @@ export async function GET(
 
     // Check for debug and refresh params
     const url = new URL(req.url)
-    const debugMode = url.searchParams.get('debug') === '1'
-    const forceRefresh = url.searchParams.get('fresh') === '1'
+    // Diagnostic and cache-refresh options are admin-only; others get the normal response.
+    const wantsOptions = url.searchParams.get('debug') === '1' || url.searchParams.get('fresh') === '1'
+    const admin = wantsOptions && (await isAdminSession())
+    const debugMode = admin && url.searchParams.get('debug') === '1'
+    const forceRefresh = admin && url.searchParams.get('fresh') === '1'
 
     // Clear cache if force refresh
     if (forceRefresh) {
@@ -246,7 +250,7 @@ export async function GET(
       contentError,
       ...(debugInfo ? { _debug: debugInfo } : {}),
     }, {
-      headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' }
+      headers: { 'Cache-Control': admin ? 'private, no-store' : 'public, s-maxage=3600, stale-while-revalidate=86400' }
     })
   } catch (e: unknown) {
     return internalError(e, 'manuals/[id]', 'Failed to load manual')

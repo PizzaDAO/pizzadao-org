@@ -63,6 +63,15 @@ export async function requireAnyRole(
   return auth;
 }
 
+/** True when the request has a session that belongs to a guild admin (never throws). */
+export async function isAdminSession(): Promise<boolean> {
+  try {
+    return (await requireAdmin()).ok;
+  } catch {
+    return false;
+  }
+}
+
 /** Require a session belonging to a guild admin. 401 if no session, 403 if not admin. */
 export async function requireAdmin(): Promise<GuardResult> {
   return requireAnyRole(ADMIN_ROLE_IDS, "Admin access required");
