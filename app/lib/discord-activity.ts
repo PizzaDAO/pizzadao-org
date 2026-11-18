@@ -209,7 +209,7 @@ export async function applyActivityBatch(
       async (tx) => {
         // One batch at a time across processes (backfill + live, two recorders during a deploy): increments are
         // read-modify-write, so concurrent batches would lose counts. Released at commit.
-        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext('discord_activity'))`
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('discord_activity'))`
         try {
           await tx.discordActivityBatch.create({ data: { id: batch.batchId, appliedAt: now } })
         } catch (e) {
