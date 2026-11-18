@@ -39,6 +39,20 @@ export default function NotFound() {
       >
         Read articles
       </Link>
+      <Link
+        href="/join"
+        className="btn-pill border no-underline"
+        style={{ borderColor: "hsl(var(--rule-warm))", color: "hsl(var(--foreground))" }}
+      >
+        Join PizzaDAO
+      </Link>
+      <Link
+        href="/handbook"
+        className="btn-pill border no-underline"
+        style={{ borderColor: "hsl(var(--rule-warm))", color: "hsl(var(--foreground))" }}
+      >
+        Read the handbook
+      </Link>
     </EditorialNotice>
   );
 }

@@ -465,6 +465,7 @@ export default function PepDashboard() {
   if (loading) {
     return (
       <div style={pageContainer()}>
+        <h1 className="sr-only">PEP</h1>
         <div style={{ maxWidth: 1100, margin: "0 auto" }}>
           <div
             className="paper-soft relative overflow-hidden rounded-[24px] border"

@@ -65,7 +65,10 @@ export const metadata: Metadata = {
   openGraph: {
     siteName: "PizzaDAO",
     type: "website",
+    // Default share card for every page that doesn't set its own (the marketing pages set theirs in pageMeta).
+    images: [{ url: "/marketing/assets/hero-crowd.jpg", width: 1920, height: 1080, alt: "PizzaDAO" }],
   },
+  twitter: { card: "summary_large_image" },
 };
 
 export default async function RootLayout({

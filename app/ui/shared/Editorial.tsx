@@ -141,7 +141,7 @@ export function LoadingLine({ label }: { label: string }) {
     <div className="grid place-items-center py-24" role="status" aria-live="polite">
       <span
         aria-hidden
-        className="block h-10 w-10 rounded-full border-4 border-[hsl(var(--ink)/0.10)] border-t-tomato animate-spin mb-4"
+        className="block h-10 w-10 rounded-full border-4 border-[hsl(var(--ink)/0.10)] border-t-tomato animate-spin motion-reduce:animate-none mb-4"
       />
       <p className="overline text-muted-foreground m-0">§ {label}</p>
     </div>
