@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/app/lib/session'
 import { getNotifications, getUnreadCount } from '@/app/lib/notifications'
+import { internalError } from '@/app/lib/errors/error-response'
 
 export const runtime = 'nodejs'
 
@@ -27,7 +28,6 @@ export async function GET() {
     })
   } catch (error) {
     console.error('Failed to fetch notifications:', error)
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return internalError(error, 'notifications')
   }
 }

@@ -4,7 +4,7 @@ import { canManageCrew, canManageBounty } from '@/app/lib/crew-leads'
 import { normalizeCrewId } from '@/app/lib/crew-id'
 import { getAllBounties, createBounty, resolveBountyCrewId, getCrewLabelMap } from '@/app/lib/bounties'
 import { requireOnboarded } from '@/app/lib/economy'
-import { withErrorHandling } from '@/app/lib/errors/error-response'
+import { withErrorHandling, internalError } from '@/app/lib/errors/error-response'
 import { UnauthorizedError, ValidationError } from '@/app/lib/errors/api-errors'
 import { NO_STORE_HEADERS } from '@/app/lib/no-store'
 import { resolveDiscordMentions } from '@/app/lib/discord-mention-resolve'
@@ -75,8 +75,7 @@ export async function GET(request: NextRequest) {
       headers: NO_STORE_HEADERS
     })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500, headers: NO_STORE_HEADERS })
+    return internalError(error, 'bounties', 'Internal server error', 500, NO_STORE_HEADERS)
   }
 }
 

@@ -49,10 +49,29 @@ export function internalError(
   error: unknown,
   context: string,
   message = 'Internal server error',
-  status = 500
+  status = 500,
+  headers?: HeadersInit
 ): NextResponse<ErrorResponse> {
   console.error(`[${context}]`, error);
-  return NextResponse.json({ error: message }, { status });
+  return NextResponse.json({ error: message }, { status, headers });
+}
+
+/**
+ * Like internalError, but passes the error message through when it is one of
+ * an explicit allowlist of user-facing strings (messages the client displays).
+ * Anything else is logged server-side and replaced with a generic message.
+ */
+export function safeMessageError(
+  error: unknown,
+  context: string,
+  safeMessages: readonly string[],
+  status = 400,
+  headers?: HeadersInit
+): NextResponse<ErrorResponse> {
+  if (error instanceof Error && safeMessages.includes(error.message)) {
+    return NextResponse.json({ error: error.message }, { status, headers });
+  }
+  return internalError(error, context, 'Internal server error', 500, headers);
 }
 
 /**

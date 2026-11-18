@@ -8,6 +8,8 @@ async function stateFor(qs: string) {
   return decodeOAuthState(new URL(res.headers.get("location")!).searchParams.get("state")!);
 }
 
+process.env.SESSION_SECRET = "test-secret-at-least-32-chars-long!!";
+
 describe("Discord login: next", () => {
   beforeEach(() => {
     process.env.DISCORD_CLIENT_ID = "x";

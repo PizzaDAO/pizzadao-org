@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireAdmin } from '@/app/lib/auth-guards'
 import { prisma } from '@/app/lib/db'
+import { internalError } from '@/app/lib/errors/error-response'
 
 export const runtime = 'nodejs'
 
@@ -27,7 +28,6 @@ export async function POST() {
       message: `Reset ${deleted.count} job completions for today`
     })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return internalError(error, 'jobs/reset')
   }
 }

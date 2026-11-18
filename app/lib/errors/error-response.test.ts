@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, vi } from 'vitest'
-import { internalError, handleApiError } from './error-response'
+import { internalError, safeMessageError, handleApiError } from './error-response'
 import { ValidationError } from './api-errors'
 
 describe('internalError', () => {
@@ -28,6 +28,19 @@ describe('handleApiError', () => {
     const res = handleApiError(err)
     expect(res.status).toBe(500)
     expect((await res.json()).error).toBe('An unexpected error occurred')
+    spy.mockRestore()
+  })
+})
+
+describe('safeMessageError', () => {
+  it('passes an allowlisted message through and hides everything else', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const ok = safeMessageError(new Error('Job not found'), 't', ['Job not found'])
+    expect(ok.status).toBe(400)
+    expect((await ok.json()).error).toBe('Job not found')
+    const hidden = safeMessageError(new Error('db column x'), 't', ['Job not found'])
+    expect(hidden.status).toBe(500)
+    expect((await hidden.json()).error).toBe('Internal server error')
     spy.mockRestore()
   })
 })

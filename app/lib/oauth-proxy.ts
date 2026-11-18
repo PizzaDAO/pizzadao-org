@@ -7,14 +7,17 @@ import { SITE_URL } from "@/app/lib/site-url";
 const PRODUCTION_ORIGIN = SITE_URL;
 
 // Where the production callback may send a transfer token / redirect:
-// only this app's own preview deployments (Vercel project `onboarding` on the
-// `pizza-dao` team, e.g. onboarding-abc123xyz-pizza-dao.vercel.app or
-// onboarding-git-my-branch-pizza-dao.vercel.app). Production is deliberately NOT
-// listed: it never proxies a login to itself (only previews hop through it), and
-// allowing it would let anyone mint a plain transfer token aimed at production.
-// The preview host must be a single DNS label under vercel.app.
-const ALLOWED_RETURN_PATTERNS = [
-  /^https:\/\/onboarding-[a-z0-9-]+-pizza-dao\.vercel\.app$/,
+// only this app's own preview deployments, in the exact host shapes Vercel
+// generates for the two projects (`onboarding` and `onboarding-v7lj`) on the
+// `pizza-dao` team:
+//   onboarding-<hash>-pizza-dao.vercel.app
+//   onboarding-git-<branch>-pizza-dao.vercel.app
+//   onboarding-v7lj-<hash>-pizza-dao.vercel.app
+//   onboarding-v7lj-git-<branch>-pizza-dao.vercel.app
+// Production is deliberately NOT listed: it never proxies a login to itself.
+// The host must be a single DNS label under vercel.app.
+export const ALLOWED_RETURN_PATTERNS = [
+  /^https:\/\/onboarding-(?:v7lj-)?(?:git-[a-z0-9]+(?:-[a-z0-9]+)*|[a-z0-9]+)-pizza-dao\.vercel\.app$/,
 ];
 
 // Local development only (never accepted in production builds).
@@ -149,13 +152,31 @@ export function encodeOAuthState(state: OAuthState): string {
   if (state.nonce) payload.nonce = state.nonce;
   if (state.join) payload.join = true;
   if (state.next) payload.next = state.next;
-  return Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  return `${body}.${signState(body)}`;
+}
+
+function signState(body: string): string {
+  return createHmac("sha256", process.env.SESSION_SECRET!)
+    .update("state:" + body)
+    .digest("base64url");
 }
 
 export function decodeOAuthState(state: string): OAuthState {
   if (!state) return { sessionId: "" };
+  const dot = state.lastIndexOf(".");
+  // Signed states carry a trailing signature; one that does not verify is
+  // discarded entirely (no nonce, no return_to), so every check downstream fails closed.
+  if (dot === -1) {
+    // Legacy plain value: only ever a session id, never trusted fields.
+    return { sessionId: state };
+  }
+  const body = state.slice(0, dot);
+  const sigA = Buffer.from(state.slice(dot + 1));
+  const sigB = Buffer.from(signState(body));
+  if (sigA.length !== sigB.length || !timingSafeEqual(sigA, sigB)) return { sessionId: "" };
   try {
-    const decoded = JSON.parse(Buffer.from(state, "base64url").toString("utf-8"));
+    const decoded = JSON.parse(Buffer.from(body, "base64url").toString("utf-8"));
     if (decoded && typeof decoded === "object" && decoded.sessionId !== undefined) {
       return {
         sessionId: String(decoded.sessionId ?? ""),
@@ -166,9 +187,9 @@ export function decodeOAuthState(state: string): OAuthState {
       };
     }
   } catch {
-    // Not base64url JSON - plain sessionId (backward compat)
+    // Signed but unparseable: ignore
   }
-  return { sessionId: state };
+  return { sessionId: "" };
 }
 
 /** Read a single cookie value from a Request's Cookie header. */

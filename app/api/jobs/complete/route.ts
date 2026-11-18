@@ -3,6 +3,7 @@ import { getSession } from '@/app/lib/session'
 import { completeJob, getJobRewardAmount } from '@/app/lib/jobs'
 import { formatCurrency } from '@/app/lib/economy'
 import { prisma } from '@/app/lib/db'
+import { safeMessageError } from '@/app/lib/errors/error-response'
 
 // Admin role IDs that can complete jobs
 const ADMIN_ROLE_IDS = process.env.ADMIN_ROLE_IDS?.split(',') || []
@@ -65,7 +66,6 @@ export async function POST(request: NextRequest) {
       reward: rewardAmount
     })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 400 })
+    return safeMessageError(error, 'jobs/complete', ['User does not have an active job'])
   }
 }
