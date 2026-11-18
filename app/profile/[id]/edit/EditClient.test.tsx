@@ -15,6 +15,10 @@ vi.mock("../../../lib/hooks/use-api", () => ({
     useUserData: () => hooks.user,
     useXAccount: () => hooks.x,
 }));
+vi.mock("@tanstack/react-query", async (importOriginal) => ({
+    ...(await importOriginal<typeof import("@tanstack/react-query")>()),
+    useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+}));
 vi.mock("../../../ui/profile-links", () => ({ ProfileLinksEditor: () => null }));
 vi.mock("../../../ui/vouches/SocialAccountLinker", () => ({
     SocialAccountLinker: (props: { hideManualX?: boolean }) => {
