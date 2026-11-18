@@ -1,5 +1,6 @@
 // Server component: the next crew-call agendas Metalhead would post (read-only preview).
 import { getLocale, getTranslations } from "next-intl/server";
+import { callDateTimeFormat } from "@/app/lib/calls/format-call-time";
 import { callAgendaEnabled, planAgendas } from "@/app/lib/call-agenda/run";
 import { loadSettings } from "@/app/lib/settings";
 import { UPDATES_VOICES } from "@/app/lib/settings/call-updates-settings";
@@ -11,7 +12,7 @@ const HORIZON_MS = 48 * 60 * 60 * 1000;
 export default async function AgendaPreview() {
     const t = await getTranslations("adminCalls");
     const locale = await getLocale();
-    const when = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
+    const when = callDateTimeFormat(locale);
     let plans: Awaited<ReturnType<typeof planAgendas>> | null = null;
     try {
         plans = await planAgendas({ horizonMs: HORIZON_MS });

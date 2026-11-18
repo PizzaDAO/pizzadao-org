@@ -11,6 +11,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
+import { callDateTimeFormat } from "@/app/lib/calls/format-call-time";
 import { asSegments, getPublishedRecording } from "@/app/lib/calls/recordings";
 import { callSectionAccess } from "@/app/lib/calls/transcript-access";
 import { publishedQaForRecording } from "@/app/lib/calls/live-qa";
@@ -54,7 +55,7 @@ export default async function PublishedCallPage({ params }: Params) {
 
     const t = await getTranslations("callsPage.recording");
     const locale = await getLocale();
-    const when = new Intl.DateTimeFormat(locale, { dateStyle: "long", timeStyle: "short" }).format(rec.startedAt);
+    const when = callDateTimeFormat(locale, { month: "long" }).format(rec.startedAt);
     // Unlabelled speakers of an imported call show as "Speaker N"; the source link and linked member ids are never public.
     const speakerText = { speakerN: (n: number) => t("speakerN", { n }), fallback: t("unknownSpeaker") };
     const names = new Map(rec.speakers.map((s) => [s.discordId, displaySpeakerName(s.discordId, s.displayName, speakerText)]));

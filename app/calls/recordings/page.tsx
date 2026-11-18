@@ -9,6 +9,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
+import { callDateFormat } from "@/app/lib/calls/format-call-time";
 import { listPublishedRecordings } from "@/app/lib/calls/recordings";
 import { callSectionAccess } from "@/app/lib/calls/transcript-access";
 import { getSession } from "@/app/lib/session";
@@ -30,7 +31,7 @@ export default async function PublishedCallsPage() {
     const rows = await listPublishedRecordings();
     // The summary excerpt follows the summary level; failures hide it.
     const showSummary = (await callSectionAccess(session.discordId).catch(() => null))?.summary.visible ?? false;
-    const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium" });
+    const date = callDateFormat(locale);
 
     return (
         <EditorialPage width="max-w-[900px]">

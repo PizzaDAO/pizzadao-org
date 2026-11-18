@@ -27,6 +27,19 @@ type UserStatus = {
   hasClaimedToken: boolean
 }
 
+// Errors the API returns that are meaningful to a voter; everything else gets a generic message.
+const KNOWN_ERRORS = new Set(['You have already voted', 'Poll is not open for voting'])
+
+class VoteError extends Error {}
+
+async function friendlyError(res: Response, fallback: string): Promise<VoteError> {
+  const data = await res.json().catch(() => ({}))
+  const msg = typeof data?.error === 'string' && KNOWN_ERRORS.has(data.error) ? data.error : fallback
+  return new VoteError(msg)
+}
+
+const GENERIC_ERROR = 'Something went wrong. Please try again.'
+
 export default function AnonymousVote({ pollId }: { pollId: string }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -43,18 +56,17 @@ export default function AnonymousVote({ pollId }: { pollId: string }) {
         const res = await fetch(`/api/polls/${pollId}/status`)
         if (res.status === 401) {
           // Not logged in - redirect to login (break out of iframe if embedded)
-          ;(window.top || window).location.href = '/api/discord/login'
+          ;(window.top || window).location.href = `/login?returnTo=${encodeURIComponent(`/vote/${pollId}`)}`
           return
         }
         if (!res.ok) {
-          const data = await res.json()
-          throw new Error(data.error || 'Failed to load poll')
+          throw await friendlyError(res, "We couldn't load this poll. Please try again.")
         }
         const data = await res.json()
         setPoll(data.poll)
         setUserStatus(data.user)
       } catch (e: unknown) {
-        setError((e as any)?.message || 'An error occurred')
+        setError(e instanceof VoteError ? e.message : GENERIC_ERROR)
       } finally {
         setLoading(false)
       }
@@ -71,7 +83,7 @@ export default function AnonymousVote({ pollId }: { pollId: string }) {
     try {
       // Get public key from environment (exposed via API)
       const pubKeyRes = await fetch('/api/voting-pubkey')
-      if (!pubKeyRes.ok) throw new Error('Failed to get public key')
+      if (!pubKeyRes.ok) throw new VoteError(GENERIC_ERROR)
       const { publicKey: publicKeyPem } = await pubKeyRes.json()
 
       // Import public key
@@ -95,8 +107,7 @@ export default function AnonymousVote({ pollId }: { pollId: string }) {
       })
 
       if (!signRes.ok) {
-        const data = await signRes.json()
-        throw new Error(data.error || 'Failed to get signature')
+        throw await friendlyError(signRes, "We couldn't prepare your vote. Please try again.")
       }
 
       const { blindSignature } = await signRes.json()
@@ -120,17 +131,17 @@ export default function AnonymousVote({ pollId }: { pollId: string }) {
       })
 
       if (!voteRes.ok) {
-        const data = await voteRes.json()
-        if (data.error === 'You have already voted') {
+        const err = await friendlyError(voteRes, "We couldn't submit your vote. Please try again.")
+        if (err.message === 'You have already voted') {
           setHasVoted(true)
           return
         }
-        throw new Error(data.error || 'Failed to submit vote')
+        throw err
       }
 
       setHasVoted(true)
     } catch (e: unknown) {
-      setError((e as any)?.message || 'An error occurred')
+      setError(e instanceof VoteError ? e.message : GENERIC_ERROR)
     } finally {
       setClaimingToken(false)
     }

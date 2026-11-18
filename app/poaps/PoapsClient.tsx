@@ -4,7 +4,8 @@
 // press-clipping event rows. Fetching and search are unchanged.
 
 import { TermExplanation } from "@/app/ui/shared/TermExplanation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import Image from "next/image";
 import { isOptimizableImage } from "@/app/lib/image-hosts";
 import {
@@ -134,24 +135,31 @@ export default function POAPsPage({ initialData }: { initialData?: WhitelistData
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
+  const [needsLogin, setNeedsLogin] = useState(false);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    setNeedsLogin(false);
+    try {
+      const res = await fetch("/api/poaps/whitelist");
+      if (res.status === 401) {
+        setNeedsLogin(true);
+        return;
+      }
+      if (!res.ok) throw new Error("bad status");
+      setData(await res.json());
+    } catch {
+      setError("We couldn't load the POAPs right now. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (initialData) return; // prefilled on the server
-    async function fetchData() {
-      try {
-        const res = await fetch("/api/poaps/whitelist");
-        if (!res.ok) throw new Error("Failed to fetch POAPs");
-        const json = await res.json();
-        setData(json);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Unknown error");
-      } finally {
-        setLoading(false);
-      }
-    }
-
     fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [initialData, fetchData]);
 
   // Filter events by search query
   const filteredEvents = data?.events.filter((event) => {
@@ -209,17 +217,26 @@ export default function POAPsPage({ initialData }: { initialData?: WhitelistData
       )}
 
       {/* Error state */}
-      {!loading && error && (
+      {!loading && needsLogin && (
+        <div className={`${paperCard} p-10 text-center grid justify-items-center gap-4`}>
+          <p className="text-base m-0">Log in to see the POAPs.</p>
+          <Link href="/login?returnTo=%2Fpoaps" className={pillInk}>
+            Log in
+          </Link>
+        </div>
+      )}
+
+      {!loading && !needsLogin && error && (
         <div className={`${paperCard} p-10 text-center grid justify-items-center gap-4`}>
           <p className="text-base text-destructive m-0">{error}</p>
-          <button type="button" onClick={() => window.location.reload()} className={pillInk}>
+          <button type="button" onClick={() => fetchData()} className={pillInk}>
             Try again
           </button>
         </div>
       )}
 
       {/* Events list */}
-      {!loading && !error && data && (
+      {!loading && !needsLogin && !error && data && (
         <>
           {filteredEvents && filteredEvents.length === 0 ? (
             <EmptyState

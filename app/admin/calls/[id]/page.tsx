@@ -7,6 +7,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
+import { callDateTimeFormat } from "@/app/lib/calls/format-call-time";
 import { getSession } from "@/app/lib/session";
 import { canReviewCalls } from "@/app/lib/calls/access";
 import { asSegments, getRecording } from "@/app/lib/calls/recordings";
@@ -62,7 +63,7 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
     const rec = await getRecording(id);
     if (!rec) notFound();
 
-    const when = new Intl.DateTimeFormat(locale, { dateStyle: "long", timeStyle: "short" });
+    const when = callDateTimeFormat(locale, { month: "long" });
     const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
     const segments = asSegments(rec.transcript);
     const redacted = new Set(rec.redactedSpeakerIds);
