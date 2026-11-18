@@ -12,6 +12,8 @@ export interface PostFiltersValue {
     excludedCrewIds: string[];
     excludedCrewLabelTerms: string[];
     blockedTerms: string[];
+    ownerOnlyTerms?: string[];
+    ownerOnlyCrewIds?: string[];
 }
 
 export interface PostFiltersLabels {
@@ -20,6 +22,8 @@ export interface PostFiltersLabels {
     crewIds: string;
     crewLabelTerms: string;
     blockedTerms: string;
+    ownerOnlyCrewIds: string;
+    ownerOnlyTerms: string;
     save: string;
     saving: string;
     saved: string;
@@ -34,6 +38,8 @@ export function PostFilters({ initial, labels }: { initial: PostFiltersValue; la
     const [ids, setIds] = useState(toText(initial.excludedCrewIds));
     const [terms, setTerms] = useState(toText(initial.excludedCrewLabelTerms));
     const [blocked, setBlocked] = useState(toText(initial.blockedTerms));
+    const [ownerCrews, setOwnerCrews] = useState(toText(initial.ownerOnlyCrewIds ?? []));
+    const [ownerTerms, setOwnerTerms] = useState(toText(initial.ownerOnlyTerms ?? []));
     const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
     async function save() {
@@ -42,7 +48,7 @@ export function PostFilters({ initial, labels }: { initial: PostFiltersValue; la
             const res = await fetch("/api/admin/calls/post-filters", {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ excludedCrewIds: toList(ids), excludedCrewLabelTerms: toList(terms), blockedTerms: toList(blocked) }),
+                body: JSON.stringify({ excludedCrewIds: toList(ids), excludedCrewLabelTerms: toList(terms), blockedTerms: toList(blocked), ownerOnlyCrewIds: toList(ownerCrews), ownerOnlyTerms: toList(ownerTerms) }),
             });
             if (!res.ok) return setState("error");
             setState("saved");
@@ -69,6 +75,16 @@ export function PostFilters({ initial, labels }: { initial: PostFiltersValue; la
                 <label className="grid gap-1 text-sm">
                     {labels.blockedTerms}
                     <textarea className={area} rows={4} value={blocked} onChange={(e) => { setBlocked(e.target.value); setState("idle"); }} style={{ borderColor: "hsl(var(--rule-warm) / 0.55)" }} />
+                </label>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+                <label className="grid gap-1 text-sm">
+                    {labels.ownerOnlyCrewIds}
+                    <textarea className={area} rows={3} value={ownerCrews} onChange={(e) => { setOwnerCrews(e.target.value); setState("idle"); }} style={{ borderColor: "hsl(var(--rule-warm) / 0.55)" }} />
+                </label>
+                <label className="grid gap-1 text-sm">
+                    {labels.ownerOnlyTerms}
+                    <textarea className={area} rows={3} value={ownerTerms} onChange={(e) => { setOwnerTerms(e.target.value); setState("idle"); }} style={{ borderColor: "hsl(var(--rule-warm) / 0.55)" }} />
                 </label>
             </div>
             <div className="flex items-center gap-3">

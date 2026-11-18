@@ -8,7 +8,8 @@ import Link from "next/link";
 import { getLocale, getTranslations } from "next-intl/server";
 import { callDateTimeFormat } from "@/app/lib/calls/format-call-time";
 import { getSession } from "@/app/lib/session";
-import { canReviewCalls } from "@/app/lib/calls/access";
+import { callReviewRole } from "@/app/lib/calls/access";
+import { dropAutoHeld } from "@/app/lib/calls/hold";
 import { listRecordingsPage, type ListRecordingsOpts, type SourceFilter } from "@/app/lib/calls/recordings";
 import { bulkActionMax } from "@/app/lib/calls/bulk";
 import { loadPostFilter } from "@/app/lib/calls/post-filters";
@@ -33,7 +34,9 @@ export default async function AdminCallsPage({ searchParams }: { searchParams: P
     const t = await getTranslations("adminCalls");
     const locale = await getLocale();
     const session = await getSession();
-    const allowed = session?.discordId ? await canReviewCalls(session.discordId) : false;
+    const role = session?.discordId ? await callReviewRole(session.discordId) : null;
+    const allowed = role !== null;
+    const isOwner = role === "owner";
 
     if (!allowed) {
         return (
@@ -53,11 +56,18 @@ export default async function AdminCallsPage({ searchParams }: { searchParams: P
 
     const sp = await searchParams;
     const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
-    const source = SOURCES.find((x) => x === one(sp.source)) ?? "all";
-    const status = STATUSES.find((x) => x === one(sp.status));
+    // A capo only ever sees Discord calls (imported ones are the owner's backlog).
+    const source = isOwner ? (SOURCES.find((x) => x === one(sp.source)) ?? "all") : "discord";
+    // A capo only sees calls in review or published (no removed, recorded or processing ones).
+    const statusOptions = isOwner ? STATUSES : STATUSES.filter((x) => x === "IN_REVIEW" || x === "PUBLISHED");
+    const status = statusOptions.find((x) => x === one(sp.status));
     const cursorRaw = one(sp.cursor);
-    const opts: ListRecordingsOpts = { source, status, cursor: cursorRaw && CURSOR.test(cursorRaw) ? cursorRaw : null };
-    const [{ rows, nextCursor }, bulkMax] = await Promise.all([listRecordingsPage(opts), bulkActionMax()]);
+    const opts: ListRecordingsOpts = { source, status, cursor: cursorRaw && CURSOR.test(cursorRaw) ? cursorRaw : null, ...(isOwner ? {} : { excludeHeld: true, capoScope: true }) };
+    const [listed, bulkMax] = await Promise.all([listRecordingsPage(opts), isOwner ? bulkActionMax() : Promise.resolve(1)]);
+    // A capo's list also leaves out calls the private owner-only filter holds (an unreadable filter hides them all).
+    const rows = isOwner ? listed.rows : await dropAutoHeld(listed.rows, await loadPostFilter().catch(() => null));
+    // The next page starts after the last row the viewer can see (the last fetched row may be a held call).
+    const nextCursor = listed.nextCursor && !isOwner && rows.length > 0 ? rows[rows.length - 1].id : listed.nextCursor;
     const href = (over: { source?: string; status?: string | null; cursor?: string | null }) => {
         const q = new URLSearchParams();
         const src = over.source ?? source;
@@ -68,7 +78,7 @@ export default async function AdminCallsPage({ searchParams }: { searchParams: P
         const qs = q.toString();
         return qs ? `/admin/calls?${qs}` : "/admin/calls";
     };
-    const postFilter = await loadPostFilter().catch(() => null);
+    const postFilter = isOwner ? await loadPostFilter().catch(() => null) : null;
     const when = callDateTimeFormat(locale);
 
     return (
@@ -80,7 +90,7 @@ export default async function AdminCallsPage({ searchParams }: { searchParams: P
                     <p className="m-0 text-foreground/70">{t("description")}</p>
                 </header>
 
-                {postFilter ? (
+                {!isOwner ? null : postFilter ? (
                     <PostFilters
                         initial={postFilter}
                         labels={{
@@ -89,6 +99,8 @@ export default async function AdminCallsPage({ searchParams }: { searchParams: P
                             crewIds: t("filtersCrewIds"),
                             crewLabelTerms: t("filtersCrewLabelTerms"),
                             blockedTerms: t("filtersBlockedTerms"),
+                            ownerOnlyCrewIds: t("filtersOwnerOnlyCrewIds"),
+                            ownerOnlyTerms: t("filtersOwnerOnlyTerms"),
                             save: t("filtersSave"),
                             saving: t("filtersSaving"),
                             saved: t("filtersSaved"),
@@ -99,28 +111,36 @@ export default async function AdminCallsPage({ searchParams }: { searchParams: P
                     <p className="text-tomato">{t("filtersUnavailable")}</p>
                 )}
 
-                <p className="m-0 text-sm">
-                    <Link href="/admin/calls/attendance" className="underline">
-                        Attendance: compare sheets with recordings, add or remove attendees
-                    </Link>
-                </p>
+                {isOwner && (
+                    <>
+                        <p className="m-0 text-sm">
+                            <Link href="/admin/calls/attendance" className="underline">
+                                Attendance: compare sheets with recordings, add or remove attendees
+                            </Link>
+                        </p>
 
-                <AgendaPreview />
+                        <AgendaPreview />
 
-                <EventTimesPanel />
+                        <EventTimesPanel />
+                    </>
+                )}
 
                 <nav aria-label={t("filterSource")} className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
-                    <span className="text-foreground/60">{t("filterSource")}:</span>
-                    {SOURCES.map((x) => (
-                        <Link key={x} href={href({ source: x, cursor: null })} aria-current={x === source ? "page" : undefined} className={x === source ? "font-bold underline" : "underline text-foreground/70"}>
-                            {t(x === "all" ? "sourceAll" : x === "discord" ? "sourceDiscord" : "sourceImported")}
-                        </Link>
-                    ))}
-                    <span className="text-foreground/60 ml-3">{t("filterStatus")}:</span>
+                    {isOwner && (
+                        <>
+                            <span className="text-foreground/60">{t("filterSource")}:</span>
+                            {SOURCES.map((x) => (
+                                <Link key={x} href={href({ source: x, cursor: null })} aria-current={x === source ? "page" : undefined} className={x === source ? "font-bold underline" : "underline text-foreground/70"}>
+                                    {t(x === "all" ? "sourceAll" : x === "discord" ? "sourceDiscord" : "sourceImported")}
+                                </Link>
+                            ))}
+                        </>
+                    )}
+                    <span className={isOwner ? "text-foreground/60 ml-3" : "text-foreground/60"}>{t("filterStatus")}:</span>
                     <Link href={href({ status: null, cursor: null })} aria-current={!status ? "page" : undefined} className={!status ? "font-bold underline" : "underline text-foreground/70"}>
                         {t("statusAll")}
                     </Link>
-                    {STATUSES.map((x) => (
+                    {statusOptions.map((x) => (
                         <Link key={x} href={href({ status: x, cursor: null })} aria-current={x === status ? "page" : undefined} className={x === status ? "font-bold underline" : "underline text-foreground/70"}>
                             {t(`status.${x}`)}
                         </Link>

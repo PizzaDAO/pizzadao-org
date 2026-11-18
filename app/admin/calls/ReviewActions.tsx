@@ -181,6 +181,7 @@ export function ReviewActions({
     initialActionItems,
     initialChapters,
     followUpStates,
+    publishBlocked,
     labels,
 }: {
     recordingId: string;
@@ -191,6 +192,8 @@ export function ReviewActions({
     initialChapters: Chapter[];
     /** Item key -> what its linked follow-ups say (only passed while live status is on). */
     followUpStates?: Record<string, "in_progress" | "done">;
+    /** Why Publish is disabled for this viewer (a capo with lines hidden after the summary); omitted for the owner. */
+    publishBlocked?: string;
     labels: ReviewLabels;
 }) {
     const router = useRouter();
@@ -346,7 +349,7 @@ export function ReviewActions({
                 </button>
                 <button
                     type="button"
-                    disabled={busy !== null || (!published && !canPublish)}
+                    disabled={busy !== null || (!published && (!canPublish || !!publishBlocked))}
                     onClick={() =>
                         published
                             ? run("publish", [() => fetch(`${base}/publish`, { method: "POST", headers: json, body: JSON.stringify({ action: "unpublish" }) })])
@@ -358,8 +361,9 @@ export function ReviewActions({
                     {busy === "publish" ? labels.working : published ? labels.unpublish : labels.publish}
                 </button>
             </div>
-            {!published && !canPublish && <p className="m-0 text-sm text-foreground/60">{labels.publishNeedsContent}</p>}
-            {!published && canPublish && <p className="m-0 text-sm text-foreground/60">{labels.publishNote}</p>}
+            {!published && publishBlocked && <p className="m-0 text-sm text-tomato" role="alert">{publishBlocked}</p>}
+            {!published && !publishBlocked && !canPublish && <p className="m-0 text-sm text-foreground/60">{labels.publishNeedsContent}</p>}
+            {!published && !publishBlocked && canPublish && <p className="m-0 text-sm text-foreground/60">{labels.publishNote}</p>}
             {message === "saved" && <p className="m-0 text-sm" role="status">{labels.saved}</p>}
             {problem && <p className="m-0 text-sm text-tomato" role="alert">{problem}</p>}
             {message === "error" && !problem && <p className="m-0 text-sm text-tomato" role="alert">{labels.error}</p>}

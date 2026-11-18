@@ -151,6 +151,10 @@ export interface ListRecordingsOpts {
   status?: 'RECORDED' | 'PROCESSING' | 'IN_REVIEW' | 'PUBLISHED' | 'REJECTED'
   /** Id of the last row of the previous page. */
   cursor?: string | null
+  /** Leave out calls on a manual owner hold (a capo's list). Auto-held calls are dropped by the caller (hold.ts dropAutoHeld). */
+  excludeHeld?: boolean
+  /** A capo's list: only calls in review or published that already have a summary (never removed, recorded or processing ones). */
+  capoScope?: boolean
 }
 
 /** One page of the review list, newest first, with an id cursor for the next page (null on the last page). */
@@ -164,6 +168,8 @@ export async function listRecordingsPage(opts: ListRecordingsOpts = {}) {
       : {}),
     ...(opts.source === 'discord' ? { source: 'DISCORD' as const } : opts.source === 'imported' ? { source: { not: 'DISCORD' as const } } : {}),
     ...(opts.status ? { status: opts.status } : {}),
+    ...(opts.excludeHeld ? { reviewHoldAt: null } : {}),
+    ...(opts.capoScope ? { status: opts.status === 'PUBLISHED' ? ('PUBLISHED' as const) : opts.status === 'IN_REVIEW' ? ('IN_REVIEW' as const) : { in: ['IN_REVIEW' as const, 'PUBLISHED' as const] }, summary: { not: '' } } : {}),
   }
   const rows = await prisma.callRecording.findMany({
     where,
@@ -433,11 +439,11 @@ export async function withLiveItems(
 /** How far back the transcription cron looks (rows reset by the re-transcribe tool are picked up whatever their age). */
 export const PENDING_WINDOW_DAYS = 14
 
-export type PublishResult = 'ok' | 'already' | 'not-found' | 'not-allowed' | 'incomplete' | 'transcribing' | 'conflict'
+export type PublishResult = 'ok' | 'already' | 'not-found' | 'not-allowed' | 'incomplete' | 'transcribing' | 'conflict' | 'stale-redactions'
 
 /** IN_REVIEW -> PUBLISHED (needs a transcript and a summary). Rejected calls cannot be published. */
-export async function publishRecording(id: string, reviewerDiscordId: string, now = new Date()): Promise<PublishResult> {
-  const rec = await prisma.callRecording.findUnique({ where: { id }, select: { id: true, status: true, summary: true, transcript: true, redactedSpeakerIds: true, redactedSegmentIds: true, transcribedAt: true, transcribeAttempts: true, startedAt: true, retranscribeRequestedAt: true, updatedAt: true, speakers: { select: { discordId: true, trackKey: true, talkTimeSec: true } } } })
+export async function publishRecording(id: string, reviewerDiscordId: string, now = new Date(), opts: { refuseStaleRedactions?: boolean } = {}): Promise<PublishResult> {
+  const rec = await prisma.callRecording.findUnique({ where: { id }, select: { redactionsUpdatedAt: true, summaryGeneratedAt: true, summaryEditedAt: true, id: true, status: true, summary: true, transcript: true, redactedSpeakerIds: true, redactedSegmentIds: true, transcribedAt: true, transcribeAttempts: true, startedAt: true, retranscribeRequestedAt: true, updatedAt: true, speakers: { select: { discordId: true, trackKey: true, talkTimeSec: true } } } })
   if (!rec) return 'not-found'
   if (rec.status === 'PUBLISHED') return 'already'
   if (rec.status !== 'IN_REVIEW') return 'not-allowed'
@@ -448,6 +454,8 @@ export async function publishRecording(id: string, reviewerDiscordId: string, no
   // Only when the cron will really pick the row up (inside its window or flagged by the tool, and OpenAI configured); otherwise waiting would block publishing forever.
   const cronWillRun = !!process.env.OPENAI_API_KEY?.trim() && (!!rec.retranscribeRequestedAt || (rec.startedAt?.getTime() ?? 0) >= now.getTime() - PENDING_WINDOW_DAYS * 86_400_000)
   if (!rec.transcribedAt && transcribable && !hasSpeech && (rec.transcribeAttempts ?? 0) < 3 && cronWillRun) return 'transcribing'
+  // A capo may not publish text that lines hidden after the summary have outdated. Checked on this same row, which the guarded write below pins by updatedAt, so a hide that lands meanwhile makes it a conflict.
+  if (opts.refuseStaleRedactions && rec.redactionsUpdatedAt && rec.redactionsUpdatedAt.getTime() > Math.max(rec.summaryGeneratedAt?.getTime() ?? 0, rec.summaryEditedAt?.getTime() ?? 0)) return 'stale-redactions'
   if (!rec.summary?.trim() || visibleSegments(rec.transcript, rec.redactedSpeakerIds, rec.redactedSegmentIds).length === 0) return 'incomplete'
   // Guarded on the row we just checked: if anything changed meanwhile (a redaction, a regenerated summary, a transcript), nothing is published.
   const res = await prisma.callRecording.updateMany({

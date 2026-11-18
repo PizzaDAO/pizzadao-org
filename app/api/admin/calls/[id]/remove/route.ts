@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireCallReviewer } from '@/app/lib/calls/access'
+import { recordCallReviewEvent } from '@/app/lib/calls/review-audit'
 import { rejectRecording } from '@/app/lib/calls/recordings'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { NotFoundError, ValidationError } from '@/app/lib/errors/api-errors'
@@ -21,5 +22,6 @@ export const POST = withErrorHandling(async (request: Request, ctx: { params: Pr
 
   const { id } = await ctx.params
   if (!(await rejectRecording(id, auth.session.discordId))) throw new NotFoundError('Recording')
+  await recordCallReviewEvent({ recordingId: id, actorId: auth.session.discordId, action: 'reject', via: 'web' })
   return NextResponse.json({ success: true })
 })

@@ -35,7 +35,11 @@ export const PUT = withErrorHandling(async (request: Request) => {
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
   if (!body || typeof body !== 'object') throw new ValidationError('Invalid body')
   const saved = await savePostFilter(
-    { excludedCrewIds: list(body, 'excludedCrewIds'), excludedCrewLabelTerms: list(body, 'excludedCrewLabelTerms'), blockedTerms: list(body, 'blockedTerms') },
+    { excludedCrewIds: list(body, 'excludedCrewIds'), excludedCrewLabelTerms: list(body, 'excludedCrewLabelTerms'), blockedTerms: list(body, 'blockedTerms'),
+      // Left out by an older client: keep what is saved (savePostFilter treats undefined as "unchanged").
+      ownerOnlyTerms: body.ownerOnlyTerms === undefined ? undefined : list(body, 'ownerOnlyTerms'),
+      ownerOnlyCrewIds: body.ownerOnlyCrewIds === undefined ? undefined : list(body, 'ownerOnlyCrewIds'),
+    },
     auth.session.discordId,
   )
   return NextResponse.json(saved, NO_STORE)

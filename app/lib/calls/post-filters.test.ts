@@ -69,8 +69,27 @@ describe('loadPostFilter / savePostFilter', () => {
   })
   it('save stores the cleaned lists as the private setting and refreshes the cache', async () => {
     const saved = await savePostFilter({ excludedCrewIds: [' crew_x ', 'crew_x'], blockedTerms: ['ZETA'] }, 'u1')
-    const filter = { excludedCrewIds: ['crew_x'], excludedCrewLabelTerms: [], blockedTerms: ['ZETA'] }
+    const filter = { excludedCrewIds: ['crew_x'], excludedCrewLabelTerms: [], blockedTerms: ['ZETA'], ownerOnlyTerms: [], ownerOnlyCrewIds: [] }
     expect(saved).toEqual(filter)
     expect(saveSetting).toHaveBeenCalledWith('calls.postFilter', filter, 'u1')
+  })
+})
+
+describe('owner-only lists', () => {
+  const db = prisma as unknown as Record<string, Record<string, ReturnType<typeof vi.fn>>>
+  it('are cleaned and saved with the others', async () => {
+    const saved = await savePostFilter({ ownerOnlyTerms: [' Alpha ', 'alpha', 'b'], ownerOnlyCrewIds: ['crew_x'] }, 'u1')
+    expect(saved.ownerOnlyTerms).toEqual(['Alpha', 'b'])
+    expect(saved.ownerOnlyCrewIds).toEqual(['crew_x'])
+  })
+  it('a save that leaves them out (an older client) keeps what is saved', async () => {
+    db.appSetting.findMany.mockResolvedValue([{ key: 'calls.postFilter', value: { excludedCrewIds: [], excludedCrewLabelTerms: [], blockedTerms: [], ownerOnlyTerms: ['keepme'], ownerOnlyCrewIds: ['crew_k'] }, updatedAt: new Date(), updatedBy: 'x' }])
+    const saved = await savePostFilter({ blockedTerms: ['z'] }, 'u1')
+    expect(saved.ownerOnlyTerms).toEqual(['keepme'])
+    expect(saved.ownerOnlyCrewIds).toEqual(['crew_k'])
+  })
+  it('a value saved before they existed still loads, with empty lists', async () => {
+    db.appSetting.findMany.mockResolvedValue([{ key: 'calls.postFilter', value: { excludedCrewIds: ['a'], excludedCrewLabelTerms: [], blockedTerms: [] }, updatedAt: new Date(), updatedBy: 'x' }])
+    expect(await loadPostFilter(2000)).toEqual(f({ excludedCrewIds: ['a'] }))
   })
 })

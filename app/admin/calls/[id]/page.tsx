@@ -9,10 +9,13 @@ import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import { callDateTimeFormat } from "@/app/lib/calls/format-call-time";
 import { getSession } from "@/app/lib/session";
-import { canReviewCalls } from "@/app/lib/calls/access";
+import { callReviewRole, canActOnCall, heldReason } from "@/app/lib/calls/access";
+import { HoldControl } from "../HoldControl";
 import { asSegments, getRecording } from "@/app/lib/calls/recordings";
 import { loadPostFilter } from "@/app/lib/calls/post-filters";
 import { loadSettings } from "@/app/lib/settings";
+import { resolveMemberNames } from "@/app/lib/calls/live-members";
+import { toggleEnabled } from "@/app/lib/settings/toggles";
 import { buildRecapParts, loadRecapPeople, recapActionViews, recapCrewExcluded, recapLimits, recapFilteredCount, recapPostingEnabled, redactionsNewerThanSummary, resolveRecapChannel } from "@/app/lib/calls/recap";
 import { formatClock } from "@/app/lib/calls/summarize";
 import { CallAudioPlayer } from "../CallAudioPlayer";
@@ -46,7 +49,9 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
     const t = await getTranslations("adminCalls");
     const locale = await getLocale();
     const session = await getSession();
-    const allowed = session?.discordId ? await canReviewCalls(session.discordId) : false;
+    const role = session?.discordId ? await callReviewRole(session.discordId) : null;
+    const allowed = role !== null;
+    const isOwner = role === "owner";
 
     if (!allowed) {
         return (
@@ -62,6 +67,19 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
     const { id } = await params;
     const rec = await getRecording(id);
     if (!rec) notFound();
+    // The private filter: the owner sees why a call is held; a capo cannot open a held, auto-held or imported call (404, like the API).
+    const holdFilter = await loadPostFilter().catch(() => null);
+    if (!canActOnCall(role, "view", rec, holdFilter)) notFound();
+    const held = heldReason(rec, holdFilter);
+    // Newest review events (who published, held, edited, and from where). Best effort: a failure just hides the strip.
+    const capoOn = await toggleEnabled("calls.capoReviewEnabled").catch(() => false);
+    const auditRows = !capoOn ? [] : await prisma.callReviewEvent
+        .findMany({ where: { recordingId: rec.id }, orderBy: { createdAt: "desc" }, take: 8, select: { id: true, actorId: true, action: true, via: true, createdAt: true } })
+        .catch(() => []);
+    const actorNames = await resolveMemberNames(auditRows.map((e) => e.actorId));
+    const tAudit = (action: string) =>
+        action === "publish" ? t("auditPublish") : action === "unpublish" ? t("auditUnpublish") : action === "reject" ? t("auditReject") : action === "hold" ? t("auditHold") : action === "release" ? t("auditRelease")
+        : action === "auto_hold" ? t("auditAuto_hold") : action === "summary_edit" ? t("auditSummary_edit") : action === "regenerate" ? t("auditRegenerate") : action === "redact" ? t("auditRedact") : action === "card_posted" ? t("auditCard_posted") : action;
 
     const when = callDateTimeFormat(locale, { month: "long" });
     const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
@@ -79,7 +97,7 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
     const actionItems = (Array.isArray(rec.actionItems) ? rec.actionItems : []) as Array<{ text?: string; owner?: string; suggestedBy?: string; done?: boolean; evidence?: Array<{ url: string; label?: string }>; key?: string }>;
     const chapters = (Array.isArray(rec.chapters) ? rec.chapters : []) as Array<{ startMs?: number; title?: string }>;
     // Preview of the Discord recap that publishing triggers (text from the saved title/summary/action items).
-    const postFilter = await loadPostFilter().catch(() => null);
+    const postFilter = holdFilter;
     // An imported call posts no recap (and drafts no follow-ups) unless its switch is on, so there is nothing to preview.
     const [importedRecapOn, importedFollowupsOn] = imported
         ? await Promise.all([importedAllowed("calls.importedRecapPostEnabled"), importedAllowed("calls.importedFollowupsEnabled")])
@@ -100,8 +118,9 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
     const recapText = recapParts?.text ?? null;
     const recapChannel = recapText ? await resolveRecapChannel(rec.crewId).catch(() => null) : null;
     const recapEnabled = await recapPostingEnabled();
-    const recapExcluded = postFilter ? recapCrewExcluded(rec, postFilter) : false;
-    const recapOmitted = postFilter ? recapFilteredCount(rec, postFilter) : 0;
+    // How the owner-only post filter treats this call is not shown to a capo.
+    const recapExcluded = isOwner && postFilter ? recapCrewExcluded(rec, postFilter) : false;
+    const recapOmitted = isOwner && postFilter ? recapFilteredCount(rec, postFilter) : 0;
     const recapStale = redactionsNewerThanSummary(rec);
     const transcribeGaveUp = !rec.transcribedAt && rec.transcribeAttempts >= 3 && !PERMANENT_TRANSCRIBE_ERRORS.includes(rec.transcribeError ?? "");
     // A run that stopped mid-track after a failed chunk leaves the (sanitized) error here; the next run resumes.
@@ -117,7 +136,7 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
     // Items without a key yet are offered as "#N" (their A-label number): the server hands out the keys when a link is saved, so this page never writes.
     const linkItems = actionItems.filter((a) => a.text).map((a, i) => ({ key: a.key ?? `#${i + 1}`, label: `A${i + 1}`, text: a.text as string }));
     const followUpStates: Record<string, "in_progress" | "done"> = {};
-    if (actionViews) {
+    if (actionViews && isOwner) {
         for (const it of keyedItems) {
             const mine = followUpRows.filter((f) => f.actionKey === it.key);
             if (mine.some((f) => f.status === "IN_PROGRESS" || f.status === "NEEDS_HELP")) followUpStates[it.key] = "in_progress";
@@ -139,6 +158,8 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
     const showTaskProposals =
         !!rec.crewId && !imported && (rec.status === "IN_REVIEW" || rec.status === "PUBLISHED") && !!rec.summary?.trim() && ((proposalCfg.enabled && crewInAllowlist(proposalCfg, rec.crewId)) || proposalCount > 0);
     const hasAudio =!!rec.mixKey || rec.speakers.some((s) => s.trackKey);
+    // A capo may not publish text newer redactions have outdated: regenerate or edit the summary first (the API refuses it too).
+    const capoPublishBlocked = !isOwner && redactionsNewerThanSummary(rec);
 
     return (
         <main className="min-h-screen bg-background text-foreground p-5 md:p-10">
@@ -163,7 +184,7 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                 {imported && (
                     <section className="grid gap-1">
                         <p className="m-0 text-sm text-foreground/70">{t("importedNote")}</p>
-                        {rec.sourceUrl && (
+                        {isOwner && rec.sourceUrl && (
                             <p className="m-0 text-sm">
                                 <a href={rec.sourceUrl} rel="noreferrer noopener" target="_blank" className="underline">
                                     {t("sourceLink")}
@@ -173,6 +194,7 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                     </section>
                 )}
 
+                {isOwner && (
                 <section className="grid gap-3">
                     <h2 className="text-xl font-bold m-0">{t("audioHeading")}</h2>
                     {hasAudio ? (
@@ -192,6 +214,23 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                         <p className="text-foreground/60 m-0">{t("noAudio")}</p>
                     )}
                 </section>
+                )}
+
+                {rec.reviewHoldAt && (
+                    <section className="grid gap-1">
+                        <h2 className="text-xl font-bold m-0">{t("holdHeading")}</h2>
+                        <p className="m-0 text-tomato">{t("holdHeldNote")}</p>
+                        {isOwner && rec.reviewHoldNote && <p className="m-0 text-sm text-foreground/70">{rec.reviewHoldNote}</p>}
+                    </section>
+                )}
+                {isOwner && capoOn && !rec.reviewHoldAt && held && <p className="m-0 text-tomato">{held === "crew" ? t("holdAutoCrew") : held === "term" ? t("holdAutoTerm") : t("holdAutoUnreadable")}</p>}
+                {capoOn && rec.status !== "REJECTED" && (
+                    <HoldControl
+                        recordingId={rec.id}
+                        held={!!rec.reviewHoldAt}
+                        labels={{ hold: t("holdButton"), confirm: t("holdConfirm"), notePlaceholder: t("holdNotePlaceholder"), release: t("holdRelease"), working: t("holdWorking"), error: t("holdError") }}
+                    />
+                )}
 
                 {labelsNewerThanSummary && <p className="m-0 text-tomato">{t("labelsChanged")}</p>}
 
@@ -204,11 +243,11 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                 {transcribeGaveUp && (
                     <section className="grid gap-2">
                         <p className="m-0 text-tomato">{t("transcribeFailed", { count: rec.transcribeAttempts, error: rec.transcribeError ?? "" })}</p>
-                        <RetryTranscription recordingId={rec.id} labels={{ retry: t("transcribeRetry"), working: t("working"), error: t("reviewError") }} />
+                        {isOwner && <RetryTranscription recordingId={rec.id} labels={{ retry: t("transcribeRetry"), working: t("working"), error: t("reviewError") }} />}
                     </section>
                 )}
 
-                {canDraftFollowUps && (
+                {isOwner && canDraftFollowUps && (
                     <section className="grid gap-2">
                         <h2 className="text-xl font-bold m-0">
                             {t("followUpsHeading")}
@@ -224,7 +263,7 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                     </section>
                 )}
 
-                {followUpRows.length > 0 && (
+                {isOwner && followUpRows.length > 0 && (
                     <section className="grid gap-2">
                         <h2 className="text-xl font-bold m-0">{t("followUpLinksHeading")}</h2>
                         <p className="m-0 text-foreground/70 text-sm">{t("followUpLinksHelp")}</p>
@@ -241,7 +280,7 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                         <h2 className="text-xl font-bold m-0">{t("taskProposalsHeading")}</h2>
                         <p className="m-0 text-foreground/70 text-sm">{t("taskProposalsHelp")}</p>
                         <div className="flex flex-wrap items-center gap-4">
-                            <ProposeTaskUpdates recordingId={rec.id} />
+                            {isOwner && <ProposeTaskUpdates recordingId={rec.id} />}
                         </div>
                         {(routedCrewIds.length === 0 || proposalCrewIds.includes(rec.crewId)) && <CrewCallUpdates crewId={rec.crewId} recordingId={rec.id} showEmpty />}
                         {routedCrewIds.map((crewId) => (
@@ -278,7 +317,7 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                                                 <SpeakerLabel recordingId={rec.id} speakerId={s.discordId} name={s.displayName} linked={!!s.linkedDiscordId} />
                                             </>
                                         )}
-                                        {(lines > 0 || redacted.has(s.discordId)) && rec.status !== "REJECTED" && rec.status !== "PROCESSING" && (
+                                        {(lines > 0 || redacted.has(s.discordId)) && (isOwner || !redacted.has(s.discordId)) && rec.status !== "REJECTED" && rec.status !== "PROCESSING" && (
                                             <>
                                                 {" "}
                                                 <RedactSpeaker
@@ -296,6 +335,7 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                     )}
                 </section>
 
+                {isOwner && (
                 <section className="grid gap-2">
                     {rec.status === "REJECTED" ? (
                         <p className="text-foreground/60 m-0">{t("removedNote")}</p>
@@ -313,6 +353,7 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                         />
                     )}
                 </section>
+                )}
 
                 {rec.status !== "REJECTED" && (
                     <section className="grid gap-3">
@@ -331,6 +372,7 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                                 initialActionItems={actionItems.filter((i): i is { text: string; owner?: string; suggestedBy?: string; done?: boolean; evidence?: Array<{ url: string; label?: string }>; key?: string } => !!i.text)}
                                 initialChapters={chapters.filter((c): c is { startMs: number; title: string } => !!c.title && typeof c.startMs === "number")}
                                 followUpStates={followUpStates}
+                                publishBlocked={capoPublishBlocked ? t("capoPublishBlocked") : undefined}
                                 labels={{
                                     followUpInProgress: t("followUpStateInProgress"),
                                     followUpDone: t("followUpStateDone"),
@@ -393,7 +435,7 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                                 );
                             })}
                         </pre>
-                        {rec.status === "PUBLISHED" && rec.recapPostedAt && rec.recapMessageId && <UpdateRecap recordingId={rec.id} />}
+                        {isOwner && rec.status === "PUBLISHED" && rec.recapPostedAt && rec.recapMessageId && <UpdateRecap recordingId={rec.id} />}
                     </section>
                 )}
 
@@ -429,6 +471,17 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                     </section>
                 )}
 
+                {auditRows.length > 0 && (
+                    <section className="grid gap-2">
+                        <h2 className="text-xl font-bold m-0">{t("auditHeading")}</h2>
+                        <ul className="m-0 pl-5 grid gap-1 text-sm">
+                            {auditRows.map((e) => (
+                                <li key={e.id}>{t("auditLine", { action: tAudit(e.action), actor: actorNames.get(e.actorId) ?? e.actorId, via: e.via, time: when.format(e.createdAt) })}</li>
+                            ))}
+                        </ul>
+                    </section>
+                )}
+
                 <section className="grid gap-2">
                     <h2 className="text-xl font-bold m-0">{t("transcriptHeading")}</h2>
                     {segments.length === 0 ? (
@@ -454,7 +507,7 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                                         ) : (
                                             seg.text
                                         )}
-                                        {rec.status !== "REJECTED" && rec.status !== "PROCESSING" && !redacted.has(seg.discordId) && (
+                                        {rec.status !== "REJECTED" && rec.status !== "PROCESSING" && !redacted.has(seg.discordId) && (isOwner || !hiddenLines.has(key)) && (
                                             <>
                                                 {" "}
                                                 <HideLine

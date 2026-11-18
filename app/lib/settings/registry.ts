@@ -1006,6 +1006,13 @@ export const SETTINGS = {
     help: 'Post the recap to Discord when a call is published. The CALL_RECAP_POST_ENABLED env var set to off always wins.',
     confirmOn: 'Published calls will post a recap to Discord.',
   }),
+  'calls.capoReviewEnabled': boolSetting({
+    key: 'calls.capoReviewEnabled',
+    area: 'calls',
+    label: 'Capo call review',
+    help: 'Let Pizza Capos review and publish Discord calls on the website (view, publish, unpublish, edit or regenerate the summary, hide lines, hold a call for the owner). Audio, removing a call, restoring hidden lines, follow-ups, filters and bulk actions stay owner-only. The CALL_CAPO_REVIEW_ENABLED env var set to off always wins.',
+    confirmOn: 'Pizza Capos can review and publish calls on the website.',
+  }),
   'calls.recapMentionPing': boolSetting({
     key: 'calls.recapMentionPing',
     area: 'calls',

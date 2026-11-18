@@ -129,6 +129,7 @@ describe('settings registry', () => {
       ['missions.verifiersEnabled', false],
       ['missions.reviewCardsEnabled', false],
       ['calls.recapPostEnabled', false],
+      ['calls.capoReviewEnabled', false],
       ['calls.recapMentionPing', true],
       ['calls.recapLiveStatusEnabled', false],
       ['calls.recapMemberLinksEnabled', true],

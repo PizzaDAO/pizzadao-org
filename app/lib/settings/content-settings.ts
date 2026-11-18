@@ -57,14 +57,21 @@ const summaryPromptExtra: SettingDef<string> = {
 const stringEntry = z.string().trim().min(1).max(MAX_FILTER_ENTRY_CHARS)
 const filterList = z.array(stringEntry).max(MAX_FILTER_ENTRIES).transform((l) => cleanList(l))
 
-/** The three call post filter lists. Private. Unreadable or invalid means the callers skip posting. */
-const postFilter: SettingDef<{ excludedCrewIds: string[]; excludedCrewLabelTerms: string[]; blockedTerms: string[] }> = {
+/** The call post filter lists (plus the owner-only hold lists). Private. Unreadable or invalid means the callers skip posting. */
+const postFilter: SettingDef<{ excludedCrewIds: string[]; excludedCrewLabelTerms: string[]; blockedTerms: string[]; ownerOnlyTerms: string[]; ownerOnlyCrewIds: string[] }> = {
   key: 'calls.postFilter',
   area: 'calls',
   label: 'Call post filter (private)',
   help: 'Crews and terms left out of the automated agenda and recap posts. Edited on the call review page; this page only shows whether it is set.',
-  schema: z.object({ excludedCrewIds: filterList, excludedCrewLabelTerms: filterList, blockedTerms: filterList }),
-  default: { excludedCrewIds: [], excludedCrewLabelTerms: [], blockedTerms: [] },
+  // The two owner-only lists default to empty so a value saved before they existed still parses.
+  schema: z.object({
+    excludedCrewIds: filterList,
+    excludedCrewLabelTerms: filterList,
+    blockedTerms: filterList,
+    ownerOnlyTerms: filterList.optional().default([]),
+    ownerOnlyCrewIds: filterList.optional().default([]),
+  }),
+  default: { excludedCrewIds: [], excludedCrewLabelTerms: [], blockedTerms: [], ownerOnlyTerms: [], ownerOnlyCrewIds: [] },
   onReadFailure: 'throw',
   input: { type: 'managed', href: '/admin/calls' },
   private: true,

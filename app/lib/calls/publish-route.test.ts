@@ -3,9 +3,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@/app/lib/db')
 vi.mock('@/app/lib/crew-mappings', () => ({ getCrewMappings: vi.fn(async () => ({ cached: true, crews: [] })) }))
-vi.mock('@/app/lib/calls/access', () => ({ requireCallReviewer: vi.fn(async () => ({ ok: true, session: { discordId: '9' } })) }))
+vi.mock('@/app/lib/calls/access', () => ({ requireCallAccess: vi.fn(async () => ({ ok: true, session: { discordId: '9' }, role: 'owner', rec: null })) }))
+vi.mock('@/app/lib/calls/review-audit', () => ({ recordCallReviewEvent: vi.fn(async () => undefined) }))
 vi.mock('./recordings', () => ({ publishRecording: vi.fn(), unpublishRecording: vi.fn() }))
-vi.mock('./recap', () => ({ postCallRecap: vi.fn(async () => 'posted') }))
+vi.mock('./recap', () => ({ postCallRecap: vi.fn(async () => 'posted'), redactionsNewerThanSummary: vi.fn(() => false) }))
 
 import { publishRecording } from './recordings'
 import { postCallRecap } from './recap'

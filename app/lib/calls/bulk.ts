@@ -8,6 +8,7 @@ import { prisma } from '@/app/lib/db'
 import { getSetting } from '@/app/lib/settings'
 import { publishRecording, rejectRecording, type PublishResult } from './recordings'
 import { isImportedSource } from './imported'
+import { recordCallReviewEvent } from './review-audit'
 
 export const BULK_HARD_MAX = 50
 export type BulkAction = 'publish' | 'reject'
@@ -39,8 +40,15 @@ export async function bulkReview(
     else if (!imported.get(id)) out.push({ id, result: 'not-imported' })
     // Bulk actions are for calls waiting in review; published or rejected calls are handled one by one.
     else if (!inReview.get(id)) out.push({ id, result: 'not-allowed' })
-    else if (action === 'publish') out.push({ id, result: await publishRecording(id, reviewerDiscordId).catch(() => 'conflict' as const) })
-    else out.push({ id, result: (await rejectRecording(id, reviewerDiscordId).catch(() => false)) ? 'rejected' : 'not-found' })
+    else if (action === 'publish') {
+      const result = await publishRecording(id, reviewerDiscordId).catch(() => 'conflict' as const)
+      if (result === 'ok') await recordCallReviewEvent({ recordingId: id, actorId: reviewerDiscordId, action: 'publish', via: 'bulk' })
+      out.push({ id, result })
+    } else {
+      const rejected = await rejectRecording(id, reviewerDiscordId).catch(() => false)
+      if (rejected) await recordCallReviewEvent({ recordingId: id, actorId: reviewerDiscordId, action: 'reject', via: 'bulk' })
+      out.push({ id, result: rejected ? 'rejected' : 'not-found' })
+    }
   }
   return out
 }

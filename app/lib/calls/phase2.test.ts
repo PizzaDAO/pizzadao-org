@@ -513,6 +513,18 @@ describe('publish gating', () => {
     expect(data.publishedAt).toBeInstanceOf(Date)
   })
 
+  it('refuseStaleRedactions (capo publish) checks the fresh row: hidden lines newer than the summary are refused, nothing written', async () => {
+    const row = { id: 'rec1', status: 'IN_REVIEW', summary: 'S', transcript: [{ discordId: ANN, startMs: 0, endMs: 1, text: 'a' }], summaryGeneratedAt: new Date('2026-11-01T10:00:00Z'), summaryEditedAt: null }
+    db.callRecording.findUnique.mockResolvedValue({ ...row, redactionsUpdatedAt: new Date('2026-11-02T10:00:00Z') })
+    expect(await publishRecording('rec1', '9', undefined, { refuseStaleRedactions: true })).toBe('stale-redactions')
+    expect(db.callRecording.updateMany).not.toHaveBeenCalled()
+    // Without the option (the owner) it publishes as before; an edit after the hide clears the refusal.
+    db.callRecording.updateMany.mockResolvedValue({ count: 1 })
+    expect(await publishRecording('rec1', '9')).toBe('ok')
+    db.callRecording.findUnique.mockResolvedValue({ ...row, redactionsUpdatedAt: new Date('2026-11-02T10:00:00Z'), summaryEditedAt: new Date('2026-11-03T10:00:00Z') })
+    expect(await publishRecording('rec1', '9', undefined, { refuseStaleRedactions: true })).toBe('ok')
+  })
+
   it('409 without a summary, and for a REJECTED or merely RECORDED call', async () => {
     asReviewer()
     db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'IN_REVIEW', summary: null, transcript: [{ discordId: ANN, startMs: 0, endMs: 1, text: 'a' }] })

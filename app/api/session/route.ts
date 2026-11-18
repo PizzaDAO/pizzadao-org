@@ -9,6 +9,7 @@ import {
 } from "@/app/lib/sheets/member-repository";
 import { getUserRoles } from "@/app/lib/discord";
 import { canReviewAnyMission } from "@/app/lib/mission-review-access";
+import { callReviewRole } from "@/app/lib/calls/access";
 import { canManageShopRoles } from "@/app/lib/shop-admin-auth";
 import { ADMIN_ROLE_IDS } from "@/app/ui/constants";
 import { disavowEnabled } from "@/app/lib/disavow/constants";
@@ -93,9 +94,11 @@ export async function GET() {
         canReviewAnyMission(roles),
         canManageShopRoles(roles),
       ]);
-      return { isAdmin, canReviewMissions, canManageShop };
+      // Call review nav entry: only while capo review is switched on (the entry stays absent otherwise, so nothing hints at it).
+      const callsReviewNav = (await toggleEnabled("calls.capoReviewEnabled")) && (await callReviewRole(roles)) !== null;
+      return { isAdmin, canReviewMissions, canManageShop, callsReviewNav };
     } catch {
-      return { isAdmin: false, canReviewMissions: false, canManageShop: false };
+      return { isAdmin: false, canReviewMissions: false, canManageShop: false, callsReviewNav: false };
     }
   };
 
@@ -129,7 +132,7 @@ export async function GET() {
     toggleEnabled("education.publicListingEnabled").catch(() => false),
   ]);
   const { memberId, memberName, crews, pfpPath } = member;
-  const { isAdmin, canReviewMissions, canManageShop } = roleFlags;
+  const { isAdmin, canReviewMissions, canManageShop, callsReviewNav } = roleFlags;
   // Proposals nav entry: shown while voting or the proposal history is switched on (fails closed).
   const showProposals = votingOn || historyOn;
   const showSessions = sessionsOn;
@@ -150,6 +153,7 @@ export async function GET() {
       ...(disavowFlags ?? {}),
       ...(showProposals ? { showProposals: true } : {}),
       ...(showSessions ? { showSessions: true } : {}),
+      ...(callsReviewNav ? { canReviewCalls: true } : {}),
     },
     {
       headers: { "Cache-Control": "private, max-age=300" },
