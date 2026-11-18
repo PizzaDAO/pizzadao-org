@@ -4,7 +4,7 @@ import localFont from "next/font/local";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import { SpeedInsights } from "@vercel/speed-insights/next";
-import { pickClientMessages } from "@/app/lib/i18n/client-namespaces";
+import { pickMessages, ROOT_NAMESPACES } from "@/app/lib/i18n/route-namespaces";
 import "./globals.css";
 import { Providers } from "./providers";
 import CornerLinks from "@/app/ui/CornerLinks";
@@ -75,8 +75,9 @@ export default async function RootLayout({
 }>) {
   // Resolved by app/lib/i18n/request.ts (cookie → Accept-Language → default).
   const locale = await getLocale();
-  // Client components only get the namespaces they use (see client-namespaces.ts); server code reads the full catalog.
-  const messages = pickClientMessages(await getMessages());
+  // Only the root chrome's namespaces; route segments add theirs with <RouteMessages> (see route-namespaces.ts).
+  // Server code reads the full catalog.
+  const messages = pickMessages(await getMessages(), ROOT_NAMESPACES);
 
   return (
     <html lang={locale} suppressHydrationWarning>
