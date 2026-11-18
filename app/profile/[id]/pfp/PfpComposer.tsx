@@ -12,6 +12,9 @@ interface Asset {
 }
 interface State {
   level: number;
+  allowedBaseKinds: BaseKind[];
+  memberName?: string;
+  access: { allowed: boolean; minLevel: number; completed: number };
   bases: { static: string | null; discord: string | null; mafia: string | null };
   current: { baseKind: BaseKind; baseUrl: string; composedUrl: string; layers: Layer[]; original: OriginalBase | null } | null;
   assets: Asset[];
@@ -58,21 +61,75 @@ export function PfpComposer({ memberId }: { memberId: string }) {
     try {
       const s: State = await api("/api/pfp/compose");
       setState(s);
+      const allowed = s.allowedBaseKinds ?? ["mafia", "restyle"];
+      const first = (["mafia", "static", "discord"] as const).find((k) => allowed.includes(k)) ?? "mafia";
       if (s.current) {
-        setBaseKind(s.current.baseKind);
-        if (s.current.baseKind === "upload") setUploadUrl(s.current.baseUrl);
-        if (s.current.baseKind === "restyle") {
-          setRestyleUrl(s.current.baseUrl);
-          setOriginal(s.current.original);
-        }
+        // A saved picture built on a base that is no longer allowed stays as saved, but editing starts
+        // from an allowed base.
+        if (allowed.includes(s.current.baseKind)) {
+          setBaseKind(s.current.baseKind);
+          if (s.current.baseKind === "upload") setUploadUrl(s.current.baseUrl);
+          if (s.current.baseKind === "restyle") {
+            setRestyleUrl(s.current.baseUrl);
+            setOriginal(s.current.original);
+          }
+        } else setBaseKind(first);
         setLayers(s.current.layers);
         setSavedUrl(s.current.composedUrl);
-      } else setBaseKind(s.bases.static ? "static" : s.bases.discord ? "discord" : "static");
+      } else setBaseKind(first);
     } catch (e) { setError((e as Error).message); }
   }, []);
   useEffect(() => { void load(); }, [load]);
 
   if (!state) return <p className="text-foreground/60">{error ?? "Loading..."}</p>;
+
+  async function removeSaved() {
+    if (!window.confirm("Remove your saved PFP and go back to the original picture?")) return;
+    setBusy(true); setError(null);
+    try { await api("/api/pfp/compose", { method: "DELETE", headers: { "content-type": "application/json" }, body: "{}" }); setLayers([]); setSavedUrl(null); await load(); }
+    catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  }
+
+  async function generatePortrait() {
+    const name = state?.memberName?.trim();
+    if (!name) { setError("We could not find your mafia name. Set it on your profile first."); return; }
+    setBusy(true); setError(null);
+    try {
+      const res = await fetch("/api/mafia-portrait", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name, variant: 0 }),
+      });
+      if (res.status === 429) throw new Error("You have used today's portraits. Try again tomorrow.");
+      if (!res.ok) throw new Error("Portrait generation is not available right now. Try again later.");
+      await load();
+    } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  }
+
+  if (state.access && !state.access.allowed) {
+    const { minLevel, completed } = state.access;
+    return (
+      <section className="grid gap-3 rounded-[24px] border p-6 text-center" data-testid="pfp-locked">
+        {state.current?.composedUrl && (
+          <div className="mx-auto grid gap-2 justify-items-center" data-testid="pfp-locked-saved">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={state.current.composedUrl} alt="Your saved PFP" className="h-32 w-32 rounded-full border object-cover" />
+            <button type="button" disabled={busy} onClick={removeSaved} className="text-sm underline">Remove</button>
+            {error && <p role="alert" className="m-0 text-sm">{error}</p>}
+          </div>
+        )}
+        <h2 className="m-0 text-2xl font-bold">Reach level {minLevel} to make your PFP</h2>
+        <p className="m-0 text-foreground/70">
+          You have completed level {completed} so far. Finish the level {Math.min(minLevel, completed + 1)} missions to keep going.
+        </p>
+        <div className="mx-auto h-2 w-full max-w-xs overflow-hidden rounded bg-foreground/10" role="progressbar" aria-valuemin={0} aria-valuemax={minLevel} aria-valuenow={Math.min(completed, minLevel)}>
+          <div className="h-full bg-foreground" style={{ width: `${Math.min(100, (completed / Math.max(1, minLevel)) * 100)}%` }} />
+        </div>
+        <a href="/missions" className="mx-auto rounded border px-4 py-2 font-semibold underline">Go to missions</a>
+      </section>
+    );
+  }
+  const allowedKinds = state.allowedBaseKinds ?? ["mafia", "restyle"];
 
   const byId = new Map(state.assets.map((a) => [a.id, a]));
   const baseSrc = baseKind === "upload" ? uploadUrl : baseKind === "restyle" ? restyleUrl : state.bases[baseKind];
@@ -254,18 +311,26 @@ export function PfpComposer({ memberId }: { memberId: string }) {
         <section className="grid gap-2">
           <h2 className="m-0 text-lg font-bold">Base picture</h2>
           <div className="flex gap-2 flex-wrap">
-            {([["static", "Current"], ["discord", "Discord"], ["mafia", "Mafia portrait"]] as const).map(([k, label]) => (
+            {([["static", "Current"], ["discord", "Discord"], ["mafia", "Mafia portrait"]] as const).filter(([k]) => allowedKinds.includes(k)).map(([k, label]) => (
               <button key={k} type="button" disabled={!state.bases[k]} onClick={() => pickBase(k)}
                 aria-pressed={baseKind === k} className={`rounded border px-3 py-1 text-sm disabled:opacity-40 ${baseKind === k ? "font-bold border-foreground" : ""}`}>
                 {label}
               </button>
             ))}
-            <label className="rounded border px-3 py-1 text-sm cursor-pointer">
+            {allowedKinds.includes("upload") && <label className="rounded border px-3 py-1 text-sm cursor-pointer">
               Upload
               <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="sr-only" disabled={busy}
                 onChange={(e) => e.target.files?.[0] && uploadBase(e.target.files[0])} />
-            </label>
+            </label>}
           </div>
+          {allowedKinds.includes("mafia") && !state.bases.mafia && (
+            <p className="m-0 rounded border p-3 text-sm" data-testid="pfp-no-portrait">
+              Your PFP starts from your AI mafia portrait, and you do not have one yet.{" "}
+              <button type="button" disabled={busy} onClick={generatePortrait} className="font-semibold underline disabled:opacity-50">
+                {busy ? "Drawing..." : "Generate your mafia portrait"}
+              </button>
+            </p>
+          )}
         </section>
 
         <div role="tablist" className="flex gap-2">

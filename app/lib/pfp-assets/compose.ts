@@ -162,6 +162,11 @@ export async function loadBase(
     } catch {
       ok = false
     }
+    if (ok && choice.kind === 'restyle') {
+      // Only a result the server itself recorded for this member (status ok), not any file under the prefix.
+      const row = await prisma.pfpRestyle.findFirst({ where: { memberId, resultUrl: url, status: 'ok' }, select: { id: true } })
+      ok = !!row
+    }
     if (!ok) throw new ValidationError('Upload not found', 'base')
     return { bytes: await fetchImageBytes(url, fetchImpl), url }
   }

@@ -34,9 +34,9 @@ describe('completedLevel / titleForLevel', () => {
   })
 })
 
-describe('gating still uses the working-on level', () => {
-  it('the PFP unlock context carries getCurrentLevel unchanged', async () => {
+describe('PFP unlock rules use the completed level', () => {
+  it('the PFP unlock context carries the highest completed level (getCurrentLevel minus one)', async () => {
     getCurrentLevel.mockResolvedValue(8)
-    expect((await loadUnlockContext('1')).level).toBe(8)
+    expect((await loadUnlockContext('1')).level).toBe(7)
   })
 })
