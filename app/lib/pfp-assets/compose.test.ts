@@ -183,8 +183,10 @@ describe('composeMemberPfp', () => {
       const upsert = vi.fn()
       ;(prisma as unknown as Record<string, unknown>).memberPfp = { upsert, findUnique: vi.fn(async () => null) }
       vi.mocked(put).mockImplementation((async (key: string) => ({ url: `https://s.public.blob.vercel-storage.com/${key}` })) as never)
+      const findFirst = vi.fn(async (a: { where: { resultUrl: string } }) => (a.where.resultUrl.endsWith('/restyle-abc.png') ? { id: 1 } : null))
+      ;(prisma as unknown as Record<string, unknown>).pfpRestyle = { findFirst }
       const fetchImpl = vi.fn(async () => new Response(new Uint8Array(art), { status: 200 }))
-      return { upsert, fetchImpl }
+      return { upsert, fetchImpl, findFirst }
     }
     const U = 'https://s.public.blob.vercel-storage.com/pfp-base/42'
 
@@ -209,6 +211,14 @@ describe('composeMemberPfp', () => {
       await expect(composeMemberPfp({ ...base, base: { kind: 'restyle', url: `${U}/restyle-abc.png` } })).rejects.toThrow(/original/)
       await expect(composeMemberPfp({ ...base, original: { kind: 'static' }, base: { kind: 'restyle', url: `${U}/me.png` } })).rejects.toThrow(/Upload not found/)
       await expect(composeMemberPfp({ ...base, original: { kind: 'static' }, base: { kind: 'restyle', url: 'https://s.public.blob.vercel-storage.com/pfp-base/43/restyle-abc.png' } })).rejects.toThrow(/Upload not found/)
+      expect(upsert).not.toHaveBeenCalled()
+    })
+
+    it('a restyle base with no recorded ok result for this member is refused', async () => {
+      const { upsert, fetchImpl, findFirst } = await setup()
+      const base = { memberId: '42', discordId: '1', fetchImpl: fetchImpl as never, layers: [], original: { kind: 'static' as const } }
+      await expect(composeMemberPfp({ ...base, base: { kind: 'restyle', url: `${U}/restyle-old.png` } })).rejects.toThrow(/Upload not found/)
+      expect(findFirst).toHaveBeenCalledWith({ where: { memberId: '42', resultUrl: `${U}/restyle-old.png`, status: 'ok' }, select: { id: true } })
       expect(upsert).not.toHaveBeenCalled()
     })
   })

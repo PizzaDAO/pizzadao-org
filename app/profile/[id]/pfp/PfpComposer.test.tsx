@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, cleanup } from "@testing-library/react";
+import { render, screen, waitFor, cleanup, fireEvent } from "@testing-library/react";
 import { PfpComposer } from "./PfpComposer";
 
 const base = {
@@ -31,11 +31,20 @@ describe("PfpComposer", () => {
     expect(screen.queryByTestId("pfp-no-portrait")).toBeNull();
   });
 
-  it("guides a member without a portrait to generate one", async () => {
-    mockState({ bases: { ...base.bases, mafia: null } });
+  it("lets a member without a portrait draw one from their own mafia name, then reloads", async () => {
+    const calls: Array<[string, RequestInit | undefined]> = [];
+    let drawn = false;
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push([url, init]);
+      if (url === "/api/mafia-portrait") { drawn = true; return { ok: true, status: 200, json: async () => ({ url: "https://x/m.png" }) }; }
+      return { ok: true, json: async () => ({ ...base, memberName: "Tony Soprano", bases: { ...base.bases, mafia: drawn ? "https://x/m.png" : null } }) };
+    }));
     render(<PfpComposer memberId="42" />);
     const box = await screen.findByTestId("pfp-no-portrait");
-    expect(box.querySelector("a")?.getAttribute("href")).toBe("/get-your-mafia-name");
+    fireEvent.click(box.querySelector("button")!);
+    await waitFor(() => expect(screen.queryByTestId("pfp-no-portrait")).toBeNull());
+    const post = calls.find(([u]) => u === "/api/mafia-portrait")!;
+    expect(JSON.parse(String(post[1]?.body))).toEqual({ name: "Tony Soprano", variant: 0 });
   });
 
   it("shows the locked state with progress and a missions link below the level", async () => {
@@ -46,6 +55,17 @@ describe("PfpComposer", () => {
     expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe("1");
     expect(screen.getByText("Go to missions").getAttribute("href")).toBe("/missions");
     expect(screen.queryByText("Save")).toBeNull();
+  });
+
+  it("keeps showing the saved PFP, with Remove, in the locked state", async () => {
+    mockState({
+      access: { allowed: false, minLevel: 2, completed: 0 },
+      current: { baseKind: "mafia", baseUrl: "https://x/m.png", composedUrl: "https://x/saved.webp", layers: [], original: null },
+    });
+    render(<PfpComposer memberId="42" />);
+    const box = await screen.findByTestId("pfp-locked-saved");
+    expect(box.querySelector("img")?.getAttribute("src")).toBe("https://x/saved.webp");
+    expect(screen.getByText("Remove")).toBeTruthy();
   });
 
   it("brings legacy bases back when the setting allows them", async () => {

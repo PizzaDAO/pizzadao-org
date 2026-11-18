@@ -2098,7 +2098,7 @@ export const SETTINGS = {
     area: 'features',
     label: 'PFP editor: allowed base pictures',
     help: 'Which base pictures the PFP editor accepts (one per line): mafia (the AI portrait made on the platform), restyle (dress-up results), and the legacy static, discord, upload. Default: mafia and restyle only. Enforced by the server.',
-    schema: z.array(z.enum(['mafia', 'restyle', 'static', 'discord', 'upload'])).max(5),
+    schema: z.array(z.enum(['mafia', 'restyle', 'static', 'discord', 'upload'])).min(1).max(5),
     default: ['mafia', 'restyle'] as string[],
     onReadFailure: { value: ['mafia', 'restyle'] as string[] },
     input: { type: 'stringList', maxItems: 5, maxLength: 10 },

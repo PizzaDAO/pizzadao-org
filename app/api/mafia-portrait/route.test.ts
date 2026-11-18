@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const getSession = vi.fn();
 const findUnique = vi.fn();
 const create = vi.fn();
+const updateMany = vi.fn();
+const upsert = vi.fn();
 const checkKeyed = vi.fn();
 const generatePortrait = vi.fn();
 const recordLater = vi.fn();
@@ -10,7 +12,7 @@ let upstash = true;
 
 vi.mock("@/app/lib/session", () => ({ getSession: () => getSession() }));
 vi.mock("@/app/lib/db", () => ({
-  prisma: { appSetting: { findMany: async () => [] }, mafiaPortrait: { findUnique: (...a: unknown[]) => findUnique(...a), create: (...a: unknown[]) => create(...a) } },
+  prisma: { appSetting: { findMany: async () => [] }, mafiaPortrait: { findUnique: (...a: unknown[]) => findUnique(...a), create: (...a: unknown[]) => create(...a), updateMany: (...a: unknown[]) => updateMany(...a), upsert: (...a: unknown[]) => upsert(...a) } },
 }));
 vi.mock("@/app/lib/activation", () => ({
   recordActivationLater: (...a: unknown[]) => recordLater(...a),
@@ -42,7 +44,7 @@ const body = (o: Record<string, unknown> = {}) =>
 
 describe("POST /api/mafia-portrait", () => {
   beforeEach(() => {
-    for (const m of [getSession, findUnique, create, checkKeyed, generatePortrait, recordLater]) m.mockReset();
+    for (const m of [getSession, findUnique, create, updateMany, upsert, checkKeyed, generatePortrait, recordLater]) m.mockReset();
     process.env.MAFIA_PORTRAIT_ENABLED = "1";
     process.env.OPENAI_API_KEY = "test-key";
     delete process.env.VERCEL;
@@ -71,6 +73,23 @@ describe("POST /api/mafia-portrait", () => {
   it("400 on variant 5 or an empty name", async () => {
     expect((await POST(body({ variant: 5 }))).status).toBe(400);
     expect((await POST(body({ name: "   " }))).status).toBe(400);
+  });
+
+  it("a member cache hit claims an unowned portrait, copies someone else's, and leaves their own alone", async () => {
+    const row = { cacheKey: "k1", name: "n", topping: "", filmKey: "", variant: 0, animal: "", model: "m", url: "https://blob/c.webp" };
+    getSession.mockResolvedValue({ discordId: "400000000000000001" });
+    findUnique.mockResolvedValue({ ...row, discordId: null });
+    await POST(body());
+    expect(updateMany).toHaveBeenCalledWith({ where: { cacheKey: "k1", discordId: null }, data: { discordId: "400000000000000001" } });
+    findUnique.mockResolvedValue({ ...row, discordId: "999" });
+    await POST(body());
+    expect(upsert.mock.calls[0][0]).toMatchObject({ where: { cacheKey: "k1:400000000000000001" }, create: { url: row.url, discordId: "400000000000000001" } });
+    updateMany.mockClear();
+    upsert.mockClear();
+    findUnique.mockResolvedValue({ ...row, discordId: "400000000000000001" });
+    await POST(body());
+    expect(updateMany).not.toHaveBeenCalled();
+    expect(upsert).not.toHaveBeenCalled();
   });
 
   it("cache hit skips limits and the provider", async () => {

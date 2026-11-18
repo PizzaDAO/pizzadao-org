@@ -62,6 +62,41 @@ const bodySchema = z.object({
   originSig: z.string().max(100).optional(),
 });
 
+/**
+ * Make sure the signed-in member has a MafiaPortrait row for this image (the PFP editor looks portraits up
+ * by discordId). An unclaimed (anonymous) row is claimed; a row owned by someone else gets a per-member copy
+ * under its own cache key. Best effort: the portrait is served either way.
+ */
+async function attachPortrait(
+  row: { cacheKey: string; name: string; topping: string; filmKey: string; variant: number; animal: string; model: string; url: string; discordId: string | null },
+  discordId: string,
+) {
+  if (row.discordId === discordId) return;
+  try {
+    if (row.discordId === null) {
+      await prisma.mafiaPortrait.updateMany({ where: { cacheKey: row.cacheKey, discordId: null }, data: { discordId } });
+      return;
+    }
+    await prisma.mafiaPortrait.upsert({
+      where: { cacheKey: `${row.cacheKey}:${discordId}` },
+      create: {
+        cacheKey: `${row.cacheKey}:${discordId}`,
+        name: row.name,
+        topping: row.topping,
+        filmKey: row.filmKey,
+        variant: row.variant,
+        animal: row.animal,
+        model: row.model,
+        url: row.url,
+        discordId,
+      },
+      update: {},
+    });
+  } catch {
+    console.error("[mafia-portrait] could not attach portrait to member");
+  }
+}
+
 const fallback = (reason: string) => NextResponse.json({ fallback: true, reason }, { status: 503 });
 
 function envCap(name: string, fallbackCap: number): number {
@@ -114,7 +149,10 @@ export async function POST(req: Request) {
 
   // Cache hits are free: they skip the limits and the provider.
   const hit = await prisma.mafiaPortrait.findUnique({ where: { cacheKey } });
-  if (hit) return NextResponse.json({ url: hit.url, cached: true });
+  if (hit) {
+    if (discordId) await attachPortrait(hit, discordId);
+    return NextResponse.json({ url: hit.url, cached: true });
+  }
 
   // Spend caps fail CLOSED: if Redis is down (or, on Vercel, not configured so
   // counters would be per instance) we refuse rather than risk unbounded spend.
@@ -191,7 +229,10 @@ export async function POST(req: Request) {
     // Lost a race on the unique key: serve the winner's portrait.
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
       const winner = await prisma.mafiaPortrait.findUnique({ where: { cacheKey } });
-      if (winner) return NextResponse.json({ url: winner.url, cached: true });
+      if (winner) {
+        if (discordId) await attachPortrait(winner, discordId);
+        return NextResponse.json({ url: winner.url, cached: true });
+      }
     }
     console.error("[mafia-portrait] could not store portrait row");
     // The image exists; still show it to this member.

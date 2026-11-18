@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@/app/lib/session', () => ({ getSession: vi.fn() }))
-vi.mock('@/app/lib/sheets/member-repository', () => ({ fetchMemberIdByDiscordId: vi.fn() }))
+vi.mock('@/app/lib/sheets/member-repository', () => ({ fetchMemberIdByDiscordId: vi.fn(), fetchMemberByDiscordId: vi.fn(async () => ({ memberId: '42', name: 'Tony' })) }))
 vi.mock('@/app/lib/db', () => ({ prisma: { memberPfp: { findUnique: vi.fn(), deleteMany: vi.fn() } } }))
 vi.mock('@vercel/blob', () => ({ del: vi.fn(async () => undefined), put: vi.fn(), list: vi.fn() }))
 vi.mock('@/app/lib/pfp-assets/compose', async (orig) => ({
@@ -63,6 +63,7 @@ describe('/api/pfp/compose rules', () => {
     const body = await (await GET(new Request('https://app.test/api/pfp/compose'))).json()
     expect(body.allowedBaseKinds).toEqual(['mafia', 'restyle'])
     expect(body.access).toMatchObject({ allowed: true, minLevel: 2 })
+    expect(body.memberName).toBe('Tony')
   })
 })
 

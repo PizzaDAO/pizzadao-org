@@ -17,6 +17,7 @@ import { lockHint } from '@/app/lib/pfp-assets/types'
 import { availableBases, composeMemberPfp, isBaseKind } from '@/app/lib/pfp-assets/compose'
 import { ValidationError } from '@/app/lib/errors/api-errors'
 import { allowedBaseKinds, assertBaseKindAllowed, assertCanEdit, loadEditAccess } from '@/app/lib/pfp-assets/access'
+import { fetchMemberByDiscordId } from '@/app/lib/sheets/member-repository'
 import { toggleEnabled } from '@/app/lib/settings/toggles'
 import { evaluateAllowance, loadRestyleSettings, loadUsage, usageByOutfit } from '@/app/lib/pfp-assets/restyle'
 
@@ -31,7 +32,11 @@ function parseBase(v: unknown): { kind: import('@/app/lib/pfp-assets/compose').B
 }
 
 export const GET = memberPfpRoute(async (_req, { memberId, discordId }) => {
-  const [access, baseKinds] = await Promise.all([loadEditAccess(discordId), allowedBaseKinds()])
+  const [access, baseKinds, who] = await Promise.all([
+    loadEditAccess(discordId),
+    allowedBaseKinds(),
+    fetchMemberByDiscordId(discordId).catch(() => null),
+  ])
   const [assets, ctx, bases, current, outfitOverlay, restyleSettings, used] = await Promise.all([
     listAssets({ activeOnly: true }),
     loadUnlockContext(discordId),
@@ -50,6 +55,8 @@ export const GET = memberPfpRoute(async (_req, { memberId, discordId }) => {
   return {
     level: ctx.level,
     allowedBaseKinds: baseKinds,
+    // The member's own mafia name, for drawing their portrait from the editor.
+    memberName: who?.name ?? '',
     access: { allowed: access.allowed, minLevel: access.minLevel, completed: access.bypass ? ctx.level : access.completed },
     outfitOverlay,
     restyle: {

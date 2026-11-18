@@ -1,8 +1,8 @@
 /**
  * Display helpers for member levels. `getCurrentLevel` / `computeCurrentLevel` return the level a
- * member is WORKING ON (highest completed + 1) and gate things on it (missions, PFP unlocks,
- * payouts). Badges and labels show the highest level COMPLETED instead: use these helpers in
- * display code only, never to gate anything.
+ * member is WORKING ON (highest completed + 1) and gate missions and payouts on it. Badges, labels
+ * and the PFP editor (its gate and its asset unlock rules) use the highest level COMPLETED instead:
+ * use these helpers for display and for the PFP rules, never to gate missions or payouts.
  */
 
 /** The highest level completed, given the working-on level. 0 means nothing completed yet. */

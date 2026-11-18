@@ -13,6 +13,7 @@ interface Asset {
 interface State {
   level: number;
   allowedBaseKinds: BaseKind[];
+  memberName?: string;
   access: { allowed: boolean; minLevel: number; completed: number };
   bases: { static: string | null; discord: string | null; mafia: string | null };
   current: { baseKind: BaseKind; baseUrl: string; composedUrl: string; layers: Layer[]; original: OriginalBase | null } | null;
@@ -82,10 +83,41 @@ export function PfpComposer({ memberId }: { memberId: string }) {
 
   if (!state) return <p className="text-foreground/60">{error ?? "Loading..."}</p>;
 
+  async function removeSaved() {
+    if (!window.confirm("Remove your saved PFP and go back to the original picture?")) return;
+    setBusy(true); setError(null);
+    try { await api("/api/pfp/compose", { method: "DELETE", headers: { "content-type": "application/json" }, body: "{}" }); setLayers([]); setSavedUrl(null); await load(); }
+    catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  }
+
+  async function generatePortrait() {
+    const name = state?.memberName?.trim();
+    if (!name) { setError("We could not find your mafia name. Set it on your profile first."); return; }
+    setBusy(true); setError(null);
+    try {
+      const res = await fetch("/api/mafia-portrait", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name, variant: 0 }),
+      });
+      if (res.status === 429) throw new Error("You have used today's portraits. Try again tomorrow.");
+      if (!res.ok) throw new Error("Portrait generation is not available right now. Try again later.");
+      await load();
+    } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  }
+
   if (state.access && !state.access.allowed) {
     const { minLevel, completed } = state.access;
     return (
       <section className="grid gap-3 rounded-[24px] border p-6 text-center" data-testid="pfp-locked">
+        {state.current?.composedUrl && (
+          <div className="mx-auto grid gap-2 justify-items-center" data-testid="pfp-locked-saved">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={state.current.composedUrl} alt="Your saved PFP" className="h-32 w-32 rounded-full border object-cover" />
+            <button type="button" disabled={busy} onClick={removeSaved} className="text-sm underline">Remove</button>
+            {error && <p role="alert" className="m-0 text-sm">{error}</p>}
+          </div>
+        )}
         <h2 className="m-0 text-2xl font-bold">Reach level {minLevel} to make your PFP</h2>
         <p className="m-0 text-foreground/70">
           You have completed level {completed} so far. Finish the level {Math.min(minLevel, completed + 1)} missions to keep going.
@@ -294,7 +326,9 @@ export function PfpComposer({ memberId }: { memberId: string }) {
           {allowedKinds.includes("mafia") && !state.bases.mafia && (
             <p className="m-0 rounded border p-3 text-sm" data-testid="pfp-no-portrait">
               Your PFP starts from your AI mafia portrait, and you do not have one yet.{" "}
-              <a href="/get-your-mafia-name" className="font-semibold underline">Generate your mafia portrait</a>, then come back here.
+              <button type="button" disabled={busy} onClick={generatePortrait} className="font-semibold underline disabled:opacity-50">
+                {busy ? "Drawing..." : "Generate your mafia portrait"}
+              </button>
             </p>
           )}
         </section>
