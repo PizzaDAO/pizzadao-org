@@ -23,6 +23,11 @@ vi.mock("@/app/lib/db", () => ({
         if (db.down) throw new Error("relation does not exist");
         return db.rounds.find((r) => r.dayKey === where.dayKey) ?? null;
       },
+      update: async ({ where, data }: { where: { id: number }; data: { questionId: string } }) => {
+        const row = db.rounds.find((r) => r.id === where.id)!;
+        row.questionId = data.questionId;
+        return row;
+      },
       create: async ({ data }: { data: { dayKey: string; questionId: string; surface: string } }) => {
         if (db.down) throw new Error("relation does not exist");
         const row = { id: db.rounds.length + 1, ...data };
@@ -41,7 +46,13 @@ vi.mock("@/app/lib/db", () => ({
       count: async ({ where }: { where: { roundId: number; correct?: boolean } }) =>
         db.attempts.filter((a) => a.roundId === where.roundId && (where.correct === undefined || a.correct === where.correct)).length,
       findMany: async () => [],
+      deleteMany: async ({ where }: { where: { roundId: number } }) => {
+        const before = db.attempts.length;
+        db.attempts = db.attempts.filter((a) => a.roundId !== where.roundId);
+        return { count: before - db.attempts.length };
+      },
     },
+    $transaction: async (ops: Promise<unknown>[]) => Promise.all(ops),
     triviaReport: {
       create: async ({ data }: { data: (typeof db.reports)[number] }) => {
         db.reports.push(data);
@@ -88,12 +99,17 @@ function wrongFor(q: ReturnType<typeof getBank>["questions"][number]): string {
 }
 
 const webPool = () => servable({ pool: "web" });
+/** The body a client sends for today's daily. */
+const dailyBody = (answer: string, over: Record<string, unknown> = {}) => {
+  const q = dailyQuestionFor(dayKeyUtc(), servable({ pool: "web" }))!;
+  return { answer, dayKey: dayKeyUtc(), questionId: q.id, ...over };
+};
 const discordPool = () => servable({ pool: "discord" });
 
 beforeEach(() => {
   session.value = null;
   db.rounds.length = 0;
-  db.attempts.length = 0;
+  db.attempts = [];
   db.reports.length = 0;
   db.down = false;
 });
@@ -118,6 +134,25 @@ describe("practice", () => {
     expect((await practiceGET(req("/api/trivia/practice?category=nope"))).status).toBe(400);
   });
 
+  it("never serves today's daily question: not in GET, and POST gives 404 (no answer lookup before a recorded attempt)", async () => {
+    const daily = dailyQuestionFor(dayKeyUtc(), servable({ pool: "web" }))!;
+    for (let i = 0; i < 40; i++) {
+      const body = await (await practiceGET(req("/api/trivia/practice"))).json();
+      expect(body.questions.some((q: { id: string }) => q.id === daily.id)).toBe(false);
+    }
+    const res = await practicePOST(req("/api/trivia/practice", { method: "POST", body: { questionId: daily.id, answer: daily.answer } }));
+    expect(res.status).toBe(404);
+    expect(JSON.stringify(await res.json())).not.toContain(daily.explanation.slice(0, 20));
+  });
+
+  it("practice keeps working with the tables down and still hides the computed daily", async () => {
+    db.down = true;
+    const daily = dailyQuestionFor(dayKeyUtc(), servable({ pool: "web" }))!;
+    const body = await (await practiceGET(req("/api/trivia/practice"))).json();
+    expect(body.questions.length).toBe(10);
+    expect(body.questions.some((q: { id: string }) => q.id === daily.id)).toBe(false);
+  });
+
   it("never serves a Discord-pool question, even across many draws", async () => {
     const discord = new Set(discordPool().map((q) => q.id));
     for (let i = 0; i < 30; i++) {
@@ -127,7 +162,8 @@ describe("practice", () => {
   });
 
   it("POST: correct and wrong verdicts return the reveal (answer, explanation, sources), never aliases or rejects", async () => {
-    const q = webPool().find((x) => x.id === "pd-001") ?? webPool().find((x) => x.match.kind === "number")!;
+    const dailyId = dailyQuestionFor(dayKeyUtc(), webPool())!.id;
+    const q = webPool().find((x) => x.id !== dailyId && x.match.kind === "number")!;
     const right = await practicePOST(req("/api/trivia/practice", { method: "POST", body: { questionId: q.id, answer: q.answer } }));
     const rb = await right.json();
     expect(rb.verdict).toBe("correct");
@@ -140,7 +176,8 @@ describe("practice", () => {
   });
 
   it("POST: not an answer is ignored without revealing anything", async () => {
-    const tf = webPool().find((x) => x.type === "true_false")!;
+    const dailyId = dailyQuestionFor(dayKeyUtc(), webPool())!.id;
+    const tf = webPool().find((x) => x.id !== dailyId && x.type === "true_false")!;
     const body = await (await practicePOST(req("/api/trivia/practice", { method: "POST", body: { questionId: tf.id, answer: "lol what" } }))).json();
     expect(body).toEqual({ verdict: "ignore" });
   });
@@ -156,7 +193,8 @@ describe("practice", () => {
 
   it("POST: the 31st check in a minute from one IP is 429", async () => {
     const ip = freshIp();
-    const q = webPool()[0];
+    const dailyId = dailyQuestionFor(dayKeyUtc(), webPool())!.id;
+    const q = webPool().find((x) => x.id !== dailyId)!;
     let last = 0;
     for (let i = 0; i < 31; i++) {
       last = (await practicePOST(req("/api/trivia/practice", { method: "POST", ip, body: { questionId: q.id, answer: "x" } }))).status;
@@ -196,26 +234,30 @@ describe("daily", () => {
     expect((await res.json()).question.id).toBe(today().id);
   });
 
-  it("logged out: POST gives a verdict and the reveal, records nothing", async () => {
+  it("logged out: POST gives only correct/wrong, no answer text, and records nothing", async () => {
     const q = today();
-    const res = await dailyPOST(req("/api/trivia/daily", { method: "POST", body: { answer: q.match.kind === "boolean" ? q.answer : q.answer } }));
+    const res = await dailyPOST(req("/api/trivia/daily", { method: "POST", body: dailyBody(q.answer) }));
     const body = await res.json();
     expect(body.verdict).toBe("correct");
     expect(body.recorded).toBe(false);
-    expect(body.reveal.explanation).toBeTruthy();
+    expect(body.signInToReveal).toBe(true);
+    for (const f of ["reveal", "explanation", "sources", "answer"]) expect(keysDeep(body).has(f), `leaked ${f}`).toBe(false);
     expect(db.attempts).toHaveLength(0);
+    const wrong = await (await dailyPOST(req("/api/trivia/daily", { method: "POST", body: dailyBody(wrongFor(q)) }))).json();
+    expect(wrong.verdict).toBe("wrong");
+    expect(keysDeep(wrong).has("reveal")).toBe(false);
   });
 
   it("signed in: one recorded attempt per day; a second submit returns the first result, and GET then reveals", async () => {
     session.value = { discordId: "111" };
     const q = today();
-    const wrongAnswer = wrongFor(q);
-    const first = await (await dailyPOST(req("/api/trivia/daily", { method: "POST", body: { answer: wrongAnswer } }))).json();
+    const first = await (await dailyPOST(req("/api/trivia/daily", { method: "POST", body: dailyBody(wrongFor(q)) }))).json();
     expect(first.verdict).toBe("wrong");
     expect(first.recorded).toBe(true);
+    expect(first.reveal.answer).toBeTruthy();
     expect(db.attempts).toHaveLength(1);
 
-    const second = await (await dailyPOST(req("/api/trivia/daily", { method: "POST", body: { answer: q.answer } }))).json();
+    const second = await (await dailyPOST(req("/api/trivia/daily", { method: "POST", body: dailyBody(q.answer) }))).json();
     expect(second.alreadyAnswered).toBe(true);
     expect(second.verdict).toBe("wrong"); // the first attempt stands
     expect(db.attempts).toHaveLength(1);
@@ -226,22 +268,53 @@ describe("daily", () => {
     expect(got.attempt.reveal.answer).toBeTruthy();
   });
 
+  it("a stale dayKey or questionId (UTC midnight, or a pulled question) is a 409: nothing graded, nothing recorded", async () => {
+    session.value = { discordId: "555" };
+    const q = today();
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+    for (const over of [{ dayKey: yesterday }, { questionId: "pd-001-nope" }]) {
+      const res = await dailyPOST(req("/api/trivia/daily", { method: "POST", body: dailyBody(q.answer, over) }));
+      expect(res.status).toBe(409);
+      const body = await res.json();
+      expect(body.code).toBe("STALE_QUESTION");
+      expect(keysDeep(body).has("verdict")).toBe(false);
+    }
+    expect(db.attempts).toHaveLength(0);
+  });
+
+  it("a body without dayKey and questionId is a 400", async () => {
+    const res = await dailyPOST(req("/api/trivia/daily", { method: "POST", body: { answer: "x" } }));
+    expect(res.status).toBe(400);
+  });
+
   it("not an answer does not use the day's attempt", async () => {
     session.value = { discordId: "222" };
     const q = today();
     if (q.match.kind !== "boolean") return; // only a true/false question treats chit-chat as ignore
-    const body = await (await dailyPOST(req("/api/trivia/daily", { method: "POST", body: { answer: "hmm not sure" } }))).json();
+    const body = await (await dailyPOST(req("/api/trivia/daily", { method: "POST", body: dailyBody("hmm not sure") }))).json();
     expect(body.verdict).toBe("ignore");
     expect(db.attempts).toHaveLength(0);
   });
 
-  it("answers are checked even when the tables are missing (nothing recorded)", async () => {
+  it("tables down: a signed-in member gets the verdict but no answer text (nothing recorded)", async () => {
     db.down = true;
     session.value = { discordId: "333" };
     const q = today();
-    const body = await (await dailyPOST(req("/api/trivia/daily", { method: "POST", body: { answer: q.answer } }))).json();
+    const body = await (await dailyPOST(req("/api/trivia/daily", { method: "POST", body: dailyBody(q.answer) }))).json();
     expect(body.verdict).toBe("correct");
     expect(body.recorded).toBe(false);
+    expect(keysDeep(body).has("reveal")).toBe(false);
+  });
+
+  it("a question pulled mid-day: the round is re-pointed at the replacement and the old answers are voided", async () => {
+    const pulled = servable({ pool: "discord" })[0]; // not in the web pool, like a disabled question
+    db.rounds.push({ id: 1, dayKey: dayKeyUtc(), questionId: pulled.id, surface: "WEB_DAILY" });
+    db.attempts.push({ roundId: 1, discordId: "777", messageId: null, correct: true, answerText: "x" });
+    const body = await (await dailyGET(req("/api/trivia/daily"))).json();
+    expect(body.question.id).toBe(today().id);
+    expect(db.rounds[0].questionId).toBe(today().id);
+    expect(db.attempts).toHaveLength(0); // graded against the pulled question: void, so reveal and % stay consistent
+    expect(body.attempt).toBeNull();
   });
 });
 

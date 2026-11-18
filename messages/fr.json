@@ -2918,6 +2918,8 @@
     "reportThanks": "Merci. Nous allons vérifier.",
     "reportError": "Impossible d'envoyer votre signalement. Réessayez plus tard.",
     "cancel": "Annuler",
-    "adminTitle": "Admin : Quiz"
+    "adminTitle": "Admin : Quiz",
+    "signInToSeeAnswer": "Connectez-vous avec Discord pour voir la réponse et garder votre série.",
+    "notRecordedNoAnswer": "Votre réponse n'a pas pu être enregistrée pour le moment, la réponse n'est donc pas affichée. Réessayez plus tard."
   }
 }

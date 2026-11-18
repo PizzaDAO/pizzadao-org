@@ -22,6 +22,7 @@ interface AnswerResponse {
   verdict: "correct" | "wrong" | "ignore";
   alreadyAnswered?: boolean;
   recorded?: boolean;
+  signInToReveal?: boolean;
   reveal?: RevealDto;
   percentCorrect?: number | null;
   streak?: number | null;
@@ -46,6 +47,7 @@ export default function DailyCard() {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<AnswerResponse | null>(null);
   const [nudge, setNudge] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const left = useCountdown(data?.resetsAt);
 
   useEffect(() => {
@@ -62,13 +64,21 @@ export default function DailyCard() {
     return () => {
       live = false;
     };
-  }, []);
+  }, [reloadKey]);
 
   async function submit(answer: string) {
     setBusy(true);
     setNudge(false);
-    const r = await postJson<AnswerResponse>("/api/trivia/daily", { answer });
+    // Send the day and question the member was shown: if the day rolled over meanwhile, the server refuses (409)
+    // and records nothing, and we load the new question instead of grading the answer against it.
+    const r = await postJson<AnswerResponse>("/api/trivia/daily", { answer, dayKey: data?.dayKey, questionId: data?.question.id });
     setBusy(false);
+    if (r.status === 409) {
+      setResult(null);
+      setData(null);
+      setState("loading");
+      return setReloadKey((k) => k + 1);
+    }
     if (!r.ok || !r.data) return setState("error");
     if (r.data.verdict === "ignore") return setNudge(true);
     setResult(r.data);
@@ -81,6 +91,8 @@ export default function DailyCard() {
     : prior
       ? { verdict: (prior.correct ? "correct" : "wrong") as "correct" | "wrong", reveal: prior.reveal, pct: prior.percentCorrect, recorded: true, already: true }
       : null;
+  // A verdict with no answer text: logged out (sign in to see it) or not recorded (tables unavailable).
+  const verdictOnly = result && result.verdict !== "ignore" && !result.reveal ? { verdict: result.verdict, signIn: !!result.signInToReveal } : null;
   const streak = answered?.streak ?? data?.streak ?? null;
 
   return (
@@ -109,11 +121,19 @@ export default function DailyCard() {
         {state === "ready" && data && (
           <>
             <QuestionHeader q={data.question} />
-            {!shown && <AnswerForm question={data.question} busy={busy} onSubmit={submit} />}
+            {!shown && !verdictOnly && <AnswerForm question={data.question} busy={busy} onSubmit={submit} />}
             {nudge && (
               <p role="alert" className="mb-0 mt-3 text-sm text-tomato-readable">
                 {t("notAnAnswer")}
               </p>
+            )}
+            {verdictOnly && (
+              <div className={`${paperCard} mt-5 p-5`} role="status" aria-live="polite">
+                <p className={`font-display m-0 text-xl font-black ${verdictOnly.verdict === "correct" ? "text-foreground" : "text-tomato-readable"}`}>
+                  {verdictOnly.verdict === "correct" ? t("correct") : t("wrong")}
+                </p>
+                <p className="mb-0 mt-2 text-foreground/80">{verdictOnly.signIn ? t("signInToSeeAnswer") : t("notRecordedNoAnswer")}</p>
+              </div>
             )}
             {shown && (
               <>

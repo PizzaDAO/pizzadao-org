@@ -37,7 +37,7 @@ CREATE TABLE "TriviaAttempt" (
     "discordId" TEXT NOT NULL,
     "messageId" TEXT,
     "correct" BOOLEAN NOT NULL,
-    "answerText" VARCHAR(120) NOT NULL,
+    "answerText" VARCHAR(120),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "TriviaAttempt_pkey" PRIMARY KEY ("id")

@@ -3416,7 +3416,7 @@ model TriviaAttempt {
   discordId  String
   messageId  String?     @unique // Discord: idempotency for recorder retries
   correct    Boolean
-  answerText String      @db.VarChar(120) // truncated; kept 30 days, then nulled by the scrub cron
+  answerText String?     @db.VarChar(120) // truncated; kept 30 days, then nulled by the scrub cron
   createdAt  DateTime    @default(now())
   round      TriviaRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
 

@@ -5,7 +5,11 @@
 // The daily is drawn from the web pool only, so nothing here can leak a Discord question.
 //
 // Signed in (Discord session): one attempt per UTC day, recorded for the streak and leaderboard.
-// Logged out: can answer for fun; nothing is recorded.
+// Logged out: can answer for fun; they get only correct/wrong (no answer text: that waits for a recorded attempt) and
+// nothing is recorded.
+//
+// The client sends the dayKey and questionId it was shown; if the day rolled over (or the question was pulled) since,
+// the answer is refused with 409 and nothing is recorded, so it is never graded against a question the member did not see.
 import { NextRequest } from "next/server";
 import { getSession } from "@/app/lib/session";
 import { rejectUnsafeWrite } from "@/app/lib/admin-guard";
@@ -57,7 +61,10 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => null);
   const answer = readAnswer(body);
-  if (answer === null) return reply({ error: `Send {"answer": "..."} (max ${MAX_ANSWER_INPUT} characters)` }, 400);
+  const shown = body && typeof body === "object" ? (body as { dayKey?: unknown; questionId?: unknown }) : {};
+  if (answer === null || typeof shown.dayKey !== "string" || typeof shown.questionId !== "string") {
+    return reply({ error: `Send {"answer": "...", "dayKey": "...", "questionId": "..."} (answer max ${MAX_ANSWER_INPUT} characters)` }, 400);
+  }
 
   const session = await getSession();
   if (session?.discordId) {
@@ -69,6 +76,9 @@ export async function POST(request: NextRequest) {
   if (!round) return reply({ error: "No daily question today" }, 503);
   const q = round.question;
   const discordId = session?.discordId;
+  if (shown.dayKey !== round.dayKey || shown.questionId !== q.id) {
+    return reply({ error: "The daily question changed. Reloading.", code: "STALE_QUESTION", dayKey: round.dayKey }, 409);
+  }
 
   // One attempt per member per day: a second submit gets the first one's result back.
   const already = async () => {
@@ -89,9 +99,11 @@ export async function POST(request: NextRequest) {
 
   const { verdict } = match(q, answer);
   if (verdict === "ignore") return reply({ verdict: "ignore" });
+  // Logged out: nothing is recorded, so nothing is revealed. Only a recorded attempt gets the answer text.
+  if (!discordId) return reply({ verdict, alreadyAnswered: false, recorded: false, signInToReveal: true });
 
   let recorded = false;
-  if (discordId && round.roundId) {
+  if (round.roundId) {
     recorded = await recordDailyAttempt(round.roundId, discordId, verdict === "correct", answer);
     if (!recorded) {
       // A concurrent submit won the race: report that attempt, not this one.
@@ -99,12 +111,15 @@ export async function POST(request: NextRequest) {
       if (raced) return raced;
     }
   }
+  // Not recorded (the tables are unavailable): the member gets the verdict but not the answer, which would
+  // otherwise be free to retry for. The answer text only ever goes with a recorded attempt.
+  if (!recorded) return reply({ verdict, alreadyAnswered: false, recorded: false });
   return reply({
     verdict,
     alreadyAnswered: false,
-    recorded,
+    recorded: true,
     reveal: reveal(q),
-    percentCorrect: recorded && round.roundId ? await percentCorrect(round.roundId) : null,
-    streak: recorded && discordId ? await streakFor(discordId, round.dayKey) : null,
+    percentCorrect: round.roundId ? await percentCorrect(round.roundId) : null,
+    streak: await streakFor(discordId, round.dayKey),
   });
 }

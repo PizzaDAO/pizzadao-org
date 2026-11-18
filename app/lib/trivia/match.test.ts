@@ -208,3 +208,50 @@ describe("fuzz", () => {
     }
   });
 });
+
+describe("lists of guesses never pass (review probes)", () => {
+  it.each([
+    ["pz-016", "base ethereum polygon bitcoin"],
+    ["pz-016", "Base, Polygon"],
+    ["pz-010", "ethereum bitcoin solana base"],
+    ["jc-006", "$41 $400 $40,000"],
+    ["jc-006", "400 or 41"],
+    ["eb-027", "10 30 70 99"],
+    ["eb-027", "under 70%"],
+    ["pd-015", "windows mac linux"],
+    ["pd-015", "mac or windows"],
+    ["eb-009", "nyt ft the times"],
+    ["eb-009", "times of india"],
+    ["eb-024", "hal finney jed mccaleb gavin"],
+    ["eb-033", "satoshin@gmx.de"],
+    ["eb-033", "satoshin@gmx.com.evil"],
+  ])("%s: %s is not correct", (id, input) => {
+    expect(verdict(id, input)).toBe("wrong");
+  });
+
+  it.each([
+    ["jc-006", "it's $400"],
+    ["jc-006", "I think $400"],
+    ["pz-010", "the answer is ethereum"],
+    ["pz-010", "ethereum!"],
+    ["pz-016", "Base mainnet"],
+    ["eb-027", "over 70"],
+    ["pd-015", "it's mac os x"],
+    ["pd-015", "the mac"],
+    ["eb-009", "the times of london"],
+    ["eb-009", "The Times!"],
+    ["eb-024", "mccaleb jed"],
+    ["eb-024", "it was jed mccaleb"],
+    ["pd-004", "I think papa johns"],
+    ["eb-033", "satoshin@gmx.com"],
+    ["fun-002", "i think pineapple and jalapeno"],
+  ])("%s: %s still passes", (id, input) => {
+    expect(verdict(id, input)).toBe("correct");
+  });
+
+  it("the answer is true / articles / typos still work", () => {
+    expect(verdict("pd-007", "the answer is true")).toBe("correct");
+    expect(verdict("pd-004", "papa jons")).toBe("correct"); // one typo
+    expect(verdict("eb-009", "a times")).toBe("correct");
+  });
+});

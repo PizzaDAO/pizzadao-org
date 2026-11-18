@@ -2918,6 +2918,8 @@
     "reportThanks": "Gracias. Lo revisaremos.",
     "reportError": "No se pudo enviar tu reporte. Intenta de nuevo más tarde.",
     "cancel": "Cancelar",
-    "adminTitle": "Admin: Trivia"
+    "adminTitle": "Admin: Trivia",
+    "signInToSeeAnswer": "Inicia sesión con Discord para ver la respuesta y mantener tu racha.",
+    "notRecordedNoAnswer": "No se pudo registrar tu respuesta ahora, así que no se muestra la solución. Intenta de nuevo más tarde."
   }
 }

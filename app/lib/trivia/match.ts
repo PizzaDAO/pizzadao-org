@@ -302,7 +302,12 @@ function matchNumber(q: MatchableQuestion, cleaned: string): Verdict {
 // ---------------------------------------------------------------------------------------------------------------
 
 const NEGATIONS = new Set(["not", "isnt", "wasnt", "no", "never", "dont", "didnt", "cant", "nor", "except"]);
-const MAX_EXTRA_TOKENS = 3;
+
+/** Words that may surround an answer without changing it ("I think it was jercos"). */
+const HARMLESS = new Set([
+  ...FILLER,
+  "im", "believe", "bet", "pretty", "sure", "pls", "please", "thanks", "thank", "you", "lol", "yeah", "yes", "of", "for",
+]);
 
 function containsSequence(hay: string[], needle: string[]): boolean {
   if (needle.length === 0 || needle.length > hay.length) return false;
@@ -328,43 +333,66 @@ function nearlyEqual(input: string, target: string, fuzzy: boolean, maxFuzz = 3)
   return allowed > 0 && editDistance(input, target) <= allowed;
 }
 
-type TextVerdict = "correct" | "wrong" | "none";
-
 /**
- * Text match against a set of targets and rejects.
- *  1. rejects: exact or fuzzy (<= 1, still length-scaled): wrong, and it beats aliases
- *  2. exact match on answer + aliases: correct
- *  3. fuzzy (length-scaled): correct
- *  4. containment as a whole-word sequence, <= 3 extra tokens, no negation: correct
- *  5. otherwise "none" (the caller decides: a wrong guess, or not an attempt at all)
+ *  - "wrong":   the input is, or contains, a reject (a list of guesses that includes one is wrong)
+ *  - "exact":   the whole input equals (or is fuzzily close to) the answer or an alias
+ *  - "contain": the input contains an answer/alias as a whole-word sequence, with no negation, and every other word
+ *               is harmless filler or a word of the question's own answers (so "mccaleb jed" and "it was jercos"
+ *               pass, but "times of india", "hal finney jed mccaleb gavin" and "satoshin@gmx.de" do not)
+ *  - "none":    nothing matched
  */
-function matchTextAgainst(inputRaw: string, targets: string[], rejects: string[], fuzzy: boolean): TextVerdict {
+type TextLevel = "wrong" | "exact" | "contain" | "none";
+
+function textLevel(inputRaw: string, targets: string[], rejects: string[], fuzzy: boolean): TextLevel {
   const inVariants = variants(inputRaw).filter(Boolean);
   if (inVariants.length === 0) return "none";
 
-  for (const r of rejects) {
-    for (const rv of variants(r).filter(Boolean)) {
-      if (inVariants.some((iv) => nearlyEqual(iv, rv, fuzzy, 1))) return "wrong";
+  // 1. The whole input is (nearly) a reject: wrong, and it beats aliases.
+  const rejectVariants = rejects.flatMap((r) => variants(r).filter(Boolean));
+  for (const rv of rejectVariants) if (inVariants.some((iv) => nearlyEqual(iv, rv, fuzzy, 1))) return "wrong";
+  // 2. The whole input is an answer or alias.
+  const targetVariants = targets.flatMap((t) => variants(t).filter(Boolean));
+  for (const tv of targetVariants) if (inVariants.includes(tv)) return "exact";
+  if (fuzzy) for (const tv of targetVariants) if (inVariants.some((iv) => nearlyEqual(iv, tv, true))) return "exact";
+  // 3. The input contains a reject ("windows mac linux"): wrong, unless that reject is just part of an answer that the
+  //    input also contains ("pineapple" inside "pineapple jalapeno pizza").
+  for (const iv of inVariants) {
+    const inTokens = iv.split(" ");
+    const containedTargets = targetVariants.filter((tv) => containsSequence(inTokens, tv.split(" ")));
+    for (const rv of rejectVariants) {
+      const rTokens = rv.split(" ");
+      if (!containsSequence(inTokens, rTokens)) continue;
+      if (containedTargets.some((tv) => containsSequence(tv.split(" "), rTokens))) continue;
+      return "wrong";
     }
   }
-  const targetVariants = targets.flatMap((t) => variants(t).filter(Boolean));
-  for (const tv of targetVariants) if (inVariants.includes(tv)) return "correct";
-  if (fuzzy) for (const tv of targetVariants) if (inVariants.some((iv) => nearlyEqual(iv, tv, true))) return "correct";
 
+  const vocab = new Set<string>(HARMLESS);
+  for (const tv of targetVariants) for (const w of tv.split(" ")) vocab.add(w);
   for (const iv of inVariants) {
     const inTokens = iv.split(" ");
     if (inTokens.some((t) => NEGATIONS.has(t))) continue;
     for (const tv of targetVariants) {
       const tTokens = tv.split(" ");
-      if (inTokens.length - tTokens.length <= MAX_EXTRA_TOKENS && containsSequence(inTokens, tTokens)) return "correct";
+      if (!containsSequence(inTokens, tTokens)) continue;
+      // Every word outside one occurrence of the target must be harmless or part of the answers' own vocabulary.
+      const rest = removeSequence(inTokens, tTokens);
+      if (rest.every((w) => vocab.has(w))) return "contain";
     }
   }
   return "none";
 }
 
+function removeSequence(hay: string[], needle: string[]): string[] {
+  for (let i = 0; i + needle.length <= hay.length; i++) {
+    if (needle.every((w, j) => hay[i + j] === w)) return [...hay.slice(0, i), ...hay.slice(i + needle.length)];
+  }
+  return hay;
+}
+
 function matchText(q: MatchableQuestion, cleaned: string): Verdict {
-  const v = matchTextAgainst(cleaned, [q.answer, ...q.aliases], q.rejects, q.match.fuzzy ?? false);
-  return v === "correct" ? "correct" : "wrong"; // a wrong guess counts as an attempt
+  const level = textLevel(cleaned, [q.answer, ...q.aliases], q.rejects, q.match.fuzzy ?? false);
+  return level === "exact" || level === "contain" ? "correct" : "wrong"; // a wrong guess counts as an attempt
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -381,19 +409,35 @@ export function parseChoiceLetter(cleaned: string): number | null {
   return m ? m[1].charCodeAt(0) - 97 : null;
 }
 
+/** The words of a string that carry meaning (normalised, filler removed). */
+function contentTokens(s: string): string[] {
+  return tokens(normalizeText(s)).filter((w) => !HARMLESS.has(w));
+}
+
+/**
+ * Multiple choice. A letter picks a choice. Otherwise the input is matched against the answer, but an input that
+ * names more than one choice (a list of guesses) is wrong, and one that only half-names a choice ("under 70%") is
+ * wrong, not an ignored message: a failed attempt must not be free. Chit-chat that touches no choice is ignored.
+ */
 function matchChoice(q: MatchableQuestion, cleaned: string): Verdict {
   const choices = q.choices ?? [];
+  const answerForms = variants(q.answer);
   const letter = parseChoiceLetter(cleaned);
   if (letter !== null) {
     if (letter >= choices.length) return "ignore";
-    return variants(choices[letter]).some((v) => variants(q.answer).includes(v)) ? "correct" : "wrong";
+    return variants(choices[letter]).some((v) => answerForms.includes(v)) ? "correct" : "wrong";
   }
   const fuzzy = q.match.fuzzy ?? true;
-  const verdict = matchTextAgainst(cleaned, [q.answer, ...q.aliases], q.rejects, fuzzy);
-  if (verdict !== "none") return verdict;
-  // It names one of the other choices: a wrong answer. Anything else is not an attempt.
-  const others = choices.filter((c) => !variants(c).some((v) => variants(q.answer).includes(v)));
-  return matchTextAgainst(cleaned, others, [], fuzzy) === "correct" ? "wrong" : "ignore";
+  const level = textLevel(cleaned, [q.answer, ...q.aliases], q.rejects, fuzzy);
+  if (level === "wrong") return "wrong";
+  if (level === "exact") return "correct";
+
+  // Which choices does the input touch (shares a meaningful word with)?
+  const inWords = new Set(contentTokens(cleaned));
+  const touched = choices.filter((c) => contentTokens(c).some((w) => inWords.has(w)));
+  if (touched.length >= 2) return "wrong";
+  if (level === "contain") return "correct";
+  return touched.length === 1 ? "wrong" : "ignore";
 }
 
 // ---------------------------------------------------------------------------------------------------------------

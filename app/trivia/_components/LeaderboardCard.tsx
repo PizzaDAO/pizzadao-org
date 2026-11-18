@@ -11,6 +11,7 @@ interface Entry {
   name: string;
   memberId: string | null;
   score: number;
+  capped?: boolean;
 }
 interface BoardDto {
   available: boolean;
@@ -83,7 +84,7 @@ export default function LeaderboardCard() {
                       r.name
                     )}
                   </td>
-                  <td className="py-2 text-right font-semibold tabular-nums">{r.score}</td>
+                  <td className="py-2 text-right font-semibold tabular-nums">{r.score}{r.capped ? "+" : ""}</td>
                 </tr>
               ))}
             </tbody>

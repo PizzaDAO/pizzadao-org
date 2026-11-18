@@ -17,7 +17,14 @@ export interface DailyRound {
   roundId: number | null;
 }
 
-/** Today's web daily: the stored round if there is one, else computed (and stored, best effort). Null if the web pool is empty. */
+/**
+ * Today's web daily: the stored round if there is one, else computed (and stored, best effort). Null if the web pool is empty.
+ *
+ * If the stored question was pulled since (disabled, retired, or no longer a web question) the round is re-pointed at the
+ * replacement and the answers already given to the pulled question are voided (deleted): they were graded against a
+ * question that is no longer served, so keeping them would make the reveal, "% got it right" and streak disagree with
+ * the question on screen. Those members can answer the replacement and win the day back.
+ */
 export async function getDailyRound(now: Date = new Date()): Promise<DailyRound | null> {
   const dayKey = dayKeyUtc(now);
   const pool = servable({ now, pool: "web" });
@@ -27,10 +34,13 @@ export async function getDailyRound(now: Date = new Date()): Promise<DailyRound 
     const existing = await prisma.triviaRound.findUnique({ where: { dayKey } });
     if (existing) {
       const stored = getQuestion(existing.questionId);
-      // Keep the stored question unless it was pulled since (retired, disabled or no longer a web question).
       if (stored && pool.some((q) => q.id === stored.id)) return { dayKey, question: stored, roundId: existing.id };
-      if (computed) return { dayKey, question: computed, roundId: existing.id };
-      return null;
+      if (!computed) return null;
+      await prisma.$transaction([
+        prisma.triviaAttempt.deleteMany({ where: { roundId: existing.id } }),
+        prisma.triviaRound.update({ where: { id: existing.id }, data: { questionId: computed.id } }),
+      ]);
+      return { dayKey, question: computed, roundId: existing.id };
     }
     if (!computed) return null;
     try {
@@ -47,6 +57,18 @@ export async function getDailyRound(now: Date = new Date()): Promise<DailyRound 
     console.error("[trivia] daily round unavailable:", (e as Error).message);
     return computed ? { dayKey, question: computed, roundId: null } : null;
   }
+}
+
+/**
+ * The questions practice may serve: the web pool minus today's daily, so a practice reveal can never give away the
+ * daily answer before a member's recorded attempt.
+ */
+export async function practicePool(now: Date = new Date()): Promise<TriviaQuestion[]> {
+  const pool = servable({ now, pool: "web" });
+  const daily = await getDailyRound(now);
+  const computed = dailyQuestionFor(dayKeyUtc(now), pool);
+  const hidden = new Set([daily?.question.id, computed?.id].filter((x): x is string => !!x));
+  return pool.filter((q) => !hidden.has(q.id));
 }
 
 export interface StoredAttempt {
@@ -96,6 +118,7 @@ export async function streakFor(discordId: string, today: string): Promise<numbe
     const rows = await prisma.triviaAttempt.findMany({
       where: { discordId, messageId: null, round: { surface: "WEB_DAILY", dayKey: { gte: addDays(today, -400) } } },
       select: { round: { select: { dayKey: true } } },
+      orderBy: { id: "asc" },
       take: 500,
     });
     return computeStreak(

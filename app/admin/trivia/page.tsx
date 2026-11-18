@@ -2,7 +2,9 @@
 //
 // Trivia admin, READ ONLY in phase 1 (plans/trivia.md §4.2, §12): bank stats and what is held back, recent rounds and
 // the "report a problem" queue. No writes: disabling a question is a bank edit (PR) until phase 2 adds the setting.
-// Gate: ADMIN_ROLE_IDS (isAdminDiscordId, fails closed). Anyone else gets a real 404, and logged-out visitors go to log in.
+// Gate: ADMIN_ROLE_IDS (isAdminDiscordId, fails closed). A visitor with no session gets a real 307 to log in from proxy.ts
+// before anything renders. A signed-in non-admin gets notFound(): the site's not-found page, but with a 200 status (the root
+// layout's Suspense has already sent the status by the time the page runs), and no admin data is rendered or sent.
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
