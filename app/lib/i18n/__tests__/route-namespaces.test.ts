@@ -40,8 +40,29 @@ function resolveImport(from: string, spec: string): string | null {
 type FileInfo = { imports: string[]; uses: string[]; problems: string[] };
 const cache = new Map<string, FileInfo>();
 
+/** Removes // and block comments in one left-to-right pass, leaving string and template literals intact. */
 function stripComments(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`\\])\/\/.*$/gm, "$1");
+  let out = "";
+  let i = 0;
+  while (i < src.length) {
+    const c = src[i];
+    const n = src[i + 1];
+    if (c === "/" && n === "/") {
+      while (i < src.length && src[i] !== "\n") i++;
+    } else if (c === "/" && n === "*") {
+      const end = src.indexOf("*/", i + 2);
+      i = end === -1 ? src.length : end + 2;
+    } else if (c === '"' || c === "'" || c === "`") {
+      let j = i + 1;
+      while (j < src.length && src[j] !== c) j += src[j] === "\\" ? 2 : 1;
+      out += src.slice(i, j + 1);
+      i = j + 1;
+    } else {
+      out += c;
+      i++;
+    }
+  }
+  return out;
 }
 
 function info(file: string): FileInfo {
@@ -127,6 +148,19 @@ for (const e of fs.readdirSync(APP, { withFileTypes: true })) {
     else rootOther.push(p);
   }
 }
+
+describe("stripComments", () => {
+  it("a // comment containing /* does not swallow the code after it", () => {
+    const src = '// Wrapper for /api/admin/shop/* handlers\nimport X from "@/x";\nuseTranslations("a");\n/* c */ const y = 1; // t */';
+    const out = stripComments(src);
+    expect(out).toContain('import X from "@/x";');
+    expect(out).toContain('useTranslations("a")');
+    expect(out).not.toContain("Wrapper");
+  });
+  it("keeps comment markers inside strings", () => {
+    expect(stripComments('const u = "http://x/*y*/"; // gone')).toBe('const u = "http://x/*y*/"; ');
+  });
+});
 
 describe("per-route client messages", () => {
   it("every route's provider supplies the namespaces its client components use", () => {
