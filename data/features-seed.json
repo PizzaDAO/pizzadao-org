@@ -1693,11 +1693,6 @@
           "repo": "PizzaDAO/pizzadao-org",
           "path": "app/lib/calls/live-qa.ts",
           "description": ""
-        },
-        {
-          "repo": "PizzaDAO/pizzadao-org",
-          "path": "app/api/polls",
-          "description": ""
         }
       ],
       "position": 400
@@ -2140,17 +2135,7 @@
         },
         {
           "repo": "PizzaDAO/pizzadao-org",
-          "path": "app/vote/[pollId]",
-          "description": ""
-        },
-        {
-          "repo": "PizzaDAO/pizzadao-org",
           "path": "app/lib/proposals",
-          "description": ""
-        },
-        {
-          "repo": "PizzaDAO/pizzadao-org",
-          "path": "app/api/vote",
           "description": ""
         },
         {

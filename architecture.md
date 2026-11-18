@@ -56,8 +56,6 @@ This is a Next.js 16 application serving as the onboarding and community managem
 │   ├── crew/[crewId]/          # Individual crew
 │   ├── dashboard/[id]/         # User dashboard
 │   ├── profile/[id]/           # User profile
-│   ├── vote/[pollId]/          # Anonymous voting
-│   ├── admin/polls/            # Poll administration
 │   ├── layout.tsx              # Root layout
 │   └── providers.tsx           # Web3 providers
 ├── prisma/
@@ -222,7 +220,6 @@ CLAIM_PASSWORD=                  # Member claiming
 | `/api/jobs/*` | Job listing, assignment, completion |
 | `/api/bounties/*` | Bounty CRUD and lifecycle |
 | `/api/nfts/*` | NFT fetching and leaderboard |
-| `/api/polls/*` | Poll management and voting |
 | `/api/inventory/*` | Item ownership |
 | `/api/shop/*` | Item purchasing |
 | `/api/crew/*` | Crew membership |
