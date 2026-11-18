@@ -8,17 +8,18 @@ import { useToast } from "@/app/(marketing)/_site/hooks/use-toast";
 import { identifyByEmail, track } from "@/app/(marketing)/_site/lib/analytics/posthog";
 import { EVT } from "@/app/(marketing)/_site/lib/analytics/events";
 
+type FooterItem = { label: string; href: string };
+
 const cols = [
-  { title: "More", items: ["About", "Global Pizza Party", { label: "Partners", href: "/partners" }, "Journal", "Join"] as Array<string | { label: string; href: string }> },
-  { title: "Resources", items: [{ label: "Handbook", href: "/handbook" }, { label: "Manuals", href: "/manuals" }] as Array<string | { label: string; href: string }> },
-  { title: "Press", items: [{ label: "Brand System", href: "https://pizzadao.xyz/brand" }, { label: "Contact", href: "/contact" }, "Inquiries"] as Array<string | { label: string; href: string }> },
-  { title: "Elsewhere", items: [{ label: "Instagram", href: "https://www.instagram.com/Pizza_DAO/" }, { label: "X / Twitter", href: "https://x.com/Pizza_DAO" }, { label: "YouTube", href: "https://www.youtube.com/@PizzaDAO" }] as Array<string | { label: string; href: string }> },
+  { title: "More", items: [{ label: "About", href: "/about" }, { label: "Global Pizza Party", href: "https://globalpizza.party" }, { label: "Partners", href: "/partners" }, { label: "Articles", href: "/articles" }, { label: "Join", href: "/join" }] as FooterItem[] },
+  { title: "Resources", items: [{ label: "Handbook", href: "/handbook" }, { label: "Manuals", href: "/manuals" }] as FooterItem[] },
+  { title: "Press", items: [{ label: "Brand System", href: "/brand-system" }, { label: "Contact", href: "/contact" }, { label: "Inquiries", href: "/contact" }] as FooterItem[] },
+  { title: "Elsewhere", items: [{ label: "Instagram", href: "https://www.instagram.com/Pizza_DAO/" }, { label: "X / Twitter", href: "https://x.com/Pizza_DAO" }, { label: "YouTube", href: "https://www.youtube.com/@PizzaDAO" }] as FooterItem[] },
 ];
 
 const PHRASES = [
   "Pizza the planet",
   "Slice by slice",
-  "See you May 22",
   "The internet needed a table",
   "People kept showing up",
   "Every city does it differently",
@@ -164,7 +165,7 @@ const Footer = () => {
                 </div>
                 <ul className="mt-4 space-y-2.5">
                   {c.items.map((i) => {
-                    const item = typeof i === "string" ? { label: i, href: "#" } : i;
+                    const item = i;
                     return (
                       <li key={item.label}>
                         <a
