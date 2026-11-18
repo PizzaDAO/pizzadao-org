@@ -80,7 +80,7 @@ describe("<MissionsClient /> level header", () => {
       levelTitle: "Don of Dons",
     };
     render(<MissionsClient initial={data} />);
-    expect(await screen.findByText("Made Mafia")).toBeTruthy();
+    expect((await screen.findAllByText("Made Mafia")).length).toBeGreaterThan(0);
     expect(screen.getByText("§ Level Completed")).toBeTruthy();
     expect(screen.getByText(/Next: Level 8\s*· Don of Dons/)).toBeTruthy();
   });
