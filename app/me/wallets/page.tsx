@@ -10,6 +10,7 @@
 // this route is *only* for the owner managing their own wallets.
 
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/app/lib/session";
 import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
@@ -104,7 +105,7 @@ export default async function MyWalletsPage({
 
     const session = await getSession();
     if (!session?.discordId) {
-        return <Forbidden reason="Please log in to manage your wallets." />;
+        redirect("/login?returnTo=%2Fme%2Fwallets");
     }
 
     let viewerMemberId: string | null = null;

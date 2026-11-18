@@ -134,8 +134,8 @@ export default function VouchesPage() {
             Vouches
           </h1>
           <p className="text-muted-foreground m-0">{authError}</p>
-          <Link href="/" className={`${pillInk} justify-self-start`}>
-            Back to Home
+          <Link href={meError ? "/login?returnTo=%2Fvouches" : "/"} className={`${pillInk} justify-self-start`}>
+            {meError ? "Log in" : "Back to Home"}
           </Link>
         </div>
       </EditorialPage>

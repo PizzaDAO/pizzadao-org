@@ -6,6 +6,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getLocale, getTranslations } from "next-intl/server";
+import { callDateTimeFormat } from "@/app/lib/calls/format-call-time";
 import { getSession } from "@/app/lib/session";
 import { canReviewCalls } from "@/app/lib/calls/access";
 import { listRecordingsPage, type ListRecordingsOpts, type SourceFilter } from "@/app/lib/calls/recordings";
@@ -68,7 +69,7 @@ export default async function AdminCallsPage({ searchParams }: { searchParams: P
         return qs ? `/admin/calls?${qs}` : "/admin/calls";
     };
     const postFilter = await loadPostFilter().catch(() => null);
-    const when = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
+    const when = callDateTimeFormat(locale);
 
     return (
         <main className="min-h-screen bg-background text-foreground p-5 md:p-10">

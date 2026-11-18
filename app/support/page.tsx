@@ -32,7 +32,7 @@ export default async function SupportPage() {
                     <h1 className="font-[family-name:var(--font-display)] font-black text-3xl m-0">Need a hand?</h1>
                     <p className="m-0 text-foreground/70">Log in with Discord to open a support ticket.</p>
                     <Link
-                        href="/login"
+                        href="/login?returnTo=%2Fsupport"
                         className="btn-pill self-start"
                         style={{ background: "hsl(var(--ink))", color: "hsl(var(--cream))" }}
                     >

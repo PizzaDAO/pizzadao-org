@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "@/app/lib/hooks/use-session";
 import {
@@ -11,6 +10,7 @@ import {
   FilterChip,
   LoadingLine,
   paperCard,
+  pillInk,
 } from "@/app/ui/shared/Editorial";
 
 // Editorial restyle: § masthead, paper-soft search strip and city cards on
@@ -47,7 +47,6 @@ function regionLabel(id: string): string {
 }
 
 export default function ChatsPage() {
-  const router = useRouter();
   const { data: session, isLoading } = useSession();
 
   const [cities, setCities] = useState<CityChatListItem[]>([]);
@@ -57,13 +56,6 @@ export default function ChatsPage() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [regionFilter, setRegionFilter] = useState<string | null>(null);
-
-  // Redirect unauthenticated users to login.
-  useEffect(() => {
-    if (!isLoading && !session?.authenticated) {
-      router.push("/login?returnTo=/chats");
-    }
-  }, [isLoading, session?.authenticated, router]);
 
   // Debounce search input.
   useEffect(() => {
@@ -85,7 +77,8 @@ export default function ChatsPage() {
         const res = await fetch("/api/chats");
         if (!res.ok) {
           const j = await res.json().catch(() => ({}));
-          throw new Error(j?.error || "Failed to load chats");
+          console.error("chats load failed", j?.error);
+          throw new Error("load failed");
         }
         const data: ChatsResponse = await res.json();
         if (cancelled) return;
@@ -93,7 +86,8 @@ export default function ChatsPage() {
         setRegions(data.regions || []);
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Unknown error");
+          console.error("chats load failed", err);
+          setError("We couldn't load the city chats right now. Please try again.");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -115,7 +109,7 @@ export default function ChatsPage() {
     });
   }, [cities, search, regionFilter]);
 
-  // While checking auth, show a loading state. Render nothing if unauthenticated.
+  // While checking auth, show a loading state. Unauthenticated visitors get a login prompt.
   if (isLoading) {
     return (
       <EditorialPage width="max-w-[1200px]">
@@ -125,7 +119,16 @@ export default function ChatsPage() {
   }
 
   if (!session?.authenticated) {
-    return null;
+    return (
+      <EditorialPage width="max-w-[1200px]">
+        <div className={`${paperCard} p-10 text-center grid justify-items-center gap-4`}>
+          <p className="text-base m-0">Log in to see city chats.</p>
+          <Link href="/login?returnTo=%2Fchats" className={pillInk}>
+            Log in
+          </Link>
+        </div>
+      </EditorialPage>
+    );
   }
 
   return (
