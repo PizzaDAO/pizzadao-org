@@ -61,7 +61,7 @@ function makeDeps(initial: CallCardView, over: Partial<SweepDeps> = {}) {
     store: async (_id, c) => void (state.v.card = { ...c, resolvedAt: null, claimedAt: NOW }),
     saveState: async (_id, s) => {
       state.saved.push(s)
-      state.errors.push(s.error)
+      state.errors.push(s.error ?? null)
       state.v.card = { channelId: null, messageId: null, renderedHash: null, claimedAt: null, ...(state.v.card ?? {}), resolvedAt: s.resolvedAt, ...(s.renderedHash ? { renderedHash: s.renderedHash } : {}) }
     },
     clearMessage: async () => void (state.v.card = null),
