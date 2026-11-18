@@ -7,6 +7,7 @@
 // preserved verbatim.
 
 import { useCallback, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 
 // Glyphs in the order they render. The API speaks glyphs back to us, so
 // this list is also the set of valid `myReaction` values.
@@ -44,6 +45,7 @@ function readCounts(raw: unknown): Record<Emoji, number> {
 }
 
 export default function ArticleReactions({ slug, currentUserDiscordId }: Props) {
+  const pathname = usePathname();
   const [state, setState] = useState<ReactionState>({
     counts: emptyCounts(),
     myReaction: null,
@@ -177,7 +179,7 @@ export default function ArticleReactions({ slug, currentUserDiscordId }: Props) 
         {!currentUserDiscordId && (
           <span className="overline ml-1 text-foreground/55">
             <a
-              href="/api/auth/discord"
+              href={`/login?returnTo=${encodeURIComponent(pathname || `/articles/${slug}`)}`}
               className="text-tomato hover:text-[hsl(var(--tomato-deep))] no-underline transition-colors font-semibold"
             >
               Sign in

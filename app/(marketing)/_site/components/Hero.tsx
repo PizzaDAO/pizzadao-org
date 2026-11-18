@@ -37,7 +37,7 @@ const Hero = () => {
 
             <div className="mt-7 flex flex-col gap-3 md:items-stretch">
               <a
-                href="#join"
+                href="/join"
                 className="mk-btn-pill group bg-cream text-ink hover:bg-butter"
               >
                 Join the Pizza Mafia

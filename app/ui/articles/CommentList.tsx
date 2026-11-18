@@ -6,6 +6,7 @@
 // borders. Edit/delete actions become quiet pill buttons.
 
 import { useCallback, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 import ArticleRenderer from "./ArticleRenderer";
 import CommentComposer, { type PostedComment } from "./CommentComposer";
@@ -263,6 +264,7 @@ function CommentRow({
  * Renders the comments thread + the composer for a given article slug.
  */
 export default function CommentList({ slug, currentUserDiscordId, isAdmin }: Props) {
+  const pathname = usePathname();
   const [comments, setComments] = useState<CommentDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -324,7 +326,7 @@ export default function CommentList({ slug, currentUserDiscordId, isAdmin }: Pro
       ) : (
         <div className="paper-soft px-4 py-4 bg-card border border-[hsl(var(--rule-warm)/0.55)] rounded-[--radius] text-sm text-foreground/75">
           <a
-            href="/api/auth/discord"
+            href={`/login?returnTo=${encodeURIComponent(pathname || `/articles/${slug}`)}`}
             className="text-tomato hover:text-[hsl(var(--tomato-deep))] font-semibold no-underline transition-colors"
           >
             Sign in
