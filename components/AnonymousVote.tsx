@@ -28,7 +28,7 @@ type UserStatus = {
 }
 
 // Errors the API returns that are meaningful to a voter; everything else gets a generic message.
-const KNOWN_ERRORS = new Set(['You have already voted', 'Poll is not open for voting'])
+const KNOWN_ERRORS = new Set(['You have already voted', 'Poll is not open for voting', 'Poll not found'])
 
 class VoteError extends Error {}
 

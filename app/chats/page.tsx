@@ -77,7 +77,8 @@ export default function ChatsPage() {
         const res = await fetch("/api/chats");
         if (!res.ok) {
           const j = await res.json().catch(() => ({}));
-          throw new Error(j?.error || "Failed to load chats");
+          console.error("chats load failed", j?.error);
+          throw new Error("load failed");
         }
         const data: ChatsResponse = await res.json();
         if (cancelled) return;
@@ -85,7 +86,8 @@ export default function ChatsPage() {
         setRegions(data.regions || []);
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Unknown error");
+          console.error("chats load failed", err);
+          setError("We couldn't load the city chats right now. Please try again.");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -107,7 +109,7 @@ export default function ChatsPage() {
     });
   }, [cities, search, regionFilter]);
 
-  // While checking auth, show a loading state. Render nothing if unauthenticated.
+  // While checking auth, show a loading state. Unauthenticated visitors get a login prompt.
   if (isLoading) {
     return (
       <EditorialPage width="max-w-[1200px]">

@@ -12,6 +12,12 @@ vi.mock("@/app/lib/session", () => ({
     getSession: vi.fn(),
 }));
 
+vi.mock("next/navigation", () => ({
+    redirect: vi.fn(() => {
+        throw new Error("NEXT_REDIRECT");
+    }),
+}));
+
 vi.mock("@/app/lib/sheets/member-repository", () => ({
     fetchMemberIdByDiscordId: vi.fn(),
 }));
@@ -25,6 +31,7 @@ vi.mock("./WalletsClient", () => ({
 }));
 
 import MyWalletsPage from "./page";
+import { redirect } from "next/navigation";
 import { getSession } from "@/app/lib/session";
 import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
 
@@ -40,12 +47,12 @@ describe("/me/wallets (owner-only access gate)", () => {
         vi.clearAllMocks();
     });
 
-    it("renders 403 when there is no session", async () => {
+    it("redirects to login with a return path when there is no session", async () => {
         (getSession as ReturnType<typeof vi.fn>).mockResolvedValue(null);
 
-        await renderPage();
+        await expect(renderPage()).rejects.toThrow("NEXT_REDIRECT");
 
-        expect(screen.getByText(/403 — Forbidden/)).toBeInTheDocument();
+        expect(redirect).toHaveBeenCalledWith("/login?returnTo=%2Fme%2Fwallets");
         expect(screen.queryByTestId("wallets-client")).not.toBeInTheDocument();
     });
 

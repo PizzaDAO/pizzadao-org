@@ -5,7 +5,6 @@
 
 import { TermExplanation } from "@/app/ui/shared/TermExplanation";
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import Image from "next/image";
 import { isOptimizableImage } from "@/app/lib/image-hosts";
 import {
@@ -135,18 +134,11 @@ export default function POAPsPage({ initialData }: { initialData?: WhitelistData
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const [needsLogin, setNeedsLogin] = useState(false);
-
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
-    setNeedsLogin(false);
     try {
       const res = await fetch("/api/poaps/whitelist");
-      if (res.status === 401) {
-        setNeedsLogin(true);
-        return;
-      }
       if (!res.ok) throw new Error("bad status");
       setData(await res.json());
     } catch {
@@ -217,16 +209,7 @@ export default function POAPsPage({ initialData }: { initialData?: WhitelistData
       )}
 
       {/* Error state */}
-      {!loading && needsLogin && (
-        <div className={`${paperCard} p-10 text-center grid justify-items-center gap-4`}>
-          <p className="text-base m-0">Log in to see the POAPs.</p>
-          <Link href="/login?returnTo=%2Fpoaps" className={pillInk}>
-            Log in
-          </Link>
-        </div>
-      )}
-
-      {!loading && !needsLogin && error && (
+      {!loading && error && (
         <div className={`${paperCard} p-10 text-center grid justify-items-center gap-4`}>
           <p className="text-base text-destructive m-0">{error}</p>
           <button type="button" onClick={() => fetchData()} className={pillInk}>
@@ -236,7 +219,7 @@ export default function POAPsPage({ initialData }: { initialData?: WhitelistData
       )}
 
       {/* Events list */}
-      {!loading && !needsLogin && !error && data && (
+      {!loading && !error && data && (
         <>
           {filteredEvents && filteredEvents.length === 0 ? (
             <EmptyState
