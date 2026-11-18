@@ -11,12 +11,11 @@
  * so every route that still uses them is exactly as before.
  */
 import { NextResponse } from 'next/server'
-import { holdsAny, isDreadPizzaRoberts, resolveRoles, type Reviewer } from '@/app/lib/mission-review-access'
+import { isDreadPizzaRoberts } from '@/app/lib/mission-review-access'
 import { requireSession, type GuardResult } from '@/app/lib/auth-guards'
 import type { Session } from '@/app/lib/session'
-import { CALL_CAPO_ROLE_IDS } from '@/app/ui/constants'
-import { toggleEnabled } from '@/app/lib/settings/toggles'
 import { prisma } from '@/app/lib/db'
+import { callReviewRole, type CallRole } from '@/app/lib/calls/review-role'
 import { loadPostFilter, type PostFilter } from '@/app/lib/calls/post-filters'
 import { autoHoldReason, heldReason, type HoldView } from '@/app/lib/calls/hold-rules'
 
@@ -36,7 +35,7 @@ export async function requireCallReviewer(): Promise<GuardResult> {
 
 // ---- Capo review ----
 
-export type CallRole = 'owner' | 'capo'
+export type { CallRole }
 
 /** What a reviewer can do on a call. */
 export type CallAction =
@@ -62,21 +61,7 @@ export type CallAction =
 
 export const CAPO_ACTIONS: ReadonlySet<CallAction> = new Set<CallAction>(['view', 'publish', 'unpublish', 'editSummary', 'regenerate', 'hide', 'hold'])
 
-/**
- * The reviewer's role: 'owner' (Dread Pizza Roberts), 'capo' (Pizza Capo role while the toggle is on) or
- * null. Pass a Discord id (roles are looked up, failing closed) or the role ids from an interaction
- * payload. With the toggle off a capo is null, exactly as before.
- */
-export async function callReviewRole(who: Reviewer): Promise<CallRole | null> {
-  // Exactly the old check first; with the toggle off nothing else is looked up.
-  if (await isDreadPizzaRoberts(who)) return 'owner'
-  try {
-    if (!(await toggleEnabled('calls.capoReviewEnabled'))) return null
-    return (await holdsAny(await resolveRoles(who), CALL_CAPO_ROLE_IDS)) ? 'capo' : null
-  } catch {
-    return null // fail closed
-  }
-}
+export { callReviewRole }
 
 export type { HoldView, HeldReason } from '@/app/lib/calls/hold-rules'
 export { autoHoldReason, heldReason }

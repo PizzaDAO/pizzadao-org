@@ -14,7 +14,7 @@ import { resolveMemberNames } from './live-members'
 import { assignActionKeys } from './action-keys'
 import { readEvidence } from './evidence'
 import { requestRecapRefresh } from './recap-refresh'
-import { queueCallReviewCardSync } from './review-cards'
+import { cardVersion, queueCallReviewCardSync } from './review-cards'
 
 /**
  * Crew list for event -> crew mapping. A sheet outage must not lose a
@@ -447,8 +447,8 @@ export const PENDING_WINDOW_DAYS = 14
 export type PublishResult = 'ok' | 'already' | 'not-found' | 'not-allowed' | 'incomplete' | 'transcribing' | 'conflict' | 'stale-redactions'
 
 /** IN_REVIEW -> PUBLISHED (needs a transcript and a summary). Rejected calls cannot be published. */
-export async function publishRecording(id: string, reviewerDiscordId: string, now = new Date(), opts: { refuseStaleRedactions?: boolean } = {}): Promise<PublishResult> {
-  const rec = await prisma.callRecording.findUnique({ where: { id }, select: { redactionsUpdatedAt: true, summaryGeneratedAt: true, summaryEditedAt: true, id: true, status: true, summary: true, transcript: true, redactedSpeakerIds: true, redactedSegmentIds: true, transcribedAt: true, transcribeAttempts: true, startedAt: true, retranscribeRequestedAt: true, updatedAt: true, speakers: { select: { discordId: true, trackKey: true, talkTimeSec: true } } } })
+export async function publishRecording(id: string, reviewerDiscordId: string, now = new Date(), opts: { refuseStaleRedactions?: boolean; expectVersion?: string; requireNotHeld?: boolean } = {}): Promise<PublishResult> {
+  const rec = await prisma.callRecording.findUnique({ where: { id }, select: { title: true, reviewHoldAt: true, redactionsUpdatedAt: true, summaryGeneratedAt: true, summaryEditedAt: true, id: true, status: true, summary: true, transcript: true, redactedSpeakerIds: true, redactedSegmentIds: true, transcribedAt: true, transcribeAttempts: true, startedAt: true, retranscribeRequestedAt: true, updatedAt: true, speakers: { select: { discordId: true, trackKey: true, talkTimeSec: true } } } })
   if (!rec) return 'not-found'
   if (rec.status === 'PUBLISHED') return 'already'
   if (rec.status !== 'IN_REVIEW') return 'not-allowed'
@@ -462,9 +462,12 @@ export async function publishRecording(id: string, reviewerDiscordId: string, no
   // A capo may not publish text that lines hidden after the summary have outdated. Checked on this same row, which the guarded write below pins by updatedAt, so a hide that lands meanwhile makes it a conflict.
   if (opts.refuseStaleRedactions && rec.redactionsUpdatedAt && rec.redactionsUpdatedAt.getTime() > Math.max(rec.summaryGeneratedAt?.getTime() ?? 0, rec.summaryEditedAt?.getTime() ?? 0)) return 'stale-redactions'
   if (!rec.summary?.trim() || visibleSegments(rec.transcript, rec.redactedSpeakerIds, rec.redactedSegmentIds).length === 0) return 'incomplete'
+  // Discord Confirm: publish only the text the reviewer saw (an edit, a new title or a hide since is a conflict), and a capo's never a held call. The write below pins this same row by updatedAt.
+  if (opts.expectVersion && opts.expectVersion !== cardVersion(rec)) return 'conflict'
+  if (opts.requireNotHeld && rec.reviewHoldAt) return 'conflict'
   // Guarded on the row we just checked: if anything changed meanwhile (a redaction, a regenerated summary, a transcript), nothing is published.
   const res = await prisma.callRecording.updateMany({
-    where: { id, status: 'IN_REVIEW', updatedAt: rec.updatedAt },
+    where: { id, status: 'IN_REVIEW', updatedAt: rec.updatedAt, ...(opts.requireNotHeld ? { reviewHoldAt: null } : {}) },
     data: { status: 'PUBLISHED', reviewedBy: reviewerDiscordId, reviewedAt: now, publishedAt: now },
   })
   if (res.count === 1) queueCallReviewCardSync(id)

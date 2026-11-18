@@ -21,6 +21,7 @@ import { EPHEMERAL, InteractionType, ResponseType } from './commands'
 import { sliceUnits } from '../display-name'
 import { authorFor, displayName, makeEmbed, numbered, roleLabel, type Embed, type EmbedAuthor, type EmbedField, type Tone } from './embeds'
 import { handleReviewButton, handleReviewModal, type MissionReviewDeps } from './mission-review'
+import { handleCallReviewButton, isCallReviewInteraction, type CallReviewDeps } from './call-review'
 import type { MemberCommandJob, MemberCommandName } from './member-commands'
 import { BOUNTY_SUBCOMMANDS, type BountyJob } from './bounty-command'
 import { TASK_SUBCOMMANDS, type TaskJob } from './task-command'
@@ -205,6 +206,8 @@ export interface HandlerDeps {
   }
   /** Mission review card buttons and the Reject modal (./mission-review.ts). */
   missionReview?: MissionReviewDeps
+  /** Call review card buttons (./call-review.ts, custom ids `cr:`). */
+  callReview?: CallReviewDeps
   /** Follow-up DM buttons and Reply modal (./followups.ts). */
   followups?: FollowUpInteractionDeps
   /** Reminder DM Stop button (./reminders.ts, custom ids `rm:`). */
@@ -783,6 +786,10 @@ async function component(i: Interaction, userId: string, deps: HandlerDeps, cur:
   if ((i.data?.custom_id ?? '').startsWith('mr:')) {
     if (!deps.missionReview) return out.error('Unknown button.')
     return handleReviewButton(i, userId, deps.missionReview, (h, b) => out.error(h, b))
+  }
+  if (isCallReviewInteraction(i)) {
+    if (!deps.callReview) return out.error('Unknown button.')
+    return handleCallReviewButton(i, userId, deps.callReview, (h, b) => out.error(h, b))
   }
   const m =/^bj:(hit|stand):([a-z0-9]{10,40})$/.exec(i.data?.custom_id ?? '')
   if (!m) return out.error('Unknown button.')
