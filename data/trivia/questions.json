@@ -1,0 +1,2689 @@
+{
+  "version": 2,
+  "verifiedAt": "2026-11-18",
+  "notes": "Draft bank for plans/trivia.md. Only status=approved is served. 'match.kind' picks the matcher (boolean | number | text | choice). For number questions 'answer' is the canonical number; for choice questions it is the exact text of the correct choice. 'rejects' are near-misses that must never be accepted, even fuzzily. Sources were checked 2026-11-18. Where sources disagree it is noted and the question is worded around the disagreement. Phase 1 (2026-11-18): every approved question has a 'pool': 'discord' (reserved for the Discord rounds, never served on the web) or 'web' (practice + web daily; also the only pool just-for-fun questions may use). Assigned once, per category sorted by id, every 3rd question -> discord; just-for-fun -> web. Never re-derive it: a question keeps its pool forever.",
+  "questions": [
+    {
+      "id": "pd-001",
+      "category": "pizza-day",
+      "type": "short_answer",
+      "difficulty": "easy",
+      "question": "How many bitcoins did Laszlo Hanyecz pay for two pizzas in May 2010?",
+      "answer": "10000",
+      "aliases": [
+        "10,000",
+        "10k",
+        "ten thousand",
+        "10000 btc",
+        "10,000 bitcoins"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "10,000 BTC, paid in a single transaction confirmed on May 22, 2010.",
+      "sources": [
+        {
+          "url": "https://bitcointalk.org/index.php?topic=137.0",
+          "note": "Laszlo, May 22 2010: \"I just want to report that I successfully traded 10,000 bitcoins for pizza.\""
+        },
+        {
+          "url": "https://mempool.space/tx/a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d",
+          "note": "Single 10,000 BTC output"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "pd-002",
+      "category": "pizza-day",
+      "type": "short_answer",
+      "difficulty": "easy",
+      "question": "On what date (month and day) is Bitcoin Pizza Day celebrated every year?",
+      "answer": "May 22",
+      "aliases": [
+        "22 may",
+        "may 22nd",
+        "22nd may",
+        "22nd of may",
+        "5/22",
+        "22/5",
+        "05/22",
+        "may 22 2010"
+      ],
+      "rejects": [
+        "may 18",
+        "may 21"
+      ],
+      "match": {
+        "kind": "text",
+        "fuzzy": false
+      },
+      "explanation": "May 22, the day in 2010 Laszlo reported the pizza trade had gone through.",
+      "sources": [
+        {
+          "url": "https://bitcointalk.org/index.php?topic=137.0",
+          "note": "Success post dated May 22, 2010"
+        },
+        {
+          "url": "https://en.bitcoin.it/wiki/Laszlo_Hanyecz",
+          "note": "May 22 is commemorated annually"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "pd-003",
+      "category": "pizza-day",
+      "type": "short_answer",
+      "difficulty": "easy",
+      "question": "In what year did Laszlo Hanyecz buy two pizzas for 10,000 BTC?",
+      "answer": "2010",
+      "aliases": [],
+      "rejects": [],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "2010. The transaction is in block 57,043, mined May 22, 2010.",
+      "sources": [
+        {
+          "url": "https://mempool.space/tx/a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d",
+          "note": "Block 57043, 2010-05-22 18:16:31 UTC"
+        }
+      ],
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "pd-004",
+      "category": "pizza-day",
+      "type": "multiple_choice",
+      "difficulty": "medium",
+      "question": "Laszlo's famous photos of the 10,000 BTC pizzas show boxes from which chain?",
+      "choices": [
+        "Domino's",
+        "Papa John's",
+        "Pizza Hut",
+        "Little Caesars"
+      ],
+      "answer": "Papa John's",
+      "aliases": [
+        "papa johns",
+        "papa john",
+        "papa john's pizza"
+      ],
+      "rejects": [
+        "dominos",
+        "domino's"
+      ],
+      "match": {
+        "kind": "choice"
+      },
+      "explanation": "Papa John's. Fun wrinkle: in 2016 jercos said he remembered ordering from Domino's, but the photos show Papa John's.",
+      "sources": [
+        {
+          "url": "https://en.wikipedia.org/wiki/History_of_bitcoin",
+          "note": "Sturdivant ordered two Papa John's pizzas"
+        },
+        {
+          "url": "https://www.bitcoinwhoswho.com/blog/?p=25",
+          "note": "jercos: \"I clearly remember Domino's pizza ... but the pictures show Papa John's.\""
+        }
+      ],
+      "notes": "Sources disagree on the chain: worded around the photos, which every source agrees on.",
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "pd-005",
+      "category": "pizza-day",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "In which US city did Laszlo Hanyecz live when he made the pizza deal?",
+      "answer": "Jacksonville",
+      "aliases": [
+        "jacksonville fl",
+        "jacksonville florida",
+        "jax"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "text",
+        "fuzzy": true
+      },
+      "explanation": "Jacksonville, Florida. He posted his location in the thread on May 18, 2010.",
+      "sources": [
+        {
+          "url": "https://bitcointalk.org/index.php?topic=137.0",
+          "note": "May 18 2010: \"Jacksonville, Florida ... United States\""
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "pd-006",
+      "category": "pizza-day",
+      "type": "short_answer",
+      "difficulty": "hard",
+      "question": "What was the title of Laszlo's bitcointalk thread offering bitcoin for pizza?",
+      "answer": "Pizza for bitcoins?",
+      "aliases": [
+        "pizza for bitcoins",
+        "pizza for bitcoin"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "text",
+        "fuzzy": true
+      },
+      "explanation": "\"Pizza for bitcoins?\", started May 18, 2010.",
+      "sources": [
+        {
+          "url": "https://bitcointalk.org/index.php?topic=137.0",
+          "note": "Thread title"
+        }
+      ],
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "pd-007",
+      "category": "pizza-day",
+      "type": "true_false",
+      "difficulty": "medium",
+      "question": "True or false: Laszlo wrote that the two pizzas cost only about $25.",
+      "answer": "true",
+      "aliases": [],
+      "rejects": [],
+      "match": {
+        "kind": "boolean"
+      },
+      "explanation": "True. June 12, 2010: \"the 2 pizzas are only about 25 dollars total, maybe 30 if you give the guy a nice tip.\"",
+      "sources": [
+        {
+          "url": "https://bitcointalk.org/index.php?topic=137.0",
+          "note": "Laszlo post, June 12 2010"
+        }
+      ],
+      "notes": "Popular articles quote $25, $30 or $41. $25-30 is the pizza price Laszlo gave; $41 is what the bitcoin was quoted at. Never ask an exact dollar price as a short answer.",
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "pd-008",
+      "category": "pizza-day",
+      "type": "multiple_choice",
+      "difficulty": "medium",
+      "question": "According to the Bitcoin Wiki, roughly what were Laszlo's 10,000 BTC worth in US dollars at the time of the offer?",
+      "choices": [
+        "$4",
+        "$41",
+        "$410",
+        "$4,100"
+      ],
+      "answer": "$41",
+      "aliases": [
+        "41",
+        "41 dollars",
+        "about 41"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "choice"
+      },
+      "explanation": "About $41. Today that much BTC is worth hundreds of millions of dollars.",
+      "sources": [
+        {
+          "url": "https://en.bitcoin.it/wiki/Laszlo_Hanyecz",
+          "note": "\"quoted at $41 at the time of the offer\""
+        },
+        {
+          "url": "https://en.wikipedia.org/wiki/History_of_bitcoin",
+          "note": "\"worth about $41\""
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "pd-009",
+      "category": "pizza-day",
+      "type": "short_answer",
+      "difficulty": "hard",
+      "question": "In which block was the 10,000 BTC pizza transaction confirmed?",
+      "answer": "57043",
+      "aliases": [
+        "57,043",
+        "block 57043"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "Block 57,043 (May 22, 2010, 18:16 UTC).",
+      "sources": [
+        {
+          "url": "https://mempool.space/tx/a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d",
+          "note": "block_height 57043"
+        }
+      ],
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "pd-010",
+      "category": "pizza-day",
+      "type": "short_answer",
+      "difficulty": "hard",
+      "question": "The pizza payment was built from many small coins. How many inputs does the 10,000 BTC pizza transaction have?",
+      "answer": "131",
+      "aliases": [],
+      "rejects": [],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "131 inputs, totalling 10,000.99 BTC, mostly from Laszlo's own mining.",
+      "sources": [
+        {
+          "url": "https://mempool.space/api/tx/a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d",
+          "note": "vin length 131, inputs total 10000.99 BTC"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "pd-011",
+      "category": "pizza-day",
+      "type": "short_answer",
+      "difficulty": "hard",
+      "question": "How much did the 10,000 BTC pizza transaction pay in fees, in BTC?",
+      "answer": "0.99",
+      "aliases": [
+        ".99",
+        "0.99 btc",
+        "99000000 sats",
+        "99 million sats"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "0.99 BTC: inputs of 10,000.99 BTC, one output of exactly 10,000 BTC.",
+      "sources": [
+        {
+          "url": "https://mempool.space/api/tx/a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d",
+          "note": "fee 99,000,000 sats"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "pd-012",
+      "category": "pizza-day",
+      "type": "true_false",
+      "difficulty": "easy",
+      "question": "True or false: Laszlo baked the pizzas himself and sold them for bitcoin.",
+      "answer": "false",
+      "aliases": [],
+      "rejects": [],
+      "match": {
+        "kind": "boolean"
+      },
+      "explanation": "False. Laszlo was the buyer: he paid 10,000 BTC and someone else (jercos) ordered the pizzas for him.",
+      "sources": [
+        {
+          "url": "https://bitcointalk.org/index.php?topic=137.0",
+          "note": "Offer and success posts"
+        }
+      ],
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "pd-013",
+      "category": "pizza-day",
+      "type": "true_false",
+      "difficulty": "medium",
+      "question": "True or false: the May 22, 2010 pizzas were not Laszlo's only bitcoin pizza purchase that year.",
+      "answer": "true",
+      "aliases": [],
+      "rejects": [],
+      "match": {
+        "kind": "boolean"
+      },
+      "explanation": "True. In June he offered 10,000 BTC for two more pizzas \"any time\", and by August he thanked \"everyone who bought me pizza already\".",
+      "sources": [
+        {
+          "url": "https://bitcointalk.org/index.php?topic=137.0",
+          "note": "Posts of June 12 and Aug 4, 2010"
+        }
+      ],
+      "notes": "Do NOT ask for his total. Sources disagree (about 80,000 BTC from forum posts; 81,432 BTC of payments; 'closer to 100,000' in a later interview).",
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "pd-014",
+      "category": "pizza-day",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "Laszlo is remembered as an early pioneer of mining bitcoin on what kind of hardware?",
+      "answer": "GPU",
+      "aliases": [
+        "gpus",
+        "graphics card",
+        "graphics cards",
+        "video card",
+        "graphics processing unit",
+        "gpu mining",
+        "nvidia"
+      ],
+      "rejects": [
+        "cpu",
+        "asic",
+        "fpga"
+      ],
+      "match": {
+        "kind": "text",
+        "fuzzy": true
+      },
+      "explanation": "GPUs (graphics cards). On May 10, 2010 he posted about mining on an NVIDIA 8800 GTS.",
+      "sources": [
+        {
+          "url": "https://bitcoinmagazine.com/culture/the-man-behind-bitcoin-pizza-day-is-more-than-a-meme-hes-a-mining-pioneer",
+          "note": "Mining pioneer profile"
+        },
+        {
+          "url": "https://cointelegraph.com/news/satoshi-invented-gpu-mining-to-defend-the-network-says-early-dev",
+          "note": "Laszlo says Satoshi had GPU code before him, so ask 'pioneer', not 'inventor'"
+        }
+      ],
+      "notes": "Never word this as 'invented GPU mining'. Laszlo himself credits Satoshi with having it first.",
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "pd-015",
+      "category": "pizza-day",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "Laszlo published the first Bitcoin client for which operating system?",
+      "answer": "Mac OS X",
+      "aliases": [
+        "mac",
+        "macos",
+        "mac os",
+        "os x",
+        "osx",
+        "macintosh",
+        "apple mac"
+      ],
+      "rejects": [
+        "linux",
+        "windows"
+      ],
+      "match": {
+        "kind": "text",
+        "fuzzy": true
+      },
+      "explanation": "Mac OS X, in April 2010. Before that Bitcoin ran on Windows and Linux.",
+      "sources": [
+        {
+          "url": "https://bitcoinmagazine.com/culture/the-man-behind-bitcoin-pizza-day-is-more-than-a-meme-hes-a-mining-pioneer",
+          "note": "First Mac OS X client"
+        }
+      ],
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "pd-016",
+      "category": "pizza-day",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "In February 2018 Laszlo bought pizza with bitcoin again, this time over which new payment network?",
+      "answer": "Lightning Network",
+      "aliases": [
+        "lightning",
+        "the lightning network",
+        "ln"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "text",
+        "fuzzy": true
+      },
+      "explanation": "The Lightning Network (Feb 25, 2018), dubbed \"Bitcoin Pizza Day 2\".",
+      "sources": [
+        {
+          "url": "https://www.coindesk.com/bitcoin-pizza-day-2-lightning-payment-just-made-history",
+          "note": "Lightning pizza purchase"
+        }
+      ],
+      "notes": "Sources give the amount as 0.00649 BTC, but only one secondary source was found, so don't ask the amount.",
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "pd-017",
+      "category": "pizza-day",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "Laszlo's first post asked for \"maybe 2\" pizzas of what size?",
+      "answer": "large",
+      "aliases": [
+        "large ones",
+        "2 large",
+        "two large",
+        "large pizzas"
+      ],
+      "rejects": [
+        "small",
+        "medium"
+      ],
+      "match": {
+        "kind": "text",
+        "fuzzy": true
+      },
+      "explanation": "Large: \"I'll pay 10,000 bitcoins for a couple of pizzas.. like maybe 2 large ones\".",
+      "sources": [
+        {
+          "url": "https://bitcointalk.org/index.php?topic=137.0",
+          "note": "First post, May 18 2010"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "pd-018",
+      "category": "pizza-day",
+      "type": "true_false",
+      "difficulty": "medium",
+      "question": "True or false: the pizza transaction was mined into a block on the same day Laszlo posted that the trade had succeeded.",
+      "answer": "true",
+      "aliases": [],
+      "rejects": [],
+      "match": {
+        "kind": "boolean"
+      },
+      "explanation": "True. Block 57,043 was mined May 22, 2010 (18:16 UTC), the same date as his success post.",
+      "sources": [
+        {
+          "url": "https://mempool.space/tx/a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d",
+          "note": "Block time"
+        },
+        {
+          "url": "https://bitcointalk.org/index.php?topic=137.0",
+          "note": "Post dated May 22, 2010"
+        }
+      ],
+      "notes": "Don't ask the time of day: the forum shows times in the viewer's timezone setting, so the post time is ambiguous.",
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "pd-019",
+      "category": "pizza-day",
+      "type": "multiple_choice",
+      "difficulty": "easy",
+      "question": "Where did Laszlo post his pizza offer?",
+      "choices": [
+        "The Bitcoin Forum (bitcointalk)",
+        "Reddit",
+        "The cryptography mailing list",
+        "Twitter"
+      ],
+      "answer": "The Bitcoin Forum (bitcointalk)",
+      "aliases": [
+        "bitcointalk",
+        "bitcointalk.org",
+        "bitcoin forum",
+        "the forum"
+      ],
+      "rejects": [
+        "reddit"
+      ],
+      "match": {
+        "kind": "choice"
+      },
+      "explanation": "The Bitcoin Forum, today's bitcointalk.org (topic 137).",
+      "sources": [
+        {
+          "url": "https://bitcointalk.org/index.php?topic=137.0",
+          "note": "Thread"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "jc-001",
+      "category": "jercos",
+      "type": "short_answer",
+      "difficulty": "easy",
+      "question": "What was the forum username of the person who took Laszlo's 10,000 BTC and ordered the pizzas?",
+      "answer": "jercos",
+      "aliases": [],
+      "rejects": [
+        "laszlo",
+        "satoshi"
+      ],
+      "match": {
+        "kind": "text",
+        "fuzzy": true
+      },
+      "explanation": "jercos. Laszlo's success post ends with \"thanks jercos!\"",
+      "sources": [
+        {
+          "url": "https://bitcointalk.org/index.php?topic=137.0",
+          "note": "May 22 2010 post"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "jc-002",
+      "category": "jercos",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "What is the real name of \"jercos\", who ordered the 10,000 BTC pizzas?",
+      "answer": "Jeremy Sturdivant",
+      "aliases": [
+        "jeremy",
+        "sturdivant"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "text",
+        "fuzzy": true
+      },
+      "explanation": "Jeremy Sturdivant.",
+      "sources": [
+        {
+          "url": "https://en.wikipedia.org/wiki/History_of_bitcoin",
+          "note": "\"Jeremy Sturdivant accepted\""
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "jc-003",
+      "category": "jercos",
+      "type": "true_false",
+      "difficulty": "medium",
+      "question": "True or false: jercos paid for the pizzas himself and had them delivered to Laszlo.",
+      "answer": "true",
+      "aliases": [],
+      "rejects": [],
+      "match": {
+        "kind": "boolean"
+      },
+      "explanation": "True. The order was paid online with an out-of-state card and delivered to Laszlo in Florida.",
+      "sources": [
+        {
+          "url": "https://en.wikipedia.org/wiki/History_of_bitcoin",
+          "note": "\"ordering two Papa John's pizzas for delivery\""
+        },
+        {
+          "url": "https://www.bitcoinwhoswho.com/blog/?p=25",
+          "note": "\"paid for online with an out of state card\""
+        }
+      ],
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "jc-004",
+      "category": "jercos",
+      "type": "true_false",
+      "difficulty": "hard",
+      "question": "True or false: in a 2016 interview, jercos said he remembered ordering from Domino's, even though the photos show Papa John's.",
+      "answer": "true",
+      "aliases": [],
+      "rejects": [],
+      "match": {
+        "kind": "boolean"
+      },
+      "explanation": "True: \"I clearly remember Domino's pizza (right down to their particular web interface), but the pictures show Papa John's.\"",
+      "sources": [
+        {
+          "url": "https://www.bitcoinwhoswho.com/blog/?p=25",
+          "note": "Bitcoin Who's Who interview, Jan 30 2016"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "jc-005",
+      "category": "jercos",
+      "type": "true_false",
+      "difficulty": "easy",
+      "question": "True or false: jercos held on to his 10,000 BTC for years.",
+      "answer": "false",
+      "aliases": [],
+      "rejects": [],
+      "match": {
+        "kind": "boolean"
+      },
+      "explanation": "False. He said the coins \"made it back into the economy fairly quickly, around the time they were worth some $400\".",
+      "sources": [
+        {
+          "url": "https://www.bitcoinwhoswho.com/blog/?p=25",
+          "note": "2016 interview"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "jc-006",
+      "category": "jercos",
+      "type": "multiple_choice",
+      "difficulty": "hard",
+      "question": "Roughly what did jercos say the 10,000 BTC were worth by the time he'd spent them?",
+      "choices": [
+        "$41",
+        "$400",
+        "$40,000",
+        "$4 million"
+      ],
+      "answer": "$400",
+      "aliases": [
+        "400",
+        "400 dollars"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "choice"
+      },
+      "explanation": "About $400, by his own account in 2016.",
+      "sources": [
+        {
+          "url": "https://www.bitcoinwhoswho.com/blog/?p=25",
+          "note": "\"around the time they were worth some $400\""
+        }
+      ],
+      "notes": "Don't ask jercos's age in 2010. Sources say 18 or 19.",
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "eb-001",
+      "category": "early-bitcoin",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "What is the full title of the Bitcoin whitepaper?",
+      "answer": "Bitcoin: A Peer-to-Peer Electronic Cash System",
+      "aliases": [
+        "a peer-to-peer electronic cash system",
+        "peer to peer electronic cash system",
+        "bitcoin a peer to peer electronic cash system"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "text",
+        "fuzzy": true
+      },
+      "explanation": "\"Bitcoin: A Peer-to-Peer Electronic Cash System\".",
+      "sources": [
+        {
+          "url": "https://bitcoin.org/bitcoin.pdf",
+          "note": "Title page"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "eb-002",
+      "category": "early-bitcoin",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "On what date did Satoshi announce the Bitcoin whitepaper on the cryptography mailing list?",
+      "answer": "October 31, 2008",
+      "aliases": [
+        "oct 31 2008",
+        "31 october 2008",
+        "31 oct 2008",
+        "10/31/2008",
+        "31/10/2008",
+        "2008-10-31",
+        "halloween 2008",
+        "october 31",
+        "oct 31"
+      ],
+      "rejects": [
+        "november 1 2008"
+      ],
+      "match": {
+        "kind": "text",
+        "fuzzy": false
+      },
+      "explanation": "October 31, 2008 (Halloween), 18:10 UTC: \"Bitcoin P2P e-cash paper\".",
+      "sources": [
+        {
+          "url": "https://satoshi.nakamotoinstitute.org/emails/cryptography/1/",
+          "note": "Oct 31 2008 18:10 UTC"
+        }
+      ],
+      "notes": "The mail-archive.com mirror stamps it Sat, 01 Nov 2008 16:16 -0700 (its relay time). The list archive and the Nakamoto Institute say Oct 31. Matching 'november 1' is explicitly rejected; keep the explanation clear.",
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "eb-003",
+      "category": "early-bitcoin",
+      "type": "multiple_choice",
+      "difficulty": "medium",
+      "question": "Where did Satoshi first share the Bitcoin whitepaper?",
+      "choices": [
+        "The Cryptography Mailing List",
+        "Bitcointalk",
+        "Slashdot",
+        "The Cypherpunks mailing list"
+      ],
+      "answer": "The Cryptography Mailing List",
+      "aliases": [
+        "cryptography mailing list",
+        "metzdowd",
+        "the cryptography list"
+      ],
+      "rejects": [
+        "cypherpunks"
+      ],
+      "match": {
+        "kind": "choice"
+      },
+      "explanation": "The Cryptography Mailing List (metzdowd.com). Bitcointalk didn't exist yet.",
+      "sources": [
+        {
+          "url": "https://satoshi.nakamotoinstitute.org/emails/cryptography/1/",
+          "note": "Mailing list: The Cryptography Mailing List"
+        }
+      ],
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "eb-004",
+      "category": "early-bitcoin",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "How many pages long is the Bitcoin whitepaper, references included?",
+      "answer": "9",
+      "aliases": [
+        "nine"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "Nine pages, in 12 sections.",
+      "sources": [
+        {
+          "url": "https://bitcoin.org/bitcoin.pdf",
+          "note": "Page numbers 1-9; references on page 9"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "eb-005",
+      "category": "early-bitcoin",
+      "type": "short_answer",
+      "difficulty": "hard",
+      "question": "Reference [1] in the Bitcoin whitepaper is a 1998 proposal called \"b-money\". Who wrote it?",
+      "answer": "Wei Dai",
+      "aliases": [
+        "dai",
+        "w. dai",
+        "w dai"
+      ],
+      "rejects": [
+        "nick szabo",
+        "adam back"
+      ],
+      "match": {
+        "kind": "text",
+        "fuzzy": true
+      },
+      "explanation": "Wei Dai: \"[1] W. Dai, 'b-money', 1998.\"",
+      "sources": [
+        {
+          "url": "https://bitcoin.org/bitcoin.pdf",
+          "note": "References list"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "eb-006",
+      "category": "early-bitcoin",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "The whitepaper says Bitcoin's proof-of-work is \"similar to\" which system by Adam Back?",
+      "answer": "Hashcash",
+      "aliases": [
+        "hash cash"
+      ],
+      "rejects": [
+        "b-money",
+        "bit gold"
+      ],
+      "match": {
+        "kind": "text",
+        "fuzzy": true
+      },
+      "explanation": "Hashcash (reference [6]).",
+      "sources": [
+        {
+          "url": "https://bitcoin.org/bitcoin.pdf",
+          "note": "Section 4, reference [6]"
+        }
+      ],
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "eb-007",
+      "category": "early-bitcoin",
+      "type": "true_false",
+      "difficulty": "hard",
+      "question": "True or false: the Bitcoin whitepaper states the 21 million coin limit.",
+      "answer": "false",
+      "aliases": [],
+      "rejects": [],
+      "match": {
+        "kind": "boolean"
+      },
+      "explanation": "False. The whitepaper never gives a supply cap. \"21,000,000\" first appears in Satoshi's v0.1 release email (Jan 2009).",
+      "sources": [
+        {
+          "url": "https://bitcoin.org/bitcoin.pdf",
+          "note": "Full text contains no supply figure"
+        },
+        {
+          "url": "https://www.mail-archive.com/cryptography@metzdowd.com/msg10142.html",
+          "note": "\"Total circulation will be 21,000,000 coins.\""
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "eb-008",
+      "category": "early-bitcoin",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "On what date was Bitcoin's genesis block mined?",
+      "answer": "January 3, 2009",
+      "aliases": [
+        "jan 3 2009",
+        "3 january 2009",
+        "3 jan 2009",
+        "1/3/2009",
+        "3/1/2009",
+        "2009-01-03",
+        "january 3rd 2009",
+        "january 3"
+      ],
+      "rejects": [
+        "january 9 2009"
+      ],
+      "match": {
+        "kind": "text",
+        "fuzzy": false
+      },
+      "explanation": "January 3, 2009 (block 0, 18:15 UTC).",
+      "sources": [
+        {
+          "url": "https://mempool.space/block/000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f",
+          "note": "Timestamp 2009-01-03 18:15:05 UTC"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "eb-009",
+      "category": "early-bitcoin",
+      "type": "short_answer",
+      "difficulty": "easy",
+      "question": "Which newspaper's headline is embedded in Bitcoin's genesis block?",
+      "answer": "The Times",
+      "aliases": [
+        "times",
+        "the times of london",
+        "times of london",
+        "london times",
+        "the times uk"
+      ],
+      "rejects": [
+        "new york times",
+        "financial times",
+        "nyt",
+        "ft"
+      ],
+      "match": {
+        "kind": "text",
+        "fuzzy": true
+      },
+      "explanation": "The Times (London): \"The Times 03/Jan/2009 Chancellor on brink of second bailout for banks\".",
+      "sources": [
+        {
+          "url": "https://mempool.space/block/000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f",
+          "note": "Coinbase text decoded from block 0"
+        },
+        {
+          "url": "https://en.bitcoin.it/wiki/Genesis_block",
+          "note": "Genesis block"
+        }
+      ],
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "eb-010",
+      "category": "early-bitcoin",
+      "type": "short_answer",
+      "difficulty": "easy",
+      "question": "Fill in the blank from the genesis block: \"Chancellor on brink of second ____ for banks\".",
+      "answer": "bailout",
+      "aliases": [
+        "bail out",
+        "bail-out"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "text",
+        "fuzzy": true
+      },
+      "explanation": "Bailout.",
+      "sources": [
+        {
+          "url": "https://en.bitcoin.it/wiki/Genesis_block",
+          "note": "Coinbase text"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "eb-011",
+      "category": "early-bitcoin",
+      "type": "true_false",
+      "difficulty": "medium",
+      "question": "True or false: the 50 BTC reward in the genesis block can be spent.",
+      "answer": "false",
+      "aliases": [],
+      "rejects": [],
+      "match": {
+        "kind": "boolean"
+      },
+      "explanation": "False. Because of how the genesis block is coded, its 50 BTC can never be spent.",
+      "sources": [
+        {
+          "url": "https://en.bitcoin.it/wiki/Genesis_block",
+          "note": "Unspendable coinbase"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "eb-012",
+      "category": "early-bitcoin",
+      "type": "short_answer",
+      "difficulty": "easy",
+      "question": "What famous two-word tweet did Hal Finney post in January 2009?",
+      "answer": "Running bitcoin",
+      "aliases": [
+        "running btc"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "text",
+        "fuzzy": true
+      },
+      "explanation": "\"Running bitcoin\".",
+      "sources": [
+        {
+          "url": "https://x.com/halfin/status/1110302988",
+          "note": "The tweet (X blocks automated fetches; verified via coverage below)"
+        },
+        {
+          "url": "https://cointelegraph.com/news/bitcoiners-celebrate-17th-anniversary-hal-finney-bitcoin",
+          "note": "Anniversary coverage"
+        }
+      ],
+      "notes": "Date disagreement: most coverage says Jan 10, 2009; the tweet's own timestamp is Jan 11 (timezone). Never ask the date.",
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "eb-013",
+      "category": "early-bitcoin",
+      "type": "short_answer",
+      "difficulty": "easy",
+      "question": "Who received the first-ever bitcoin transaction from Satoshi?",
+      "answer": "Hal Finney",
+      "aliases": [
+        "hal",
+        "finney",
+        "halfin"
+      ],
+      "rejects": [
+        "laszlo",
+        "gavin andresen"
+      ],
+      "match": {
+        "kind": "text",
+        "fuzzy": true
+      },
+      "explanation": "Hal Finney, in block 170 on January 12, 2009.",
+      "sources": [
+        {
+          "url": "https://en.wikipedia.org/wiki/History_of_bitcoin",
+          "note": "First transaction to Finney, 12 Jan 2009, block 170"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "eb-014",
+      "category": "early-bitcoin",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "How many BTC did Satoshi send Hal Finney in the first bitcoin transaction?",
+      "answer": "10",
+      "aliases": [
+        "ten",
+        "10 btc"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "10 BTC (block 170; Satoshi kept 40 BTC as change).",
+      "sources": [
+        {
+          "url": "https://mempool.space/tx/f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16",
+          "note": "Outputs 10 BTC and 40 BTC"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "eb-015",
+      "category": "early-bitcoin",
+      "type": "short_answer",
+      "difficulty": "hard",
+      "question": "Which block contains the first Satoshi-to-Hal Finney transaction?",
+      "answer": "170",
+      "aliases": [
+        "block 170"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "Block 170.",
+      "sources": [
+        {
+          "url": "https://en.wikipedia.org/wiki/History_of_bitcoin",
+          "note": "Block 170"
+        }
+      ],
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "eb-016",
+      "category": "early-bitcoin",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "What version number did Satoshi give the first Bitcoin software release in January 2009?",
+      "answer": "0.1",
+      "aliases": [
+        "v0.1",
+        "version 0.1",
+        "0.1.0"
+      ],
+      "rejects": [
+        "1.0"
+      ],
+      "match": {
+        "kind": "text",
+        "fuzzy": false
+      },
+      "explanation": "v0.1 (\"Bitcoin v0.1 released\", Jan 9, 2009).",
+      "sources": [
+        {
+          "url": "https://www.mail-archive.com/cryptography@metzdowd.com/msg10142.html",
+          "note": "Subject \"Bitcoin v0.1 released\""
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "eb-017",
+      "category": "early-bitcoin",
+      "type": "multiple_choice",
+      "difficulty": "medium",
+      "question": "Bitcoin v0.1 ran on which operating system only?",
+      "choices": [
+        "Windows",
+        "Linux",
+        "Mac OS X",
+        "FreeBSD"
+      ],
+      "answer": "Windows",
+      "aliases": [
+        "win",
+        "microsoft windows"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "choice"
+      },
+      "explanation": "Windows: \"Windows only for now.\"",
+      "sources": [
+        {
+          "url": "https://www.mail-archive.com/cryptography@metzdowd.com/msg10142.html",
+          "note": "v0.1 announcement"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "eb-018",
+      "category": "early-bitcoin",
+      "type": "short_answer",
+      "difficulty": "easy",
+      "question": "Satoshi's v0.1 release email says total bitcoin circulation will be how many coins?",
+      "answer": "21000000",
+      "aliases": [
+        "21,000,000",
+        "21 million",
+        "21m",
+        "21 mil"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "21,000,000 (in practice slightly less: 20,999,999.9769).",
+      "sources": [
+        {
+          "url": "https://www.mail-archive.com/cryptography@metzdowd.com/msg10142.html",
+          "note": "\"Total circulation will be 21,000,000 coins.\""
+        },
+        {
+          "url": "https://en.bitcoin.it/wiki/Controlled_supply",
+          "note": "Exact ceiling 20,999,999.9769"
+        }
+      ],
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "eb-019",
+      "category": "early-bitcoin",
+      "type": "short_answer",
+      "difficulty": "hard",
+      "question": "In what month and year was the bitcoin.org domain registered?",
+      "answer": "August 2008",
+      "aliases": [
+        "aug 2008",
+        "08/2008",
+        "august 18 2008",
+        "aug 18 2008",
+        "18 august 2008",
+        "2008-08-18"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "text",
+        "fuzzy": false
+      },
+      "explanation": "August 18, 2008, about ten weeks before the whitepaper.",
+      "sources": [
+        {
+          "url": "https://en.wikipedia.org/wiki/History_of_bitcoin",
+          "note": "\"registered on 18 August 2008\""
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "eb-020",
+      "category": "early-bitcoin",
+      "type": "short_answer",
+      "difficulty": "hard",
+      "question": "In the August 2010 value overflow bug, roughly how many bitcoins were created out of thin air?",
+      "answer": "184467440737",
+      "aliases": [
+        "184 billion",
+        "over 184 billion",
+        "184b",
+        "184,467,440,737",
+        "184.4 billion",
+        "184.5 billion"
+      ],
+      "rejects": [
+        "21 million",
+        "92 billion"
+      ],
+      "match": {
+        "kind": "number",
+        "tolerance": 1000000000
+      },
+      "explanation": "Over 184 billion BTC (184,467,440,737.09551616). The bad block was orphaned and the coins vanished.",
+      "sources": [
+        {
+          "url": "https://en.bitcoin.it/wiki/Value_overflow_incident",
+          "note": "\"184,467,440,737.09551616 bitcoins\""
+        },
+        {
+          "url": "https://en.wikipedia.org/wiki/History_of_bitcoin",
+          "note": "Two outputs of about 92.2 billion each"
+        }
+      ],
+      "notes": "Sources disagree on the number of addresses (bitcoin.it: three; Wikipedia: two outputs). Never ask the address count. Number matcher accepts 183.5-185.5 billion.",
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "eb-021",
+      "category": "early-bitcoin",
+      "type": "short_answer",
+      "difficulty": "hard",
+      "question": "Which block number held the August 2010 value overflow transaction?",
+      "answer": "74638",
+      "aliases": [
+        "74,638",
+        "block 74638"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "Block 74,638, later replaced on the honest chain.",
+      "sources": [
+        {
+          "url": "https://en.bitcoin.it/wiki/Value_overflow_incident",
+          "note": "Block 74638"
+        }
+      ],
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "eb-022",
+      "category": "early-bitcoin",
+      "type": "true_false",
+      "difficulty": "medium",
+      "question": "True or false: a fixed Bitcoin client was released within about five hours of the 2010 value overflow bug being found.",
+      "answer": "true",
+      "aliases": [],
+      "rejects": [],
+      "match": {
+        "kind": "boolean"
+      },
+      "explanation": "True. The fix shipped within about five hours, and the honest chain overtook the bad one at block 74,691.",
+      "sources": [
+        {
+          "url": "https://en.bitcoin.it/wiki/Value_overflow_incident",
+          "note": "\"within five hours\"; good chain overtook at 74691"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "eb-023",
+      "category": "early-bitcoin",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "Mt. Gox's name originally stood for \"Magic: The Gathering Online ____\". Fill in the blank.",
+      "answer": "eXchange",
+      "aliases": [
+        "exchange"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "text",
+        "fuzzy": true
+      },
+      "explanation": "Magic: The Gathering Online eXchange, a trading-card site before it was a bitcoin exchange.",
+      "sources": [
+        {
+          "url": "https://en.wikipedia.org/wiki/Mt._Gox",
+          "note": "Name origin"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "eb-024",
+      "category": "early-bitcoin",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "Who founded Mt. Gox?",
+      "answer": "Jed McCaleb",
+      "aliases": [
+        "mccaleb",
+        "jed"
+      ],
+      "rejects": [
+        "mark karpeles",
+        "karpeles"
+      ],
+      "match": {
+        "kind": "text",
+        "fuzzy": true
+      },
+      "explanation": "Jed McCaleb (bitcoin exchange launched July 2010).",
+      "sources": [
+        {
+          "url": "https://en.wikipedia.org/wiki/Mt._Gox",
+          "note": "Founder"
+        }
+      ],
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "eb-025",
+      "category": "early-bitcoin",
+      "type": "short_answer",
+      "difficulty": "hard",
+      "question": "To whom did Jed McCaleb sell Mt. Gox in March 2011?",
+      "answer": "Mark Karpelès",
+      "aliases": [
+        "mark karpeles",
+        "karpeles",
+        "karpelès"
+      ],
+      "rejects": [
+        "jed mccaleb"
+      ],
+      "match": {
+        "kind": "text",
+        "fuzzy": true
+      },
+      "explanation": "Mark Karpelès, a French developer living in Japan.",
+      "sources": [
+        {
+          "url": "https://en.wikipedia.org/wiki/Mt._Gox",
+          "note": "Sale, March 2011"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "eb-026",
+      "category": "early-bitcoin",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "In what year did Mt. Gox suspend trading and file for bankruptcy?",
+      "answer": "2014",
+      "aliases": [],
+      "rejects": [],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "2014 (trading suspended Feb 24; bankruptcy filed in Tokyo Feb 28).",
+      "sources": [
+        {
+          "url": "https://en.wikipedia.org/wiki/Mt._Gox",
+          "note": "February 2014"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "eb-027",
+      "category": "early-bitcoin",
+      "type": "multiple_choice",
+      "difficulty": "medium",
+      "question": "At its 2013 peak, roughly what share of the world's bitcoin trades went through Mt. Gox?",
+      "choices": [
+        "About 10%",
+        "About 30%",
+        "Over 70%",
+        "About 99%"
+      ],
+      "answer": "Over 70%",
+      "aliases": [
+        "70",
+        "70%",
+        "over 70"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "choice"
+      },
+      "explanation": "Over 70%.",
+      "sources": [
+        {
+          "url": "https://en.wikipedia.org/wiki/Mt._Gox",
+          "note": "\"handling over 70% of the world's bitcoin trades\""
+        }
+      ],
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "eb-028",
+      "category": "satoshi",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "In what month and year did Satoshi make a last public post on bitcointalk?",
+      "answer": "December 2010",
+      "aliases": [
+        "dec 2010",
+        "12/2010",
+        "december 12 2010",
+        "dec 12 2010",
+        "12 december 2010",
+        "2010-12-12"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "text",
+        "fuzzy": false
+      },
+      "explanation": "December 12, 2010: \"Added some DoS limits, removed safe mode (0.3.19)\".",
+      "sources": [
+        {
+          "url": "https://news.bitcoin.com/satoshi-walked-away-15-years-ago-the-575th-forum-post-marked-the-moment-bitcoin-stood-on-its-own",
+          "note": "Last post Dec 12 2010"
+        }
+      ],
+      "notes": "His profile shows him logged in on Dec 13, so ask about the last post, not the last login.",
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "eb-029",
+      "category": "satoshi",
+      "type": "short_answer",
+      "difficulty": "hard",
+      "question": "Satoshi's last bitcointalk post announced DoS limits in which Bitcoin version?",
+      "answer": "0.3.19",
+      "aliases": [
+        "v0.3.19",
+        "version 0.3.19"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "text",
+        "fuzzy": false
+      },
+      "explanation": "0.3.19.",
+      "sources": [
+        {
+          "url": "https://news.bitcoin.com/satoshi-walked-away-15-years-ago-the-575th-forum-post-marked-the-moment-bitcoin-stood-on-its-own",
+          "note": "\"Added some DoS limits, removed safe mode (0.3.19)\""
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "eb-030",
+      "category": "satoshi",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "Fill in Satoshi's 2011 email to Mike Hearn: \"I've moved on to other ____.\"",
+      "answer": "things",
+      "aliases": [],
+      "rejects": [],
+      "match": {
+        "kind": "text",
+        "fuzzy": true
+      },
+      "explanation": "\"things\" (April 2011), widely treated as Satoshi's last known message.",
+      "sources": [
+        {
+          "url": "https://cointelegraph.com/news/satoshi-nakamoto-final-email-revisited-after-13-years",
+          "note": "Email of April 23, 2011"
+        },
+        {
+          "url": "https://en.wikipedia.org/wiki/Satoshi_Nakamoto",
+          "note": "\"moved on to other things\""
+        }
+      ],
+      "notes": "Date disagreement: coverage says April 23, 2011, while Wikipedia's infobox ends the active period on April 26, 2011. Never ask the exact day.",
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "eb-031",
+      "category": "satoshi",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "Complete Satoshi's 2010 quote: \"Lost coins only make everyone else's coins worth slightly ____.\"",
+      "answer": "more",
+      "aliases": [],
+      "rejects": [
+        "less"
+      ],
+      "match": {
+        "kind": "text",
+        "fuzzy": false
+      },
+      "explanation": "\"more. Think of it as a donation to everyone.\" (bitcointalk, June 21, 2010)",
+      "sources": [
+        {
+          "url": "https://satoshi.nakamotoinstitute.org/posts/bitcointalk/threads/71/",
+          "note": "Thread \"Dying bitcoins\""
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "eb-032",
+      "category": "satoshi",
+      "type": "true_false",
+      "difficulty": "easy",
+      "question": "True or false: Satoshi Nakamoto's real identity has been confirmed.",
+      "answer": "false",
+      "aliases": [],
+      "rejects": [],
+      "match": {
+        "kind": "boolean"
+      },
+      "explanation": "False. \"Nakamoto's true identity is unknown.\"",
+      "sources": [
+        {
+          "url": "https://en.wikipedia.org/wiki/Satoshi_Nakamoto",
+          "note": "Identity unknown"
+        }
+      ],
+      "notes": "Time-sensitive in principle. Re-check before each season, and retire it if that ever changes.",
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "eb-033",
+      "category": "satoshi",
+      "type": "short_answer",
+      "difficulty": "hard",
+      "question": "What email address appears under Satoshi's name on the Bitcoin whitepaper?",
+      "answer": "satoshin@gmx.com",
+      "aliases": [
+        "satoshin at gmx.com",
+        "satoshin@gmx"
+      ],
+      "rejects": [
+        "satoshi@vistomail.com"
+      ],
+      "match": {
+        "kind": "text",
+        "fuzzy": false
+      },
+      "explanation": "satoshin@gmx.com.",
+      "sources": [
+        {
+          "url": "https://bitcoin.org/bitcoin.pdf",
+          "note": "Author line"
+        }
+      ],
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "eb-034",
+      "category": "satoshi",
+      "type": "true_false",
+      "difficulty": "easy",
+      "question": "True or false: Bitcoin's smallest unit is named after its creator.",
+      "answer": "true",
+      "aliases": [],
+      "rejects": [],
+      "match": {
+        "kind": "boolean"
+      },
+      "explanation": "True. 1 satoshi = 0.00000001 BTC.",
+      "sources": [
+        {
+          "url": "https://cointelegraph.com/features/what-is-a-satoshi-the-smallest-unit-on-the-bitcoin-blockchains",
+          "note": "Satoshi unit"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "eb-035",
+      "category": "satoshi",
+      "type": "short_answer",
+      "difficulty": "hard",
+      "question": "Which bitcointalk user is usually credited with proposing the name \"satoshi\" for a bitcoin unit?",
+      "answer": "ribuck",
+      "aliases": [],
+      "rejects": [],
+      "match": {
+        "kind": "text",
+        "fuzzy": true
+      },
+      "explanation": "ribuck (Nov 2010, at first for 0.01 BTC). Others later pinned it to 0.00000001 BTC.",
+      "sources": [
+        {
+          "url": "https://cointelegraph.com/features/what-is-a-satoshi-the-smallest-unit-on-the-bitcoin-blockchains",
+          "note": "ribuck, Nov 15 2010"
+        }
+      ],
+      "notes": "FLAGGED: attribution is muddy (ribuck coined the name; marcus_of_augustus is credited with today's definition). Secondary sources only.",
+      "status": "flagged"
+    },
+    {
+      "id": "eb-036",
+      "category": "satoshi",
+      "type": "short_answer",
+      "difficulty": "hard",
+      "question": "What did a 2014 post on Satoshi's P2P Foundation account say?",
+      "answer": "I am not Dorian Nakamoto",
+      "aliases": [
+        "not dorian nakamoto",
+        "i am not dorian nakamoto."
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "text",
+        "fuzzy": true
+      },
+      "explanation": "\"I am not Dorian Nakamoto.\" (March 7, 2014)",
+      "sources": [
+        {
+          "url": "https://satoshi.nakamotoinstitute.org/posts/p2pfoundation/4/",
+          "note": "Post text and date"
+        }
+      ],
+      "notes": "FLAGGED: I could not verify whether Satoshi wrote this or someone else had the account. Keep the 'account' wording if Snax approves it.",
+      "status": "flagged"
+    },
+    {
+      "id": "eb-037",
+      "category": "early-bitcoin",
+      "type": "short_answer",
+      "difficulty": "hard",
+      "question": "Bitcoin's first USD exchange rate (New Liberty Standard, Oct 2009) was about how many BTC per dollar?",
+      "answer": "1309.03",
+      "aliases": [
+        "1,309.03",
+        "1309",
+        "1,309",
+        "about 1300"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "number",
+        "tolerance": 10
+      },
+      "explanation": "1,309.03 BTC for $1, based on the electricity cost of mining.",
+      "sources": [
+        {
+          "url": "https://bitbo.io/calendar/first-valuation/",
+          "note": "Notes no primary source survives"
+        }
+      ],
+      "notes": "FLAGGED: widely repeated, but Bitbo found no primary source (only period screenshots and forum references).",
+      "status": "flagged"
+    },
+    {
+      "id": "pr-001",
+      "category": "protocol",
+      "type": "short_answer",
+      "difficulty": "easy",
+      "question": "How many BTC did miners earn per block when Bitcoin launched in 2009?",
+      "answer": "50",
+      "aliases": [
+        "fifty",
+        "50 btc"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "50 BTC.",
+      "sources": [
+        {
+          "url": "https://en.bitcoin.it/wiki/Controlled_supply",
+          "note": "Reward schedule"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "pr-002",
+      "category": "protocol",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "Every how many blocks does the bitcoin block subsidy halve?",
+      "answer": "210000",
+      "aliases": [
+        "210,000",
+        "210k"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "Every 210,000 blocks, about every four years.",
+      "sources": [
+        {
+          "url": "https://en.bitcoin.it/wiki/Controlled_supply",
+          "note": "210,000 blocks"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "pr-003",
+      "category": "protocol",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "In what year did the first bitcoin halving happen?",
+      "answer": "2012",
+      "aliases": [],
+      "rejects": [],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "2012: block 210,000 on November 28, 2012, cut the reward from 50 to 25 BTC.",
+      "sources": [
+        {
+          "url": "https://mempool.space/block/000000000000048b95347e83192f69cf0366076336c639f9b7228e9ba171342e",
+          "note": "Block 210000, 2012-11-28"
+        }
+      ],
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "pr-004",
+      "category": "protocol",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "After the April 2024 halving, how many BTC is the block subsidy?",
+      "answer": "3.125",
+      "aliases": [
+        "3.125 btc"
+      ],
+      "rejects": [
+        "6.25"
+      ],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "3.125 BTC, down from 6.25.",
+      "sources": [
+        {
+          "url": "https://en.bitcoin.it/wiki/Controlled_supply",
+          "note": "3.125 at block 840,000"
+        }
+      ],
+      "notes": "Time-sensitive: true until the next halving (block 1,050,000, about 2028). The plan's season check retires or rewords it then.",
+      "validUntil": "2028-01-01",
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "pr-005",
+      "category": "protocol",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "At what block height did the 2024 halving happen?",
+      "answer": "840000",
+      "aliases": [
+        "840,000",
+        "840k"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "Block 840,000 (April 20, 2024 UTC; still April 19 in the Americas).",
+      "sources": [
+        {
+          "url": "https://en.bitcoin.it/wiki/Controlled_supply",
+          "note": "Schedule"
+        }
+      ],
+      "notes": "Don't ask the date: it's April 19 or 20 depending on timezone.",
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "pr-006",
+      "category": "protocol",
+      "type": "true_false",
+      "difficulty": "easy",
+      "question": "True or false: the 2020 halving cut the block subsidy from 12.5 to 6.25 BTC.",
+      "answer": "true",
+      "aliases": [],
+      "rejects": [],
+      "match": {
+        "kind": "boolean"
+      },
+      "explanation": "True (block 630,000, May 11, 2020).",
+      "sources": [
+        {
+          "url": "https://en.bitcoin.it/wiki/Controlled_supply",
+          "note": "6.25 at 630,000"
+        }
+      ],
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "pr-007",
+      "category": "protocol",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "Bitcoin's mining difficulty adjusts every how many blocks?",
+      "answer": "2016",
+      "aliases": [
+        "2,016"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "Every 2,016 blocks (about two weeks).",
+      "sources": [
+        {
+          "url": "https://en.bitcoin.it/wiki/Controlled_supply",
+          "note": "Adjusts every 2016 blocks"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "pr-008",
+      "category": "protocol",
+      "type": "short_answer",
+      "difficulty": "easy",
+      "question": "What is Bitcoin's target average time between blocks, in minutes?",
+      "answer": "10",
+      "aliases": [
+        "ten",
+        "10 minutes",
+        "10 min"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "10 minutes.",
+      "sources": [
+        {
+          "url": "https://en.bitcoin.it/wiki/Controlled_supply",
+          "note": "~10 minutes"
+        },
+        {
+          "url": "https://bitcoin.org/bitcoin.pdf",
+          "note": "Section 7: \"generated every 10 minutes\""
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "pr-009",
+      "category": "protocol",
+      "type": "short_answer",
+      "difficulty": "easy",
+      "question": "How many satoshis are in one bitcoin?",
+      "answer": "100000000",
+      "aliases": [
+        "100,000,000",
+        "100 million",
+        "100m",
+        "1e8",
+        "10^8"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "100,000,000.",
+      "sources": [
+        {
+          "url": "https://cointelegraph.com/features/what-is-a-satoshi-the-smallest-unit-on-the-bitcoin-blockchains",
+          "note": "1 sat = 0.00000001 BTC"
+        }
+      ],
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "pr-010",
+      "category": "protocol",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "Around what year is the last new bitcoin expected to be mined?",
+      "answer": "2140",
+      "aliases": [
+        "around 2140",
+        "~2140"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "Around 2140 (an estimate: it depends on future block times).",
+      "sources": [
+        {
+          "url": "https://en.bitcoin.it/wiki/Controlled_supply",
+          "note": "Around 2140"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "pr-011",
+      "category": "protocol",
+      "type": "multiple_choice",
+      "difficulty": "hard",
+      "question": "Because of rounding, what is the most bitcoin that can ever exist?",
+      "choices": [
+        "Exactly 21,000,000",
+        "20,999,999.9769",
+        "21,000,000.0001",
+        "18,000,000"
+      ],
+      "answer": "20,999,999.9769",
+      "aliases": [
+        "20999999.9769"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "choice"
+      },
+      "explanation": "20,999,999.9769 BTC: rounding at each halving leaves it just under 21 million.",
+      "sources": [
+        {
+          "url": "https://en.bitcoin.it/wiki/Controlled_supply",
+          "note": "20,999,999.9769"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "mb-001",
+      "category": "myth-busting",
+      "type": "true_false",
+      "difficulty": "medium",
+      "question": "True or false: Satoshi said the \"bit\" in Bitcoin comes from BitTorrent.",
+      "answer": "false",
+      "aliases": [],
+      "rejects": [],
+      "match": {
+        "kind": "boolean"
+      },
+      "explanation": "False. Satoshi never explained the name, and nothing links it to BitTorrent. \"Bit\" is the unit of digital information (binary digit).",
+      "sources": [
+        {
+          "url": "https://bitcoin.org/bitcoin.pdf",
+          "note": "No etymology or BitTorrent mention in the whitepaper"
+        },
+        {
+          "url": "https://www.mail-archive.com/cryptography@metzdowd.com/msg10142.html",
+          "note": "No etymology in the v0.1 announcement"
+        },
+        {
+          "url": "https://people.math.harvard.edu/~ctm/home/text/others/shannon/entropy/entropy.pdf",
+          "note": "Shannon 1948: \"binary digits, or more briefly bits, a word suggested by J. W. Tukey\""
+        }
+      ],
+      "notes": "Replaces Snax's suggested \"What does the 'bit' in Bitcoin stand for? BitTorrent\" (see bt-000 and plans/trivia.md section 3.3).",
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "mb-002",
+      "category": "myth-busting",
+      "type": "short_answer",
+      "difficulty": "easy",
+      "question": "The word \"bit\", the unit of digital information, is short for what two words?",
+      "answer": "binary digit",
+      "aliases": [
+        "binary digits"
+      ],
+      "rejects": [
+        "bittorrent"
+      ],
+      "match": {
+        "kind": "text",
+        "fuzzy": true
+      },
+      "explanation": "Binary digit. Claude Shannon's 1948 paper credits the word to John Tukey.",
+      "sources": [
+        {
+          "url": "https://people.math.harvard.edu/~ctm/home/text/others/shannon/entropy/entropy.pdf",
+          "note": "Shannon, A Mathematical Theory of Communication, 1948"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "bt-000",
+      "category": "myth-busting",
+      "type": "short_answer",
+      "difficulty": "easy",
+      "question": "What does the 'bit' in Bitcoin stand for?",
+      "answer": "BitTorrent",
+      "aliases": [],
+      "rejects": [],
+      "match": {
+        "kind": "text",
+        "fuzzy": true
+      },
+      "explanation": "",
+      "sources": [],
+      "notes": "REJECTED: no source supports it, and it isn't PizzaDAO lore (no repo hits). Kept so it isn't re-added. Use mb-001 / mb-002.",
+      "status": "rejected"
+    },
+    {
+      "id": "fun-001",
+      "category": "myth-busting",
+      "type": "true_false",
+      "difficulty": "medium",
+      "question": "True or false: a real email from Satoshi reveals his favorite pizza was pineapple and jalapeño.",
+      "answer": "false",
+      "aliases": [],
+      "rejects": [],
+      "match": {
+        "kind": "boolean"
+      },
+      "explanation": "False. In Feb 2024, days after Martti Malmi published his real Satoshi emails, a fake one went viral claiming Satoshi liked pineapple and jalapeños.",
+      "sources": [
+        {
+          "url": "https://fortune.com/crypto/2024/02/26/who-created-bitcoin-new-emails-satoshi-nakamoto/",
+          "note": "\"a fake email that persuaded most of crypto Twitter that Satoshi liked pineapple and jalapeños on his pizza\""
+        },
+        {
+          "url": "https://unchainedcrypto.com/satoshis-emails-to-a-bitcoin-co-developer-the-5-most-revealing-quotes/",
+          "note": "Correction: \"This was a meme post and not a true quote.\""
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "fun-002",
+      "category": "just-for-fun",
+      "type": "short_answer",
+      "difficulty": "easy",
+      "label": "🍍 Just for fun (crypto-Twitter meme, not history)",
+      "question": "Just for fun: a fake \"Satoshi email\" went viral in 2024. What did it claim was Satoshi's favorite slice?",
+      "answer": "pineapple jalapeño",
+      "aliases": [
+        "pineapple jalapeno",
+        "pineapple and jalapeno",
+        "pineapple and jalapeño",
+        "pineapple & jalapeno",
+        "jalapeno pineapple",
+        "pineapple and jalapenos",
+        "pineapple jalapenos"
+      ],
+      "rejects": [
+        "pineapple",
+        "hawaiian"
+      ],
+      "match": {
+        "kind": "text",
+        "fuzzy": true
+      },
+      "explanation": "Pineapple and jalapeño. The email was fake (Fortune, Unchained), but the pizza is great.",
+      "sources": [
+        {
+          "url": "https://fortune.com/crypto/2024/02/26/who-created-bitcoin-new-emails-satoshi-nakamoto/",
+          "note": "The fake email"
+        },
+        {
+          "url": "https://unchainedcrypto.com/satoshis-emails-to-a-bitcoin-co-developer-the-5-most-revealing-quotes/",
+          "note": "\"meme post and not a true quote\""
+        }
+      ],
+      "notes": "NEEDS SNAX: his wording \"What was Satoshi's favorite slice?\" would present a fabricated quote as fact. It isn't PizzaDAO lore either: the repos have no Satoshi link (only a 2025 Catania GPP event titled \"Pineapple and jalapenos is a good pizza topping\"). Wording above keeps the meme and labels it. 'pineapple' alone is rejected so the answer stays specific; Snax may loosen that.",
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "pz-001",
+      "category": "pizzadao",
+      "type": "short_answer",
+      "difficulty": "easy",
+      "question": "What is the name of PizzaDAO's yearly worldwide pizza party on Bitcoin Pizza Day?",
+      "answer": "Global Pizza Party",
+      "aliases": [
+        "gpp",
+        "the global pizza party"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "text",
+        "fuzzy": true
+      },
+      "explanation": "The Global Pizza Party, held on May 22.",
+      "sources": [
+        {
+          "url": "https://pizzatoday.com/news/20000-to-eat-free-pizza-on-may-22-for-bitcoin-pizza-day/149236/",
+          "note": "Fifth annual GPP, May 22 2025"
+        },
+        {
+          "url": "https://pizzadao.org/handbook/getting-started",
+          "note": "Handbook: \"The next Global Pizza Party is on ...\""
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "pz-002",
+      "category": "pizzadao",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "In what year did PizzaDAO hold its first Global Pizza Party?",
+      "answer": "2021",
+      "aliases": [],
+      "rejects": [],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "2021 (May 22, 2021, with free slices through the Slice app).",
+      "sources": [
+        {
+          "url": "https://coindesk.com/business/2021/05/21/pizzadao-celebrates-bitcoin-pizza-day-with-1m-slice-giveaway/",
+          "note": "May 22 2021 celebration"
+        },
+        {
+          "url": "https://www.newswire.com/news/pizzadao-celebrates-third-annual-global-pizza-party-22042669",
+          "note": "Third annual in 2023, consistent with 2021 as the first"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "pz-003",
+      "category": "pizzadao",
+      "type": "true_false",
+      "difficulty": "medium",
+      "question": "True or false: for Bitcoin Pizza Day 2021, PizzaDAO teamed up with the Slice app to give away free pizza.",
+      "answer": "true",
+      "aliases": [],
+      "rejects": [],
+      "match": {
+        "kind": "boolean"
+      },
+      "explanation": "True. Slice delivered the free pizza with the code FREEPIZZADAY.",
+      "sources": [
+        {
+          "url": "https://coindesk.com/business/2021/05/21/pizzadao-celebrates-bitcoin-pizza-day-with-1m-slice-giveaway/",
+          "note": "Slice partnership"
+        }
+      ],
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "pz-004",
+      "category": "pizzadao",
+      "type": "short_answer",
+      "difficulty": "easy",
+      "question": "How many pizzas are in the Rare Pizzas collection?",
+      "answer": "10000",
+      "aliases": [
+        "10,000",
+        "10k",
+        "ten thousand"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "10,000, the same number as Laszlo's bitcoins.",
+      "sources": [
+        {
+          "url": "https://cryptoslate.com/nft-project-mints-10000-digital-pizzas-in-throwback-to-bitcoin/",
+          "note": "10,000 digital pizzas"
+        },
+        {
+          "url": "https://rarepizzas.com",
+          "note": "Mint page shows supply out of 10,000 (toppings repo src/app/page.tsx)"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "pz-005",
+      "category": "pizzadao",
+      "type": "multiple_choice",
+      "difficulty": "medium",
+      "question": "In 2021 a PizzaDAO co-founder described Rare Pizzas as a global what?",
+      "choices": [
+        "Bake sale",
+        "Pizza heist",
+        "Food fight",
+        "Dinner party"
+      ],
+      "answer": "Bake sale",
+      "aliases": [
+        "a bake sale",
+        "global bake sale"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "choice"
+      },
+      "explanation": "A \"global bake sale\": 51% of proceeds to pizzerias, 49% to the team.",
+      "sources": [
+        {
+          "url": "https://coindesk.com/business/2021/05/21/pizzadao-celebrates-bitcoin-pizza-day-with-1m-slice-giveaway/",
+          "note": "Sam Weinrott quote"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "pz-006",
+      "category": "pizzadao",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "Per CoinDesk in 2021, what percent of Rare Pizzas proceeds went to pizzerias around the world?",
+      "answer": "51",
+      "aliases": [
+        "51%",
+        "51 percent"
+      ],
+      "rejects": [
+        "49"
+      ],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "51% (the other 49% paid the team).",
+      "sources": [
+        {
+          "url": "https://coindesk.com/business/2021/05/21/pizzadao-celebrates-bitcoin-pizza-day-with-1m-slice-giveaway/",
+          "note": "51/49 split"
+        }
+      ],
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "pz-007",
+      "category": "pizzadao",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "By May 2021, Rare Pizzas art came from more than how many artists?",
+      "answer": "300",
+      "aliases": [
+        "300+",
+        "over 300",
+        "more than 300"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "Over 300 artists.",
+      "sources": [
+        {
+          "url": "https://coindesk.com/business/2021/05/21/pizzadao-celebrates-bitcoin-pizza-day-with-1m-slice-giveaway/",
+          "note": "\"over 300 artists\""
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "pz-008",
+      "category": "pizzadao",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "Rare Pizzas launched with how many possible toppings, a number that's a nod to pi?",
+      "answer": "314",
+      "aliases": [],
+      "rejects": [
+        "339"
+      ],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "314 artist toppings.",
+      "sources": [
+        {
+          "url": "https://thespoon.tech/the-creators-behind-rare-pizzas-want-to-use-pizza-art-nfts-to-fund-a-global-real-world-pizza-party/",
+          "note": "314 possible toppings, each by a unique artist"
+        },
+        {
+          "url": "https://rarepizzas.com/toppings",
+          "note": "Site copy: \"314 unique artist toppings across 17 classes\""
+        }
+      ],
+      "notes": "FLAGGED: toppings/src/data/toppings.json has 339 rows in 19 classes (it includes NFT/Rare classes). Snax should confirm 314 is the canonical launch count and that the 'pi' framing is accurate.",
+      "status": "flagged"
+    },
+    {
+      "id": "pz-009",
+      "category": "pizzadao",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "How much ETH does it cost to mint a Rare Pizzas Box?",
+      "answer": "0.08",
+      "aliases": [
+        "0.08 eth",
+        ".08",
+        ".08 eth"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "0.08 ETH per box.",
+      "sources": [
+        {
+          "url": "https://harvest.art/barn/1/0x4ae57798aef4af99ed03818f83d2d8aca89952c7",
+          "note": "\"mint a fresh box for 0.08\""
+        },
+        {
+          "url": "https://rarepizzas.com",
+          "note": "Mint page (toppings repo: unitPrice fallback 0.08 ETH, live price read from contract)"
+        }
+      ],
+      "notes": "Read from the contract at runtime on rarepizzas.com. If the price ever changes, retire this question. The plan's season check covers it.",
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "pz-010",
+      "category": "pizzadao",
+      "type": "multiple_choice",
+      "difficulty": "medium",
+      "question": "Which blockchain is the Rare Pizzas Box contract on?",
+      "choices": [
+        "Ethereum",
+        "Bitcoin",
+        "Solana",
+        "Base"
+      ],
+      "answer": "Ethereum",
+      "aliases": [
+        "eth",
+        "ethereum mainnet",
+        "mainnet"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "choice"
+      },
+      "explanation": "Ethereum mainnet (contract 0x4ae5…52c7).",
+      "sources": [
+        {
+          "url": "https://harvest.art/barn/1/0x4ae57798aef4af99ed03818f83d2d8aca89952c7",
+          "note": "Chain id 1 = Ethereum"
+        }
+      ],
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "pz-011",
+      "category": "pizzadao",
+      "type": "short_answer",
+      "difficulty": "easy",
+      "question": "What are PizzaDAO's community points called?",
+      "answer": "PEP",
+      "aliases": [
+        "$pep",
+        "pep points",
+        "pepperoni"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "text",
+        "fuzzy": false
+      },
+      "explanation": "PEP ($PEP), earned for missions, jobs, bounties and now trivia.",
+      "sources": [
+        {
+          "url": "https://pizzadao.org/handbook/getting-started",
+          "note": "\"earns PEP, the community's points\""
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "pz-012",
+      "category": "pizzadao",
+      "type": "short_answer",
+      "difficulty": "easy",
+      "question": "When you join PizzaDAO, what kind of name do you pick?",
+      "answer": "mafia name",
+      "aliases": [
+        "mafia",
+        "a mafia name",
+        "pizza mafia name"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "text",
+        "fuzzy": true
+      },
+      "explanation": "A mafia name. Get yours at pizzadao.org/get-your-mafia-name.",
+      "sources": [
+        {
+          "url": "https://pizzadao.org/handbook/getting-started",
+          "note": "\"pick your mafia name\""
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "pz-013",
+      "category": "pizzadao",
+      "type": "true_false",
+      "difficulty": "medium",
+      "question": "True or false: Rare Pizzas NFTs went on sale before the first Global Pizza Party.",
+      "answer": "true",
+      "aliases": [],
+      "rejects": [],
+      "match": {
+        "kind": "boolean"
+      },
+      "explanation": "True. Sales began in March 2021, two months before the first party on May 22, 2021.",
+      "sources": [
+        {
+          "url": "https://coindesk.com/business/2021/05/21/pizzadao-celebrates-bitcoin-pizza-day-with-1m-slice-giveaway/",
+          "note": "\"since March 2021\""
+        }
+      ],
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "pz-014",
+      "category": "pizzadao",
+      "type": "true_false",
+      "difficulty": "medium",
+      "question": "True or false: the 2025 Global Pizza Party spanned six continents.",
+      "answer": "true",
+      "aliases": [],
+      "rejects": [],
+      "match": {
+        "kind": "boolean"
+      },
+      "explanation": "True. It reached 400+ cities on six continents.",
+      "sources": [
+        {
+          "url": "https://pizzatoday.com/news/20000-to-eat-free-pizza-on-may-22-for-bitcoin-pizza-day/149236/",
+          "note": "Six continents, 400+ cities (May 2025)"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "pz-015",
+      "category": "pizzadao",
+      "type": "multiple_choice",
+      "difficulty": "medium",
+      "question": "The 2025 Global Pizza Party was held in more than how many cities?",
+      "choices": [
+        "40",
+        "100",
+        "400",
+        "4,000"
+      ],
+      "answer": "400",
+      "aliases": [
+        "400+",
+        "over 400"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "choice"
+      },
+      "explanation": "More than 400 cities.",
+      "sources": [
+        {
+          "url": "https://pizzatoday.com/news/20000-to-eat-free-pizza-on-may-22-for-bitcoin-pizza-day/149236/",
+          "note": "\"more than 400 cities worldwide\""
+        }
+      ],
+      "notes": "Dated on purpose ('2025'). Never ask 'how many cities' without a year.",
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "pz-016",
+      "category": "pizzadao",
+      "type": "multiple_choice",
+      "difficulty": "hard",
+      "question": "2025 Global Pizza Party RSVPs used Unlock Protocol event contracts on which network?",
+      "choices": [
+        "Base",
+        "Ethereum mainnet",
+        "Polygon",
+        "Bitcoin"
+      ],
+      "answer": "Base",
+      "aliases": [
+        "base mainnet"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "choice"
+      },
+      "explanation": "Base.",
+      "sources": [
+        {
+          "url": "https://app.unlock-protocol.com/event/global-pizza-party-5th-bitcoin-pizza-day-prague",
+          "note": "Example 2025 event; pizzadao-org data/gpp-contracts.json lists network_name Base, start 2025-05-22"
+        }
+      ],
+      "notes": "Check every 2025 entry in data/gpp-contracts.json is Base before approving for rewards (spot-checked entries all say Base / 8453).",
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "pz-017",
+      "category": "pizzadao",
+      "type": "multiple_choice",
+      "difficulty": "medium",
+      "question": "By 2025, roughly how much free pizza had PizzaDAO given away since 2021?",
+      "answer": "Over $1 million",
+      "aliases": [
+        "1 million",
+        "$1 million",
+        "1m",
+        "$1m",
+        "one million"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "choice"
+      },
+      "explanation": "Over $1 million in free pizza since 2021, in 75+ countries.",
+      "sources": [
+        {
+          "url": "https://pizzatoday.com/news/20000-to-eat-free-pizza-on-may-22-for-bitcoin-pizza-day/149236/",
+          "note": "\"over $1 million in free pizza distributed since 2021\""
+        }
+      ],
+      "notes": "Dated to 2025 on purpose.",
+      "status": "approved",
+      "choices": [
+        "Over $10,000",
+        "Over $100,000",
+        "Over $1 million",
+        "Over $100 million"
+      ],
+      "pool": "web"
+    }
+  ]
+}

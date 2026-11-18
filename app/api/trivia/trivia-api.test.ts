@@ -1,0 +1,284 @@
+// @vitest-environment node
+/**
+ * The trivia APIs: answer secrecy (no answer/aliases/rejects before an attempt), the practice and daily verdicts,
+ * the web/Discord pool split, rate limits and report validation. The database is an in-memory fake; the rate
+ * limiter is the real one (in-memory fallback, since no Upstash env is set in tests).
+ */
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NextRequest } from "next/server";
+
+const session = vi.hoisted(() => ({ value: null as null | { discordId: string } }));
+const db = vi.hoisted(() => ({
+  rounds: [] as { id: number; dayKey: string | null; questionId: string; surface: string }[],
+  attempts: [] as { roundId: number; discordId: string; messageId: string | null; correct: boolean; answerText: string }[],
+  reports: [] as { questionId: string; discordId: string | null; text: string }[],
+  down: false,
+}));
+
+vi.mock("@/app/lib/session", () => ({ getSession: async () => session.value }));
+vi.mock("@/app/lib/db", () => ({
+  prisma: {
+    triviaRound: {
+      findUnique: async ({ where }: { where: { dayKey: string } }) => {
+        if (db.down) throw new Error("relation does not exist");
+        return db.rounds.find((r) => r.dayKey === where.dayKey) ?? null;
+      },
+      create: async ({ data }: { data: { dayKey: string; questionId: string; surface: string } }) => {
+        if (db.down) throw new Error("relation does not exist");
+        const row = { id: db.rounds.length + 1, ...data };
+        db.rounds.push(row);
+        return row;
+      },
+    },
+    triviaAttempt: {
+      findFirst: async ({ where }: { where: { roundId: number; discordId: string } }) =>
+        db.attempts.find((a) => a.roundId === where.roundId && a.discordId === where.discordId && a.messageId === null) ?? null,
+      create: async ({ data }: { data: (typeof db.attempts)[number] }) => {
+        if (db.attempts.some((a) => a.roundId === data.roundId && a.discordId === data.discordId && a.messageId === null)) throw new Error("unique");
+        db.attempts.push(data);
+        return data;
+      },
+      count: async ({ where }: { where: { roundId: number; correct?: boolean } }) =>
+        db.attempts.filter((a) => a.roundId === where.roundId && (where.correct === undefined || a.correct === where.correct)).length,
+      findMany: async () => [],
+    },
+    triviaReport: {
+      create: async ({ data }: { data: (typeof db.reports)[number] }) => {
+        db.reports.push(data);
+        return data;
+      },
+    },
+  },
+}));
+
+import { GET as dailyGET, POST as dailyPOST } from "./daily/route";
+import { GET as practiceGET, POST as practicePOST } from "./practice/route";
+import { POST as reportPOST } from "./report/route";
+import { getBank, servable } from "@/app/lib/trivia/bank";
+import { dailyQuestionFor, dayKeyUtc } from "@/app/lib/trivia/daily";
+
+let ipCounter = 0;
+const freshIp = () => `10.0.${Math.floor(++ipCounter / 250)}.${ipCounter % 250}`;
+
+function req(url: string, init: { method?: string; body?: unknown; ip?: string } = {}) {
+  return new NextRequest(`https://pizzadao.test${url}`, {
+    method: init.method ?? "GET",
+    headers: { "content-type": "application/json", "x-forwarded-for": init.ip ?? freshIp() },
+    body: init.body === undefined ? undefined : JSON.stringify(init.body),
+  });
+}
+
+const FORBIDDEN_KEYS = ["answer", "aliases", "rejects", "explanation", "sources", "match", "notes", "pool", "status"];
+function keysDeep(v: unknown, out = new Set<string>()): Set<string> {
+  if (Array.isArray(v)) v.forEach((x) => keysDeep(x, out));
+  else if (v && typeof v === "object")
+    for (const [k, x] of Object.entries(v)) {
+      out.add(k);
+      keysDeep(x, out);
+    }
+  return out;
+}
+
+/** A clearly wrong but well-formed answer for any kind of question. */
+function wrongFor(q: ReturnType<typeof getBank>["questions"][number]): string {
+  if (q.match.kind === "boolean") return q.answer === "true" ? "false" : "true";
+  if (q.match.kind === "number") return String(Number(q.answer) + 7);
+  if (q.match.kind === "choice") return q.choices!.find((c) => c !== q.answer)!;
+  return "zzzz nothing";
+}
+
+const webPool = () => servable({ pool: "web" });
+const discordPool = () => servable({ pool: "discord" });
+
+beforeEach(() => {
+  session.value = null;
+  db.rounds.length = 0;
+  db.attempts.length = 0;
+  db.reports.length = 0;
+  db.down = false;
+});
+
+describe("practice", () => {
+  it("GET returns at most 10 public questions with no answer fields, only from the web pool", async () => {
+    const res = await practiceGET(req("/api/trivia/practice"));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.questions.length).toBe(10);
+    const keys = keysDeep(body.questions);
+    for (const f of FORBIDDEN_KEYS) expect(keys.has(f), `leaked ${f}`).toBe(false);
+    const web = new Set(webPool().map((q) => q.id));
+    for (const q of body.questions) expect(web.has(q.id)).toBe(true);
+    expect(res.headers.get("cache-control")).toContain("no-store");
+  });
+
+  it("GET filters by category and rejects an unknown one", async () => {
+    const ok = await (await practiceGET(req("/api/trivia/practice?category=early-bitcoin"))).json();
+    expect(ok.questions.length).toBeGreaterThan(0);
+    expect(ok.questions.every((q: { category: string }) => q.category === "early-bitcoin")).toBe(true);
+    expect((await practiceGET(req("/api/trivia/practice?category=nope"))).status).toBe(400);
+  });
+
+  it("never serves a Discord-pool question, even across many draws", async () => {
+    const discord = new Set(discordPool().map((q) => q.id));
+    for (let i = 0; i < 30; i++) {
+      const body = await (await practiceGET(req("/api/trivia/practice"))).json();
+      for (const q of body.questions) expect(discord.has(q.id)).toBe(false);
+    }
+  });
+
+  it("POST: correct and wrong verdicts return the reveal (answer, explanation, sources), never aliases or rejects", async () => {
+    const q = webPool().find((x) => x.id === "pd-001") ?? webPool().find((x) => x.match.kind === "number")!;
+    const right = await practicePOST(req("/api/trivia/practice", { method: "POST", body: { questionId: q.id, answer: q.answer } }));
+    const rb = await right.json();
+    expect(rb.verdict).toBe("correct");
+    expect(rb.reveal.answer).toBeTruthy();
+    expect(rb.reveal.sources.length).toBeGreaterThan(0);
+    for (const f of ["aliases", "rejects", "notes"]) expect(keysDeep(rb).has(f)).toBe(false);
+
+    const wrong = await practicePOST(req("/api/trivia/practice", { method: "POST", body: { questionId: q.id, answer: "7" } }));
+    expect((await wrong.json()).verdict).toBe("wrong");
+  });
+
+  it("POST: not an answer is ignored without revealing anything", async () => {
+    const tf = webPool().find((x) => x.type === "true_false")!;
+    const body = await (await practicePOST(req("/api/trivia/practice", { method: "POST", body: { questionId: tf.id, answer: "lol what" } }))).json();
+    expect(body).toEqual({ verdict: "ignore" });
+  });
+
+  it("POST: refuses a Discord-pool, held-back or unknown question (404), and bad bodies (400)", async () => {
+    for (const id of [discordPool()[0].id, "pz-008", "eb-035", "bt-000", "nope-999"]) {
+      const res = await practicePOST(req("/api/trivia/practice", { method: "POST", body: { questionId: id, answer: "x" } }));
+      expect(res.status, id).toBe(404);
+    }
+    expect((await practicePOST(req("/api/trivia/practice", { method: "POST", body: { questionId: "pd-001" } }))).status).toBe(400);
+    expect((await practicePOST(req("/api/trivia/practice", { method: "POST", body: { questionId: "pd-001", answer: "x".repeat(500) } }))).status).toBe(400);
+  });
+
+  it("POST: the 31st check in a minute from one IP is 429", async () => {
+    const ip = freshIp();
+    const q = webPool()[0];
+    let last = 0;
+    for (let i = 0; i < 31; i++) {
+      last = (await practicePOST(req("/api/trivia/practice", { method: "POST", ip, body: { questionId: q.id, answer: "x" } }))).status;
+      if (i < 30) expect(last).toBe(200);
+    }
+    expect(last).toBe(429);
+  });
+
+  it("POST: a cross-origin write is rejected", async () => {
+    const r = new NextRequest("https://pizzadao.test/api/trivia/practice", {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: "https://evil.example", "x-forwarded-for": freshIp() },
+      body: JSON.stringify({ questionId: "pd-001", answer: "x" }),
+    });
+    expect((await practicePOST(r)).status).toBe(403);
+  });
+});
+
+describe("daily", () => {
+  const today = () => dailyQuestionFor(dayKeyUtc(), webPool())!;
+
+  it("GET returns today's public question, from the web pool, with no answer fields", async () => {
+    const res = await dailyGET(req("/api/trivia/daily"));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.question.id).toBe(today().id);
+    for (const f of FORBIDDEN_KEYS) expect(keysDeep(body).has(f), `leaked ${f}`).toBe(false);
+    expect(body.attempt).toBeNull();
+    expect(body.signedIn).toBe(false);
+    expect(discordPool().some((q) => q.id === body.question.id)).toBe(false);
+  });
+
+  it("GET still works when the Trivia tables are missing", async () => {
+    db.down = true;
+    const res = await dailyGET(req("/api/trivia/daily"));
+    expect(res.status).toBe(200);
+    expect((await res.json()).question.id).toBe(today().id);
+  });
+
+  it("logged out: POST gives a verdict and the reveal, records nothing", async () => {
+    const q = today();
+    const res = await dailyPOST(req("/api/trivia/daily", { method: "POST", body: { answer: q.match.kind === "boolean" ? q.answer : q.answer } }));
+    const body = await res.json();
+    expect(body.verdict).toBe("correct");
+    expect(body.recorded).toBe(false);
+    expect(body.reveal.explanation).toBeTruthy();
+    expect(db.attempts).toHaveLength(0);
+  });
+
+  it("signed in: one recorded attempt per day; a second submit returns the first result, and GET then reveals", async () => {
+    session.value = { discordId: "111" };
+    const q = today();
+    const wrongAnswer = wrongFor(q);
+    const first = await (await dailyPOST(req("/api/trivia/daily", { method: "POST", body: { answer: wrongAnswer } }))).json();
+    expect(first.verdict).toBe("wrong");
+    expect(first.recorded).toBe(true);
+    expect(db.attempts).toHaveLength(1);
+
+    const second = await (await dailyPOST(req("/api/trivia/daily", { method: "POST", body: { answer: q.answer } }))).json();
+    expect(second.alreadyAnswered).toBe(true);
+    expect(second.verdict).toBe("wrong"); // the first attempt stands
+    expect(db.attempts).toHaveLength(1);
+
+    const got = await (await dailyGET(req("/api/trivia/daily"))).json();
+    expect(got.signedIn).toBe(true);
+    expect(got.attempt.correct).toBe(false);
+    expect(got.attempt.reveal.answer).toBeTruthy();
+  });
+
+  it("not an answer does not use the day's attempt", async () => {
+    session.value = { discordId: "222" };
+    const q = today();
+    if (q.match.kind !== "boolean") return; // only a true/false question treats chit-chat as ignore
+    const body = await (await dailyPOST(req("/api/trivia/daily", { method: "POST", body: { answer: "hmm not sure" } }))).json();
+    expect(body.verdict).toBe("ignore");
+    expect(db.attempts).toHaveLength(0);
+  });
+
+  it("answers are checked even when the tables are missing (nothing recorded)", async () => {
+    db.down = true;
+    session.value = { discordId: "333" };
+    const q = today();
+    const body = await (await dailyPOST(req("/api/trivia/daily", { method: "POST", body: { answer: q.answer } }))).json();
+    expect(body.verdict).toBe("correct");
+    expect(body.recorded).toBe(false);
+  });
+});
+
+describe("report", () => {
+  const post = (body: unknown, ip?: string) => reportPOST(req("/api/trivia/report", { method: "POST", body, ip }));
+
+  it("stores a report for a served question, with the Discord id when signed in", async () => {
+    session.value = { discordId: "444" };
+    const q = webPool()[0];
+    const res = await post({ questionId: q.id, text: "  The date looks wrong  " });
+    expect(res.status).toBe(200);
+    expect(db.reports).toEqual([{ questionId: q.id, discordId: "444", text: "The date looks wrong" }]);
+  });
+
+  it("rejects short or long text, unknown, Discord-pool and held-back questions", async () => {
+    const q = webPool()[0];
+    expect((await post({ questionId: q.id, text: "x" })).status).toBe(400);
+    expect((await post({ questionId: q.id, text: "y".repeat(501) })).status).toBe(400);
+    expect((await post({ questionId: "nope-1", text: "something is off" })).status).toBe(404);
+    expect((await post({ questionId: discordPool()[0].id, text: "something is off" })).status).toBe(404);
+    expect((await post({ questionId: "pz-008", text: "something is off" })).status).toBe(404);
+    expect(db.reports).toHaveLength(0);
+  });
+
+  it("is rate limited per IP (5 per 10 minutes)", async () => {
+    const ip = freshIp();
+    const q = webPool()[0];
+    const codes: number[] = [];
+    for (let i = 0; i < 6; i++) codes.push((await post({ questionId: q.id, text: "something is off" }, ip)).status);
+    expect(codes).toEqual([200, 200, 200, 200, 200, 429]);
+  });
+});
+
+describe("bank pool sanity for the routes", () => {
+  it("has questions in both pools", () => {
+    expect(getBank().questions.length).toBeGreaterThan(80);
+    expect(webPool().length).toBeGreaterThan(50);
+    expect(discordPool().length).toBeGreaterThan(20);
+  });
+});

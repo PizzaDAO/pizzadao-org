@@ -211,6 +211,7 @@ enum TransactionType {
   GAME_WIN // Casino game payout incl. stake returned on a push (+)
   ADMIN_GRANT // Discord /add-money by an admin (+)
   ADMIN_REMOVE // Discord /remove-money by an admin (-)
+  TRIVIA_REWARD // Discord trivia win (plans/trivia.md); written from phase 2, added now so the enum stays in sync
 }
 
 model Transaction {
@@ -3371,4 +3372,66 @@ model RsvLinkJti {
 model MemberRsvCheck {
   memberId  String   @id
   checkedAt DateTime
+}
+
+// Trivia (plans/trivia.md). Questions live in data/trivia/questions.json; these tables hold runtime state only.
+enum TriviaRoundStatus {
+  OPEN
+  WON
+  EXPIRED
+  CANCELLED
+}
+
+enum TriviaSurface {
+  DISCORD
+  WEB_DAILY
+}
+
+model TriviaRound {
+  id              Int               @id @default(autoincrement())
+  surface         TriviaSurface
+  questionId      String
+  status          TriviaRoundStatus @default(OPEN)
+  channelId       String? // Discord channel
+  messageId       String?           @unique // the bot's question post (snowflake)
+  dayKey          String?           @unique // WEB_DAILY: 'YYYY-MM-DD' (UTC)
+  rewardPep       Int               @default(0)
+  openedAt        DateTime          @default(now())
+  closesAt        DateTime
+  winnerDiscordId String?
+  winnerMessageId String?
+  wonAt           DateTime?
+  attempts        TriviaAttempt[]
+
+  @@index([surface, status])
+  @@index([questionId])
+  // The migration also adds two partial unique indexes Prisma cannot express:
+  //   TriviaRound_one_open_discord_per_channel: at most one OPEN DISCORD round per channel
+  //   TriviaAttempt_web_once_per_round: one web attempt (messageId IS NULL) per user per round
+}
+
+model TriviaAttempt {
+  id         Int         @id @default(autoincrement())
+  roundId    Int
+  discordId  String
+  messageId  String?     @unique // Discord: idempotency for recorder retries
+  correct    Boolean
+  answerText String      @db.VarChar(120) // truncated; kept 30 days, then nulled by the scrub cron
+  createdAt  DateTime    @default(now())
+  round      TriviaRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+
+  @@unique([roundId, discordId, messageId])
+  @@index([roundId, discordId])
+  @@index([discordId, createdAt])
+}
+
+model TriviaReport {
+  id         Int      @id @default(autoincrement())
+  questionId String
+  discordId  String?
+  text       String   @db.VarChar(500)
+  status     String   @default("open") @db.VarChar(16)
+  createdAt  DateTime @default(now())
+
+  @@index([status, createdAt])
 }

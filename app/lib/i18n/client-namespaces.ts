@@ -44,6 +44,7 @@ export const CLIENT_NAMESPACES = [
   "spotlight",
   "taxForm",
   "telegramLink",
+  "trivia",
 ] as const;
 
 /** The subset of a catalog that client components may read. Unknown namespaces are simply absent. */
