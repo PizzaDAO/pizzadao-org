@@ -3,6 +3,7 @@ import { memberWritesConfigured, postMemberWrite } from "@/app/lib/members/write
 import {
     MEMBER_COLUMNS,
     cellText,
+    fetchMemberIdByDiscordId,
     findMemberRow,
     getMembersTable,
     invalidateMembersCache,
@@ -14,6 +15,8 @@ import { getSession } from "@/app/lib/session";
 import { getDiscordTurtleRoles, mergeTurtles, parseTurtlesFromSheet } from "@/app/lib/discord-roles";
 import { syncDiscordMember } from "@/app/lib/services/discord-api";
 import { TURTLE_ROLE_IDS } from "@/app/ui/constants";
+import { safeEqual } from "@/app/lib/auth-guards";
+import { checkKeyedRateLimit, rateLimitResponse } from "@/app/lib/rate-limit";
 import { internalError } from "@/app/lib/errors/error-response";
 
 export const runtime = "nodejs";
@@ -78,6 +81,10 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
         }
 
+        // Per-session attempt limit, applied before any password comparison.
+        const limit = await checkKeyedRateLimit("claim-member", sessionDiscordId, undefined, { failClosed: true });
+        if (!limit.success) return rateLimitResponse(limit);
+
         const body = await req.json();
         const { memberId, password } = body;
 
@@ -86,7 +93,7 @@ export async function POST(req: Request) {
         if (!claimPassword) {
             return NextResponse.json({ error: "Claim password not configured" }, { status: 500 });
         }
-        if (password !== claimPassword) {
+        if (!safeEqual(typeof password === "string" ? password : null, claimPassword)) {
             return NextResponse.json({ error: "Incorrect password" }, { status: 403 });
         }
 
@@ -124,6 +131,15 @@ export async function POST(req: Request) {
         // If already claimed by same user, treat as success (idempotent)
         if (alreadyClaimedDiscord === sessionDiscordId) {
             return NextResponse.json({ ok: true, alreadyClaimed: true });
+        }
+
+        // The caller must not already be linked to a different member row.
+        const ownedMemberId = await fetchMemberIdByDiscordId(sessionDiscordId, { fresh: true });
+        if (ownedMemberId && ownedMemberId !== String(memberId)) {
+            return NextResponse.json(
+                { error: "This Discord account is already linked to a member." },
+                { status: 409 }
+            );
         }
 
         // 3) Fetch Discord turtle roles and merge with existing sheet turtles

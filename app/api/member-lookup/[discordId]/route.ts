@@ -7,6 +7,7 @@
 import { getSheetData } from "@/app/lib/sheets/member-repository";
 import { getSession } from "@/app/lib/session";
 import { NextResponse } from "next/server";
+import { normalizeMemberName } from "@/app/lib/members/name-match";
 
 export const runtime = "nodejs";
 
@@ -39,7 +40,7 @@ export async function GET(
                 const rowDiscord = String(row.discordId ?? "").trim();
                 if (rowDiscord && rowDiscord !== "null" && rowDiscord !== "undefined") continue;
 
-                const name = String(row["Name"] || row["Mafia Name"] || row["Real Name"] || "").trim().toLowerCase();
+                const name = normalizeMemberName(row["Name"] || row["Mafia Name"] || row["Real Name"]);
                 if (name === searchName) {
                     memberData = row;
                     for (const [mid, i] of cache.memberToIdx) {

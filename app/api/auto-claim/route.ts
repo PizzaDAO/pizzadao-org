@@ -5,6 +5,7 @@ import { memberWritesConfigured, postMemberWrite } from "@/app/lib/members/write
 import {
     MEMBER_COLUMNS,
     cellText,
+    fetchMemberIdByDiscordId,
     findMemberRow,
     getMembersTable,
     invalidateMembersCache,
@@ -15,6 +16,8 @@ import { getSession } from "@/app/lib/session";
 import { getDiscordTurtleRoles, mergeTurtles, parseTurtlesFromSheet } from "@/app/lib/discord-roles";
 import { syncDiscordMember } from "@/app/lib/services/discord-api";
 import { TURTLE_ROLE_IDS } from "@/app/ui/constants";
+import { checkKeyedRateLimit, rateLimitResponse } from "@/app/lib/rate-limit";
+import { memberNameMatches } from "@/app/lib/members/name-match";
 import { internalError } from "@/app/lib/errors/error-response";
 
 export const runtime = "nodejs";
@@ -52,8 +55,12 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
         }
 
+        // Per-session limit, failing closed if the limiter backend errors.
+        const limit = await checkKeyedRateLimit("auto-claim", sessionDiscordId, undefined, { failClosed: true });
+        if (!limit.success) return rateLimitResponse(limit);
+
         const body = await req.json();
-        const { memberId, expectedName } = body;
+        const { memberId } = body;
 
         if (!memberId) {
             return NextResponse.json({ error: "Missing memberId" }, { status: 400 });
@@ -85,8 +92,9 @@ export async function POST(req: Request) {
             const memberName = cellText(cells[idxName]);
             const existingDiscord = idxDiscord != null ? cellText(cells[idxDiscord]) : "";
 
-            // Verify name match (case-insensitive)
-            if (!expectedName || memberName.toLowerCase() !== expectedName.toLowerCase()) {
+            // Verify the sheet name against the signed-in user's own identity
+            // (server-side session), never against anything the client sends.
+            if (!memberNameMatches(memberName, [session?.nick, session?.username])) {
                 return NextResponse.json({
                     error: "Name mismatch - cannot auto-claim",
                     canAutoClaim: false
@@ -104,6 +112,15 @@ export async function POST(req: Request) {
             // If already claimed by same user, return success
             if (existingDiscord === sessionDiscordId) {
                 return NextResponse.json({ ok: true, alreadyClaimed: true });
+            }
+
+            // The caller must not already be linked to a different member row.
+            const ownedMemberId = await fetchMemberIdByDiscordId(sessionDiscordId, { fresh: true });
+            if (ownedMemberId && ownedMemberId !== String(memberId)) {
+                return NextResponse.json({
+                    error: "This Discord account is already linked to a member",
+                    canAutoClaim: false
+                }, { status: 409 });
             }
 
             // Fetch existing turtles and merge with Discord roles

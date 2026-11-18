@@ -453,7 +453,6 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             memberId: lookup.memberId,
-            expectedName: lookup.memberName || discordNick,
           }),
         });
         if (claimRes.ok) {
