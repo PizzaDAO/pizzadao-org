@@ -6,7 +6,8 @@ vi.mock('next/server', () => ({ after: (fn: () => unknown) => void fn() }))
 import {
   cardState,
   cardVersion,
-  everyoneDeniedView,
+  channelIsPrivateFor,
+  POSTED_UNSTORED,
   needsNewCard,
   renderCallReviewCard,
   renderHash,
@@ -123,9 +124,17 @@ describe('renderCallReviewCard', () => {
     expect(rm.embeds[0].description).not.toContain('We agreed')
   })
 
-  it('notes stale redactions on an open card', () => {
-    const m = renderCallReviewCard(view({ staleRedactions: true }), { appUrl: APP })
-    expect(JSON.stringify(m)).toContain('hidden after the summary')
+  it('stale redactions: rendered like a held card (no summary, no action items), with the note and website link only', () => {
+    const m = renderCallReviewCard(view({ staleRedactions: true, summary: 'SECRET summary' }), { appUrl: APP })
+    const text = JSON.stringify(m)
+    expect(text).toContain('hidden after the summary')
+    expect(text).not.toContain('SECRET')
+    expect(text).not.toContain('Write the doc')
+    expect(m.embeds[0].fields).toBeUndefined()
+    const buttons = (m.components[0] as { components: Array<{ custom_id?: string; url?: string }> }).components
+    expect(buttons).toHaveLength(1)
+    expect(buttons[0].url).toBe(`${APP}/admin/calls/rec1`)
+    expect(cardState({ status: 'IN_REVIEW', held: null, staleRedactions: true })).toBe('stale')
   })
 
   it('same view renders the same hash; a changed summary changes it', () => {
@@ -159,22 +168,41 @@ describe('state and version helpers', () => {
   })
 })
 
-describe('everyoneDeniedView', () => {
-  const ch = (ow: Array<{ id: string; type: number; allow: string; deny: string }> | undefined) => ({ guildId: 'g1', permissionOverwrites: ow })
-  it('needs a role overwrite on the guild id that denies View Channel', () => {
-    expect(everyoneDeniedView(ch([{ id: 'g1', type: 0, allow: '0', deny: '1024' }]))).toBe(true)
-    expect(everyoneDeniedView(ch([{ id: 'g1', type: 0, allow: '0', deny: '3072' }]))).toBe(true)
+describe('channelIsPrivateFor', () => {
+  const OPTS = { guildId: 'g1', allowedIds: ['capo-role', 'dpr-role', 'bot-user'] }
+  const EVERYONE = { id: 'g1', type: 0, allow: '0', deny: '1024' }
+  const ch = (ow: Array<{ id: string; type: number; allow: string; deny: string }> | undefined, guildId: string | null = 'g1') => ({ guildId, permissionOverwrites: ow })
+  it('private: @everyone denied, nobody else outside the allow-list granted View Channel', () => {
+    expect(channelIsPrivateFor(ch([EVERYONE]), OPTS)).toBe(true)
+    expect(channelIsPrivateFor(ch([{ ...EVERYONE, deny: '3072' }]), OPTS)).toBe(true)
+  })
+  it('allow-listed roles and the bot may be granted View Channel', () => {
+    expect(channelIsPrivateFor(ch([EVERYONE, { id: 'capo-role', type: 0, allow: '1024', deny: '0' }, { id: 'dpr-role', type: 0, allow: '1024', deny: '0' }, { id: 'bot-user', type: 1, allow: '1024', deny: '0' }]), OPTS)).toBe(true)
+  })
+  it('refused when another role is re-granted View Channel (e.g. Verified)', () => {
+    expect(channelIsPrivateFor(ch([EVERYONE, { id: 'verified-role', type: 0, allow: '1024', deny: '0' }]), OPTS)).toBe(false)
+    expect(channelIsPrivateFor(ch([EVERYONE, { id: 'capo-role', type: 0, allow: '1024', deny: '0' }, { id: 'verified-role', type: 0, allow: '3072', deny: '0' }]), OPTS)).toBe(false)
+  })
+  it('refused when a member overwrite outside the allow-list grants View Channel', () => {
+    expect(channelIsPrivateFor(ch([EVERYONE, { id: 'some-member', type: 1, allow: '1024', deny: '0' }]), OPTS)).toBe(false)
+  })
+  it('a deny-only overwrite on another role is fine', () => {
+    expect(channelIsPrivateFor(ch([EVERYONE, { id: 'verified-role', type: 0, allow: '0', deny: '1024' }]), OPTS)).toBe(true)
+  })
+  it('refused for a channel in another guild, or with no configured guild', () => {
+    expect(channelIsPrivateFor(ch([{ ...EVERYONE, id: 'g2' }], 'g2'), OPTS)).toBe(false)
+    expect(channelIsPrivateFor(ch([EVERYONE]), { ...OPTS, guildId: '' })).toBe(false)
   })
   it('fails closed on everything else', () => {
-    expect(everyoneDeniedView(ch([{ id: 'g1', type: 0, allow: '1024', deny: '0' }]))).toBe(false)
-    expect(everyoneDeniedView(ch([{ id: 'g1', type: 0, allow: '0', deny: '2048' }]))).toBe(false)
-    expect(everyoneDeniedView(ch([{ id: 'other', type: 0, allow: '0', deny: '1024' }]))).toBe(false)
-    expect(everyoneDeniedView(ch([{ id: 'g1', type: 1, allow: '0', deny: '1024' }]))).toBe(false)
-    expect(everyoneDeniedView(ch([]))).toBe(false)
-    expect(everyoneDeniedView(ch(undefined))).toBe(false)
-    expect(everyoneDeniedView({ guildId: null, permissionOverwrites: [{ id: 'g1', type: 0, allow: '0', deny: '1024' }] })).toBe(false)
-    expect(everyoneDeniedView(null)).toBe(false)
-    expect(everyoneDeniedView(ch([{ id: 'g1', type: 0, allow: 'x', deny: 'y' }]))).toBe(false)
+    expect(channelIsPrivateFor(ch([{ ...EVERYONE, allow: '1024', deny: '0' }]), OPTS)).toBe(false)
+    expect(channelIsPrivateFor(ch([{ ...EVERYONE, deny: '2048' }]), OPTS)).toBe(false)
+    expect(channelIsPrivateFor(ch([{ ...EVERYONE, id: 'other' }]), OPTS)).toBe(false)
+    expect(channelIsPrivateFor(ch([{ ...EVERYONE, type: 1 }]), OPTS)).toBe(false)
+    expect(channelIsPrivateFor(ch([]), OPTS)).toBe(false)
+    expect(channelIsPrivateFor(ch(undefined), OPTS)).toBe(false)
+    expect(channelIsPrivateFor(ch([EVERYONE], null), OPTS)).toBe(false)
+    expect(channelIsPrivateFor(null, OPTS)).toBe(false)
+    expect(channelIsPrivateFor(ch([{ ...EVERYONE, allow: 'x', deny: 'y' }]), OPTS)).toBe(false)
   })
 })
 
@@ -299,6 +327,61 @@ describe('syncCallReviewCard', () => {
     const { deps, state } = makeDeps(view(), { edit: async () => { throw new DiscordPostError('boom', 500) } })
     state.v.card = { channelId: '111111111111111111', messageId: '999999999999999999', renderedHash: 'old', resolvedAt: null, claimedAt: NOW }
     expect(await syncCallReviewCard('rec1', deps)).toBe('failed')
+  })
+})
+
+describe('syncCallReviewCard: privacy re-check and post safety', () => {
+  const OPEN_CARD = { channelId: '111111111111111111', messageId: '222222222222222222', renderedHash: 'old', resolvedAt: null, claimedAt: NOW }
+  it('an existing open card is collapsed when its channel is no longer private', async () => {
+    const { state, deps } = makeDeps(view(), { channelIsPrivate: async () => false })
+    state.v.card = { ...OPEN_CARD }
+    expect(await syncCallReviewCard('rec1', deps)).toBe('edited')
+    const text = JSON.stringify(state.edits[0])
+    expect(text).not.toContain('We agreed')
+    expect(text).toContain('Held for owner review')
+  })
+  it('an existing open card is collapsed when its channel is not the configured one any more', async () => {
+    const { state, deps } = makeDeps(view(), { channelId: async () => '999999999999999999' })
+    state.v.card = { ...OPEN_CARD }
+    expect(await syncCallReviewCard('rec1', deps)).toBe('edited')
+    expect(JSON.stringify(state.edits[0])).not.toContain('We agreed')
+  })
+  it('a private, configured channel keeps the summary', async () => {
+    const { state, deps } = makeDeps(view())
+    state.v.card = { ...OPEN_CARD }
+    await syncCallReviewCard('rec1', deps)
+    expect(JSON.stringify(state.edits[0])).toContain('We agreed')
+  })
+  it('a post with no message id is a failure and blocks an automatic repost', async () => {
+    const { state, deps } = makeDeps(view(), { post: async () => ({ id: null }) })
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect(await syncCallReviewCard('rec1', deps)).toBe('failed')
+    expect(state.claimed).toBe(true) // not unclaimed
+    expect(state.errors.at(-1)).toContain(POSTED_UNSTORED)
+    expect(state.v.card?.messageId ?? null).toBeNull()
+  })
+  it('a store that fails once is retried; failing twice blocks a repost and keeps the message id in the error', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    let n = 0
+    const once = makeDeps(view())
+    const realStore = once.deps.store
+    once.deps.store = async (id, c) => {
+      if (n++ === 0) throw new Error('db blip')
+      return realStore(id, c)
+    }
+    expect(await syncCallReviewCard('rec1', once.deps)).toBe('posted')
+    expect(once.state.posts).toHaveLength(1)
+
+    const twice = makeDeps(view(), { store: async () => { throw new Error('db down') } })
+    expect(await syncCallReviewCard('rec1', twice.deps)).toBe('failed')
+    expect(twice.state.posts).toHaveLength(1)
+    expect(twice.state.claimed).toBe(true)
+    expect(twice.state.errors.at(-1)).toBe(`${POSTED_UNSTORED}: 222222222222222222`)
+  })
+  it('a held call with no card is remembered so the sweep does not keep picking it', async () => {
+    const { state, deps } = makeDeps(view({ held: 'term' }))
+    expect(await syncCallReviewCard('rec1', deps)).toBe('no_card_needed')
+    expect(state.saved).toEqual([{ resolvedAt: NOW }])
   })
 })
 

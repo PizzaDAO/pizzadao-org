@@ -30,6 +30,7 @@ import { loadPostFilter, type PostFilter } from '@/app/lib/calls/post-filters'
 import { heldReason, type HeldReason } from '@/app/lib/calls/hold-rules'
 import { neutralizeMentions } from '@/app/lib/calls/recap'
 import { callDateTimeFormat } from '@/app/lib/calls/format-call-time'
+import { CALL_CAPO_ROLE_IDS, DREAD_PIZZA_ROBERTS_ROLE_ID } from '@/app/ui/constants'
 import { SITE_URL } from '@/app/lib/site-url'
 import { createHash } from 'node:crypto'
 
@@ -45,7 +46,7 @@ export function reviewCardsEnabled(env: NodeJS.ProcessEnv = process.env): Promis
 
 // ------------------------------------------------------------------- view ---
 
-export type CardState = 'open' | 'published' | 'removed' | 'held'
+export type CardState = 'open' | 'stale' | 'published' | 'removed' | 'held'
 
 export interface CallCardView {
   id: string
@@ -88,10 +89,12 @@ export function cardVersion(r: { summaryGeneratedAt?: Date | null; summaryEdited
   return ms.toString(36)
 }
 
-export function cardState(v: Pick<CallCardView, 'status' | 'held'>): CardState {
+export function cardState(v: Pick<CallCardView, 'status' | 'held'> & { staleRedactions?: boolean }): CardState {
   if (v.status === 'REJECTED') return 'removed'
   if (v.status === 'PUBLISHED') return 'published'
-  return v.held ? 'held' : 'open'
+  if (v.held) return 'held'
+  // Lines were hidden after the summary was written: the summary on the card may show what was hidden.
+  return v.staleRedactions ? 'stale' : 'open'
 }
 
 const ts = (d: Date, style = 'f') => `<t:${Math.floor(d.getTime() / 1000)}:${style}>`
@@ -136,7 +139,9 @@ export function renderCallReviewCard(v: CallCardView, opts: { appUrl: string }):
     if (v.summary?.trim()) body.push('', clean(v.summary, SUMMARY_MAX))
     const items = actionLines(v.actionItems)
     if (items.length) fields.push({ name: 'Action items', value: clip(items.join('\n'), 1000) })
-    if (v.staleRedactions) fields.push({ name: 'Note', value: 'Lines were hidden after the summary was written. Regenerate or edit the summary on the website before publishing.' })
+  } else if (state === 'stale') {
+    headline = `Needs the website: ${crew}`
+    body.push(when, '', 'Lines were hidden after the summary was written. Regenerate or edit the summary on the website, then approve.')
   } else if (state === 'held') {
     headline = `Held for owner review: ${crew}`
     body.push(when)
@@ -176,8 +181,8 @@ export interface CallCardDeps {
   claim: (id: string, now: Date) => Promise<boolean>
   unclaim: (id: string) => Promise<void>
   store: (id: string, card: { channelId: string; messageId: string; renderedHash: string }) => Promise<void>
-  /** Save the render hash, the resolved time and the last error (null clears it) without touching the message. */
-  saveState: (id: string, s: { renderedHash?: string; resolvedAt: Date | null; error: string | null }) => Promise<void>
+  /** Save the render hash, the resolved time and the last error (null clears it, undefined leaves it) without touching the message. */
+  saveState: (id: string, s: { renderedHash?: string; resolvedAt: Date | null; error?: string | null }) => Promise<void>
   /** The Discord message is gone: forget it. */
   clearMessage: (id: string) => Promise<void>
   post: (channelId: string, msg: CardMessage) => Promise<{ id: string | null }>
@@ -196,6 +201,15 @@ export function needsNewCard(v: CallCardView, now: Date, maxAgeDays: number): bo
   return v.source === 'DISCORD' && v.status === 'IN_REVIEW' && !!v.summary?.trim() && !v.held && v.startedAt.getTime() >= now.getTime() - maxAgeDays * 86_400_000
 }
 
+/** Is it safe to show the unreviewed summary in this channel? It must still be the configured channel, and private. */
+async function openAllowed(deps: CallCardDeps, channelId: string): Promise<boolean> {
+  const current = await deps.channelId()
+  return !!current && current === channelId && (await deps.channelIsPrivate(channelId))
+}
+
+/** Error marker: Discord may hold a card we have no record of. The claim stays blocked (no automatic repost) until an owner clears it. */
+export const POSTED_UNSTORED = 'posted-unstored'
+
 /** Bring the call's card up to date (see the module comment). Never throws. */
 export async function syncCallReviewCard(id: string, deps: CallCardDeps = defaultCallCardDeps): Promise<CallCardOutcome> {
   try {
@@ -203,10 +217,13 @@ export async function syncCallReviewCard(id: string, deps: CallCardDeps = defaul
     const v = await deps.load(id)
     // Imported calls are the owner's backlog: never a card.
     if (!v || v.source !== 'DISCORD') return v ? 'no_card_needed' : 'missing'
+    // An existing card is only shown with its summary while its channel is still the configured, private one;
+    // otherwise it is collapsed like a held call (checked on every sync, so a changed or opened-up channel closes it).
+    if (v.card?.messageId && v.card.channelId && cardState(v) === 'open' && !(await openAllowed(deps, v.card.channelId))) v.held = 'unreadable'
     const appUrl = deps.appUrl()
     const now = deps.now?.() ?? new Date()
     const state = cardState(v)
-    const resolvedAt = state === 'open' ? null : v.card?.resolvedAt ?? now
+    const resolvedAt = state === 'open' || state === 'stale' ? null : v.card?.resolvedAt ?? now
 
     if (v.card?.messageId && v.card.channelId) {
       const msg = renderCallReviewCard(v, { appUrl })
@@ -228,7 +245,11 @@ export async function syncCallReviewCard(id: string, deps: CallCardDeps = defaul
       }
     }
 
-    if (!needsNewCard(v, now, await deps.maxAgeDays())) return 'no_card_needed'
+    if (!needsNewCard(v, now, await deps.maxAgeDays())) {
+      // A held call is remembered (resolved, no message) so the sweep's candidate list is not clogged by it; releasing the hold syncs again.
+      if (v.held && v.status === 'IN_REVIEW' && !v.card?.messageId) await deps.saveState(id, { resolvedAt: v.card?.resolvedAt ?? now })
+      return 'no_card_needed'
+    }
     const channelId = await deps.channelId()
     if (!channelId) return 'no_channel'
     if (!(await deps.claim(id, now))) return 'claimed_elsewhere'
@@ -247,9 +268,24 @@ export async function syncCallReviewCard(id: string, deps: CallCardDeps = defaul
       await deps.saveState(id, { resolvedAt: null, error: errText(err) }).catch(() => {})
       throw err
     }
-    if (!posted.id) return 'posted'
+    if (!posted.id) {
+      // Discord may have the card: never repost automatically.
+      console.error(`[calls/review-cards] post for ${id} returned no message id; automatic reposting is blocked until the card row's error is cleared`)
+      await deps.saveState(id, { resolvedAt: null, error: `${POSTED_UNSTORED}: no message id` }).catch(() => {})
+      return 'failed'
+    }
     const hash = renderHash(msg)
-    await deps.store(id, { channelId, messageId: posted.id, renderedHash: hash })
+    try {
+      await deps.store(id, { channelId, messageId: posted.id, renderedHash: hash })
+    } catch {
+      try {
+        await deps.store(id, { channelId, messageId: posted.id, renderedHash: hash })
+      } catch (err) {
+        console.error(`[calls/review-cards] card for ${id} was posted (message ${posted.id}) but could not be stored; reposting is blocked:`, errText(err))
+        await deps.saveState(id, { resolvedAt: null, error: `${POSTED_UNSTORED}: ${posted.id}` }).catch(() => {})
+        return 'failed'
+      }
+    }
     // Changed (published, edited, held) while the card was being posted: show the current state.
     const fresh = await deps.load(id)
     if (fresh) {
@@ -257,7 +293,8 @@ export async function syncCallReviewCard(id: string, deps: CallCardDeps = defaul
       const h2 = renderHash(m2)
       if (h2 !== hash) {
         await deps.edit({ channelId, messageId: posted.id }, m2)
-        await deps.saveState(id, { renderedHash: h2, resolvedAt: cardState(fresh) === 'open' ? null : now, error: null })
+        const st = cardState(fresh)
+        await deps.saveState(id, { renderedHash: h2, resolvedAt: st === 'open' || st === 'stale' ? null : now, error: null })
       }
     }
     return 'posted'
@@ -290,10 +327,12 @@ export interface SweepDeps extends CallCardDeps {
   /** Ids of calls that need a NEW card (DISCORD, IN_REVIEW, summarized, recent, no posted card). */
   listNew: (since: Date, limit: number) => Promise<string[]>
   /** Ids of calls with a posted card that is open or was resolved recently. */
-  listExisting: (resolvedSince: Date, limit: number) => Promise<string[]>
+  /** `cursor` rotates through open cards so more than `limit` of them all get checked over successive runs. */
+  listExisting: (resolvedSince: Date, limit: number, cursor: number) => Promise<string[]>
 }
 
 export const SWEEP_EXISTING_LIMIT = 50
+const SWEEP_EVERY_MS = 10 * 60 * 1000
 
 /**
  * The reconcile sweep (followups cron, every 10 min): posts cards for calls that are due one (at most
@@ -308,14 +347,17 @@ export async function syncDueCallReviewCards(limit = 5, deps: SweepDeps = defaul
     const maxAge = await deps.maxAgeDays()
     // A few spare candidates: some (auto-held, channel problems) end up with no card and must not starve the rest.
     const fresh = await deps.listNew(new Date(now.getTime() - maxAge * 86_400_000), limit * 4)
-    const existing = await deps.listExisting(new Date(now.getTime() - RESOLVED_RECHECK_MS), SWEEP_EXISTING_LIMIT)
+    const existing = await deps.listExisting(new Date(now.getTime() - RESOLVED_RECHECK_MS), SWEEP_EXISTING_LIMIT, Math.floor(now.getTime() / SWEEP_EVERY_MS))
+    // One privacy lookup per channel per run, however many cards are checked.
+    const privacy = new Map<string, Promise<boolean>>()
+    const run: SweepDeps = { ...deps, channelIsPrivate: (c) => privacy.get(c) ?? (privacy.set(c, deps.channelIsPrivate(c)), privacy.get(c)!) }
     let posted = 0
     let edited = 0
     for (const id of fresh) {
       if (posted >= limit) break
-      if ((await syncCallReviewCard(id, deps)) === 'posted') posted++
+      if ((await syncCallReviewCard(id, run)) === 'posted') posted++
     }
-    for (const id of existing) if ((await syncCallReviewCard(id, deps)) === 'edited') edited++
+    for (const id of existing) if ((await syncCallReviewCard(id, run)) === 'edited') edited++
     return { posted, edited, checked: fresh.length + existing.length }
   } catch (err) {
     console.error('[calls/review-cards] sweep failed:', errText(err))
@@ -327,13 +369,31 @@ export async function syncDueCallReviewCards(limit = 5, deps: SweepDeps = defaul
 
 const botToken = () => process.env.DISCORD_BOT_TOKEN?.trim() ?? ''
 
-/** The @everyone role id is the guild id; an overwrite on it that denies VIEW_CHANNEL makes the channel private. Pure. */
-export function everyoneDeniedView(channel: { guildId: string | null; permissionOverwrites?: Array<{ id: string; type: number; allow: string; deny: string }> } | null | undefined): boolean {
-  if (!channel?.guildId || !Array.isArray(channel.permissionOverwrites)) return false
-  const ow = channel.permissionOverwrites.find((o) => o.id === channel.guildId && Number(o.type) === 0)
-  if (!ow) return false
+type Overwrite = { id: string; type: number; allow: string; deny: string }
+
+/**
+ * Pure. A channel is private enough for unreviewed summaries when:
+ *   - it belongs to our guild,
+ *   - an overwrite on @everyone (the role whose id is the guild id) denies VIEW_CHANNEL without allowing it,
+ *   - no other role or member overwrite allows VIEW_CHANNEL, except the allow-list (the capo and DPR
+ *     roles, the bot's own user), so a role re-grant (e.g. Verified) is refused.
+ * Anything unreadable fails closed.
+ */
+export function channelIsPrivateFor(
+  channel: { guildId: string | null; permissionOverwrites?: Overwrite[] } | null | undefined,
+  opts: { guildId: string; allowedIds: readonly string[] },
+): boolean {
+  if (!opts.guildId || !channel?.guildId || channel.guildId !== opts.guildId || !Array.isArray(channel.permissionOverwrites)) return false
   try {
-    return (BigInt(ow.deny) & VIEW_CHANNEL_BIT) !== BigInt(0) && (BigInt(ow.allow) & VIEW_CHANNEL_BIT) === BigInt(0)
+    const everyone = channel.permissionOverwrites.find((o) => o.id === channel.guildId && Number(o.type) === 0)
+    if (!everyone) return false
+    if ((BigInt(everyone.deny) & VIEW_CHANNEL_BIT) === BigInt(0) || (BigInt(everyone.allow) & VIEW_CHANNEL_BIT) !== BigInt(0)) return false
+    const allowed = new Set(opts.allowedIds)
+    for (const o of channel.permissionOverwrites) {
+      if (o === everyone) continue
+      if ((BigInt(o.allow) & VIEW_CHANNEL_BIT) !== BigInt(0) && !allowed.has(o.id)) return false
+    }
+    return true
   } catch {
     return false
   }
@@ -398,13 +458,21 @@ export const defaultCallCardDeps: CallCardDeps = {
   channelId: () => savedChannelId('discord.callReviewChannelId'),
   async channelIsPrivate(channelId) {
     const r = await fetchChannel(channelId, { botToken: botToken() })
-    return r.ok && everyoneDeniedView(r.channel)
+    // Who may see it besides: the capo and DPR roles and the bot itself (its application id is its user id).
+    const allowedIds = [...CALL_CAPO_ROLE_IDS, DREAD_PIZZA_ROBERTS_ROLE_ID, process.env.DISCORD_CLIENT_ID?.trim() ?? '']
+    return r.ok && channelIsPrivateFor(r.channel, { guildId: process.env.DISCORD_GUILD_ID?.trim() ?? '', allowedIds })
   },
   async claim(id, now) {
     const created = await prisma.callReviewCard.createMany({ data: [{ recordingId: id, claimedAt: now }], skipDuplicates: true })
     if (created.count === 1) return true
     const r = await prisma.callReviewCard.updateMany({
-      where: { recordingId: id, messageId: null, OR: [{ claimedAt: null }, { claimedAt: { lt: new Date(now.getTime() - STALE_CLAIM_MS) } }] },
+      where: {
+        recordingId: id,
+        messageId: null,
+        OR: [{ claimedAt: null }, { claimedAt: { lt: new Date(now.getTime() - STALE_CLAIM_MS) } }],
+        // A card Discord may already hold (posted, not stored) is never re-posted automatically.
+        AND: [{ OR: [{ error: null }, { NOT: { error: { startsWith: POSTED_UNSTORED } } }] }],
+      },
       data: { claimedAt: now },
     })
     return r.count === 1
@@ -416,14 +484,14 @@ export const defaultCallCardDeps: CallCardDeps = {
     await prisma.callReviewCard.upsert({
       where: { recordingId: id },
       create: { recordingId: id, ...card, claimedAt: new Date() },
-      update: { ...card, error: null },
+      update: { ...card, error: null, resolvedAt: null },
     })
   },
   async saveState(id, s) {
     await prisma.callReviewCard.upsert({
       where: { recordingId: id },
-      create: { recordingId: id, ...(s.renderedHash ? { renderedHash: s.renderedHash } : {}), resolvedAt: s.resolvedAt, error: s.error },
-      update: { ...(s.renderedHash ? { renderedHash: s.renderedHash } : {}), resolvedAt: s.resolvedAt, error: s.error },
+      create: { recordingId: id, ...(s.renderedHash ? { renderedHash: s.renderedHash } : {}), resolvedAt: s.resolvedAt, ...(s.error !== undefined ? { error: s.error } : {}) },
+      update: { ...(s.renderedHash ? { renderedHash: s.renderedHash } : {}), resolvedAt: s.resolvedAt, ...(s.error !== undefined ? { error: s.error } : {}) },
     })
   },
   async clearMessage(id) {
@@ -444,7 +512,8 @@ export const defaultSweepDeps: SweepDeps = {
         summary: { not: null },
         startedAt: { gte: since },
         reviewHoldAt: null,
-        OR: [{ reviewCard: null }, { reviewCard: { messageId: null } }],
+        // No card yet, or a card row with no message that is not a remembered hold (resolvedAt set).
+        OR: [{ reviewCard: null }, { reviewCard: { messageId: null, resolvedAt: null } }],
       },
       orderBy: { startedAt: 'asc' },
       take: limit,
@@ -452,13 +521,22 @@ export const defaultSweepDeps: SweepDeps = {
     })
     return rows.map((r) => r.id)
   },
-  async listExisting(resolvedSince, limit) {
-    const rows = await prisma.callReviewCard.findMany({
-      where: { messageId: { not: null }, recording: { source: 'DISCORD' }, OR: [{ resolvedAt: null }, { resolvedAt: { gte: resolvedSince } }] },
-      orderBy: { updatedAt: 'desc' },
-      take: limit,
-      select: { recordingId: true },
-    })
-    return rows.map((r) => r.recordingId)
+  async listExisting(resolvedSince, limit, cursor) {
+    // Open cards first, rotating through them so more than `limit` all get checked over successive runs.
+    const open = (
+      await prisma.callReviewCard.findMany({ where: { messageId: { not: null }, resolvedAt: null, recording: { source: 'DISCORD' } }, orderBy: { recordingId: 'asc' }, take: 500, select: { recordingId: true } })
+    ).map((r) => r.recordingId)
+    const start = open.length ? (cursor * limit) % open.length : 0
+    const ids = [...open.slice(start), ...open.slice(0, start)].slice(0, limit)
+    if (ids.length < limit) {
+      const recent = await prisma.callReviewCard.findMany({
+        where: { messageId: { not: null }, resolvedAt: { gte: resolvedSince }, recording: { source: 'DISCORD' } },
+        orderBy: { updatedAt: 'desc' },
+        take: limit - ids.length,
+        select: { recordingId: true },
+      })
+      ids.push(...recent.map((r) => r.recordingId))
+    }
+    return ids
   },
 }
