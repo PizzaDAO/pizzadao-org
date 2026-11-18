@@ -31,6 +31,7 @@ import { AttendanceCard } from "../../ui/attendance-card";
 import { useSession } from "../../lib/hooks/use-session";
 import { useProfileSummary, type ProfileSummaryData } from "../../lib/hooks/use-api";
 import { norm } from "../../lib/strings";
+import { goBackOrFallback } from "../../lib/go-back";
 import { DisavowChip } from "../../disavow/_components/DisavowChip";
 import type { ReactNode } from "react";
 import type { ProfilePrefill } from "./profile-page-data";
@@ -120,7 +121,7 @@ export function ProfileClient({ id, disavowWarning = null, buddySlot = null, ini
                         {(error as Error | undefined)?.message || "This member doesn't exist."}
                     </p>
                     <button
-                        onClick={() => router.back()}
+                        onClick={() => goBackOrFallback(router, "/crews")}
                         className="btn-pill self-start"
                         style={{
                             background: "hsl(var(--ink))",
@@ -153,7 +154,7 @@ export function ProfileClient({ id, disavowWarning = null, buddySlot = null, ini
                 {/* Back */}
                 <div>
                     <button
-                        onClick={() => router.back()}
+                        onClick={() => goBackOrFallback(router, "/crews")}
                         className="overline bg-transparent border-0 p-0 text-foreground/55 hover:text-tomato cursor-pointer transition-colors"
                     >
                         ← Back

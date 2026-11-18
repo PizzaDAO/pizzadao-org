@@ -175,8 +175,8 @@ export default function CrewPageClient({ params, featuresLink = false }: { param
       try {
         const res = await fetch(`/api/crew/${crewId}`)
         if (!res.ok) {
-          const err = await res.json()
-          throw new Error(err.error || 'Failed to load crew')
+          const err = await res.json().catch(() => ({}))
+          throw new Error((err as { error?: string }).error || 'Failed to load crew. Please try again.')
         }
         const json = await res.json()
         setData(json)
@@ -256,9 +256,10 @@ export default function CrewPageClient({ params, featuresLink = false }: { param
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ crewId, action: 'join' }),
       })
-      const result = await res.json()
-      if (!res.ok) throw new Error(result.error || 'Failed to join crew')
+      const result = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error((result as { error?: string }).error || 'Failed to join crew. Please try again.')
       setUser(prev => prev ? { ...prev, crews: [...prev.crews, crewId.toLowerCase()] } : null)
+      setReloadKey(k => k + 1) // refetch so the roster updates
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'Something went wrong')
     } finally {
@@ -275,9 +276,10 @@ export default function CrewPageClient({ params, featuresLink = false }: { param
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ crewId, action: 'leave' }),
       })
-      const result = await res.json()
-      if (!res.ok) throw new Error(result.error || 'Failed to leave crew')
+      const result = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error((result as { error?: string }).error || 'Failed to leave crew. Please try again.')
       setUser(prev => prev ? { ...prev, crews: prev.crews.filter(c => c.toLowerCase() !== crewId.toLowerCase()) } : null)
+      setReloadKey(k => k + 1) // refetch so the roster updates
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'Something went wrong')
     } finally {

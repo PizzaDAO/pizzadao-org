@@ -29,6 +29,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { Field } from "../../../ui/onboarding/Field";
 import { ProfileLinksEditor } from "../../../ui/profile-links";
@@ -163,18 +164,24 @@ function TextEditor({
     placeholder,
 }: TextEditorProps) {
     const t = useTranslations("profileEdit");
+    const qc = useQueryClient();
     const [value, setValue] = useState(initial === "None" ? "" : initial);
+    // Last-saved value; Save is disabled while the text matches it.
+    const [baseline, setBaseline] = useState(
+        (initial === "None" ? "" : initial).trim()
+    );
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [savedAt, setSavedAt] = useState<number | null>(null);
 
     useEffect(() => {
         setValue(initial === "None" ? "" : initial);
+        setBaseline((initial === "None" ? "" : initial).trim());
     }, [initial]);
 
     const trimmed = value.trim();
     const tooLong = trimmed.length > MAX_LEN;
-    const dirty = trimmed !== (initial === "None" ? "" : initial).trim();
+    const dirty = trimmed !== baseline;
 
     const onSave = async () => {
         setError(null);
@@ -200,7 +207,10 @@ function TextEditor({
                 );
                 return;
             }
+            setBaseline(trimmed);
             setSavedAt(Date.now());
+            qc.invalidateQueries({ queryKey: ["profile-summary", memberId] });
+            qc.invalidateQueries({ queryKey: ["user-data", memberId] });
         } catch {
             setError(t("networkError"));
         } finally {

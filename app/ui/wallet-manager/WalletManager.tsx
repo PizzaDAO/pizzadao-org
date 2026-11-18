@@ -33,6 +33,7 @@ function truncateAddress(addr: string): string {
 export function WalletManager({ memberId }: WalletManagerProps) {
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -71,9 +72,12 @@ export function WalletManager({ memberId }: WalletManagerProps) {
       if (res.ok) {
         const data = await res.json();
         setWallets(data.wallets || []);
+        setLoadFailed(false);
+      } else {
+        setLoadFailed(true);
       }
     } catch {
-      // Ignore fetch errors on load
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -114,7 +118,9 @@ export function WalletManager({ memberId }: WalletManagerProps) {
     async function autoSave() {
       // Wait for the initial wallet list to load — otherwise `wallets` is
       // still [] and we'd race a POST before we know the address is saved.
-      if (loading || !isConnected || !connectedAddress || saving) return;
+      // Also wait out a failed load: with an unknown list we can't tell
+      // whether the address is already saved.
+      if (loading || loadFailed || !isConnected || !connectedAddress || saving) return;
 
       const addr = connectedAddress.toLowerCase();
       // Don't keep retrying an address that already failed to save.
@@ -169,7 +175,7 @@ export function WalletManager({ memberId }: WalletManagerProps) {
       }
     }
     autoSave();
-  }, [isConnected, connectedAddress, wallets, memberId, saving, loading, fetchWallets]);
+  }, [isConnected, connectedAddress, wallets, memberId, saving, loading, loadFailed, fetchWallets]);
 
   const handleConnectDifferent = async () => {
     setPendingReconnect(true);
@@ -241,6 +247,9 @@ export function WalletManager({ memberId }: WalletManagerProps) {
       if (res.ok) {
         const data = await res.json();
         setWallets(data.wallets || []);
+      } else {
+        const data = await res.json().catch(() => ({}) as { error?: string });
+        setError(data.error || "Failed to set primary");
       }
     } catch {
       setError("Failed to set primary");
@@ -259,6 +268,9 @@ export function WalletManager({ memberId }: WalletManagerProps) {
         const data = await res.json();
         setWallets(data.wallets || []);
         setEditingId(null);
+      } else {
+        const data = await res.json().catch(() => ({}) as { error?: string });
+        setError(data.error || "Failed to update label");
       }
     } catch {
       setError("Failed to update label");
@@ -313,6 +325,9 @@ export function WalletManager({ memberId }: WalletManagerProps) {
             );
           }
         }
+      } else {
+        const data = await res.json().catch(() => ({}) as { error?: string });
+        setError(data.error || "Failed to delete wallet");
       }
     } catch {
       setError("Failed to delete wallet");
@@ -886,8 +901,41 @@ export function WalletManager({ memberId }: WalletManagerProps) {
         </div>
       )}
 
+      {/* Load failure: don't claim the user has no wallets */}
+      {loadFailed && wallets.length === 0 && (
+        <div
+          role="alert"
+          style={{
+            marginTop: 12,
+            padding: 16,
+            borderRadius: "var(--radius)",
+            border: "1px solid hsl(var(--tomato) / 0.45)",
+            background: "hsl(var(--card))",
+            textAlign: "center",
+            fontSize: 13,
+            color: "hsl(var(--tomato))",
+            display: "grid",
+            gap: 8,
+            justifyItems: "center",
+          }}
+        >
+          <span>Couldn&apos;t load your wallets.</span>
+          <button
+            type="button"
+            onClick={() => {
+              setLoading(true);
+              fetchWallets();
+            }}
+            className="btn-pill"
+            style={{ fontSize: 13 }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* Empty state */}
-      {wallets.length === 0 && !showManualAdd && (
+      {wallets.length === 0 && !loadFailed && !showManualAdd && (
         <div
           style={{
             marginTop: 12,

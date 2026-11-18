@@ -79,7 +79,12 @@ export default function CallsPage({ initialData }: { initialData?: CallsResponse
   const [detail, setDetail] = useState<CallDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
+  // Request-id guards: only the latest request may apply its response.
+  const listReqId = useRef(0);
+  const detailReqId = useRef(0);
+
   const fetchCalls = useCallback(async () => {
+    const reqId = ++listReqId.current;
     setLoading(true);
     setError(null);
     try {
@@ -94,15 +99,17 @@ export default function CallsPage({ initialData }: { initialData?: CallsResponse
         throw new Error(t("loadError"));
       }
       const data = await res.json();
+      if (reqId !== listReqId.current) return;
       setCalls(data.calls || []);
       setPagination(
         data.pagination || { page: 1, limit: PAGE_LIMIT, total: 0, totalPages: 1 }
       );
       setCrewCounts(data.filters?.crews || []);
     } catch {
+      if (reqId !== listReqId.current) return;
       setError(t("loadError"));
     } finally {
-      setLoading(false);
+      if (reqId === listReqId.current) setLoading(false);
     }
   }, [page, crewFilter, sort, t]);
 
@@ -131,6 +138,7 @@ export default function CallsPage({ initialData }: { initialData?: CallsResponse
       prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]
     );
     setPage(1);
+    detailReqId.current++;
     setExpandedKey(null);
   }
 
@@ -138,6 +146,7 @@ export default function CallsPage({ initialData }: { initialData?: CallsResponse
     setCrewFilter([]);
     setSort("newest");
     setPage(1);
+    detailReqId.current++;
     setExpandedKey(null);
   }
 
@@ -146,10 +155,12 @@ export default function CallsPage({ initialData }: { initialData?: CallsResponse
   async function toggleExpand(crewId: string, date: string) {
     const key = `${crewId}:${date}`;
     if (expandedKey === key) {
+      detailReqId.current++;
       setExpandedKey(null);
       setDetail(null);
       return;
     }
+    const reqId = ++detailReqId.current;
     setExpandedKey(key);
     setDetail(null);
     setDetailLoading(true);
@@ -157,11 +168,13 @@ export default function CallsPage({ initialData }: { initialData?: CallsResponse
       const res = await fetch(`/api/calls/${crewId}/${date}`);
       if (!res.ok) throw new Error("Failed to load attendees");
       const data: CallDetail = await res.json();
+      if (reqId !== detailReqId.current) return;
       setDetail(data);
     } catch {
+      if (reqId !== detailReqId.current) return;
       setDetail(null);
     } finally {
-      setDetailLoading(false);
+      if (reqId === detailReqId.current) setDetailLoading(false);
     }
   }
 

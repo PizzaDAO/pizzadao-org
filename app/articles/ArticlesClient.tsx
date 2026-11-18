@@ -67,7 +67,11 @@ export default function ArticlesClient({ initial }: { initial: ArticlesPage | nu
     }
   }
 
+  // Only the latest request may apply its response (filters/pages change fast).
+  const reqIdRef = useRef(0);
+
   const fetchArticles = useCallback(async () => {
+    const reqId = ++reqIdRef.current;
     setLoading(true);
     setError(null);
     try {
@@ -79,12 +83,14 @@ export default function ArticlesClient({ initial }: { initial: ArticlesPage | nu
       const res = await fetch(`/api/articles?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to load articles");
       const data = await res.json();
+      if (reqId !== reqIdRef.current) return;
       setArticles(data.articles || []);
       setPagination(data.pagination || { page: 1, limit: 12, total: 0, totalPages: 1 });
     } catch (err) {
+      if (reqId !== reqIdRef.current) return;
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
-      setLoading(false);
+      if (reqId === reqIdRef.current) setLoading(false);
     }
   }, [page, activeTag, search]);
 
