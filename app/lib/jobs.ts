@@ -233,7 +233,7 @@ type JobTx = Pick<typeof prisma, '$executeRaw' | '$queryRaw' | 'jobAssignment' |
 
 /** Serialize this user's assignments; held until the surrounding transaction ends. */
 async function lockUserAssignment(tx: JobTx, userId: string) {
-  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${JOB_ASSIGN_LOCK_NAMESPACE}, hashtext(${userId}))`
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${JOB_ASSIGN_LOCK_NAMESPACE}::int, hashtext(${userId}))`
 }
 
 /**

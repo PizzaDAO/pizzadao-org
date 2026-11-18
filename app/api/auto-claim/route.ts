@@ -164,7 +164,7 @@ export async function POST(req: Request) {
             // Lost a concurrent claim (the write lock saw the row or account already taken).
             if (sheetStatus === 409) {
                 return NextResponse.json({
-                    error: parsed?.error ?? "This member or Discord account is already claimed",
+                    error: "This member is already claimed by another Discord account, or this Discord account is already linked to a member",
                     canAutoClaim: false
                 }, { status: 409 });
             }

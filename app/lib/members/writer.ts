@@ -18,14 +18,7 @@ async function membersFromDb(): Promise<boolean> {
   return usesDb('members')
 }
 
-/**
- * Sheet mode (the default) cannot give this guarantee: the Apps Script web app is a separate
- * service, and this app reads the row, decides, then posts the write. Two claims racing in that
- * window can both be accepted (last writer wins), because nothing here can lock the sheet. Closing
- * it there needs the script to check the Discord ID cell itself (inside LockService.getScriptLock())
- * before writing. In db mode the checks live in planMemberUpsert and run under MEMBER_WRITE_LOCK,
- * on rows read inside the same transaction, so a claim that lost the race gets a conflict (409).
- */
+/** DB mode: claim checks run under MEMBER_WRITE_LOCK. */
 
 /** Serializes database member writes (and keeps them apart from id allocation, which uses ...331). */
 const MEMBER_WRITE_LOCK = 742019332

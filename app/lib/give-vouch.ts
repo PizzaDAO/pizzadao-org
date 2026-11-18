@@ -66,7 +66,7 @@ export const VOUCH_LOCK_NAMESPACE = 742019341
 /** Count + create under a per-giver advisory lock, in one transaction (no schema change needed). */
 export async function createVouchWithinLimit(followerId: string, followeeId: string, limit: number, since: Date): Promise<boolean> {
   const created = await prisma.$transaction(async (tx) => {
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${VOUCH_LOCK_NAMESPACE}, hashtext(${followerId}))`
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${VOUCH_LOCK_NAMESPACE}::int, hashtext(${followerId}))`
     const recent = await tx.vouch.count({ where: { followerId, createdAt: { gte: since } } })
     if (recent >= limit) return false
     await tx.vouch.create({ data: { followerId, followeeId } })
