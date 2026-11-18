@@ -42,6 +42,7 @@ import {
 import { renderFlyerPng, type FlyerVariant } from './flyer'
 import { editMessageWithFile, postMessageWithFile } from './discord-file'
 import type { CrewSession } from '@prisma/client'
+import { revalidatePublicPage } from '@/app/lib/revalidate-public'
 
 const PENDING = 'PENDING'
 const CHANNEL_FIELD = { announceMessageId: 'announceChannelId', generalMessageId: 'generalChannelId' } as const
@@ -144,6 +145,7 @@ export async function scheduleEducationSession(
     }
   }
   if (row.status === SESSION_STATUS.CANCELED) return { status: 'canceled', sessionId: row.id }
+  if (!existed) revalidatePublicPage('learn')
   return runSteps(row, s, cfg, deps, existed)
 }
 
@@ -390,6 +392,7 @@ export async function editSession(
     await prisma.crewSession.update({ where: { id: sessionId }, data })
   }
 
+  revalidatePublicPage('learn')
   const out: ChangeResult = { status: 'edited', errors: [] }
   const errors = out.errors!
   const cfg = await loadConfig(deps)
@@ -490,6 +493,7 @@ export async function cancelSession(sessionId: string, actorDiscordId: string, d
       data: { status: SESSION_STATUS.CANCELED, canceledAt: new Date(), updatedBy: actorDiscordId, dedupeKey: freedKey(row) },
     })
   }
+  revalidatePublicPage('learn')
   const out: ChangeResult = { status: 'canceled', alreadyCanceled, errors: [] }
   const errors = out.errors!
   const cfg = await loadConfig(deps)

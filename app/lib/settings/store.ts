@@ -5,6 +5,7 @@
 import { prisma } from '@/app/lib/db'
 import { clearSettingsCache, loadSettings } from './index'
 import { jsonOrDbNull } from './json'
+import { revalidateForSetting } from '@/app/lib/revalidate-public'
 import { AREA_LABELS, SETTINGS, SETTING_KEYS, isSettingKey, parseSetting, type SettingKey } from './registry'
 import { checkTargets, targetNames, TargetError } from './targets'
 import { baselineInt, combineSaved, legacyEnvName } from './numbers'
@@ -187,6 +188,7 @@ export async function saveSetting(
     return saved
   })
   clearSettingsCache()
+  revalidateForSetting(key)
   return { updatedAt: row.updatedAt }
 }
 
@@ -204,6 +206,7 @@ export async function resetSetting(key: SettingKey, actor: string, opts: { note?
     return true
   })
   clearSettingsCache()
+  revalidateForSetting(key)
   return removed
 }
 
