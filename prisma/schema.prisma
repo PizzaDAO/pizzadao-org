@@ -1535,13 +1535,49 @@ model CallRecording {
   createdAt               DateTime            @default(now())
   updatedAt               DateTime            @updatedAt
 
-  speakers CallSpeaker[]
+  // Capo review (plans/capo-review.md): owner-only hold. Set by the owner or a capo, cleared by the owner only.
+  reviewHoldAt            DateTime?
+  reviewHoldBy            String? // Discord id
+  reviewHoldNote          String? // private, max 300; never shown in Discord or publicly
+
+  speakers     CallSpeaker[]
+  reviewCard   CallReviewCard?
+  reviewEvents CallReviewEvent[]
 
   @@index([status, startedAt])
   @@index([crewId, startedAt])
   @@index([createdAt])
   @@index([source, startedAt])
   @@index([recapRefreshAt])
+}
+
+// One review card per recording (capo review). Its own table so card bookkeeping never bumps CallRecording.updatedAt,
+// which the publish guard compares.
+model CallReviewCard {
+  recordingId  String        @id
+  channelId    String?
+  messageId    String?
+  claimedAt    DateTime? // post claim (stale after 10 min)
+  renderedHash String?       @db.VarChar(64) // edit only when the render changed
+  resolvedAt   DateTime? // published / rejected / held: buttons removed
+  error        String? // last Discord failure, max 300, no URLs
+  updatedAt    DateTime      @updatedAt
+  recording    CallRecording @relation(fields: [recordingId], references: [id], onDelete: Cascade)
+}
+
+// Audit of call review actions (who did what, and where).
+model CallReviewEvent {
+  id          Int           @id @default(autoincrement())
+  recordingId String
+  actorId     String // a Discord id or "system:<what>"
+  action      String // publish | unpublish | reject | hold | release | auto_hold | summary_edit | regenerate | redact | card_posted
+  via         String // web | discord | bulk | cron
+  metadata    Json? // e.g. { recap: 'posted' }; never transcript text
+  createdAt   DateTime      @default(now())
+  recording   CallRecording @relation(fields: [recordingId], references: [id], onDelete: Cascade)
+
+  @@index([recordingId, createdAt])
+  @@index([actorId, createdAt])
 }
 
 // Live action items (plans/post-call-agenda-updates.md, options A and C). Keyed by the recorder
