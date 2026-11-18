@@ -2,6 +2,7 @@ import { z } from 'zod'
 import type { Prisma } from '@prisma/client'
 import { requireAdmin } from '@/app/lib/auth-guards'
 import { json, rejectUnsafeWrite } from '@/app/lib/admin-guard'
+import { revalidatePublicPage } from '@/app/lib/revalidate-public'
 import { prisma } from '@/app/lib/db'
 import { entryCreateSchema, entryPatchSchema } from '@/app/lib/features/validate'
 
@@ -32,6 +33,7 @@ export async function POST(request: Request) {
         updatedBy: auth.session.discordId,
       },
     })
+    revalidatePublicPage('features')
     return json(row, 201)
   } catch {
     return json({ error: 'Could not create the feature (check the slug and app)' }, 409)
@@ -59,6 +61,7 @@ export async function PATCH(request: Request) {
         updatedBy: auth.session.discordId,
       },
     })
+    revalidatePublicPage('features')
     return json(row)
   } catch {
     return json({ error: 'Feature not found' }, 404)

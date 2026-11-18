@@ -4,7 +4,10 @@ import { getPublicCatalog, loadSwitches } from "@/app/lib/features/service";
 import FeaturesView from "./FeaturesView";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+// Prerendered, refreshed every 5 minutes and on admin saves (see app/lib/revalidate-public.ts). A 404 baked in
+// by a build without a database (or by a switch that is off) heals at the next revalidate.
+export const dynamic = "force-static";
+export const revalidate = 300;
 
 export const metadata = pageMeta({
   path: "/features",
