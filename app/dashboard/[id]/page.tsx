@@ -20,6 +20,7 @@ import LiveCallBanner from "../../ui/calls/LiveCallBanner";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
+import { useLiveVersion } from "@/app/lib/hooks/use-live-version";
 import { markLoggedOut } from "../../lib/hooks/use-session";
 import { useTranslations } from "next-intl";
 import { CREWS } from "../../ui/constants";
@@ -86,6 +87,15 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
     const { data: balanceData } = useMyBalance();
     const { data: missionsData } = useMissions();
     const { data: discoverData } = useDiscover();
+
+    // Live updates: an approval changes the missions card and the level card without a refresh.
+    useLiveVersion({
+        onChange: ({ mine }) => {
+            if (!mine) return;
+            queryClient.invalidateQueries({ queryKey: ['missions'] });
+            queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+        },
+    });
 
     const loading = userDataLoading;
     const authError = userDataError?.message === '__AUTH_401__'

@@ -174,7 +174,7 @@ export function mergeActivity(existing: ActivityRow | null, u: ActivityUserBatch
 
 /** The slice of Prisma used here (narrow so tests can fake it). */
 export interface ActivityTx {
-  $queryRaw(strings: TemplateStringsArray, ...values: unknown[]): Promise<unknown>
+  $executeRaw(strings: TemplateStringsArray, ...values: unknown[]): Promise<number>
   discordActivity: {
     findMany(args: unknown): Promise<ActivityRow[]>
     upsert(args: unknown): Promise<unknown>

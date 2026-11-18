@@ -207,7 +207,7 @@ function PersonName({ person, strong = true }: { person: Person; strong?: boolea
   );
 }
 
-export function MissionReviewPanel() {
+export function MissionReviewPanel({ refreshKey = 0 }: { refreshKey?: number } = {}) {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [flagged, setFlagged] = useState<FlaggedCompletion[]>([]);
   const toast = useToast();
@@ -220,12 +220,13 @@ export function MissionReviewPanel() {
   const [bulkBusy, setBulkBusy] = useState(false);
 
   useEffect(() => {
-    fetchPending();
-  }, []);
+    // refreshKey > 0 is a live update: reload quietly (no spinner, notes and selection stay).
+    fetchPending(refreshKey > 0);
+  }, [refreshKey]);
 
-  async function fetchPending() {
+  async function fetchPending(silent = false) {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const res = await fetch("/api/missions/pending");
       if (!res.ok) {
         if (res.status === 403) {
@@ -238,7 +239,7 @@ export function MissionReviewPanel() {
       setSubmissions(json.submissions);
       setFlagged(json.flagged ?? []);
     } catch {
-      setError("Failed to load pending submissions");
+      if (!silent) setError("Failed to load pending submissions");
     } finally {
       setLoading(false);
     }
