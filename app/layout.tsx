@@ -9,6 +9,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 import CornerLinks from "@/app/ui/CornerLinks";
 import SiteHeader from "@/app/ui/SiteHeader";
+import NavTracker from "@/app/ui/NavTracker";
 import { XConnectNotice } from "@/app/ui/XConnectNotice";
 import { MagicLoginLandedNotice } from "@/app/ui/MagicLoginLandedNotice";
 import { GlobalBallotPreparer } from "@/app/proposals/_components/GlobalBallotPreparer";
@@ -86,6 +87,7 @@ export default async function RootLayout({
       >
         <NextIntlClientProvider locale={locale} messages={messages}>
           <Providers>
+            <NavTracker />
             <XConnectNotice />
             <MagicLoginLandedNotice />
             <GlobalBallotPreparer />

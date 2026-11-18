@@ -66,6 +66,10 @@ export function WalletManager({ memberId }: WalletManagerProps) {
   // every later refetch.
   const handledAddressRef = useRef<string | null>(null);
 
+  // After one successful load, refetch failures keep the stale list instead of
+  // flagging a load failure (which would block auto-save).
+  const loadedOnceRef = useRef(false);
+
   const fetchWallets = useCallback(async () => {
     try {
       const res = await fetch(`/api/wallet?memberId=${memberId}`);
@@ -73,11 +77,12 @@ export function WalletManager({ memberId }: WalletManagerProps) {
         const data = await res.json();
         setWallets(data.wallets || []);
         setLoadFailed(false);
-      } else {
+        loadedOnceRef.current = true;
+      } else if (!loadedOnceRef.current) {
         setLoadFailed(true);
       }
     } catch {
-      setLoadFailed(true);
+      if (!loadedOnceRef.current) setLoadFailed(true);
     } finally {
       setLoading(false);
     }
