@@ -124,14 +124,19 @@ export function fuzzyThreshold(len: number): number {
 const TRUE_WORDS = new Set(["true", "t", "yes", "y", "yep", "yeah", "correct", "right"]);
 const FALSE_WORDS = new Set(["false", "f", "no", "n", "nope", "wrong", "incorrect"]);
 
-/** true / false, or null when it is not an answer. Fuzzy (<= 1) only against "true" and "false" themselves. */
-export function parseBoolean(cleaned: string): boolean | null {
-  const withEmoji = cleaned.replace(TRUE_EMOJI, " true ").replace(FALSE_EMOJI, " false ");
+// Discord rounds run in a busy chat channel, so only explicit tokens count there: yes/no/yeah/right/wrong/y/n and
+// thumbs are everyday chat, not answers. Typos of true/false still match.
+const STRICT_TRUE = new Set(["true", "t"]);
+const STRICT_FALSE = new Set(["false", "f"]);
+
+/** true / false, or null when it is not an answer. Fuzzy (<= 1) only against "true" and "false" themselves. `strict`: Discord rules. */
+export function parseBoolean(cleaned: string, strict = false): boolean | null {
+  const withEmoji = strict ? cleaned : cleaned.replace(TRUE_EMOJI, " true ").replace(FALSE_EMOJI, " false ");
   const toks = canon(withEmoji);
   if (toks.length !== 1) return null;
   const w = toks[0];
-  if (TRUE_WORDS.has(w)) return true;
-  if (FALSE_WORDS.has(w)) return false;
+  if ((strict ? STRICT_TRUE : TRUE_WORDS).has(w)) return true;
+  if ((strict ? STRICT_FALSE : FALSE_WORDS).has(w)) return false;
   if (w.length >= 4) {
     if (editDistance(w, "true") <= 1) return true;
     if (editDistance(w, "false") <= 1) return false;
@@ -444,7 +449,12 @@ function matchChoice(q: MatchableQuestion, cleaned: string): Verdict {
 // Entry point
 // ---------------------------------------------------------------------------------------------------------------
 
-export function match(question: MatchableQuestion, raw: unknown): MatchResult {
+export interface MatchOptions {
+  /** Discord rounds: true/false questions accept only true, false, t, f and typos of true/false (see parseBoolean). */
+  strictBoolean?: boolean;
+}
+
+export function match(question: MatchableQuestion, raw: unknown, opts: MatchOptions = {}): MatchResult {
   try {
     if (typeof raw !== "string") return { verdict: "ignore" };
     const cleaned = stripDiscordSyntax(raw);
@@ -453,7 +463,7 @@ export function match(question: MatchableQuestion, raw: unknown): MatchResult {
 
     switch (question.match.kind) {
       case "boolean": {
-        const given = parseBoolean(cleaned);
+        const given = parseBoolean(cleaned, opts.strictBoolean === true);
         if (given === null) return { verdict: "ignore" };
         return { verdict: given === (question.answer === "true") ? "correct" : "wrong" };
       }

@@ -57,9 +57,25 @@ describe("dueSlot", () => {
 
   it("does not fire twice: a round opened at or after the slot counts as fired (manual starts included)", () => {
     const now = new Date(slots[0] + 7 * MIN);
-    expect(dueSlot(now, 3, [slots[0] + MIN])).toBeNull();
-    expect(dueSlot(now, 3, [slots[0]])).toBeNull();
-    expect(dueSlot(now, 3, [slots[0] - 1])).toBe(slots[0]);
+    expect(dueSlot(now, 3, [{ openedMs: slots[0] + MIN }])).toBeNull();
+    expect(dueSlot(now, 3, [{ openedMs: slots[0] }])).toBeNull();
+    expect(dueSlot(now, 3, [{ openedMs: slots[0] - 1 }])).toBe(slots[0]);
+  });
+
+  it("a round cancelled with /trivia skip (its question was posted) has fired its slot: it is not opened again", () => {
+    const now = new Date(slots[0] + 7 * MIN);
+    // skip leaves the row CANCELLED with a message id, which recentDiscordRounds reports as postFailed: false
+    expect(dueSlot(now, 3, [{ openedMs: slots[0] + MIN, postFailed: false }])).toBeNull();
+  });
+
+  it("a failed question post is retried once, then the slot is given up", () => {
+    const now = new Date(slots[0] + 12 * MIN);
+    expect(dueSlot(now, 3, [{ openedMs: slots[0] + MIN, postFailed: true }])).toBe(slots[0]);
+    expect(dueSlot(now, 3, [{ openedMs: slots[0] + MIN, postFailed: true }, { openedMs: slots[0] + 6 * MIN, postFailed: true }])).toBeNull();
+    // a retry that worked fires it
+    expect(dueSlot(now, 3, [{ openedMs: slots[0] + MIN, postFailed: true }, { openedMs: slots[0] + 6 * MIN }])).toBeNull();
+    // failures before the slot do not count against it
+    expect(dueSlot(now, 3, [{ openedMs: slots[0] - 5 * MIN, postFailed: true }, { openedMs: slots[0] - 9 * MIN, postFailed: true }])).toBe(slots[0]);
   });
 
   it("a missed tick is caught up by the next one, but a slot older than the catch-up limit is skipped", () => {

@@ -4,12 +4,10 @@
 // with the pure matcher, and run the atomic claim. The recorder is a thin forwarder; everything that decides lives
 // here (bank, settings, caps). Answers reach this in Discord order (the recorder's per-channel serial queue).
 import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
-import { checkKeyedRateLimit } from "@/app/lib/rate-limit";
 import { getQuestion } from "./bank";
 import { attemptsPerRound, MIN_ACCOUNT_AGE_DAYS, REQUIRE_MEMBER, snowflakeAfter, snowflakeMs } from "./config";
 import { match } from "./match";
-import { notEligibleMessage } from "./post";
-import { announceWin, claimWin, defaultPostDeps, findOpenRound, type ClaimResult, type Eligibility, type PostDeps } from "./rounds";
+import { announceWin, claimWin, defaultPostDeps, findAttemptByMessage, findOpenRound, hasRecentAttempt, type ClaimResult, type Eligibility, type PostDeps } from "./rounds";
 
 export interface AnswerInput {
   channelId: string;
@@ -32,8 +30,10 @@ export type AnswerOutcome =
 export interface AnswerDeps extends PostDeps {
   now(): Date;
   isMember(discordId: string): Promise<boolean>;
-  /** True when this member may send an answer now (one per 2 seconds). */
-  allow(discordId: string): Promise<boolean>;
+  /** The stored attempt for this message, if any (a recorder retry). Checked before anything else. */
+  findAttempt(messageId: string): Promise<{ correct: boolean } | null>;
+  /** True when this member already has an attempt in this round in the last 2 seconds (extras are ignored). */
+  throttled(roundId: number, discordId: string, now: Date): Promise<boolean>;
   /** Run after the response (Next after()): replies are posted off the request path. */
   defer(fn: () => Promise<void>): void;
 }
@@ -42,7 +42,8 @@ export const defaultAnswerDeps = (defer: (fn: () => Promise<void>) => void): Ans
   ...defaultPostDeps,
   now: () => new Date(),
   isMember: async (id) => !!(await fetchMemberIdByDiscordId(id)),
-  allow: async (id) => (await checkKeyedRateLimit("trivia-msg", id)).success,
+  findAttempt: findAttemptByMessage,
+  throttled: (roundId, id, now) => hasRecentAttempt(roundId, id, now),
   defer,
 });
 
@@ -66,10 +67,14 @@ export async function processAnswer(input: AnswerInput, deps: AnswerDeps): Promi
   const question = getQuestion(round.questionId);
   if (!question) return { status: "ignored", why: "no_question" };
 
-  // Cheap checks before the limiter so chatter that is not an answer never spends a member's 2 seconds.
-  const verdict = match(question, input.content).verdict;
+  // A retry of a message already recorded (the recorder retries after a 5xx) is answered from the store, before any
+  // limit: the 2 s throttle below counts recorded attempts, so a retry can never be throttled by its own first try.
+  if (await deps.findAttempt(input.messageId)) return { status: "duplicate" };
+
+  // Chatter that is not an answer is ignored and never recorded. Discord rounds accept only explicit true/false tokens.
+  const verdict = match(question, input.content, { strictBoolean: true }).verdict;
   if (verdict === "ignore") return { status: "ignored", why: "not_an_answer" };
-  if (!(await deps.allow(input.discordId))) return { status: "ignored", why: "rate_limited" };
+  if (await deps.throttled(round.id, input.discordId, now)) return { status: "ignored", why: "rate_limited" };
 
   const correct = verdict === "correct";
   let eligibility: Eligibility = { ok: true };
@@ -107,20 +112,10 @@ function finish(
     case "wrong":
       return { status: "wrong" }; // wrong guesses get no reply (keeps the channel readable)
     case "ineligible":
-    case "daily_cap": {
-      const reason = result.kind === "daily_cap" ? "daily_cap" : result.reason;
-      if (round.channelId) {
-        const channelId = round.channelId;
-        deps.defer(async () => {
-          try {
-            await deps.post(channelId, notEligibleMessage(input.discordId, reason, input.messageId));
-          } catch (e) {
-            console.error(`[trivia] reply failed: ${e instanceof Error ? e.message.slice(0, 160) : "error"}`);
-          }
-        });
-      }
-      return { status: "not_won", why: reason };
-    }
+    case "daily_cap":
+      // No public reply: "Correct!" to someone who cannot win, while the round is still open, would tell everyone the
+      // answer. The attempt is stored as correct (and ineligible); the round stays open for eligible members.
+      return { status: "not_won", why: result.kind === "daily_cap" ? "daily_cap" : result.reason };
     case "late":
     case "closed":
     case "attempts_exhausted":

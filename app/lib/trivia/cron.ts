@@ -27,7 +27,7 @@ export async function runTriviaCron(now: Date = new Date(), deps: PostDeps = def
 
   const { rewardPep, dryRun, roundsPerDay } = await triviaSettings();
   const recent = await recentDiscordRounds();
-  const slot = dueSlot(now, roundsPerDay, recent.map((r) => r.openedAt.getTime()));
+  const slot = dueSlot(now, roundsPerDay, recent.map((r) => ({ openedMs: r.openedAt.getTime(), postFailed: r.postFailed })));
   if (slot === null) return { status: "ok", expired, opened: "not_due", dryRun };
 
   const res = await openDiscordRound({ now, channelId, rewardPep: dryRun ? 0 : rewardPep }, deps);

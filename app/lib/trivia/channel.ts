@@ -8,13 +8,15 @@
 // Both saves happen through pinChannelId (insert-only, production-only), so after the first lookup everything goes
 // by id and a rename changes nothing. Nothing here sets channel permissions or slowmode.
 import { loadSettings } from "@/app/lib/settings";
-import { pinChannelId, resolveConfiguredChannel, savedChannelId } from "@/app/lib/settings/channels";
+import { pinChannelId, resolveConfiguredChannelDetailed, savedChannelId } from "@/app/lib/settings/channels";
 
 export async function resolveTriviaChannel(): Promise<string | null> {
   const saved = await savedChannelId("trivia.channelId");
   if (saved) return saved;
-  const id = await resolveConfiguredChannel("discord.missionReviewChannelId", "work", "MISSION_REVIEW_CHANNEL_ID");
-  if (id) await pinChannelId("trivia.channelId", id);
+  const { id, trusted } = await resolveConfiguredChannelDetailed("discord.missionReviewChannelId", "work", "MISSION_REVIEW_CHANNEL_ID");
+  // Only an id that is saved, from env, or an exact "work" match is saved as the trivia channel: a suffix match
+  // (some other "...-work" channel) is used but never made permanent, and never the place where answers are paid.
+  if (id && trusted) await pinChannelId("trivia.channelId", id);
   return id;
 }
 

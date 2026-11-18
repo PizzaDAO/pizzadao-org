@@ -37,8 +37,6 @@ export const RATE_LIMITS = {
   "city-timezone": { limit: 20, windowSec: 60 },
   namegen: { limit: 30, windowSec: 60 },
   "activation": { limit: 30, windowSec: 60 },
-  // Trivia answers: at most one message per member per 2 seconds counts (plans/trivia.md section 6); extras are ignored.
-  "trivia-msg": { limit: 1, windowSec: 2 },
   "trivia-command": { limit: 10, windowSec: 60 },
   "magic-login": { limit: 5, windowSec: 15 * 60 },
   // Polled every 3 s by a "check your DMs" tab for up to ~11 min (about 220 calls).

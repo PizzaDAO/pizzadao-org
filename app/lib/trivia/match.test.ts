@@ -255,3 +255,25 @@ describe("lists of guesses never pass (review probes)", () => {
     expect(verdict("eb-009", "a times")).toBe("correct");
   });
 });
+
+describe("strict booleans (Discord rounds)", () => {
+  const tf = { answer: "true", aliases: [], rejects: [], match: { kind: "boolean" as const }, choices: undefined };
+  const verdict = (raw: string, strict: boolean) => match(tf, raw, { strictBoolean: strict }).verdict;
+
+  it("accepts only true, false, t, f and typos of true/false", () => {
+    for (const w of ["true", "True", "t", "trie", "ture"]) expect(verdict(w, true)).toBe("correct");
+    for (const w of ["false", "f", "flase", "fasle"]) expect(verdict(w, true)).toBe("wrong");
+  });
+
+  it("everyday chat is not an answer: yes, no, yeah, yep, nope, right, wrong, correct, y, n, thumbs", () => {
+    for (const w of ["yes", "no", "yeah", "yep", "nope", "right", "wrong", "correct", "incorrect", "y", "n", "\u{1F44D}", "\u{1F44E}", "\u2705", "\u274C"]) {
+      expect(verdict(w, true)).toBe("ignore");
+    }
+  });
+
+  it("the web matcher is unchanged: the same words still count there", () => {
+    expect(verdict("yes", false)).toBe("correct");
+    expect(verdict("no", false)).toBe("wrong");
+    expect(verdict("\u{1F44D}", false)).toBe("correct");
+  });
+});

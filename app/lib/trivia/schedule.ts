@@ -39,12 +39,22 @@ export function slotsForDay(dayKey: string, roundsPerDay: number, windows: reado
   return slots.sort((a, b) => a - b);
 }
 
+export interface SlotRound {
+  openedMs: number;
+  /** The question post failed and the round was cancelled: this opening did not really fire the slot. */
+  postFailed?: boolean;
+}
+
+/** A slot whose question post failed is retried once, then given up for that slot. */
+export const MAX_POST_FAILURES_PER_SLOT = 2;
+
 /**
- * The slot that should fire now, or null. `openedMs` are the openedAt times of recent Discord rounds (any
- * status, manual ones included): a slot is fired once a round was opened at or after it. Only the latest due
- * slot counts, so a long outage posts one round, not a burst.
+ * The slot that should fire now, or null. `rounds` are recent Discord rounds (any status, manual ones and
+ * /trivia skip included): a slot is fired once a round was opened at or after it. The exception is a round that
+ * was cancelled because the question post failed: it does not fire the slot, but a second such failure does (at
+ * most one retry per slot). Only the latest due slot counts, so a long outage posts one round, not a burst.
  */
-export function dueSlot(now: Date, roundsPerDay: number, openedMs: readonly number[], windows: readonly string[] = WINDOWS_UTC): number | null {
+export function dueSlot(now: Date, roundsPerDay: number, rounds: readonly SlotRound[], windows: readonly string[] = WINDOWS_UTC): number | null {
   const nowMs = now.getTime();
   const today = now.toISOString().slice(0, 10);
   const yesterday = new Date(dayStartMs(today) - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -52,7 +62,9 @@ export function dueSlot(now: Date, roundsPerDay: number, openedMs: readonly numb
   const due = slots.filter((s) => s <= nowMs && nowMs - s <= SLOT_CATCH_UP_MINUTES * MIN_MS);
   if (due.length === 0) return null;
   const latest = Math.max(...due);
-  return openedMs.some((t) => t >= latest) ? null : latest;
+  const since = rounds.filter((r) => r.openedMs >= latest);
+  if (since.some((r) => !r.postFailed)) return null;
+  return since.length >= MAX_POST_FAILURES_PER_SLOT ? null : latest;
 }
 
 export interface PickOptions {

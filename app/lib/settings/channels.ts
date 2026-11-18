@@ -3,7 +3,8 @@
  * else the channel found by name (resolveChannelId). Saved ids were checked against the server when
  * they were saved; an unreadable setting falls back to the old chain.
  *
- * Rename-proofing: whenever the chain has to find a channel by NAME (no saved id, no env id), the id
+ * Rename-proofing: whenever the chain has to find a channel by NAME (no saved id, no env id) and the name matches
+ * exactly (not the "ends with -name" fallback of resolveChannelId, which could be a different channel), the id
  * it found is saved into the channel setting (pinChannelId), so every later lookup goes by id and a
  * rename of the channel (#work -> something else) cannot silently stop the posts. The save is
  * insert-only (it never overwrites an admin's value), production-only (previews share the production
@@ -11,7 +12,7 @@
  * changes nothing: the lookup still returns the id it found). The audit log shows it as
  * `system:channel-pin`.
  */
-import { resolveChannelId, type DiscordOpts } from '../discord-channels'
+import { getGuildChannels, normalizeChannelName, resolveChannelId, type DiscordOpts } from '../discord-channels'
 import { getSetting, loadSettings } from './index'
 import type { SettingKey } from './registry'
 import { saveSetting } from './store'
@@ -66,20 +67,48 @@ export async function pinChannelId(key: ChannelSettingKey, id: string, env: Reco
   }
 }
 
-/** Saved setting, else env var, else the guild channel named `name` (whose id is then saved: pinChannelId). */
+/** True when the channel `id` is called exactly `name` (after normalizing), not merely "<something>-name". */
+async function isExactNameMatch(id: string, name: string, opts: DiscordOpts): Promise<boolean> {
+  try {
+    const channels = await getGuildChannels(opts)
+    const found = channels?.find((c) => c.id === id)
+    return !!found && normalizeChannelName(found.name) === normalizeChannelName(name)
+  } catch {
+    return false
+  }
+}
+
+export interface ResolvedChannel {
+  id: string | null
+  /** The id is rename-proof or can safely be made so: a saved id, an env id, or an exact name match (never the suffix fallback). */
+  trusted: boolean
+}
+
+/** resolveConfiguredChannel, plus whether the answer is one a caller may save elsewhere (see ResolvedChannel). */
+export async function resolveConfiguredChannelDetailed(
+  key: ChannelSettingKey,
+  name: string,
+  envName?: string,
+  opts: DiscordOpts = {},
+): Promise<ResolvedChannel> {
+  const saved = await savedChannelId(key)
+  if (saved) return { id: saved, trusted: true }
+  const id = await resolveChannelId(name, envName, opts)
+  if (!id) return { id: null, trusted: false }
+  // An env id is already rename-proof, so it is trusted but not saved here.
+  const fromEnv = envName ? process.env[envName]?.trim() : ''
+  if (fromEnv && SNOWFLAKE.test(fromEnv) && fromEnv === id) return { id, trusted: true }
+  const exact = await isExactNameMatch(id, name, opts)
+  if (exact) await pinChannelId(key, id)
+  return { id, trusted: exact }
+}
+
+/** Saved setting, else env var, else the guild channel named `name` (whose id is then saved when the name matched exactly: pinChannelId). */
 export async function resolveConfiguredChannel(
   key: ChannelSettingKey,
   name: string,
   envName?: string,
   opts: DiscordOpts = {},
 ): Promise<string | null> {
-  const saved = await savedChannelId(key)
-  if (saved) return saved
-  const id = await resolveChannelId(name, envName, opts)
-  if (id) {
-    // An env id is already rename-proof, so only a lookup by name is pinned.
-    const fromEnv = envName ? process.env[envName]?.trim() : ''
-    if (!(fromEnv && SNOWFLAKE.test(fromEnv) && fromEnv === id)) await pinChannelId(key, id)
-  }
-  return id
+  return (await resolveConfiguredChannelDetailed(key, name, envName, opts)).id
 }

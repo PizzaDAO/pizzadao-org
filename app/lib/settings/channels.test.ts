@@ -4,17 +4,22 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 vi.mock('@/app/lib/db')
-vi.mock('../discord-channels', () => ({ resolveChannelId: vi.fn() }))
+vi.mock('../discord-channels', async (importActual) => ({
+  ...(await importActual<typeof import('../discord-channels')>()),
+  resolveChannelId: vi.fn(),
+  getGuildChannels: vi.fn(),
+}))
 vi.mock('./store', () => ({ saveSetting: vi.fn(async () => ({ updatedAt: new Date() })) }))
 
 import { prisma } from '@/app/lib/db'
-import { resolveChannelId } from '../discord-channels'
+import { getGuildChannels, resolveChannelId } from '../discord-channels'
 import { clearSettingsCache } from './index'
 import { saveSetting } from './store'
-import { CHANNEL_PIN_ACTOR, pinChannelId, resetChannelPins, resolveConfiguredChannel } from './channels'
+import { CHANNEL_PIN_ACTOR, pinChannelId, resetChannelPins, resolveConfiguredChannel, resolveConfiguredChannelDetailed } from './channels'
 
 const findMany = vi.mocked(prisma.appSetting.findMany)
 const resolve = vi.mocked(resolveChannelId)
+const channelList = vi.mocked(getGuildChannels)
 const save = vi.mocked(saveSetting)
 
 const WORK = '910000000000000001'
@@ -37,6 +42,8 @@ beforeEach(() => {
   findMany.mockResolvedValue([])
   resolve.mockReset()
   resolve.mockResolvedValue(WORK)
+  channelList.mockReset()
+  channelList.mockResolvedValue([{ id: WORK, name: 'work', type: 0 }])
   save.mockClear()
   vi.spyOn(console, 'warn').mockImplementation(() => {})
 })
@@ -120,6 +127,37 @@ describe('resolveConfiguredChannel pins a channel found by name', () => {
     save.mockRejectedValueOnce(new Error('changed since you loaded it'))
     expect(await resolveConfiguredChannel(REVIEW, 'work', 'MISSION_REVIEW_CHANNEL_ID')).toBe(WORK)
     expect(save).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('only an exact name match is pinned', () => {
+  it('the suffix fallback of the name lookup (some other "...-work" channel) is used but never saved', async () => {
+    channelList.mockResolvedValue([{ id: WORK, name: 'pizza-work', type: 0 }])
+    expect(await resolveConfiguredChannel(REVIEW, 'work', 'MISSION_REVIEW_CHANNEL_ID')).toBe(WORK)
+    expect(save).not.toHaveBeenCalled()
+  })
+
+  it('a decorated name that normalizes to exactly "work" is exact', async () => {
+    channelList.mockResolvedValue([{ id: WORK, name: '#Work', type: 0 }])
+    await resolveConfiguredChannel(REVIEW, 'work', 'MISSION_REVIEW_CHANNEL_ID')
+    expect(save).toHaveBeenCalledTimes(1)
+  })
+
+  it('nothing is saved when the channel list cannot be read', async () => {
+    channelList.mockResolvedValue(null)
+    await resolveConfiguredChannel(REVIEW, 'work', 'MISSION_REVIEW_CHANNEL_ID')
+    expect(save).not.toHaveBeenCalled()
+  })
+
+  it('the detailed result says whether the answer is trusted (so trivia does not copy a suffix match)', async () => {
+    channelList.mockResolvedValue([{ id: WORK, name: 'pizza-work', type: 0 }])
+    expect(await resolveConfiguredChannelDetailed(REVIEW, 'work', 'MISSION_REVIEW_CHANNEL_ID')).toEqual({ id: WORK, trusted: false })
+    channelList.mockResolvedValue([{ id: WORK, name: 'work', type: 0 }])
+    resetChannelPins()
+    expect(await resolveConfiguredChannelDetailed(REVIEW, 'work', 'MISSION_REVIEW_CHANNEL_ID')).toEqual({ id: WORK, trusted: true })
+    findMany.mockResolvedValue([{ key: REVIEW, value: OTHER }] as never)
+    clearSettingsCache({ all: true })
+    expect(await resolveConfiguredChannelDetailed(REVIEW, 'work', 'MISSION_REVIEW_CHANNEL_ID')).toEqual({ id: OTHER, trusted: true })
   })
 })
 

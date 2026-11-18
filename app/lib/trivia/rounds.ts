@@ -35,14 +35,36 @@ type RoundRow = { id: number; questionId: string; channelId: string | null; mess
 // Opening
 // ---------------------------------------------------------------------------------------------------------------
 
-/** Recent Discord question ids (newest first) and open times, for the picker and the slot schedule. */
-export async function recentDiscordRounds(limit = RECENT_ROUNDS_LOOKBACK): Promise<{ questionId: string; openedAt: Date }[]> {
-  return prisma.triviaRound.findMany({
-    where: { surface: "DISCORD", status: { not: "CANCELLED" } },
+export interface RecentRound {
+  questionId: string;
+  openedAt: Date;
+  /** Cancelled before its question was posted (the Discord post failed): the slot did not really fire. */
+  postFailed: boolean;
+}
+
+/**
+ * Recent Discord rounds, newest first, for the picker and the slot schedule. Every status counts as having fired its
+ * slot (a /trivia skip cancels a round that was asked), except a round whose question post failed: see dueSlot.
+ */
+export async function recentDiscordRounds(limit = RECENT_ROUNDS_LOOKBACK): Promise<RecentRound[]> {
+  const rows: { questionId: string; openedAt: Date; status: string; messageId: string | null }[] = await prisma.triviaRound.findMany({
+    where: { surface: "DISCORD" },
     orderBy: { id: "desc" },
     take: limit,
-    select: { questionId: true, openedAt: true },
+    select: { questionId: true, openedAt: true, status: true, messageId: true },
   });
+  return rows.map((r) => ({ questionId: r.questionId, openedAt: r.openedAt, postFailed: r.status === "CANCELLED" && r.messageId === null }));
+}
+
+/** A stored attempt for this Discord message, if any (a recorder retry): the dedupe check, before any limit. */
+export async function findAttemptByMessage(messageId: string): Promise<{ correct: boolean } | null> {
+  return prisma.triviaAttempt.findUnique({ where: { messageId }, select: { correct: true } });
+}
+
+/** The member already has a recorded attempt in this round within the last `ms`: the 2 s per-member throttle. */
+export async function hasRecentAttempt(roundId: number, discordId: string, now: Date, ms = 2000): Promise<boolean> {
+  const n = await prisma.triviaAttempt.count({ where: { roundId, discordId, createdAt: { gt: new Date(now.getTime() - ms) } } });
+  return n > 0;
 }
 
 export type OpenResult =

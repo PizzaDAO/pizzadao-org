@@ -32,7 +32,8 @@ function deps(over: Partial<AnswerDeps> = {}): AnswerDeps {
   return {
     now: () => NOW,
     isMember: vi.fn(async () => true),
-    allow: vi.fn(async () => true),
+    findAttempt: vi.fn(async () => null),
+    throttled: vi.fn(async () => false),
     defer: (fn) => void deferred.push(fn),
     post: vi.fn(async () => ({ id: "1" })),
     ...over,
@@ -69,16 +70,51 @@ describe("processAnswer gating", () => {
     expect(claim).not.toHaveBeenCalled();
   });
 
-  it("chatter is ignored without spending the member's 2 seconds", async () => {
+  it("chatter is ignored and never recorded or throttled", async () => {
     const d = deps();
     expect(await processAnswer(input("hey everyone, how is the call going today friends"), d)).toEqual({ status: "ignored", why: "not_an_answer" });
-    expect(d.allow).not.toHaveBeenCalled();
+    expect(d.throttled).not.toHaveBeenCalled();
     expect(claim).not.toHaveBeenCalled();
   });
 
-  it("a second message inside 2 seconds is ignored silently", async () => {
-    expect(await processAnswer(input(answerOf(tf, true)), deps({ allow: async () => false }))).toEqual({ status: "ignored", why: "rate_limited" });
+  it("everyday chat words are not true/false answers in Discord (yes, no, yeah, right, wrong, y, n, thumbs); true, false, t, f and typos are", async () => {
+    claim.mockResolvedValue({ kind: "wrong" });
+    for (const chat of ["yes", "no", "yeah", "yep", "nope", "right", "wrong", "correct", "y", "n", "\u{1F44D}", "\u2705"]) {
+      expect(await processAnswer(input(chat), deps())).toEqual({ status: "ignored", why: "not_an_answer" });
+    }
     expect(claim).not.toHaveBeenCalled();
+    for (const word of ["true", "TRUE", "false", "t", "f", "trie", "flase", "ture"]) {
+      claim.mockClear();
+      expect((await processAnswer(input(word), deps())).status).not.toBe("ignored");
+      expect(claim).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("a second message inside 2 seconds is ignored silently", async () => {
+    expect(await processAnswer(input(answerOf(tf, true)), deps({ throttled: async () => true }))).toEqual({ status: "ignored", why: "rate_limited" });
+    expect(claim).not.toHaveBeenCalled();
+  });
+
+  it("a retry of a recorded message is a duplicate: answered from the store before the throttle or the matcher", async () => {
+    const d = deps({ findAttempt: vi.fn(async () => ({ correct: true })), throttled: vi.fn(async () => true) });
+    expect(await processAnswer(input(answerOf(tf, true)), d)).toEqual({ status: "duplicate" });
+    expect(d.throttled).not.toHaveBeenCalled();
+    expect(claim).not.toHaveBeenCalled();
+  });
+
+  it("a 5xx then a retry: the failed first try leaves nothing behind that throttles the retry", async () => {
+    // First delivery: the claim blows up (database blip) after the answer was judged.
+    claim.mockRejectedValueOnce(new Error("db blip"));
+    const d = deps();
+    await expect(processAnswer(input(answerOf(tf, true)), d)).rejects.toThrow("db blip");
+    // Retry of the same message: nothing was stored, the throttle counts stored attempts only, so it goes through.
+    claim.mockResolvedValue({ kind: "won", rewardPep: 20, paid: true });
+    expect(await processAnswer(input(answerOf(tf, true)), d)).toEqual({ status: "won", rewardPep: 20, paid: true });
+    expect(d.throttled).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(d.throttled).mock.results.every((r) => r.type === "return")).toBe(true);
+    // And a retry after it was stored is a duplicate.
+    const stored = deps({ findAttempt: async () => ({ correct: true }) });
+    expect(await processAnswer(input(answerOf(tf, true)), stored)).toEqual({ status: "duplicate" });
   });
 
   it("a wrong answer is recorded and gets no reply", async () => {
@@ -100,25 +136,25 @@ describe("processAnswer eligibility and attempts", () => {
     expect(announceWin).toHaveBeenCalledWith(expect.objectContaining({ id: 7 }), { discordId: OLD_USER, messageId: MSG, rewardPep: 20, paid: true }, expect.anything());
   });
 
-  it("an account younger than 7 days cannot win; it is told once, as a reply", async () => {
+  it("an account younger than 7 days cannot win, and nothing is said in the channel", async () => {
     claim.mockResolvedValue({ kind: "ineligible", reason: "too_young" });
     const d = deps();
     const out = await processAnswer(input(answerOf(tf, true), { discordId: NEW_USER }), d);
     expect(out).toEqual({ status: "not_won", why: "too_young" });
     expect(claim.mock.calls[0][0]).toMatchObject({ correct: true, eligibility: { ok: false, reason: "too_young" } });
     expect(d.isMember).not.toHaveBeenCalled(); // the cheap check first
-    await deferred[0]();
-    expect(d.post).toHaveBeenCalledWith(CHAN, expect.objectContaining({ content: expect.stringContaining("7 days") }));
+    expect(deferred).toHaveLength(0);
+    expect(d.post).not.toHaveBeenCalled();
   });
 
-  it("a non-member cannot win; they are pointed at the join page", async () => {
+  it("a non-member cannot win, and nothing is said in the channel (a public Correct! would leak the answer)", async () => {
     claim.mockResolvedValue({ kind: "ineligible", reason: "not_member" });
     const d = deps({ isMember: async () => false });
     const out = await processAnswer(input(answerOf(tf, true)), d);
     expect(out).toEqual({ status: "not_won", why: "not_member" });
     expect(claim.mock.calls[0][0]).toMatchObject({ eligibility: { ok: false, reason: "not_member" } });
-    await deferred[0]();
-    expect(d.post).toHaveBeenCalledWith(CHAN, expect.objectContaining({ content: expect.stringContaining("pizzadao.org/join") }));
+    expect(deferred).toHaveLength(0);
+    expect(d.post).not.toHaveBeenCalled();
   });
 
   it("membership is not looked up for a wrong answer", async () => {
@@ -128,12 +164,12 @@ describe("processAnswer eligibility and attempts", () => {
     expect(d.isMember).not.toHaveBeenCalled();
   });
 
-  it("the daily cap leaves the round open and says so", async () => {
+  it("the daily cap leaves the round open and says nothing", async () => {
     claim.mockResolvedValue({ kind: "daily_cap" });
     const d = deps();
     expect(await processAnswer(input(answerOf(tf, true)), d)).toEqual({ status: "not_won", why: "daily_cap" });
-    await deferred[0]();
-    expect(d.post).toHaveBeenCalledWith(CHAN, expect.objectContaining({ content: expect.stringContaining("limit of 3") }));
+    expect(deferred).toHaveLength(0);
+    expect(d.post).not.toHaveBeenCalled();
   });
 
   it("late, closed and exhausted answers get no reply", async () => {

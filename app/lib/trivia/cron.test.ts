@@ -108,7 +108,21 @@ describe("the tick", () => {
   });
 
   it("a slot already fired (a round opened since) does not fire again", async () => {
-    vi.mocked(recentDiscordRounds).mockResolvedValue([{ questionId: "pd-001", openedAt: new Date(slot + 30_000) }]);
+    vi.mocked(recentDiscordRounds).mockResolvedValue([{ questionId: "pd-001", openedAt: new Date(slot + 30_000), postFailed: false }]);
+    expect(await runTriviaCron(DUE, post)).toMatchObject({ opened: "not_due" });
+    expect(openDiscordRound).not.toHaveBeenCalled();
+  });
+
+  it("a skipped (cancelled but asked) round does not re-open its slot, a failed post gets one retry", async () => {
+    vi.mocked(recentDiscordRounds).mockResolvedValue([{ questionId: "pd-001", openedAt: new Date(slot + 30_000), postFailed: false }]);
+    expect(await runTriviaCron(DUE, post)).toMatchObject({ opened: "not_due" });
+    vi.mocked(recentDiscordRounds).mockResolvedValue([{ questionId: "pd-001", openedAt: new Date(slot + 30_000), postFailed: true }]);
+    expect(await runTriviaCron(DUE, post)).toMatchObject({ opened: "opened" });
+    vi.mocked(recentDiscordRounds).mockResolvedValue([
+      { questionId: "pd-001", openedAt: new Date(slot + 90_000), postFailed: true },
+      { questionId: "pd-002", openedAt: new Date(slot + 30_000), postFailed: true },
+    ]);
+    vi.mocked(openDiscordRound).mockClear();
     expect(await runTriviaCron(DUE, post)).toMatchObject({ opened: "not_due" });
     expect(openDiscordRound).not.toHaveBeenCalled();
   });

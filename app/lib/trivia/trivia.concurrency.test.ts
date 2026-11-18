@@ -63,6 +63,7 @@ async function expectLedgerConsistent(id: string) {
   expect(await wallet(id)).toBe((opening.get(id) ?? 0) + rows.reduce((s: number, r: any) => s + r.amount, 0))
 }
 
+type AnswerThrottle = (roundId: number, discordId: string, now: Date) => Promise<boolean>
 type Posted = { channelId: string; content: string; reference?: string }
 function fakePosts(opts: { failQuestion?: boolean } = {}) {
   const posted: Posted[] = []
@@ -214,11 +215,12 @@ describe.skipIf(!isLocal)('Discord trivia under concurrency (real Postgres)', ()
   }, 120_000)
 
   describe('the full intake path (processAnswer)', () => {
-    const deps = (member: (id: string) => boolean, posts = fakePosts()) => ({
+    const deps = (member: (id: string) => boolean, posts = fakePosts(), throttled?: AnswerThrottle) => ({
       ...posts.deps,
       now: () => new Date(),
       isMember: async (id: string) => member(id),
-      allow: async () => true,
+      findAttempt: L.rounds.findAttemptByMessage,
+      throttled: throttled ?? (async () => false),
       defer: (fn: () => Promise<void>) => void pending.push(fn),
     })
     let pending: Array<() => Promise<void>> = []
@@ -238,7 +240,7 @@ describe.skipIf(!isLocal)('Discord trivia under concurrency (real Postgres)', ()
       expect(await wallet(u)).toBe(0)
     }, 60_000)
 
-    it('non-members and young accounts get the reply but not the win; the round stays open for others', async () => {
+    it('non-members and young accounts do not win and get no public reply; the round stays open for others', async () => {
       const channelId = chanId()
       const id = await openRound(channelId)
       const posts = fakePosts()
@@ -252,8 +254,9 @@ describe.skipIf(!isLocal)('Discord trivia under concurrency (real Postgres)', ()
       expect(await L.answer.processAnswer({ channelId, messageId: snow(), discordId: young, content: correctText(tf) }, d)).toEqual({ status: 'not_won', why: 'too_young' })
       expect((await roundOf(id)).status).toBe('OPEN')
       await flush()
-      expect(posts.posted.map((p) => p.content).join('\n')).toMatch(/pizzadao\.org\/join/)
-      expect(posts.posted.map((p) => p.content).join('\n')).toMatch(/7 days/)
+      // Nothing was said about the correct-but-ineligible answers: a public "Correct!" would leak the answer.
+      expect(posts.posted.filter((p) => p.channelId === channelId && !p.content.includes('Trivia Time'))).toHaveLength(0)
+      expect(await L.prisma.triviaAttempt.count({ where: { roundId: id, correct: true } })).toBe(2) // recorded as correct, not eligible
 
       const winMsg = snow()
       expect(await L.answer.processAnswer({ channelId, messageId: winMsg, discordId: member, content: correctText(tf) }, d)).toEqual({ status: 'won', rewardPep: 20, paid: true })
@@ -287,6 +290,51 @@ describe.skipIf(!isLocal)('Discord trivia under concurrency (real Postgres)', ()
       expect((await L.answer.processAnswer({ channelId, messageId: snow(), discordId: other, content: correctText(tf) }, d)).status).toBe('won')
       await expectLedgerConsistent(u)
     }, 90_000)
+
+    it('a recorder retry after a 5xx is a duplicate (never throttled, never recounted); the real 2 s throttle ignores a second fast answer', async () => {
+      const channelId = chanId()
+      const short = L.bank.servable({ pool: 'discord' }).find((q: any) => q.type === 'short_answer' && q.match.kind === 'text')
+      const r: any = await L.rounds.openDiscordRound({ channelId, rewardPep: 20, question: short }, fakePosts().deps)
+      expect(r.ok).toBe(true)
+      const u = await seedUser(0)
+      const real = (id: string) => L.rounds.hasRecentAttempt(r.roundId, id, new Date())
+      const d = deps(() => true, fakePosts(), (rid, did, now) => L.rounds.hasRecentAttempt(rid, did, now))
+      const msg = snow()
+      expect(await L.answer.processAnswer({ channelId, messageId: msg, discordId: u, content: 'qzqzqz' }, d)).toEqual({ status: 'wrong' })
+      // the retry of the same message: duplicate, although the member has a fresh attempt inside the 2 s window
+      expect(await real(u)).toBe(true)
+      expect(await L.answer.processAnswer({ channelId, messageId: msg, discordId: u, content: 'qzqzqz' }, d)).toEqual({ status: 'duplicate' })
+      // a different message right away: throttled, not recorded
+      expect(await L.answer.processAnswer({ channelId, messageId: snow(), discordId: u, content: 'qzqzqy' }, d)).toEqual({ status: 'ignored', why: 'rate_limited' })
+      expect(await L.prisma.triviaAttempt.count({ where: { roundId: r.roundId, discordId: u } })).toBe(1)
+    }, 60_000)
+
+    it('a replayed winning message through processAnswer (the round is now closed) is a harmless no-op and pays once', async () => {
+      const channelId = chanId()
+      await openRound(channelId)
+      const u = await seedUser(0)
+      const d = deps(() => true)
+      const msg = snow()
+      expect((await L.answer.processAnswer({ channelId, messageId: msg, discordId: u, content: correctText(tf) }, d)).status).toBe('won')
+      expect(await L.answer.processAnswer({ channelId, messageId: msg, discordId: u, content: correctText(tf) }, d)).toEqual({ status: 'no_round' })
+      expect(await rewardRows([u])).toHaveLength(1)
+    }, 60_000)
+
+    it('a cancelled round counts as having fired its slot; a failed post does not', async () => {
+      const channelId = chanId()
+      const posts = fakePosts()
+      await openRound(channelId, 20, posts.deps)
+      await L.rounds.cancelOpenRound(channelId, posts.deps)
+      const failed = chanId()
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+      await L.rounds.openDiscordRound({ channelId: failed, rewardPep: 20, question: tf }, fakePosts({ failQuestion: true }).deps)
+      const recent = await L.rounds.recentDiscordRounds(50)
+      const mine = await L.prisma.triviaRound.findMany({ where: { channelId: { in: [channelId, failed] } }, select: { id: true, status: true, messageId: true } })
+      expect(mine.map((m: any) => [m.status, m.messageId !== null])).toEqual(expect.arrayContaining([['CANCELLED', true], ['CANCELLED', false]]))
+      // skipped (asked) = postFailed false; failed post = postFailed true
+      expect(recent.filter((x: any) => x.postFailed).length).toBeGreaterThanOrEqual(1)
+      expect(recent.filter((x: any) => !x.postFailed).length).toBeGreaterThanOrEqual(1)
+    }, 60_000)
 
     it('a dry-run round (reward 0) names a winner but pays nothing', async () => {
       const channelId = chanId()

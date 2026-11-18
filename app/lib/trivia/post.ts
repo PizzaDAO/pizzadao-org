@@ -71,21 +71,6 @@ export function explanationMessage(q: TriviaQuestion): DiscordMessageBody {
   return { content: fit(lines.filter(Boolean).join("\n")), allowed_mentions: NO_PINGS };
 }
 
-/** A correct answer that cannot win: said once, as a reply, pings the member. */
-export function notEligibleMessage(discordId: string, reason: "not_member" | "too_young" | "daily_cap", messageId: string): DiscordMessageBody {
-  const text =
-    reason === "not_member"
-      ? "Correct! Join PizzaDAO at https://pizzadao.org/join to collect $PEP next time."
-      : reason === "too_young"
-        ? "Correct! $PEP prizes need a Discord account at least 7 days old; keep playing."
-        : "Correct! You have hit today's limit of 3 trivia wins, so this one stays open for others.";
-  return {
-    content: `✅ <@${discordId}> ${text}`,
-    allowed_mentions: { parse: [], users: [discordId] },
-    message_reference: { message_id: messageId, fail_if_not_exists: false },
-  };
-}
-
 export function cancelledMessage(): DiscordMessageBody {
   return { content: "🚫 Round cancelled. No $PEP was paid.", allowed_mentions: NO_PINGS };
 }

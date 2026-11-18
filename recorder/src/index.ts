@@ -16,7 +16,7 @@ import { createR2Uploader } from './storage.js'
 import { postIngestWithRetry } from './ingest.js'
 import { handleDm, postFollowupInbound, type DmMessage } from './dm-forward.js'
 import { RemoteConfigClient } from './remote-config.js'
-import { postTriviaAnswer, TriviaForwarder, type TriviaMessage } from './trivia-forward.js'
+import { fetchTriviaState, postTriviaAnswer, TriviaForwarder, type TriviaMessage } from './trivia-forward.js'
 import { ActivityCounter, postActivityBatch, toActivityEvent, type MessageLike } from './discord-activity.js'
 
 const log = (msg: string) => console.log(`${new Date().toISOString()} ${msg}`)
@@ -140,6 +140,8 @@ const trivia = new TriviaForwarder({
   guildId: cfg.guildId,
 })
 client.on('messageCreate', (m) => trivia.onMessage(m as unknown as TriviaMessage))
+// Forward only while a round is open: ask the app every 5 s (nothing is requested while trivia is off in the remote config).
+setInterval(() => void trivia.refreshState(() => fetchTriviaState(cfg.appBaseUrl, cfg.recorderApiKey)), 5_000).unref()
 if (cfg.followupDmForward) {
   // Own handler: fire and forget (retries run in the background), so it can never delay or break recording.
   const dmDeps = {

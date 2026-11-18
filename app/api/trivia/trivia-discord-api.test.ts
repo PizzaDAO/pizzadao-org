@@ -8,10 +8,13 @@ vi.mock("next/server", async (importOriginal) => ({ ...(await importOriginal<typ
 vi.mock("@/app/lib/trivia/cron", () => ({ runTriviaCron: vi.fn(async () => ({ status: "skipped", reason: "discord trivia off on preview" })) }));
 vi.mock("@/app/lib/trivia/enabled", () => ({ triviaLive: vi.fn(async () => false), isProductionDeploy: () => false }));
 vi.mock("@/app/lib/trivia/channel", () => ({ resolveTriviaChannel: vi.fn(async () => "850000000000000001") }));
+vi.mock("@/app/lib/trivia/rounds", () => ({ findOpenRound: vi.fn(async () => null) }));
 vi.mock("@/app/lib/trivia/answer", () => ({ defaultAnswerDeps: vi.fn(() => ({})), processAnswer: vi.fn(async () => ({ status: "wrong" })) }));
 
 import { GET as cronGET } from "@/app/api/cron/trivia/route";
 import { POST as answerPOST } from "@/app/api/trivia/discord/answer/route";
+import { GET as stateGET } from "@/app/api/trivia/discord/state/route";
+import { findOpenRound } from "@/app/lib/trivia/rounds";
 import { runTriviaCron } from "@/app/lib/trivia/cron";
 import { triviaLive } from "@/app/lib/trivia/enabled";
 import { processAnswer } from "@/app/lib/trivia/answer";
@@ -104,5 +107,31 @@ describe("POST /api/trivia/discord/answer", () => {
     vi.mocked(processAnswer).mockRejectedValueOnce(new Error("db"));
     vi.spyOn(console, "error").mockImplementation(() => {});
     expect((await answer(good, "Bearer recorder-key")).status).toBe(500);
+  });
+});
+
+describe("GET /api/trivia/discord/state", () => {
+  const state = (auth?: string) => stateGET(new Request("https://x.test/api/trivia/discord/state", { headers: auth ? { authorization: auth } : {} }));
+
+  it("401 without or with a wrong key", async () => {
+    expect((await state()).status).toBe(401);
+    expect((await state("Bearer nope")).status).toBe(401);
+    expect((await state("Bearer cron-secret")).status).toBe(401);
+    expect(findOpenRound).not.toHaveBeenCalled();
+  });
+
+  it("closed while trivia is off (a preview too), without reading any round", async () => {
+    const res = await state("Bearer recorder-key");
+    expect(await res.json()).toEqual({ ok: true, open: false });
+    expect(findOpenRound).not.toHaveBeenCalled();
+  });
+
+  it("open only while the trivia channel has an open round", async () => {
+    vi.mocked(triviaLive).mockResolvedValue(true);
+    vi.mocked(findOpenRound).mockResolvedValueOnce(null);
+    expect(await (await state("Bearer recorder-key")).json()).toMatchObject({ ok: true, open: false });
+    vi.mocked(findOpenRound).mockResolvedValueOnce({ id: 1 } as never);
+    expect(await (await state("Bearer recorder-key")).json()).toMatchObject({ ok: true, open: true, channelId: CHAN });
+    expect(findOpenRound).toHaveBeenCalledWith(CHAN);
   });
 });
