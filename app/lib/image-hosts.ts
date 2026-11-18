@@ -16,6 +16,9 @@ type RemotePattern = {
 export const REMOTE_IMAGE_PATTERNS: RemotePattern[] = [
   // POAP artwork (POAP Compass / gallery API image_url)
   { protocol: "https", hostname: "assets.poap.xyz" },
+  // Discord avatars (member pfps in call attendees, hover cards)
+  { protocol: "https", hostname: "cdn.discordapp.com", pathname: "/avatars/**" },
+  { protocol: "https", hostname: "cdn.discordapp.com", pathname: "/guilds/**" },
   // Alchemy NFT media cache + thumbnails (app/lib/nft.ts)
   { protocol: "https", hostname: "nft-cdn.alchemy.com" },
   { protocol: "https", hostname: "res.cloudinary.com", pathname: "/alchemyapi/**" },

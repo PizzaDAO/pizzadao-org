@@ -15,8 +15,6 @@ type Chapter = {
   img: string;
   /** Source width / height, used to size the request for the object-cover crop. */
   imgRatio: number;
-  /** Skip the optimizer: the source is already small and old, so recompressing gains little. */
-  unoptimized?: boolean;
   alt: string;
   meta: string;
 };
@@ -38,7 +36,6 @@ const CHAPTERS: Chapter[] = [
     attribution: ", Laszlo Hanyecz, BitcoinTalk forum",
     img: t2010,
     imgRatio: 960 / 765,
-    unoptimized: true,
     alt: "Laszlo Hanyecz at home with his two children and the two large pizzas bought for 10,000 BTC",
     meta: "Bitcoin Pizza Day · Origin",
   },
@@ -153,7 +150,7 @@ const Timeline = () => {
 
               {/* Image */}
               <figure className="mk-grain relative mt-5 overflow-hidden rounded-2xl">
-                <Image sizes={cardSizes(c.imgRatio)} unoptimized={c.unoptimized}
+                <Image sizes={cardSizes(c.imgRatio)}
                   src={c.img}
                   alt={c.alt}
                   loading="lazy"

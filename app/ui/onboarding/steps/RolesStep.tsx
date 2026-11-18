@@ -7,6 +7,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
+import Image from "next/image";
 import { ArrowLeft, ArrowUpRight, Check } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { TURTLES } from "../../constants";
@@ -211,9 +212,11 @@ function TurtleCard({
           transform: "rotate(-4deg)",
         }}
       >
-        <img
+        <Image
           src={image}
           alt={label}
+          width={32}
+          height={32}
           className="h-8 w-8 object-contain"
         />
       </div>

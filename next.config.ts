@@ -74,9 +74,17 @@ const CSP_REPORT_ONLY = [
   // is promoted to an enforced Content-Security-Policy header.
 ].join("; ");
 
-const SECURITY_HEADERS = [
+// CSP only matters on documents (HTML pages, API/route responses); it is dead weight on fingerprinted
+// bundles and static images. These are the public/ directories plus Next's own asset routes.
+const STATIC_ASSET_DIRS = ["marketing", "brand-kit", "media", "pfp", "toppings", "turtles"];
+const CSP_SOURCE = `/((?!_next/static/|_next/image|${STATIC_ASSET_DIRS.map((d) => `${d}/`).join("|")}).*)`;
+
+const CSP_HEADERS = [
   { key: "Content-Security-Policy", value: `frame-ancestors ${FRAME_ANCESTORS}` },
   { key: "Content-Security-Policy-Report-Only", value: CSP_REPORT_ONLY },
+];
+
+const SECURITY_HEADERS = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   // Nothing in the app uses the camera, microphone or geolocation.
@@ -125,6 +133,14 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       { source: "/:path*", headers: SECURITY_HEADERS },
+      { source: CSP_SOURCE, headers: CSP_HEADERS },
+      // Files in public/ are served `max-age=0, must-revalidate` by default, so every repeat view
+      // revalidates every image. Names are not fingerprinted, so cache for a day and let stale
+      // copies serve for a week while they refresh in the background.
+      ...STATIC_ASSET_DIRS.map((dir) => ({
+        source: `/${dir}/:path*`,
+        headers: [{ key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" }],
+      })),
       // Payee tax-form links carry a secret token in the query string: keep it out of
       // referrers, search indexes and caches. Listed after the global rule so these win.
       {

@@ -4,7 +4,9 @@
 //
 // Nomination form + "your submissions" list for /spotlight (blackolive-55617).
 
+import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
+import { isOptimizableImage } from "@/app/lib/image-hosts";
 import { useLocale, useTranslations } from "next-intl";
 import type { MemberSubmission } from "@/app/lib/spotlight";
 import {
@@ -284,8 +286,7 @@ export function SpotlightClient() {
                             <span className="text-xs text-foreground/50">{t("photoHint")}</span>
                             {photoUrl ? (
                                 <div className="flex items-center gap-3">
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={photoUrl} alt="" width={64} height={64} style={{ objectFit: "cover", borderRadius: 12, width: 64, height: 64 }} />
+                                    <Image src={photoUrl} alt="" width={64} height={64} unoptimized={!isOptimizableImage(photoUrl)} style={{ objectFit: "cover", borderRadius: 12, width: 64, height: 64 }} />
                                     <button type="button" className="underline text-sm" onClick={() => setPhotoUrl(null)}>
                                         {t("removePhoto")}
                                     </button>

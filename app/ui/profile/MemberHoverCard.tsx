@@ -13,7 +13,9 @@
 
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import Image from "next/image";
 import Link from "next/link";
+import { isOptimizableImage } from "@/app/lib/image-hosts";
 import { useLocale, useTranslations } from "next-intl";
 import { formatMemberSince } from "@/app/lib/member-since-format";
 import { DiscordActivityLine } from "./DiscordActivityBlock";
@@ -261,8 +263,7 @@ function CardBody({ card }: { card: MemberCard }) {
         <span className="grid gap-2">
             <span className="flex items-center gap-3">
                 {card.pfpUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={card.pfpUrl} alt="" width={44} height={44} className="h-11 w-11 shrink-0 rounded-full object-cover" />
+                    <Image src={card.pfpUrl} alt="" width={44} height={44} unoptimized={!isOptimizableImage(card.pfpUrl)} className="h-11 w-11 shrink-0 rounded-full object-cover" />
                 ) : (
                     <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-foreground/10 font-bold">
                         {Array.from(card.name)[0]?.toUpperCase() ?? "?"}
