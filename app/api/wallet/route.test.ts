@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
 const h = vi.hoisted(() => ({
+  limit: { success: true } as { success: boolean },
   emit: ((..._a: unknown[]) => undefined) as (...a: unknown[]) => void,
   required: false as boolean,
   save: (async (..._a: unknown[]) => ({}) as unknown) as (...a: unknown[]) => Promise<unknown>,
@@ -18,6 +19,10 @@ vi.mock('@/app/lib/events-attended/rsv', () => ({ clearWalletMatches: async () =
 vi.mock('@/app/lib/mission-verify/events', () => ({ emitMissionEvent: (...a: unknown[]) => { h.emit(...a); return Promise.resolve() } }))
 vi.mock('@/app/lib/slices/claims', () => ({ promoteAwaitingWallet: async () => 0 }))
 vi.mock('@/app/lib/slices/mint-queue', () => ({ processMintQueueSafe: async () => undefined }))
+vi.mock('@/app/lib/rate-limit', () => ({
+  checkKeyedRateLimit: async () => h.limit,
+  rateLimitResponse: () => new Response(JSON.stringify({ error: 'rate' }), { status: 429 }),
+}))
 vi.mock('@/app/lib/wallet-lookup', () => ({
   getAllWalletsForMember: async () => [],
   saveWalletForMember: (...a: unknown[]) => h.save(...a),
@@ -52,6 +57,7 @@ beforeEach(() => {
   h.save = vi.fn(async () => ({ id: 1 }))
   h.verify = vi.fn(async () => undefined)
   h.emit = vi.fn()
+  h.limit = { success: true }
 })
 
 describe('POST /api/wallet with wallets.requireSignature', () => {
@@ -105,5 +111,29 @@ describe('POST /api/wallet with wallets.requireSignature', () => {
     h.required = false
     await post({ memberId: 'm1', walletAddress: SOL, chainType: 'solana' })
     expect(h.emit).toHaveBeenCalledTimes(1)
+  })
+
+  it('on: caps the message and signature size before verifying', async () => {
+    h.required = true
+    let res = await post({ memberId: 'm1', walletAddress: ADDR, message: 'a'.repeat(2001), signature: '0xsig' })
+    expect(res.status).toBe(400)
+    res = await post({ memberId: 'm1', walletAddress: ADDR, message: 'msg', signature: '0x' + 'a'.repeat(20000) })
+    expect(res.status).toBe(400)
+    expect(h.verify).not.toHaveBeenCalled()
+    expect(h.save).not.toHaveBeenCalled()
+  })
+
+  it('on: verification attempts are rate limited per member', async () => {
+    h.required = true
+    h.limit = { success: false }
+    const res = await post({ memberId: 'm1', walletAddress: ADDR, message: 'msg', signature: '0xsig' })
+    expect(res.status).toBe(429)
+    expect(h.verify).not.toHaveBeenCalled()
+  })
+
+  it('rejects a non-string wallet address', async () => {
+    const res = await post({ memberId: 'm1', walletAddress: { a: 1 } })
+    expect(res.status).toBe(400)
+    expect(h.save).not.toHaveBeenCalled()
   })
 })

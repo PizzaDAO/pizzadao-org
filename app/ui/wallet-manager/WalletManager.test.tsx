@@ -348,4 +348,51 @@ describe("WalletManager — wallet ownership signature", () => {
     const body = JSON.parse((posts(fetchMock)[0][1] as RequestInit).body as string);
     expect(body.signature).toBeUndefined();
   });
+
+  it("falls back to the plain POST when the nonce call fails, and lets the server decide", async () => {
+    const fetchMock = global.fetch as unknown as ReturnType<typeof vi.fn>;
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      const method = init?.method || "GET";
+      if (url.startsWith("/api/wallet/nonce")) return Promise.resolve({ ok: false, json: async () => ({}) });
+      if (method === "GET") return Promise.resolve({ ok: true, json: async () => ({ wallets: [] }) });
+      return Promise.resolve({ ok: true, json: async () => ({ success: true }) });
+    });
+    render(<WalletManager memberId="member-1" />);
+    await waitFor(() => expect(posts(fetchMock).length).toBe(1));
+    expect(signMessageAsyncMock).not.toHaveBeenCalled();
+    const body = JSON.parse((posts(fetchMock)[0][1] as RequestInit).body as string);
+    expect(body.signature).toBeUndefined();
+  });
+
+  it("shows the signing copy only while a signature is requested", async () => {
+    mockApi(false);
+    render(<WalletManager memberId="member-1" />);
+    await waitFor(() => expect(posts(global.fetch as unknown as ReturnType<typeof vi.fn>).length).toBe(1));
+    expect(screen.queryByText(/Sign a free message/i)).toBeNull();
+
+    vi.clearAllMocks();
+    useAccountMock.mockReturnValue({ address: CONNECTED_ADDRESS, isConnected: true, chainId: 1 });
+    mockApi(true);
+    let release: (v: string) => void = () => undefined;
+    signMessageAsyncMock.mockReturnValue(new Promise<string>((r) => (release = r)));
+    render(<WalletManager memberId="member-1" />);
+    await waitFor(() => expect(screen.getByText(/Sign a free message to prove this wallet is yours \(no gas\)/i)).toBeInTheDocument());
+    release("0xsig");
+  });
+
+  it("offers EVM paste while a signature is not required, and only Solana when it is", async () => {
+    useAccountMock.mockReturnValue({ address: undefined, isConnected: false });
+    mockApi(false);
+    const { unmount } = render(<WalletManager memberId="member-1" />);
+    await waitFor(() => expect(screen.getByText("Add Manually")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Add Manually"));
+    expect(screen.getByText("EVM (Ethereum)")).toBeInTheDocument();
+    unmount();
+
+    mockApi(true);
+    render(<WalletManager memberId="member-1" />);
+    await waitFor(() => expect(screen.getByText("Add Solana Manually")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Add Solana Manually"));
+    expect(screen.queryByText("EVM (Ethereum)")).toBeNull();
+  });
 });

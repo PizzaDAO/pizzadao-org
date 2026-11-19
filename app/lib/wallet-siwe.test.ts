@@ -192,12 +192,24 @@ describe('verifyWalletSiwe', () => {
     expect(await code(verify({ message: 'hello', signature: '0x00' }))).toBe('bad_message')
   })
 
-  it('does not spend the nonce on a failed signature', async () => {
+  it('spends the nonce on a failed signature, so it cannot be tried again', async () => {
     const other = privateKeyToAccount(generatePrivateKey())
     const m = await signed()
     const forged = await other.signMessage({ message: m.message })
     await code(verify({ message: m.message, signature: forged }))
-    expect(used.size).toBe(0)
+    expect(used.size).toBe(1)
+    expect(await code(verify(m))).toBe('nonce_used')
+  })
+})
+
+describe('non-finite dates', () => {
+  it('rejects an invalid Issued At or Expiration Time as bad_message', async () => {
+    const m = await signed()
+    const bad1 = m.message.replace(/Issued At: .*/, 'Issued At: not-a-date')
+    expect(await code(verify({ message: bad1, signature: m.signature }))).toBe('bad_message')
+    const m2 = await signed()
+    const bad2 = m2.message.replace(/Expiration Time: .*/, 'Expiration Time: 2026-99-99T99:99:99Z')
+    expect(await code(verify({ message: bad2, signature: m2.signature }))).toBe('bad_message')
   })
 })
 

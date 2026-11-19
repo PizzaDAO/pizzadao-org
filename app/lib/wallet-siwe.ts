@@ -115,6 +115,9 @@ export async function verifyWalletSiwe(input: VerifyWalletSiweInput): Promise<vo
   const msg = parseSiweMessage(input.message);
   if (!msg.address || !msg.domain || !msg.uri || !msg.nonce || !msg.chainId || !msg.issuedAt) throw new SiweError("bad_message");
   if (msg.version !== "1") throw new SiweError("bad_message");
+  for (const d of [msg.issuedAt, msg.expirationTime, msg.notBefore]) {
+    if (d !== undefined && !Number.isFinite(d.getTime())) throw new SiweError("bad_message");
+  }
 
   if (msg.domain !== input.host || !isAllowedSiweDomain(msg.domain)) throw new SiweError("bad_domain");
   let uriHost = "";
@@ -136,6 +139,9 @@ export async function verifyWalletSiwe(input: VerifyWalletSiweInput): Promise<vo
   const nonceState = checkWalletNonce(msg.nonce, input.memberId, input.discordId, now);
   if (nonceState === "bad") throw new SiweError("bad_nonce");
   if (nonceState === "expired") throw new SiweError("expired");
+
+  // The nonce is spent before any signature check: one nonce, one attempt, pass or fail.
+  if (!(await consumeNonce(msg.nonce))) throw new SiweError("nonce_used");
 
   // EOA fast path: plain signature recovery, no RPC. Only contract wallets (EIP-1271 / 6492) need the
   // chain; viem's verifySiweMessage asks the RPC first even for EOAs, so it is only the fallback.
@@ -160,8 +166,6 @@ export async function verifyWalletSiwe(input: VerifyWalletSiweInput): Promise<vo
     ok = false;
   }
   if (!ok) throw new SiweError("bad_signature");
-
-  if (!(await consumeNonce(msg.nonce))) throw new SiweError("nonce_used");
 }
 
 const MESSAGES: Record<SiweFailure, string> = {

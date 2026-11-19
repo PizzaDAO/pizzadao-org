@@ -17,6 +17,7 @@ import { promoteAwaitingWallet } from "@/app/lib/slices/claims";
 import { processMintQueueSafe } from "@/app/lib/slices/mint-queue";
 import { toggleEnabled } from "@/app/lib/settings/toggles";
 import { isValidEvmAddress, isValidSolanaAddress } from "@/app/lib/wallet-address";
+import { checkKeyedRateLimit, rateLimitResponse } from "@/app/lib/rate-limit";
 import { SiweError, requestHost, siweErrorMessage, verifyWalletSiwe } from "@/app/lib/wallet-siwe";
 
 /** A newly linked EVM wallet releases any Call Slices claims that were waiting for one. */
@@ -31,6 +32,9 @@ function releaseSliceClaims(discordId: string) {
 }
 
 export const runtime = "nodejs";
+
+const MAX_MESSAGE_LENGTH = 2000;
+const MAX_SIGNATURE_LENGTH = 20000;
 
 // ---------------------------------------------------------------------------
 // Validation helpers
@@ -136,6 +140,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing member ID" }, { status: 400 });
     }
 
+    if (typeof walletAddress !== "string") {
+      return NextResponse.json({ error: "Invalid wallet address" }, { status: 400 });
+    }
+
     // Validate wallet address based on chain type
     if (chainType === "evm") {
       if (!walletAddress || !isValidEvmAddress(walletAddress)) {
@@ -171,6 +179,11 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           );
         }
+        if (message.length > MAX_MESSAGE_LENGTH || signature.length > MAX_SIGNATURE_LENGTH) {
+          return NextResponse.json({ error: "Signature message is too large", code: "siwe_too_large" }, { status: 400 });
+        }
+        const limited = await checkKeyedRateLimit("wallet-verify", `${session.discordId}:${memberId}`);
+        if (!limited.success) return rateLimitResponse(limited);
         try {
           await verifyWalletSiwe({
             message,
