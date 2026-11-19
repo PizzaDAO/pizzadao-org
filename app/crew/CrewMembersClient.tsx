@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { isOptimizableImage } from "@/app/lib/image-hosts";
+import { DEFAULT_PFP_ALT, pfpOrDefault } from "@/app/lib/pfp-default";
 import { CREWS, TURTLES } from "@/app/ui/constants";
 import { badge, btn, card, input, pageContainer } from "@/app/ui/shared-styles";
 import { useSession } from "@/app/lib/hooks/use-session";
@@ -619,11 +620,12 @@ function FilterChip({
 
 function MemberCardItem({
   member,
-  pfpUrl,
+  pfpUrl: pfpUrlProp,
 }: {
   member: PublicMember;
   pfpUrl?: string;
 }) {
+  const pfpUrl = pfpOrDefault(pfpUrlProp);
   // onion-15370: editorial paper-soft tile — preserves all existing data,
   // only adds tactile noise + restful resting state.
   return (
@@ -662,7 +664,7 @@ function MemberCardItem({
           {pfpUrl ? (
             <Image
               src={pfpUrl}
-              alt={member.name}
+              alt={pfpUrlProp ? member.name : DEFAULT_PFP_ALT}
               width={44}
               height={44}
               sizes="44px"

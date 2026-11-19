@@ -3,11 +3,12 @@
  * Server-side only (uses fs).
  *
  * Resolution order: /pfp/<id>.jpg, /pfp/<id>.png, /pfp/default.jpg,
- * /pfp/default.png, else null.
+ * /pfp/default.png, else the built-in default URL. Never a Discord avatar and never null.
  */
 
 import { existsSync } from "fs";
 import path from "path";
+import { DEFAULT_PFP_URL } from "@/app/lib/pfp-default";
 
 /** Member IDs are numeric; anything outside this set never maps to a file. */
 const SAFE_ID = /^[A-Za-z0-9_-]+$/;
@@ -16,14 +17,13 @@ function pfpDir(): string {
   return path.join(process.cwd(), "public", "pfp");
 }
 
-function defaultPfpUrl(dir: string): string | null {
+function defaultPfpUrl(dir: string): string {
   if (existsSync(path.join(dir, "default.jpg"))) return "/pfp/default.jpg";
-  if (existsSync(path.join(dir, "default.png"))) return "/pfp/default.png";
-  return null;
+  return DEFAULT_PFP_URL;
 }
 
 /** Resolve one member's profile-picture URL. Never throws. */
-export function resolvePfpUrl(memberId: string | number): string | null {
+export function resolvePfpUrl(memberId: string | number): string {
   try {
     const id = String(memberId ?? "").trim();
     const dir = pfpDir();
@@ -33,7 +33,7 @@ export function resolvePfpUrl(memberId: string | number): string | null {
     }
     return defaultPfpUrl(dir);
   } catch {
-    return null;
+    return DEFAULT_PFP_URL;
   }
 }
 
@@ -44,7 +44,7 @@ export function resolvePfpUrl(memberId: string | number): string | null {
  */
 export async function resolvePfpUrlsAsync(
   memberIds: Iterable<string | number>,
-): Promise<Record<string, string | null>> {
+): Promise<Record<string, string>> {
   const base = resolvePfpUrls(memberIds);
   const ids = Object.keys(base).filter((id) => SAFE_ID.test(id));
   if (ids.length === 0) return base;
@@ -62,15 +62,15 @@ export async function resolvePfpUrlsAsync(
 }
 
 /** Single-member version of resolvePfpUrlsAsync. */
-export async function resolvePfpUrlAsync(memberId: string | number): Promise<string | null> {
+export async function resolvePfpUrlAsync(memberId: string | number): Promise<string> {
   const id = String(memberId ?? "").trim();
   const out = await resolvePfpUrlsAsync([id]);
-  return out[id] ?? null;
+  return out[id] ?? DEFAULT_PFP_URL;
 }
 
 /** Resolve profile-picture URLs for many members in one pass. */
-export function resolvePfpUrls(memberIds: Iterable<string | number>): Record<string, string | null> {
-  const out: Record<string, string | null> = {};
+export function resolvePfpUrls(memberIds: Iterable<string | number>): Record<string, string> {
+  const out: Record<string, string> = {};
   for (const raw of memberIds) {
     const id = String(raw ?? "").trim();
     if (!id || id in out) continue;

@@ -8,6 +8,7 @@ import {
   fetchMemberById,
 } from "@/app/lib/sheets/member-repository";
 import { getUserRoles } from "@/app/lib/discord";
+import { DEFAULT_PFP_URL } from "@/app/lib/pfp-default";
 import { canReviewAnyMission } from "@/app/lib/mission-review-access";
 import { callReviewRole } from "@/app/lib/calls/access";
 import { canManageShopRoles } from "@/app/lib/shop-admin-auth";
@@ -34,7 +35,7 @@ export async function GET() {
     let memberId: string | null = null;
     let memberName: string | null = null;
     let crews: string[] = [];
-    let pfpPath: string | null = null;
+    let pfpPath: string = DEFAULT_PFP_URL;
     try {
       const member = await fetchMemberByDiscordId(session.discordId);
       if (member) {

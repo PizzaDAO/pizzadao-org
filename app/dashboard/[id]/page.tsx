@@ -53,6 +53,7 @@ import { LaneCard } from "./components/LaneCard";
 import { BoxMafiaSuggestion } from "./components/BoxMafiaSuggestion";
 import { RecentActivity } from "./components/RecentActivity";
 import { Discover } from "./components/Discover";
+import { DEFAULT_PFP_URL } from "@/app/lib/pfp-default";
 import { ProfileCompleteCelebrationGate } from "./components/ProfileCompleteCelebrationGate";
 
 // Tokens: see app/globals.css. Body uses --font-sans (Asap), headings use
@@ -110,7 +111,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
         if (userData) setData(userData);
     }, [userData]);
 
-    const pfpUrl = summary?.member?.pfpUrl ?? pfpData?.url ?? null;
+    const pfpUrl = summary?.member?.pfpUrl ?? pfpData?.url ?? DEFAULT_PFP_URL;
     const pepBalance = summary?.pep?.balance ?? balanceData?.balance ?? null;
     const myTasks = tasksData?.tasksByCrew ?? {};
     const doneCounts = tasksData?.doneCountsByCrew ?? {};

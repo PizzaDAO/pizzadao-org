@@ -22,6 +22,7 @@ import { realCrews, withoutNonCrewIds } from "@/app/lib/crew-id";
 import { prisma } from "@/app/lib/db";
 import { getMemberTagline } from "@/app/api/profile-extras/[id]/route";
 import { resolvePfpUrlAsync } from "@/app/lib/pfp";
+import { DEFAULT_PFP_URL } from "@/app/lib/pfp-default";
 import { resolveMemberSince, monthPrecisionIso } from "@/app/lib/member-since";
 import { getPublicDiscordActivity, type PublicDiscordActivity } from "@/app/lib/discord-activity-public";
 import { internalError } from "@/app/lib/errors/error-response";
@@ -267,7 +268,7 @@ export async function composeProfileSummary(
             () => null as Awaited<ReturnType<typeof getMafiaRank>> | null,
         );
     const [pfpUrl, mission, mafiaResult, vouchCounts, xRow, crewMappings, dbTagline] = await Promise.all([
-        safe(resolvePfpUrlAsync(memberId), null as string | null),
+        safe(resolvePfpUrlAsync(memberId), DEFAULT_PFP_URL as string),
         light
             ? Promise.resolve(null)
             : memberPromise.then((m) => {

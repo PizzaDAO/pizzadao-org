@@ -7,6 +7,7 @@ import {
   membersColumn,
 } from "@/app/lib/sheets/member-repository";
 import { resolvePfpUrlsAsync } from "@/app/lib/pfp";
+import { DEFAULT_PFP_URL } from "@/app/lib/pfp-default";
 
 export const runtime = "nodejs";
 
@@ -98,7 +99,7 @@ export async function GET(
 
     // One batched lookup (composed, then static) so the page needs no per-member /api/pfp request.
     const pfpById = await resolvePfpUrlsAsync(members.map((m) => m.id).filter(Boolean));
-    for (const m of members) m.pfpUrl = m.id ? (pfpById[m.id.trim()] ?? null) : null;
+    for (const m of members) m.pfpUrl = m.id ? (pfpById[m.id.trim()] ?? DEFAULT_PFP_URL) : DEFAULT_PFP_URL;
 
     const result = {
       turtle: {

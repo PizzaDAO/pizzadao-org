@@ -259,12 +259,12 @@ describe('GET /api/missions/pending', () => {
         label: 'Shares a wallet with',
         key: '0xabc',
         others: ['member-2'],
-        othersLabeled: [{ name: 'Doughy', discordId: 'member-2', handle: '@dough', avatarUrl: 'https://cdn.discordapp.com/avatars/2/a.png' }],
+        othersLabeled: [{ name: 'Doughy', discordId: 'member-2', handle: '@dough', pfpUrl: '/pfp/default.png' }],
       },
     ])
     expect(submissions.find((s: { id: number }) => s.id === 4).accountSignals).toEqual([])
     expect(flagged.map((f: { id: number }) => f.id)).toEqual([9])
-    expect(flagged[0].member).toEqual({ name: 'member-3', discordId: 'member-3' })
+    expect(flagged[0].member).toEqual({ name: 'member-3', discordId: 'member-3', pfpUrl: '/pfp/default.png' })
   })
 
   it('returns a named submitter (sheet, else Discord, else the raw ID) and names in what the verifier saw', async () => {
@@ -277,15 +277,17 @@ describe('GET /api/missions/pending', () => {
     as('capo', [CAPO])
     const { submissions } = await (await PENDING()).json()
     const [a, b, c] = submissions
-    expect(a.submitter).toEqual({ name: 'Pizza Pal', discordId: 'member-1', memberId: '42' })
+    expect(a.submitter).toEqual({ name: 'Pizza Pal', discordId: 'member-1', memberId: '42', pfpUrl: '/pfp/42.png' })
     expect(a.holdLabel).toBe('Level 6+ needs a human approval')
     expect(a.checkItems).toEqual([{ label: 'Roles', value: 'Pepperoni Mafia' }])
-    expect(b.submitter).toEqual({ name: 'Doughy', discordId: 'member-2', handle: '@dough', avatarUrl: 'https://cdn.discordapp.com/avatars/2/a.png' })
+    expect(b.submitter).toEqual({ name: 'Doughy', discordId: 'member-2', handle: '@dough', pfpUrl: '/pfp/default.png' })
     expect(b.checkItems).toEqual([
       { label: 'Channel', value: '#show-and-tell' },
       { label: 'Message', value: 'open in Discord', href: 'https://discord.com/channels/700000000000000000/900000000000000001/900000000000000002' },
     ])
-    expect(c.submitter).toEqual({ name: 'member-9', discordId: 'member-9' })
+    expect(c.submitter).toEqual({ name: 'member-9', discordId: 'member-9', pfpUrl: '/pfp/default.png' })
+    // The Discord avatar is never passed through as the person's picture.
+    expect(JSON.stringify(submissions)).not.toContain('discordapp')
     // A semi-automatic pre-check is rendered by the panel itself.
     expect(c.checkItems).toEqual([])
     expect(JSON.stringify(submissions)).not.toContain('memberName')

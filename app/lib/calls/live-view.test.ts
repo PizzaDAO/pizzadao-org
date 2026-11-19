@@ -90,7 +90,7 @@ describe('member endpoint payload', () => {
     const out = await view()
     const call = out.calls[0]
     expect(call.present.map((p) => p.name)).toEqual(['Ann', 'Bob', 'Speaker 3'])
-    expect(call.present[0]).toEqual({ name: 'Ann', memberId: 'm-ann', minutes: 10, pfpUrl: null })
+    expect(call.present[0]).toEqual({ name: 'Ann', memberId: 'm-ann', minutes: 10, pfpUrl: '/pfp/default.png' })
     expect(call.present[1].memberId).toBeNull()
     expect(call.present.some((p) => p.name === 'Cy')).toBe(false) // left the call
     expect(call.presentCount).toBe(3)

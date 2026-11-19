@@ -8,6 +8,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { TURTLES } from '@/app/ui/constants'
 import { isOptimizableImage } from '@/app/lib/image-hosts'
+import { DEFAULT_PFP_ALT, pfpOrDefault } from '@/app/lib/pfp-default'
 import {
   EditorialMasthead,
   EditorialPage,
@@ -131,24 +132,20 @@ export default function TurtleDetailPage({ params }: { params: Promise<{ turtleI
             <div key={member.id || i} className={`${paperCard} p-3.5`}>
               <div className="flex gap-3 items-start">
                 {/* Profile Picture */}
-                {member.pfpUrl ? (
+                {
                   <Image
-                    src={member.pfpUrl}
-                    alt={member.name}
+                    src={pfpOrDefault(member.pfpUrl)}
+                    alt={member.pfpUrl ? member.name : DEFAULT_PFP_ALT}
                     width={44}
                     height={44}
                     sizes="44px"
-                    unoptimized={!isOptimizableImage(member.pfpUrl)}
+                    unoptimized={!isOptimizableImage(pfpOrDefault(member.pfpUrl))}
                     className="w-11 h-11 rounded-full object-cover object-top shrink-0 border-2 border-background"
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = 'none'
                     }}
                   />
-                ) : (
-                  <div className="w-11 h-11 rounded-full bg-[hsl(var(--ink)/0.06)] flex items-center justify-center font-display text-lg font-black shrink-0">
-                    {member.name.charAt(0).toUpperCase()}
-                  </div>
-                )}
+                }
 
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-start gap-2">

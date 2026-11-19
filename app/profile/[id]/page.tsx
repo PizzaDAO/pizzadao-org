@@ -22,6 +22,7 @@ import { COOKIE_NAME } from "@/app/lib/session";
 import { cache, Suspense } from "react";
 import { cookies } from "next/headers";
 import { after } from "next/server";
+import { DEFAULT_PFP_URL } from "@/app/lib/pfp-default";
 import { withDeadline } from "@/app/api/profile-summary/[id]/route";
 import { loadProfilePrefill, partialSummaryFromLight, PROFILE_PAGE_BUDGET_MS } from "./profile-page-data";
 
@@ -83,7 +84,7 @@ export async function generateMetadata({
     const name = summary.hero.name || "PizzaDAO member";
     const tagline = summary.hero.tagline?.trim();
     const description = tagline || `${name} · PizzaDAO member`;
-    const ogImage = absoluteUrl(summary.hero.pfpUrl);
+    const ogImage = absoluteUrl(summary.hero.pfpUrl ?? DEFAULT_PFP_URL);
 
     return {
         title: name,

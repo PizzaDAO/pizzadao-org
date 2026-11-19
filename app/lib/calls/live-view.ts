@@ -20,6 +20,7 @@ import { cleanSuggestedBy } from './summarize'
 import { excludedFromSettings } from './attendance-exclude'
 import { loadCrewContext, type CrewContext } from './crew-context'
 import { resolvePfpUrlsAsync } from '@/app/lib/pfp'
+import { DEFAULT_PFP_URL } from '@/app/lib/pfp-default'
 
 export interface PublicLive {
   /** The recorder session id: actions and cursors name the call they are for. */
@@ -179,12 +180,12 @@ async function buildShared(s: Session, filter: PostFilter | null, excluded: Read
     }),
     stopped: gone.map((p) => {
       const ref = personRef(p.displayName, p.discordId, members)
-      return { ...ref, minutes: Math.floor(p.presentSec / 60), leftAt: p.leftAt ?? null, pfpUrl: (ref.memberId && pfps[ref.memberId]) || null }
+      return { ...ref, minutes: Math.floor(p.presentSec / 60), leftAt: p.leftAt ?? null, pfpUrl: (ref.memberId && pfps[ref.memberId]) || DEFAULT_PFP_URL }
     }),
     present: inChannel
       .map((p) => {
         const ref = personRef(p.displayName, p.discordId, members)
-        return { ...ref, minutes: Math.floor(p.presentSec / 60), pfpUrl: (ref.memberId && pfps[ref.memberId]) || null }
+        return { ...ref, minutes: Math.floor(p.presentSec / 60), pfpUrl: (ref.memberId && pfps[ref.memberId]) || DEFAULT_PFP_URL }
       })
       .sort((a, b) => b.minutes - a.minutes || (a.name ?? '').localeCompare(b.name ?? '')),
   }
