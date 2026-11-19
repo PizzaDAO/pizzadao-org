@@ -12,7 +12,7 @@
  * {amount}) is the legacy value while nothing is saved, else the built-in replies in ./work-prompts.
  */
 import { prisma } from '../db'
-import { getOrCreateEconomy } from '../economy'
+import { getOrCreateEconomy, lockWallet } from '../economy'
 import { logTransaction } from '../transactions'
 import { loadSettings, type Settings } from '../settings'
 import { effectiveInt, envNumber, storedOverride } from '../settings/numbers'
@@ -36,12 +36,20 @@ export function workConfig(settings?: Settings) {
   const env = process.env
   const min = effectiveInt('work.minPep', settings, envNumber(env.WORK_MIN_PEP))
   const max = Math.max(min, effectiveInt('work.maxPep', settings, envNumber(env.WORK_MAX_PEP)))
-  return { min, max, cooldownMs: effectiveInt('work.cooldownSeconds', settings, envNumber(env.WORK_COOLDOWN_SECONDS)) * 1000 }
+  const dailyCap = effectiveInt('work.dailyCapPep', settings)
+  return { min, max, dailyCap, cooldownMs: effectiveInt('work.cooldownSeconds', settings, envNumber(env.WORK_COOLDOWN_SECONDS)) * 1000 }
 }
 
 export type WorkResult =
-  | { ok: true; amount: number; balance: number; prompt: string; promptIndex: number }
+  | { ok: true; amount: number; balance: number; prompt: string; promptIndex: number; earnedToday: number; dailyCap: number }
   | { ok: false; readyAt: Date }
+  | { ok: false; capReached: true; resetAt: Date; dailyCap: number }
+
+/** Start of the UTC day containing `now`, and the start of the next one. */
+export function utcDayBounds(now: Date): { start: Date; end: Date } {
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+  return { start, end: new Date(start.getTime() + 86_400_000) }
+}
 
 export async function doWork(
   discordId: string,
@@ -50,22 +58,37 @@ export async function doWork(
   const rng = opts.rng ?? Math.random
   const now = opts.now ?? new Date()
   const settings = await loadSettings()
-  const { min, max, cooldownMs } = workConfig(settings)
+  const { min, max, dailyCap, cooldownMs } = workConfig(settings)
   const prompts = workPrompts(settings)
+  const { start, end } = utcDayBounds(now)
 
   await getOrCreateEconomy(discordId)
 
   return prisma.$transaction(async (tx) => {
+    // Serialize this member's /work payouts so the cap check and the credit are one step.
+    await lockWallet(tx, discordId)
+    // A dailyCap of 0 (or less) means no cap.
+    let earnedToday = 0
+    if (dailyCap > 0) {
+      const sum = await tx.transaction.aggregate({
+        _sum: { amount: true },
+        where: { userId: discordId, type: 'WORK_REWARD', createdAt: { gte: start, lt: end } },
+      })
+      earnedToday = sum._sum.amount ?? 0
+      if (earnedToday >= dailyCap) return { ok: false as const, capReached: true as const, resetAt: end, dailyCap }
+    }
+
     const cd = await claimCooldown(tx, discordId, 'work', cooldownMs, now)
     if (!cd.ok) return cd
 
-    const amount = randInt(min, max, rng)
+    const rolled = randInt(min, max, rng)
+    const amount = dailyCap > 0 ? Math.min(rolled, dailyCap - earnedToday) : rolled
     const promptIndex = randInt(0, prompts.length - 1, rng)
     const econ = await tx.economy.update({
       where: { id: discordId },
       data: { wallet: { increment: amount } },
     })
     await logTransaction(tx, discordId, 'WORK_REWARD', amount, 'Work shift', { command: 'work', promptIndex })
-    return { ok: true as const, amount, balance: econ.wallet, prompt: prompts[promptIndex], promptIndex }
+    return { ok: true as const, amount, balance: econ.wallet, prompt: prompts[promptIndex], promptIndex, earnedToday: earnedToday + amount, dailyCap }
   })
 }
