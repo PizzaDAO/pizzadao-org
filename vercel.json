@@ -30,6 +30,7 @@
     { "path": "/api/cron/buddies?mode=intros", "schedule": "35 * * * *" },
     { "path": "/api/cron/feature-links", "schedule": "20 3 * * *" },
     { "path": "/api/cron/warm", "schedule": "*/5 * * * *" },
-    { "path": "/api/cron/trivia", "schedule": "*/5 * * * *" }
+    { "path": "/api/cron/trivia", "schedule": "*/5 * * * *" },
+    { "path": "/api/cron/default-pfp", "schedule": "25 * * * *" }
   ]
 }

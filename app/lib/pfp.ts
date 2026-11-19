@@ -2,8 +2,10 @@
  * Profile-picture lookup against the static files in public/pfp.
  * Server-side only (uses fs).
  *
- * Resolution order: /pfp/<id>.jpg, /pfp/<id>.png, /pfp/default.jpg,
+ * Resolution order (sync): /pfp/<id>.jpg, /pfp/<id>.png, /pfp/default.jpg,
  * /pfp/default.png, else the built-in default URL. Never a Discord avatar and never null.
+ * The async version adds the composed PFP first and the member's assigned dough ball before the
+ * shared default.
  */
 
 import { existsSync } from "fs";
@@ -20,6 +22,18 @@ function pfpDir(): string {
 function defaultPfpUrl(dir: string): string {
   if (existsSync(path.join(dir, "default.jpg"))) return "/pfp/default.jpg";
   return DEFAULT_PFP_URL;
+}
+
+/** True when this member has their own static art in public/pfp (never the shared default). */
+export function hasStaticPfp(memberId: string | number): boolean {
+  try {
+    const id = String(memberId ?? "").trim();
+    if (!id || !SAFE_ID.test(id)) return false;
+    const dir = pfpDir();
+    return existsSync(path.join(dir, `${id}.jpg`)) || existsSync(path.join(dir, `${id}.png`));
+  } catch {
+    return false;
+  }
 }
 
 /** Resolve one member's profile-picture URL. Never throws. */
@@ -39,7 +53,7 @@ export function resolvePfpUrl(memberId: string | number): string {
 
 /**
  * Async resolution that honours composed PFPs: MemberPfp.composedUrl, then the static file, then
- * the default. One indexed findMany for the whole batch. A database failure (or a preview without
+ * the member's assigned dough ball, then the shared default. One indexed findMany for the whole batch. A database failure (or a preview without
  * the migration) degrades to the static lookup. Never throws.
  */
 export async function resolvePfpUrlsAsync(
@@ -54,7 +68,27 @@ export async function resolvePfpUrlsAsync(
       where: { memberId: { in: ids } },
       select: { memberId: true, composedUrl: true },
     });
-    for (const row of rows) if (row.composedUrl) base[row.memberId] = row.composedUrl;
+    const composed = new Set<string>();
+    for (const row of rows) {
+      if (row.composedUrl) {
+        base[row.memberId] = row.composedUrl;
+        composed.add(row.memberId);
+      }
+    }
+    // Members with no composed PFP and no static art get their own assigned dough ball (if any).
+    const needy = ids.filter((id) => !composed.has(id) && !hasStaticPfp(id));
+    if (needy.length > 0) {
+      try {
+        const assigned = await prisma.defaultPfpAssignment.findMany({
+          where: { memberId: { in: needy } },
+          select: { memberId: true, candidate: { select: { imageUrl: true } } },
+        });
+        const needySet = new Set(needy);
+        for (const a of assigned) if (needySet.has(a.memberId) && a.candidate?.imageUrl) base[a.memberId] = a.candidate.imageUrl;
+      } catch {
+        // table missing or database hiccup: the shared default stands
+      }
+    }
   } catch {
     // keep the static answers
   }

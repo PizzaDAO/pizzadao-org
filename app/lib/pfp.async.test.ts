@@ -7,13 +7,21 @@ vi.mock("fs", async () => {
   return { ...actual, existsSync: (p: string) => existing.has(String(p).split(/[\\/]/).pop()!) };
 });
 const findMany = vi.fn();
-vi.mock("@/app/lib/db", () => ({ prisma: { memberPfp: { findMany: (a: unknown) => findMany(a) } } }));
+const assignFindMany = vi.fn();
+vi.mock("@/app/lib/db", () => ({
+  prisma: {
+    memberPfp: { findMany: (a: unknown) => findMany(a) },
+    defaultPfpAssignment: { findMany: (a: unknown) => assignFindMany(a) },
+  },
+}));
 
 import { resolvePfpUrlsAsync, resolvePfpUrlAsync } from "./pfp";
 
 beforeEach(() => {
   existing.clear();
   findMany.mockReset();
+  assignFindMany.mockReset();
+  assignFindMany.mockResolvedValue([]);
 });
 
 describe("resolvePfpUrlsAsync", () => {
@@ -53,5 +61,43 @@ describe("resolvePfpUrlsAsync", () => {
   it("skips the query for unsafe ids", async () => {
     await resolvePfpUrlsAsync(["../x"]);
     expect(findMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("assigned dough ball", () => {
+  it("order: composed, static art, assigned dough ball, shared default", async () => {
+    existing.add("2.jpg");
+    findMany.mockResolvedValue([{ memberId: "1", composedUrl: "https://c" }]);
+    assignFindMany.mockResolvedValue([
+      { memberId: "3", candidate: { imageUrl: "https://blob/dough-3.png" } },
+    ]);
+    const out = await resolvePfpUrlsAsync(["1", "2", "3", "4"]);
+    expect(out).toEqual({
+      "1": "https://c",
+      "2": "/pfp/2.jpg",
+      "3": "https://blob/dough-3.png",
+      "4": "/pfp/default.png",
+    });
+    // only members with neither composed nor static art are looked up
+    expect(assignFindMany.mock.calls[0][0].where.memberId.in).toEqual(["3", "4"]);
+  });
+
+  it("an assignment never overrides composed or static art", async () => {
+    existing.add("2.png");
+    findMany.mockResolvedValue([{ memberId: "1", composedUrl: "https://c" }]);
+    assignFindMany.mockResolvedValue([
+      { memberId: "1", candidate: { imageUrl: "https://blob/x.png" } },
+      { memberId: "2", candidate: { imageUrl: "https://blob/y.png" } },
+    ]);
+    // the lookup is limited to needy ids, but even a stray row for a composed id must not win
+    const out = await resolvePfpUrlsAsync(["1", "2"]);
+    expect(out["1"]).toBe("https://c");
+    expect(out["2"]).toBe("/pfp/2.png");
+  });
+
+  it("a failing assignment lookup keeps the default", async () => {
+    findMany.mockResolvedValue([]);
+    assignFindMany.mockRejectedValue(new Error("no such table"));
+    expect((await resolvePfpUrlsAsync(["9"]))["9"]).toBe("/pfp/default.png");
   });
 });

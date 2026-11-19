@@ -112,6 +112,7 @@ export const TOGGLES = {
   'games.enabled': { env: 'PEP_GAMES_ENABLED', legacy: (raw) => raw === '1' },
   'crime.enabled': { env: 'PEP_CRIME_ENABLED', legacy: (raw) => raw === '1' },
   'pfp.restyleEnabled': { env: 'PFP_RESTYLE_ENABLED', legacy: ON_WORDS },
+  'defaultPfp.assignEnabled': { env: 'DEFAULT_PFP_ASSIGN_ENABLED', legacy: ON_WORDS },
   'pfp.outfitOverlayEnabled': { env: 'PFP_OUTFIT_OVERLAY_ENABLED', legacy: ON_WORDS },
   'portrait.enabled': { env: 'MAFIA_PORTRAIT_ENABLED', legacy: (raw) => raw === '1' },
   // Both on unless the env var is an explicit off (the kill switch).
