@@ -13,7 +13,7 @@ import { esc } from './text'
 
 const API = 'https://discord.com/api/v10'
 
-export const TRIVIA_SUBCOMMANDS = ['leaderboard', 'start', 'skip'] as const
+export const TRIVIA_SUBCOMMANDS = ['leaderboard', 'start', 'skip', 'report'] as const
 export type TriviaSub = (typeof TRIVIA_SUBCOMMANDS)[number]
 export const TRIVIA_ADMIN_SUBCOMMANDS: readonly TriviaSub[] = ['start', 'skip']
 
@@ -22,6 +22,8 @@ export interface TriviaJob {
   discordId: string
   /** leaderboard: show it to the channel instead of only to the member. */
   public?: boolean
+  /** report: why the question is bad (optional, already cleaned). */
+  reason?: string
   applicationId: string
   token: string
   author?: EmbedAuthor
@@ -37,14 +39,25 @@ export type StartOutcome =
   | { status: 'started'; channelId: string }
   | { status: 'no_channel' | 'open_exists' | 'no_question' | 'busy' | 'post_failed' }
 
+export type ReportLatestResult =
+  | { status: 'reported'; question: string }
+  | { status: 'duplicate'; question: string }
+  | { status: 'none' }
+  | { status: 'not_member' }
+
 export interface TriviaCommandDeps {
   /** Top winners, this month and all time. Names only, never ids. */
   leaderboard: () => Promise<{ available: boolean; month: LeaderboardRow[]; allTime: LeaderboardRow[] }>
   startRound: () => Promise<StartOutcome>
   /** Cancel the open round. `no_channel` when no channel is configured. */
   skipRound: () => Promise<'cancelled' | 'none_open' | 'no_channel'>
+  /** Report the most recent round's question for this member. `question` is the question text (shortened here). */
+  reportLatest: (discordId: string, reason: string | undefined) => Promise<ReportLatestResult>
   fetchImpl?: typeof fetch
 }
+
+/** The question, cut to about 60 characters for the confirmation. */
+const shortQuestion = (q: string): string => (q.length > 60 ? `${q.slice(0, 59).trimEnd()}…` : q)
 
 const rows = (list: LeaderboardRow[]): string =>
   list.length === 0 ? 'No wins yet.' : list.slice(0, 10).map((r) => `${r.rank}. ${esc(r.name)}: ${r.score} win${r.score === 1 ? '' : 's'}`).join('\n')
@@ -74,6 +87,14 @@ export async function buildTriviaReply(job: TriviaJob, deps: TriviaCommandDeps):
         post_failed: 'Discord refused the post, so no round was opened. Check the bot can post in the channel.',
       }
       return makeEmbed('error', "Couldn't start a round.", why[r.status], { author })
+    }
+    case 'report': {
+      const r = await deps.reportLatest(job.discordId, job.reason)
+      if (r.status === 'none') return makeEmbed('error', 'There is no trivia question to report yet.', undefined, { author })
+      if (r.status === 'not_member') return makeEmbed('error', 'Only PizzaDAO members on an account at least 7 days old can report questions.', undefined, { author })
+      const q = esc(shortQuestion(r.question))
+      if (r.status === 'duplicate') return makeEmbed('success', `You already reported '${q}'. Thanks!`, undefined, { author })
+      return makeEmbed('success', `Thanks, reported '${q}'.`, undefined, { author })
     }
     case 'skip': {
       const r = await deps.skipRound()

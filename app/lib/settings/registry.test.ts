@@ -341,6 +341,7 @@ describe('settings registry', () => {
       ['trivia.rewardPep', 20],
       ['trivia.channelId', ''],
       ['trivia.roundsPerDay', 3],
+      ['trivia.disabledQuestionIds', []],
       ['manuals.freshnessEnabled', false],
       ['manuals.staleAfterDays', 365],
       ['manuals.hideDrafts', false],

@@ -60,6 +60,8 @@ export const QuestionSchema = z
     explanation: z.string(),
     sources: z.array(z.object({ url: httpsUrl, note: z.string().min(1) }).strict()),
     notes: z.string().optional(),
+    /** Why a rejected question was retired (who and when). Only rejected questions carry one. */
+    rejectedReason: z.string().min(3).optional(),
     label: z.string().optional(),
     validUntil: isoDate.optional(),
     status: z.enum(STATUSES),
@@ -89,6 +91,7 @@ export const QuestionSchema = z
       if (q.sources.length === 0) bad("at least one source required", ["sources"]);
     }
 
+    if (q.rejectedReason && q.status !== "rejected") bad("rejectedReason belongs to rejected questions", ["rejectedReason"]);
     // Only approved questions are served, and every one of those says where.
     if (q.status === "approved" && !q.pool) bad("approved questions need a pool", ["pool"]);
     if (q.status !== "approved" && q.pool) bad("only approved questions have a pool", ["pool"]);

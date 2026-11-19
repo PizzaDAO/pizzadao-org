@@ -729,7 +729,7 @@ async function command(i: Interaction, userId: string, deps: HandlerDeps, cur: s
       if (!deps.trivia) return out.error("/trivia isn't enabled yet.")
       const subOpt = i.data?.options?.[0] as { name?: string; options?: Option[] } | undefined
       const sub = TRIVIA_SUBCOMMANDS.find((s) => s === subOpt?.name)
-      if (!sub) return out.error('Pick one of: leaderboard, start, skip.')
+      if (!sub) return out.error('Pick one of: leaderboard, start, skip, report.')
       // Admin gate first, so non-admins learn nothing else (same as /add-money).
       if (TRIVIA_ADMIN_SUBCOMMANDS.includes(sub) && !(await deps.isAdmin(i.member?.roles ?? []).catch(() => false))) {
         return out.error('Only admins can use this command.')
@@ -739,10 +739,13 @@ async function command(i: Interaction, userId: string, deps: HandlerDeps, cur: s
       const readyAt = await deps.trivia.rateLimit(userId)
       if (readyAt) return out.wait('Slow down.', `You can use /trivia again ${rel(readyAt)}.`)
       const isPublic = sub === 'leaderboard' && subOpt?.options?.find((o) => o.name === 'public')?.value === true
+      const reasonRaw = sub === 'report' ? subOpt?.options?.find((o) => o.name === 'reason')?.value : undefined
+      const reason = typeof reasonRaw === 'string' ? reasonRaw.replace(/\s+/g, ' ').trim().slice(0, 200) : ''
       deps.trivia.defer({
         sub,
         discordId: userId,
         ...(isPublic ? { public: true } : {}),
+        ...(reason ? { reason } : {}),
         applicationId: i.application_id,
         token: i.token,
         author: out.author,

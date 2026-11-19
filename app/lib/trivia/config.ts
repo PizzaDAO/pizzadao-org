@@ -85,3 +85,8 @@ export function reactionAttemptKey(questionMessageId: string, userId: string): s
 export const WRONG_ATTEMPT_REACTION = "\u274C";
 /** Added after the wrong mark when it was the member's last allowed try. */
 export const OUT_OF_TRIES_REACTION = "\u{1F512}";
+
+/** 🚩: the flag reaction the bot pre-adds, last, to every question post. A member's flag is a report, never an answer. */
+export const FLAG_REACTION = "\u{1F6A9}";
+/** 👀: the bot's acknowledgement on a reply that was recorded as a report. */
+export const ACK_REACTION = "\u{1F440}";

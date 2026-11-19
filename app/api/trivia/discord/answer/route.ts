@@ -35,7 +35,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const body = (await request.json().catch(() => null)) as {
-    kind?: unknown; channelId?: unknown; messageId?: unknown; authorId?: unknown; content?: unknown; emoji?: unknown;
+    kind?: unknown; channelId?: unknown; messageId?: unknown; authorId?: unknown; content?: unknown; emoji?: unknown; replyTo?: unknown;
   } | null;
   const { channelId, messageId, authorId, content } = body ?? {};
   const isReaction = body?.kind === "reaction";
@@ -45,7 +45,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     typeof channelId !== "string" || !SNOWFLAKE.test(channelId) ||
     typeof messageId !== "string" || !SNOWFLAKE.test(messageId) ||
     typeof authorId !== "string" || !SNOWFLAKE.test(authorId) ||
-    (isReaction ? emoji === null : typeof content !== "string")
+    (isReaction ? emoji === null : typeof content !== "string") ||
+    (body?.replyTo !== undefined && body.replyTo !== null && (typeof body.replyTo !== "string" || !SNOWFLAKE.test(body.replyTo)))
   ) {
     return reply({ error: isReaction ? "channelId, messageId, authorId and emoji are required" : "channelId, messageId, authorId and content are required" }, 400);
   }
@@ -57,7 +58,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     const deps = defaultAnswerDeps((fn) => after(() => fn().catch((e) => console.error("[trivia] deferred post failed:", e))));
     const outcome = emoji
       ? await processReaction({ channelId, messageId, discordId: authorId, emoji }, deps)
-      : await processAnswer({ channelId, messageId, discordId: authorId, content: (content as string).slice(0, MAX_CONTENT) }, deps);
+      : await processAnswer({ channelId, messageId, discordId: authorId, content: (content as string).slice(0, MAX_CONTENT), ...(typeof body?.replyTo === "string" ? { replyTo: body.replyTo } : {}) }, deps);
     return reply({ ok: true, ...outcome });
   } catch (err) {
     return internalError(err, "trivia/discord/answer", "Could not process the answer");

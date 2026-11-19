@@ -16,6 +16,10 @@
 
 /** Longer than this is chat, not an answer (the app ignores it too; sending it would only cost a request). */
 export const MAX_FORWARD_CHARS = 80
+/** A reply to a question post may be a longer "this question is bad" note: forwarded up to this length (the app decides). */
+export const MAX_REPLY_CHARS = 300
+/** The flag reaction a member uses to report a question (the bot pre-adds the same one). */
+export const FLAG_EMOJI = '\u{1F6A9}'
 /** Messages waiting per channel; beyond this (the app is down and the channel is busy) new ones are dropped. */
 export const MAX_QUEUED_PER_CHANNEL = 200
 /** Waits before each retry of one message: 1 s, 3 s, 10 s, 30 s (about 45 s in all, then it is given up). */
@@ -29,6 +33,8 @@ export interface TriviaMessage {
   guildId: string | null
   webhookId?: string | null
   system?: boolean
+  /** Discord `message_reference`: set when the message is a reply. */
+  reference?: { messageId?: string | null } | null
   author: { id: string; bot: boolean }
 }
 
@@ -37,7 +43,7 @@ export interface TriviaForwardConfig {
   channelIds: readonly string[]
 }
 
-export type ForwardBody = { channelId: string; messageId: string; authorId: string; content: string }
+export type ForwardBody = { channelId: string; messageId: string; authorId: string; content: string; /** The message this replies to, when it is a reply. */ replyTo?: string }
 /** A reaction on the question post (kind "reaction"): `messageId` is the message that was reacted to. */
 export type ReactionBody = { kind: 'reaction'; channelId: string; messageId: string; authorId: string; emoji: { id: string | null; name: string | null } }
 export type AnyForwardBody = ForwardBody | ReactionBody
@@ -55,6 +61,8 @@ export interface TriviaReaction {
 export interface TriviaRoundState {
   open: boolean
   messageId: string | null
+  /** Question posts of the last 7 days: flags and report replies on them are forwarded even when no round is open. */
+  recentMessageIds?: string[]
 }
 /** ok: delivered; retry: try again; drop: this message is refused for good (bad body); refused: the app rejected the key or route (401/403/404): drop it, never retry. */
 export type ForwardResult = 'ok' | 'retry' | 'drop' | 'refused'
@@ -96,8 +104,9 @@ export async function fetchTriviaRound(appBaseUrl: string, apiKey: string, fetch
       signal: AbortSignal.timeout(4_000),
     })
     if (!res.ok) return null
-    const j = (await res.json().catch(() => null)) as { open?: unknown; messageId?: unknown } | null
-    return { open: j?.open === true, messageId: typeof j?.messageId === 'string' && /^\d{5,25}$/.test(j.messageId) ? j.messageId : null }
+    const j = (await res.json().catch(() => null)) as { open?: unknown; messageId?: unknown; recentMessageIds?: unknown } | null
+    const ids = Array.isArray(j?.recentMessageIds) ? (j!.recentMessageIds as unknown[]).filter((x): x is string => typeof x === 'string' && /^\d{5,25}$/.test(x)).slice(0, 100) : []
+    return { open: j?.open === true, messageId: typeof j?.messageId === 'string' && /^\d{5,25}$/.test(j.messageId) ? j.messageId : null, recentMessageIds: ids }
   } catch {
     return null
   }
@@ -121,12 +130,12 @@ export async function postTriviaAnswer(appBaseUrl: string, apiKey: string, body:
 }
 
 /** True for a message that could be an answer: a human's short text in a watched channel of our server. */
-export function isCandidate(m: TriviaMessage, cfg: TriviaForwardConfig, guildId: string): boolean {
+export function isCandidate(m: TriviaMessage, cfg: TriviaForwardConfig, guildId: string, maxChars: number = MAX_FORWARD_CHARS): boolean {
   if (!cfg.enabled || cfg.channelIds.length === 0 || !cfg.channelIds.includes(m.channelId)) return false
   if (m.guildId !== guildId) return false
   if (m.author.bot || m.webhookId || m.system) return false
   const text = m.content.trim()
-  return text.length > 0 && text.length <= MAX_FORWARD_CHARS
+  return text.length > 0 && text.length <= maxChars
 }
 
 export class TriviaForwarder {
@@ -139,6 +148,7 @@ export class TriviaForwarder {
   private fetchState: (() => Promise<boolean | TriviaRoundState | null>) | null = null
   private pollInFlight = false
   private lastPollSoon = 0
+  private recentPosts = new Set<string>()
   private lastRefusedLog = 0
   private refusedSince = 0
 
@@ -167,11 +177,15 @@ export class TriviaForwarder {
   async refreshState(fetchState: () => Promise<boolean | TriviaRoundState | null>): Promise<void> {
     this.fetchState = fetchState
     try {
-      if (!this.deps.config().enabled) return this.setOpen(false)
+      if (!this.deps.config().enabled) {
+        this.recentPosts = new Set()
+        return this.setOpen(false)
+      }
       const state = await fetchState()
       if (state === null) return
-      if (typeof state === 'boolean') this.setOpen(state)
-      else this.setOpen(state.open, Date.now(), state.messageId)
+      if (typeof state === 'boolean') return this.setOpen(state)
+      if (state.recentMessageIds) this.recentPosts = new Set(state.recentMessageIds)
+      this.setOpen(state.open, Date.now(), state.messageId)
     } catch (err) {
       this.deps.log(`trivia-forward state poll failed: ${err instanceof Error ? err.message.slice(0, 160) : 'error'}`)
     }
@@ -187,8 +201,14 @@ export class TriviaForwarder {
         this.warnedEmpty = true
         this.deps.log('trivia-forward: a message in the trivia channel arrived with empty content (is MessageContent enabled?)')
       }
-      if (!isCandidate(m, cfg, this.deps.guildId)) return
-      this.accept({ channelId: m.channelId, messageId: m.id, authorId: m.author.id, content: m.content.trim() })
+      const replyTo = m.reference?.messageId ?? undefined
+      // A reply to a question post of the last 7 days may be a report ("this one is bad"): forwarded whether or not a
+      // round is open, and a little longer than an answer. The app decides whether it is a report or a guess.
+      const toQuestion = !!replyTo && this.recentPosts.has(replyTo)
+      if (!isCandidate(m, cfg, this.deps.guildId, toQuestion ? MAX_REPLY_CHARS : MAX_FORWARD_CHARS)) return
+      const body: ForwardBody = { channelId: m.channelId, messageId: m.id, authorId: m.author.id, content: m.content.trim(), ...(replyTo ? { replyTo } : {}) }
+      if (toQuestion) this.enqueueBody(body)
+      else this.accept(body)
     } catch (err) {
       this.deps.log(`trivia-forward failed: ${err instanceof Error ? err.message.slice(0, 160) : 'error'}`)
     }
@@ -205,6 +225,11 @@ export class TriviaForwarder {
       if (!cfg.enabled || !cfg.channelIds.includes(r.channelId)) return
       if (r.guildId !== this.deps.guildId || r.user.bot) return
       if (!r.emoji.id && !r.emoji.name) return
+      // A flag on a question post of the last 7 days is a report, not an answer: forwarded even when no round is open.
+      if (!r.emoji.id && r.emoji.name?.replace(/\uFE0F/g, '') === FLAG_EMOJI) {
+        if (this.recentPosts.has(r.messageId)) this.enqueueBody({ kind: 'reaction', channelId: r.channelId, messageId: r.messageId, authorId: r.user.id, emoji: { id: null, name: r.emoji.name } })
+        return
+      }
       this.accept({ kind: 'reaction', channelId: r.channelId, messageId: r.messageId, authorId: r.user.id, emoji: { id: r.emoji.id, name: r.emoji.name } })
     } catch (err) {
       this.deps.log(`trivia-forward failed: ${err instanceof Error ? err.message.slice(0, 160) : 'error'}`)

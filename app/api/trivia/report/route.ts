@@ -7,6 +7,7 @@ import { rejectUnsafeWrite } from "@/app/lib/admin-guard";
 import { checkKeyedRateLimit, enforceRateLimit, rateLimitResponse } from "@/app/lib/rate-limit";
 import { servable } from "@/app/lib/trivia/bank";
 import { reply, withNoStore } from "@/app/lib/trivia/api";
+import { autoPullIfNeeded } from "@/app/lib/trivia/reports";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,5 +41,7 @@ export async function POST(request: NextRequest) {
     console.error("[trivia] report not saved:", (e as Error).message);
     return reply({ error: "Could not save your report right now. Please try again later." }, 503);
   }
+  // Reports from signed-in members count toward the auto-pull (3 different members within 7 days). Never public.
+  if (session?.discordId) await autoPullIfNeeded(questionId);
   return reply({ ok: true });
 }

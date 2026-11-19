@@ -19,6 +19,7 @@ import { dayStartMs } from "./daily";
 import { cancelledMessage, explanationMessage, questionMessage, revealMessage, winnerMessage } from "./post";
 import { buildChoiceLabels, reactionsFor, type ChoiceLabels } from "./emoji";
 import { addQuestionReactions, resolveChoiceLabels } from "./reactions";
+import { getDisabledIds } from "./reports";
 import { pickQuestion } from "./schedule";
 import type { TriviaQuestion } from "./schema";
 
@@ -108,7 +109,7 @@ export async function openDiscordRound(opts: OpenOptions, deps: PostDeps = defau
   const now = opts.now ?? new Date();
   let question = opts.question;
   if (!question) {
-    const pool = servable({ now, pool: "discord", disabledIds: opts.disabledIds });
+    const pool = servable({ now, pool: "discord", disabledIds: opts.disabledIds ?? (await getDisabledIds()) });
     const recent = await recentDiscordRounds();
     question = pickQuestion(pool, { recentIds: recent.map((r) => r.questionId), rng: opts.rng }) ?? undefined;
   }

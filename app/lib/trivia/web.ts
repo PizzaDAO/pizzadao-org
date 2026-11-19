@@ -8,6 +8,7 @@
 import { prisma } from "@/app/lib/db";
 import { getQuestion, servable } from "./bank";
 import { addDays, computeStreak, dailyQuestionFor, dayKeyUtc, nextDayStartMs } from "./daily";
+import { getDisabledIds } from "./reports";
 import type { TriviaQuestion } from "./schema";
 
 export interface DailyRound {
@@ -27,7 +28,7 @@ export interface DailyRound {
  */
 export async function getDailyRound(now: Date = new Date()): Promise<DailyRound | null> {
   const dayKey = dayKeyUtc(now);
-  const pool = servable({ now, pool: "web" });
+  const pool = servable({ now, pool: "web", disabledIds: await getDisabledIds() });
   const computed = dailyQuestionFor(dayKey, pool);
 
   try {
@@ -64,7 +65,7 @@ export async function getDailyRound(now: Date = new Date()): Promise<DailyRound 
  * daily answer before a member's recorded attempt.
  */
 export async function practicePool(now: Date = new Date()): Promise<TriviaQuestion[]> {
-  const pool = servable({ now, pool: "web" });
+  const pool = servable({ now, pool: "web", disabledIds: await getDisabledIds() });
   const daily = await getDailyRound(now);
   const computed = dailyQuestionFor(dayKeyUtc(now), pool);
   const hidden = new Set([daily?.question.id, computed?.id].filter((x): x is string => !!x));

@@ -69,10 +69,22 @@ const roundsPerDay: SettingDef<number> = {
   input: { type: 'int', min: 1, max: 6 },
 }
 
+const disabledQuestionIds: SettingDef<string[]> = {
+  key: 'trivia.disabledQuestionIds',
+  area: 'trivia',
+  label: 'Pulled trivia questions',
+  help: 'Question ids (like pd-004) that are never asked, in Discord or on the web. Added by the one-click disable on /admin/trivia, and automatically when 3 different members report a question within 7 days. Remove an id to bring the question back.',
+  schema: z.array(z.string().regex(/^[a-z]{2,4}-\d{3}$/, 'Not a question id like pd-004')).max(200),
+  default: [],
+  onReadFailure: 'lastKnownGood',
+  input: { type: 'stringList', maxItems: 200, maxLength: 12 },
+}
+
 export const TRIVIA_SETTINGS = {
   'trivia.enabled': enabled,
   'trivia.dryRun': dryRun,
   'trivia.rewardPep': rewardPep,
   'trivia.channelId': channelId,
   'trivia.roundsPerDay': roundsPerDay,
+  'trivia.disabledQuestionIds': disabledQuestionIds,
 } as const
