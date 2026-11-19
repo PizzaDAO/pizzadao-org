@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { FORWARD_RETRY_DELAYS_MS, MAX_FORWARD_CHARS, MAX_QUEUED_PER_CHANNEL, PRE_OPEN_BUFFER_MS, REFUSED_LOG_EVERY_MS, fetchTriviaRound, fetchTriviaState, postTriviaAnswer, TriviaForwarder, type ForwardBody, type ForwardResult, type TriviaForwardConfig, type TriviaForwardDeps, type TriviaMessage, type TriviaReaction, type AnyForwardBody } from './trivia-forward.js'
+import { FORWARD_RETRY_DELAYS_MS, MAX_FORWARD_CHARS, MAX_QUEUED_PER_CHANNEL, PRE_OPEN_BUFFER_MS, REFUSED_LOG_EVERY_MS, fetchTriviaRound, fetchTriviaState, postTriviaAnswer, TriviaForwarder, type ForwardBody, type ForwardResult, type TriviaForwardConfig, type TriviaForwardDeps, type TriviaMessage, type TriviaReaction, type AnyForwardBody, type TriviaRoundState } from './trivia-forward.js'
 import { parseRemoteConfig, REMOTE_CONFIG_OFF } from './remote-config.js'
 
 const GUILD = '800000000000000001'
@@ -374,7 +374,7 @@ describe('reaction answers', () => {
     const { f, post } = setupReactions()
     f.onReaction(react({ messageId: '900000000000000999' }))
     await f.idle()
-    expect(post).not.toHaveBeenCalled()
+    expect(post).not.toHaveBeenCalled() // no poller yet, so nothing to refresh either
   })
 
   it('without a known question post it forwards (the app checks the message), but never another channel or guild', async () => {
@@ -467,5 +467,58 @@ describe('reaction answers', () => {
     f.onReaction(react())
     await f.idle()
     expect(bodies).toHaveLength(1)
+  })
+
+  it('a new round opening between two polls: the pick on the new post triggers an immediate poll and is then forwarded', async () => {
+    const NEW = '900000000000000200'
+    const bodies: AnyForwardBody[] = []
+    const post = vi.fn(async (b: AnyForwardBody) => (bodies.push(b), 'ok' as ForwardResult))
+    const f = mk({ config: () => ON, post, sleep: async () => {}, log: vi.fn(), guildId: GUILD }, undefined, false)
+    // The last poll saw round 1 (open, post QMSG).
+    await f.refreshState(async () => ({ open: true, messageId: QMSG }))
+    // Round 2 has opened since; the next poll (when asked) says so.
+    const poll = vi.fn(async () => ({ open: true, messageId: NEW }) as { open: boolean; messageId: string | null })
+    f.onReaction(react({ messageId: NEW })) // dropped as "another message" before; now buffered while the poll runs
+    // (the forwarder polls with the fetcher it was last given: hand it the updated one)
+    await f.refreshState(poll) // the 5 s tick, or the immediate poll: same code path
+    await f.idle()
+    expect(bodies).toHaveLength(1)
+    expect(bodies[0]).toMatchObject({ kind: 'reaction', messageId: NEW })
+  })
+
+  it('a pick on an unknown message while open polls immediately (debounced to one in flight, one per second), then forwards once the app names it', async () => {
+    const NEW = '900000000000000200'
+    const bodies: AnyForwardBody[] = []
+    const post = vi.fn(async (b: AnyForwardBody) => (bodies.push(b), 'ok' as ForwardResult))
+    const f = mk({ config: () => ON, post, sleep: async () => {}, log: vi.fn(), guildId: GUILD }, undefined, false)
+    let state: TriviaRoundState = { open: true, messageId: QMSG }
+    let release: () => void = () => {}
+    let calls = 0
+    const fetchState = vi.fn(async () => {
+      calls++
+      if (calls > 1) await new Promise<void>((r) => (release = r)) // the immediate poll is slow
+      return state
+    })
+    await f.refreshState(fetchState) // the regular tick: round 1
+    state = { open: true, messageId: NEW } // round 2 opened
+    for (let i = 0; i < 5; i++) f.onReaction(react({ messageId: NEW, user: { id: `22222222222222222${i}`, bot: false } }))
+    await new Promise((r) => setTimeout(r, 5))
+    expect(fetchState).toHaveBeenCalledTimes(2) // one immediate poll, not five
+    expect(bodies).toHaveLength(0)
+    release()
+    await new Promise((r) => setTimeout(r, 5))
+    await f.idle()
+    expect(bodies).toHaveLength(5) // all five picks sent once the new post was known
+    expect(bodies.every((b) => b.messageId === NEW)).toBe(true)
+  })
+
+  it('a pick on a message that is still not the question post after the poll ages out and is never sent', async () => {
+    const { f, post } = setupReactions()
+    await f.refreshState(async () => ({ open: true, messageId: QMSG }))
+    f.onReaction(react({ messageId: '900000000000000999' }))
+    await new Promise((r) => setTimeout(r, 5))
+    await f.refreshState(async () => ({ open: true, messageId: QMSG }))
+    await f.idle()
+    expect(post).not.toHaveBeenCalled()
   })
 })

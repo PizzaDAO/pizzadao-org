@@ -122,7 +122,8 @@ describe("question post with the turtles", () => {
     const lines = body.content.split("\n");
     mc.choices!.forEach((c, i) => expect(lines).toContain(`${labels.display[i]} ${c}`));
     expect(body.content).not.toMatch(/\u{1F170}|\u{1F171}/u);
-    expect(body.content).toContain("react with your pick, or type its letter");
+    expect(body.content).toContain("react with your pick, or type the answer");
+    expect(body.content).not.toMatch(/type its letter|\(A\)|\bA\.\s/);
     expect(body.allowed_mentions).toEqual({ parse: [] });
   });
 

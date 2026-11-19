@@ -44,7 +44,7 @@ export function questionMessage(q: TriviaQuestion, rewardPep: number, labels?: C
     q.type === "true_false"
       ? ` · react ${TF_REACTIONS.true} or ${TF_REACTIONS.false}, or type true / false`
       : q.type === "multiple_choice"
-        ? " · react with your pick, or type its letter"
+        ? " · react with your pick, or type the answer"
         : "";
   lines.push(`(${TYPE_LABEL[q.type]} · ${q.difficulty} · ${ROUND_MINUTES} min${how})`);
   return { content: fit(lines.join("\n")), allowed_mentions: NO_PINGS };

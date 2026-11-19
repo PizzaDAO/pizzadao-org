@@ -118,7 +118,7 @@ export interface ReactionInput {
  * A reaction on the question post, as a choice (plans/trivia.md section 17). The same rules as a typed answer: the
  * open round, eligibility, the attempt cap (1 for true/false and multiple choice), the dedupe key and claimWin. The
  * dedupe key is `reaction:<question message>:<member>`, so a member's FIRST reaction is their only reaction attempt
- * (their later ones are duplicates). A pick on the current question is removed afterwards, whatever the outcome, so
+ * (their later ones are duplicates). A pick on the current question is removed immediately, in parallel with the work and whatever the outcome, so
  * the reaction counts never show what others chose; reactions after the round closed, on other messages, or with
  * other emoji are not touched.
  */
@@ -133,28 +133,34 @@ export async function processReaction(input: ReactionInput, deps: AnswerDeps): P
   const judged = judgeReaction(question, input.emoji);
   if (!judged) return { status: "ignored", why: "not_a_choice" };
 
-  // From here the pick is hidden again whatever happens: removing it is queued before anything can fail.
+  // From here the pick is hidden again, and it must disappear at the same moment whatever the outcome: removal starts
+  // right now, before the duplicate check, the eligibility lookups (a Sheets read for correct picks only) and the claim,
+  // so neither the verdict nor the load can be told from how long the reaction stays. It runs alongside them and is
+  // awaited before returning (the request must not end first); a failure is swallowed (the remover logs it).
   const reaction = emojiToReaction(input.emoji);
-  if (reaction && deps.removeReaction) {
-    const remove = deps.removeReaction;
-    deps.defer(() => remove(input.channelId, input.messageId, reaction, input.discordId));
+  const removal: Promise<void> =
+    reaction && deps.removeReaction
+      ? deps.removeReaction(input.channelId, input.messageId, reaction, input.discordId).catch(() => undefined)
+      : Promise.resolve();
+  try {
+    const key = reactionAttemptKey(input.messageId, input.discordId);
+    if (await deps.findAttempt(key)) return { status: "duplicate" };
+
+    const eligibility = await eligibilityFor(input.discordId, judged.correct, now, deps);
+    const result = await claimWin({
+      round: { id: round.id, rewardPep: round.rewardPep, questionId: round.questionId },
+      discordId: input.discordId,
+      messageId: key,
+      answerText: `reaction:${judged.label}`,
+      correct: judged.correct,
+      eligibility,
+      maxAttempts: attemptsPerRound(question),
+      now,
+    });
+    return finish(result, { discordId: input.discordId, messageId: key, replyToId: input.messageId }, round, deps);
+  } finally {
+    await removal;
   }
-
-  const key = reactionAttemptKey(input.messageId, input.discordId);
-  if (await deps.findAttempt(key)) return { status: "duplicate" };
-
-  const eligibility = await eligibilityFor(input.discordId, judged.correct, now, deps);
-  const result = await claimWin({
-    round: { id: round.id, rewardPep: round.rewardPep, questionId: round.questionId },
-    discordId: input.discordId,
-    messageId: key,
-    answerText: `reaction:${judged.label}`,
-    correct: judged.correct,
-    eligibility,
-    maxAttempts: attemptsPerRound(question),
-    now,
-  });
-  return finish(result, { discordId: input.discordId, messageId: key, replyToId: input.messageId }, round, deps);
 }
 
 function finish(

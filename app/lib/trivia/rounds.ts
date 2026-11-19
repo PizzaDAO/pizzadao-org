@@ -22,6 +22,9 @@ import { addQuestionReactions, resolveChoiceLabels } from "./reactions";
 import { pickQuestion } from "./schedule";
 import type { TriviaQuestion } from "./schema";
 
+/** Advisory-lock namespace for one member's attempts in a round (first key of the two-key lock; see jobs.ts and give-vouch.ts for the others). */
+export const TRIVIA_ATTEMPT_LOCK_NAMESPACE = 742019343;
+
 export interface PostDeps {
   post(channelId: string, body: DiscordMessageBody): Promise<{ id: string | null }>;
   /** Choice labels for a multiple-choice round (turtles or the fallback). Absent: the regional indicators. */
@@ -220,7 +223,7 @@ async function claimInTx(input: ClaimInput): Promise<ClaimResult> {
     async (tx) => {
       // One member's attempts in a round are serialised (a typed answer and a reaction at the same moment must not
       // both pass the attempt cap): the lock is held to the end of this transaction.
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`trivia-attempt:${round.id}:${discordId}`}))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${TRIVIA_ATTEMPT_LOCK_NAMESPACE}::int, hashtext(${`${round.id}:${discordId}`}))`;
       const dup = await tx.triviaAttempt.findUnique({ where: { messageId }, select: { correct: true, roundId: true } });
       if (dup) {
         const r = await tx.triviaRound.findUnique({ where: { id: dup.roundId }, select: { winnerMessageId: true } });

@@ -181,14 +181,49 @@ describe("processReaction: hiding the picks", () => {
     }
   });
 
-  it("the removal is queued before the claim can fail, so a database error still hides the pick", async () => {
+  it("the removal starts before the duplicate check, the eligibility lookups and the claim, so every pick disappears at the same point", async () => {
+    const order: string[] = [];
+    removeReaction.mockImplementation(async () => void order.push("remove"));
+    vi.mocked(claimWin).mockImplementation(async () => (order.push("claim"), { kind: "wrong" as const }));
+    const d = deps({
+      findAttempt: vi.fn(async () => (order.push("findAttempt"), null)),
+      isMember: vi.fn(async () => (order.push("isMember"), true)),
+    });
+    await processReaction(input(turtle(rightIdx)), d);
+    expect(order.indexOf("remove")).toBe(0);
+    expect(order).toEqual(["remove", "findAttempt", "isMember", "claim"]);
+    // a wrong pick (no membership lookup) is removed at the same point
+    order.length = 0;
+    await processReaction(input(turtle((rightIdx + 1) % 4)), d);
+    expect(order[0]).toBe("remove");
+  });
+
+  it("a slow Sheets lookup for a correct pick does not delay its removal (it is already running)", async () => {
+    let releaseMember: () => void = () => {};
+    const gate = new Promise<void>((r) => (releaseMember = r));
+    let removedAt = "";
+    removeReaction.mockImplementation(async () => void (removedAt = "removed"));
+    vi.mocked(claimWin).mockResolvedValue({ kind: "wrong" });
+    const p = processReaction(input(turtle(rightIdx)), deps({ isMember: vi.fn(async () => (await gate, true)) }));
+    await new Promise((r) => setTimeout(r, 5));
+    expect(removedAt).toBe("removed"); // gone while the membership read is still pending
+    releaseMember();
+    await p;
+  });
+
+  it("the removal is awaited before the request ends, and a database error still hides the pick", async () => {
+    let done = false;
+    removeReaction.mockImplementation(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+      done = true;
+    });
     vi.mocked(claimWin).mockRejectedValue(new Error("db"));
     await expect(processReaction(input(turtle(0)), deps())).rejects.toThrow("db");
-    await flush();
+    expect(done).toBe(true);
     expect(removeReaction).toHaveBeenCalledTimes(1);
   });
 
-  it("a removal that fails does not change the outcome (the real remover never throws; a rejecting one is caught by the route)", async () => {
+  it("a removal that fails does not change the outcome (the real remover never throws; a rejecting one is swallowed here)", async () => {
     removeReaction.mockRejectedValue(new Error("Missing Permissions"));
     const out = await processReaction(input(turtle(1)), deps());
     expect(out).toEqual({ status: "wrong" });

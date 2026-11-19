@@ -136,6 +136,9 @@ export class TriviaForwarder {
   private open = false
   private recent: { at: number; body: AnyForwardBody }[] = []
   private questionMessageId: string | null = null
+  private fetchState: (() => Promise<boolean | TriviaRoundState | null>) | null = null
+  private pollInFlight = false
+  private lastPollSoon = 0
   private lastRefusedLog = 0
   private refusedSince = 0
 
@@ -146,21 +149,23 @@ export class TriviaForwarder {
 
   /** A round opened or closed (from the state poll). On opening, the last few seconds of short messages are sent too. */
   setOpen(open: boolean, now: number = Date.now(), messageId: string | null = null): void {
-    const was = this.open
     this.open = open
+    // Always follow the app's latest question post: a new round can open between two polls while the last answer was
+    // still open, and its picks must not be dropped as "another message".
     this.questionMessageId = open ? messageId : null
-    if (open && !was) {
-      const keep = this.recent.filter((r) => now - r.at <= PRE_OPEN_BUFFER_MS)
-      this.recent = []
-      // A reaction buffered before the round opened is sent only if it was on the question post (when we know it).
-      for (const r of keep) if (this.wantsBody(r.body)) this.enqueueBody(r.body)
-    } else if (!open) {
-      this.recent = this.recent.filter((r) => now - r.at <= PRE_OPEN_BUFFER_MS)
+    const fresh = this.recent.filter((r) => now - r.at <= PRE_OPEN_BUFFER_MS)
+    if (!open) {
+      this.recent = fresh
+      return
     }
+    // Send what was waiting for a round (or for the new question post) that now matches; keep the rest until it ages out.
+    this.recent = fresh.filter((r) => !this.wantsBody(r.body))
+    for (const r of fresh) if (this.wantsBody(r.body)) this.enqueueBody(r.body)
   }
 
   /** Poll the app once and apply the answer. Never throws; a failed poll leaves the last state in force. */
   async refreshState(fetchState: () => Promise<boolean | TriviaRoundState | null>): Promise<void> {
+    this.fetchState = fetchState
     try {
       if (!this.deps.config().enabled) return this.setOpen(false)
       const state = await fetchState()
@@ -206,8 +211,27 @@ export class TriviaForwarder {
     }
   }
 
+  /** Poll the app right away (at most one in flight, at most one per second) instead of waiting for the next tick. */
+  private pollSoon(now: number = Date.now()): void {
+    if (!this.fetchState || this.pollInFlight || now - this.lastPollSoon < 1000) return
+    this.lastPollSoon = now
+    this.pollInFlight = true
+    void this.refreshState(this.fetchState).finally(() => {
+      this.pollInFlight = false
+    })
+  }
+
   /** Forward now when a round is open, else keep it for a few seconds in case one opens. */
   private accept(body: AnyForwardBody): void {
+    // A reaction on a message that is not the question post we know, while a round is open: the app may have opened a
+    // new round since the last poll. Keep it, ask the app now, and it is sent (or aged out) when the answer arrives.
+    if (this.open && 'kind' in body && this.questionMessageId && body.messageId !== this.questionMessageId) {
+      const now = Date.now()
+      this.recent = this.recent.filter((r) => now - r.at <= PRE_OPEN_BUFFER_MS).slice(-50)
+      this.recent.push({ at: now, body })
+      this.pollSoon(now)
+      return
+    }
     if (!this.open) {
       const now = Date.now()
       this.recent = this.recent.filter((r) => now - r.at <= PRE_OPEN_BUFFER_MS).slice(-50)
