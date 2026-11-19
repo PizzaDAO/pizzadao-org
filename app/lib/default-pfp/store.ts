@@ -86,6 +86,18 @@ export function prismaStore(): JobDeps['store'] {
       return res.count > 0
     },
 
+    async obsoleteAssignments() {
+      const rows = await prisma.$queryRaw<Array<{ memberId: string; candidateId: string }>>(Prisma.sql`
+        SELECT a."memberId", a."candidateId" FROM "DefaultPfpAssignment" a
+        WHERE EXISTS (SELECT 1 FROM "MemberPfp" p WHERE p."memberId" = a."memberId" AND p."composedUrl" <> '')
+           OR EXISTS (SELECT 1 FROM "Member" m WHERE m."id" = a."memberId" AND m."mergedInto" IS NOT NULL)`)
+      return rows
+    },
+
+    async allAssignments() {
+      return prisma.defaultPfpAssignment.findMany({ select: { memberId: true, candidateId: true } })
+    },
+
     async unassignedCandidates() {
       const rows = await prisma.imageReviewCandidate.findMany({
         where: { set: { slug: DOUGH_BALL_SET_SLUG }, defaultPfpAssignment: null },
@@ -184,7 +196,7 @@ export async function openAiGenerate(prompt: string, models: string[], opts: { f
         method: 'POST',
         headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ model, prompt, size: '1024x1024', output_format: 'png', quality: 'medium', n: 1 }),
-        signal: AbortSignal.timeout(opts.timeoutMs ?? 120_000),
+        signal: AbortSignal.timeout(opts.timeoutMs ?? 90_000),
       })
     } catch {
       throw new GenerationBilled('image request timed out') // it may still be billed
@@ -208,13 +220,13 @@ export async function openAiGenerate(prompt: string, models: string[], opts: { f
 /** Run the job for real. */
 export async function runDefaultPfpAssignment(opts: { budgetMs?: number } = {}): Promise<JobResult> {
   const settings = await loadJobSettings()
-  if (!settings.enabled) return { skipped: 'disabled', reassigned: 0, assignedFromPool: 0, generated: 0, assignedGenerated: 0, generateFailed: 0, stillNeedy: 0 }
+  if (!settings.enabled) return { skipped: 'disabled', reassigned: 0, released: 0, assignedFromPool: 0, generated: 0, assignedGenerated: 0, generateFailed: 0, stillNeedy: 0 }
   const models = await loadImageModels()
   const deps: JobDeps = {
     settings,
     now: () => new Date(),
     rnd: Math.random,
-    deadlineMs: Date.now() + (opts.budgetMs ?? 200_000),
+    deadlineMs: Date.now() + (opts.budgetMs ?? 170_000),
     store: prismaStore(),
     hasStaticPfp,
     generateImage: (prompt) => openAiGenerate(prompt, models),

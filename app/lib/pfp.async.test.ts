@@ -65,6 +65,17 @@ describe("resolvePfpUrlsAsync", () => {
 });
 
 describe("assigned dough ball", () => {
+  it("skips a voted-down dough ball", async () => {
+    findMany.mockResolvedValue([]);
+    assignFindMany.mockResolvedValue([
+      { memberId: "3", candidate: { imageUrl: "https://blob/bad.png", votes: [{ vote: "NO" }, { vote: "NO" }, { vote: "YES" }] } },
+      { memberId: "4", candidate: { imageUrl: "https://blob/ok.png", votes: [{ vote: "YES" }, { vote: "NO" }] } },
+    ]);
+    const out = await resolvePfpUrlsAsync(["3", "4"]);
+    expect(out["3"]).toBe("/pfp/default.png");
+    expect(out["4"]).toBe("https://blob/ok.png");
+  });
+
   it("order: composed, static art, assigned dough ball, shared default", async () => {
     existing.add("2.jpg");
     findMany.mockResolvedValue([{ memberId: "1", composedUrl: "https://c" }]);

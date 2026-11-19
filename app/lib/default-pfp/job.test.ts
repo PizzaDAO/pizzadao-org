@@ -15,7 +15,7 @@ const SETTINGS: JobSettings = {
 type Cand = { id: string; yes: number; no: number; traits: unknown }
 
 /** In-memory store with the same uniqueness semantics as the database (one member per image and vice versa). */
-function fakeStore(init: { cands?: Cand[]; needy?: NeedyMember[]; assigned?: Array<[string, string]>; active?: string[]; usage?: { last24h: number; monthSpentCents: number } }) {
+function fakeStore(init: { cands?: Cand[]; needy?: NeedyMember[]; assigned?: Array<[string, string]>; active?: string[]; obsolete?: string[]; usage?: { last24h: number; monthSpentCents: number } }) {
   const cands = new Map((init.cands ?? []).map((c) => [c.id, c]))
   const byMember = new Map<string, string>(init.assigned ?? [])
   const byImage = new Map<string, string>([...byMember].map(([m, c]) => [c, m]))
@@ -35,6 +35,12 @@ function fakeStore(init: { cands?: Cand[]; needy?: NeedyMember[]; assigned?: Arr
       byMember.delete(memberId)
       byImage.delete(candidateId)
       return true
+    },
+    async obsoleteAssignments() {
+      return [...byMember].filter(([m]) => (init.obsolete ?? []).includes(m)).map(([memberId, candidateId]) => ({ memberId, candidateId }))
+    },
+    async allAssignments() {
+      return [...byMember].map(([memberId, candidateId]) => ({ memberId, candidateId }))
     },
     async unassignedCandidates() {
       return [...cands.values()].filter((c) => !byImage.has(c.id))
@@ -235,6 +241,35 @@ describe('runDefaultPfpJob', () => {
     const store = fakeStore({ cands: [approved('c1')], needy: members(2) })
     await runDefaultPfpJob(deps(store, { hasStaticPfp: (id) => id === 'm0' }), 'BASE')
     expect([...store._byMember.keys()]).toEqual(['m1'])
+  })
+
+  it('keeps the booked cost when upload or the database fails after the image was generated', async () => {
+    const up = fakeStore({ needy: members(1) })
+    const r1 = await runDefaultPfpJob(deps(up, { uploadImage: vi.fn(async () => { throw new Error('blob down') }) }), 'BASE')
+    expect(r1.generateFailed).toBe(1)
+    expect(up._finished[0]).toMatchObject({ status: 'error', patch: {} })
+    const db = fakeStore({ needy: members(1) })
+    vi.spyOn(db, 'createCandidate').mockRejectedValue(new Error('db down'))
+    await runDefaultPfpJob(deps(db), 'BASE')
+    expect(db._finished[0]).toMatchObject({ status: 'error', patch: {} })
+    // a failure before any image exists is free
+    const none = fakeStore({ needy: members(1) })
+    await runDefaultPfpJob(deps(none, { generateImage: vi.fn(async () => { throw new Error('http 500') }) }), 'BASE')
+    expect(none._finished[0]).toMatchObject({ status: 'error', patch: { costCents: 0 } })
+  })
+
+  it('frees the dough ball of a member who now has composed art, static art or was merged', async () => {
+    const store = fakeStore({
+      cands: [approved('a'), approved('b'), approved('c')],
+      assigned: [['m0', 'a'], ['m1', 'b'], ['m2', 'c']],
+      obsolete: ['m0'],
+    })
+    const d = deps(store, { hasStaticPfp: (id) => id === 'm1' })
+    const r = await runDefaultPfpJob(d, 'BASE')
+    expect(r.released).toBe(2)
+    expect([...store._byMember.keys()]).toEqual(['m2'])
+    expect(d.invalidate).toHaveBeenCalledWith('m0')
+    expect(d.invalidate).toHaveBeenCalledWith('m1')
   })
 
   it('reassigns a member whose image was voted down, and never gives that image out again', async () => {

@@ -81,10 +81,24 @@ export async function resolvePfpUrlsAsync(
       try {
         const assigned = await prisma.defaultPfpAssignment.findMany({
           where: { memberId: { in: needy } },
-          select: { memberId: true, candidate: { select: { imageUrl: true } } },
+          select: { memberId: true, candidate: { select: { imageUrl: true, votes: { select: { vote: true } } } } },
         });
+        let margin = 1;
+        try {
+          const { getSetting } = await import("@/app/lib/settings");
+          margin = Math.max(1, Number(await getSetting("defaultPfp.votedDownMargin")) || 1);
+        } catch {
+          // default margin
+        }
         const needySet = new Set(needy);
-        for (const a of assigned) if (needySet.has(a.memberId) && a.candidate?.imageUrl) base[a.memberId] = a.candidate.imageUrl;
+        for (const a of assigned) {
+          if (!needySet.has(a.memberId) || !a.candidate?.imageUrl) continue;
+          // A voted-down image disappears at once (the job then gives the member another).
+          const votes = a.candidate.votes ?? [];
+          const yes = votes.filter((v) => v.vote === "YES").length;
+          if (votes.length - yes - yes >= margin) continue;
+          base[a.memberId] = a.candidate.imageUrl;
+        }
       } catch {
         // table missing or database hiccup: the shared default stands
       }

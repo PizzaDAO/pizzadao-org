@@ -45,6 +45,10 @@ export interface JobDeps {
     /** Current assignments whose image is voted down by `rules`. */
     votedDownAssignments(rules: VoteRules): Promise<Array<{ memberId: string; candidateId: string }>>
     unassign(memberId: string, candidateId: string): Promise<boolean>
+    /** Assignments whose member now has a composed PFP or was merged into another member. */
+    obsoleteAssignments(): Promise<Array<{ memberId: string; candidateId: string }>>
+    /** Every assignment (the job drops those whose member now has static art). */
+    allAssignments(): Promise<Array<{ memberId: string; candidateId: string }>>
     /** Images in the dough-ball set with no assignment, with their vote tallies. */
     unassignedCandidates(): Promise<PoolCandidate[]>
     /** Non-merged members with no composed PFP and no assignment. Static art is filtered by the job. */
@@ -72,6 +76,7 @@ export interface JobDeps {
 export interface JobResult {
   skipped?: 'disabled'
   reassigned: number
+  released: number
   assignedFromPool: number
   generated: number
   assignedGenerated: number
@@ -92,9 +97,20 @@ const MAX_CONSECUTIVE_FAILURES = 3
 
 export async function runDefaultPfpJob(deps: JobDeps, baseDescription: string): Promise<JobResult> {
   const { settings, store } = deps
-  const result: JobResult = { reassigned: 0, assignedFromPool: 0, generated: 0, assignedGenerated: 0, generateFailed: 0, stillNeedy: 0 }
+  const result: JobResult = { reassigned: 0, released: 0, assignedFromPool: 0, generated: 0, assignedGenerated: 0, generateFailed: 0, stillNeedy: 0 }
   if (!settings.enabled) return { ...result, skipped: 'disabled' }
   const now = deps.now()
+
+  // 0. Members who got a picture of their own (or were merged away) give their dough ball back to the pool.
+  const release = new Map<string, string>()
+  for (const a of await store.obsoleteAssignments()) release.set(a.memberId, a.candidateId)
+  for (const a of await store.allAssignments()) if (deps.hasStaticPfp(a.memberId)) release.set(a.memberId, a.candidateId)
+  for (const [memberId, candidateId] of release) {
+    if (await store.unassign(memberId, candidateId)) {
+      result.released++
+      deps.invalidate(memberId)
+    }
+  }
 
   // 1. Members whose image was voted down lose it (and are handled like anyone else below).
   for (const a of await store.votedDownAssignments(settings.rules)) {
@@ -149,10 +165,12 @@ export async function runDefaultPfpJob(deps: JobDeps, baseDescription: string): 
           budget = 0 // a cap was reached since the check above (another run)
           return
         }
+        let imageMade = false
         try {
           const traits = pickAutoTraits(approved, deps.rnd)
           const prompt = buildAutoPrompt(baseDescription, traits)
           const png = await deps.generateImage(prompt)
+          imageMade = true // from here on the call was billed, whatever else fails
           const imageUrl = await deps.uploadImage(png)
           const cand = await store.createCandidate({ imageUrl, prompt, traits })
           await store.finishGeneration(id, 'ok', { candidateId: cand.id })
@@ -166,7 +184,7 @@ export async function runDefaultPfpJob(deps: JobDeps, baseDescription: string): 
           consecutiveFailures++
           result.generateFailed++
           if (e instanceof GenerationRefused) await store.finishGeneration(id, 'refused', { costCents: 0 }).catch(() => undefined)
-          else if (e instanceof GenerationBilled) await store.finishGeneration(id, 'error', {}).catch(() => undefined)
+          else if (imageMade || e instanceof GenerationBilled) await store.finishGeneration(id, 'error', {}).catch(() => undefined)
           else await store.finishGeneration(id, 'error', { costCents: 0 }).catch(() => undefined)
         }
       }
