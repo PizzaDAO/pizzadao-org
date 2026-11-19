@@ -8,7 +8,7 @@ import { resolveTriviaChannel, triviaSettings } from "./channel";
 import { getLeaderboard } from "./leaderboard";
 import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
 import { getQuestion } from "./bank";
-import { accountOldEnough } from "./answer";
+import { accountOldEnough } from "./config";
 import { latestAskedRound, recordReport } from "./reports";
 import { cancelOpenRound, defaultPostDeps, expireRounds, openDiscordRound, type PostDeps } from "./rounds";
 
@@ -44,6 +44,6 @@ export async function reportLatestQuestion(discordId: string, reason: string | u
   if (!round || !q) return { status: "none" };
   const now = new Date();
   if (!accountOldEnough(discordId, now) || !(await fetchMemberIdByDiscordId(discordId))) return { status: "not_member" };
-  const out = await recordReport({ questionId: q.id, discordId, text: reason ? `/trivia report: ${reason}` : "reported with /trivia report", now });
+  const out = await recordReport({ questionId: q.id, discordId, text: reason ? `/trivia report: ${reason}` : "reported with /trivia report", now, eligible: true });
   return { status: out.status === "duplicate" ? "duplicate" : "reported", question: q.question } as ReportLatestResult;
 }

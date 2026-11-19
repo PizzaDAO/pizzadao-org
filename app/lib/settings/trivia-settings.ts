@@ -74,10 +74,10 @@ const disabledQuestionIds: SettingDef<string[]> = {
   area: 'trivia',
   label: 'Pulled trivia questions',
   help: 'Question ids (like pd-004) that are never asked, in Discord or on the web. Added by the one-click disable on /admin/trivia, and automatically when 3 different members report a question within 7 days. Remove an id to bring the question back.',
-  schema: z.array(z.string().regex(/^[a-z]{2,4}-\d{3}$/, 'Not a question id like pd-004')).max(200),
+  schema: z.array(z.string().regex(/^[a-z]{2,4}-\d{3}$/, 'Not a question id like pd-004')).max(1000),
   default: [],
   onReadFailure: 'lastKnownGood',
-  input: { type: 'stringList', maxItems: 200, maxLength: 12 },
+  input: { type: 'stringList', maxItems: 1000, maxLength: 12 },
 }
 
 export const TRIVIA_SETTINGS = {

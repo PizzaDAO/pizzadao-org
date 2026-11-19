@@ -90,3 +90,9 @@ export const OUT_OF_TRIES_REACTION = "\u{1F512}";
 export const FLAG_REACTION = "\u{1F6A9}";
 /** 👀: the bot's acknowledgement on a reply that was recorded as a report. */
 export const ACK_REACTION = "\u{1F440}";
+
+/** Account age rule: the snowflake carries the creation date; the account must be at least MIN_ACCOUNT_AGE_DAYS old. */
+export function accountOldEnough(discordId: string, now: Date): boolean {
+  const created = snowflakeMs(discordId);
+  return Number.isFinite(created) && now.getTime() - created >= MIN_ACCOUNT_AGE_DAYS * 24 * 60 * 60 * 1000;
+}

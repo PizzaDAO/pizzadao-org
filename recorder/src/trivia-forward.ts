@@ -18,6 +18,14 @@
 export const MAX_FORWARD_CHARS = 80
 /** A reply to a question post may be a longer "this question is bad" note: forwarded up to this length (the app decides). */
 export const MAX_REPLY_CHARS = 300
+/**
+ * Words that make a reply to a question post a likely "this question is bad" report. A copy of REPORT_WORDS in the app
+ * (app/lib/trivia/reports.ts): app/lib/trivia/report-words.parity.test.ts fails if the two drift apart.
+ */
+export const REPORT_WORDS = ['bad', 'wrong', 'broken', 'report', 'flag', 'incorrect', 'outdated'] as const
+const REPORT_WORD_RE = new RegExp(`\\b(?:${REPORT_WORDS.join('|')})\\b`, 'i')
+/** True when the text contains a report word (whole word, any case). */
+export const hasReportWord = (text: string): boolean => REPORT_WORD_RE.test(text)
 /** The flag reaction a member uses to report a question (the bot pre-adds the same one). */
 export const FLAG_EMOJI = '\u{1F6A9}'
 /** Messages waiting per channel; beyond this (the app is down and the channel is busy) new ones are dropped. */
@@ -202,9 +210,12 @@ export class TriviaForwarder {
         this.deps.log('trivia-forward: a message in the trivia channel arrived with empty content (is MessageContent enabled?)')
       }
       const replyTo = m.reference?.messageId ?? undefined
-      // A reply to a question post of the last 7 days may be a report ("this one is bad"): forwarded whether or not a
-      // round is open, and a little longer than an answer. The app decides whether it is a report or a guess.
-      const toQuestion = !!replyTo && this.recentPosts.has(replyTo)
+      // A reply to a question post of the last 7 days may be a report ("this one is bad"): a little longer than an answer.
+      // The app decides whether it is a report or a guess.
+      // Outside an open round only a reply that contains a report word is forwarded straight away (ordinary replies
+      // are ordinary chat there and follow the normal gating); during an open round every reply to a question post is
+      // forwarded, as before (it may be a guess).
+      const toQuestion = !!replyTo && this.recentPosts.has(replyTo) && (this.open || hasReportWord(m.content))
       if (!isCandidate(m, cfg, this.deps.guildId, toQuestion ? MAX_REPLY_CHARS : MAX_FORWARD_CHARS)) return
       const body: ForwardBody = { channelId: m.channelId, messageId: m.id, authorId: m.author.id, content: m.content.trim(), ...(replyTo ? { replyTo } : {}) }
       if (toQuestion) this.enqueueBody(body)

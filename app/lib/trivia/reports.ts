@@ -8,7 +8,9 @@ import { prisma } from "@/app/lib/db";
 import { Prisma } from "@prisma/client";
 import { clearSettingsCache, loadSettings } from "@/app/lib/settings";
 import { getQuestion } from "./bank";
-import { FLAG_REACTION } from "./config";
+import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
+import { accountOldEnough, FLAG_REACTION, REQUIRE_MEMBER } from "./config";
+import { parseSetting } from "@/app/lib/settings/registry";
 
 export const REPORT_WINDOW_DAYS = 7;
 export const REPORT_PULL_MEMBERS = 3;
@@ -17,7 +19,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const SETTING = "trivia.disabledQuestionIds" as const;
 
 
-const REPORT_WORDS = ["bad", "wrong", "broken", "report", "flag", "incorrect", "outdated"] as const;
+/** The report words. The recorder keeps a copy (recorder/src/trivia-forward.ts); a parity test keeps the two equal. */
+export const REPORT_WORDS = ["bad", "wrong", "broken", "report", "flag", "incorrect", "outdated"] as const;
 const REPORT_WORD_RE = new RegExp(`\\b(?:${REPORT_WORDS.join("|")})\\b`, "i");
 
 /** True when the text contains one of the report words ("this one is bad", "wrong answer", "please flag"). */
@@ -87,43 +90,71 @@ export async function recentQuestionPosts(channelId: string, now: Date = new Dat
 /** Lock namespace for one member's report on one question (first key of the two-key lock). */
 export const REPORT_LOCK_NAMESPACE = 742019344;
 
-export type ReportOutcome = { status: "recorded"; pulled: boolean } | { status: "duplicate" };
+export type ReportOutcome = { status: "recorded"; pulled: boolean; eligible: boolean } | { status: "duplicate" };
+
+/** Report row statuses: open (counts, shown to admins), handled (an admin pulled, restored or dismissed it), ineligible (kept, never counted). */
+export type ReportStatus = "open" | "handled" | "ineligible";
 
 export interface RecordReportInput {
   questionId: string;
   discordId: string;
   text: string;
   now?: Date;
+  /** Already known to be eligible by the caller (it ran the same check). Omit to have it computed here. */
+  eligible?: boolean;
 }
 
 /**
- * Record one report per member per question (a second one is a duplicate, whatever its text), then check the
- * auto-pull. Never an answer attempt: it touches TriviaReport only.
+ * May this member's report count? An onboarded member on a Discord account at least MIN_ACCOUNT_AGE_DAYS old: the same
+ * two rules as winning. Throwaway accounts can still report (the row is kept, as `ineligible`) but never count toward a pull.
+ */
+export async function reporterEligible(discordId: string, now: Date, isMember: (id: string) => Promise<boolean> = async (id) => !!(await fetchMemberIdByDiscordId(id))): Promise<boolean> {
+  if (!accountOldEnough(discordId, now)) return false;
+  if (!REQUIRE_MEMBER) return true;
+  try {
+    return await isMember(discordId);
+  } catch {
+    return false; // fail closed: an unreadable member list never lets a report count
+  }
+}
+
+/**
+ * Record a report (every path: flag, reply, /trivia report, the web form). Eligibility is computed here and stored on the
+ * row (status `open` or `ineligible`), so no path can skip it. One report per member per question per REPORT_WINDOW_DAYS:
+ * a second is a duplicate, unless the earlier one was handled (an admin dismissed, pulled or restored): then the member
+ * can report again. Then the auto-pull is checked. Never an answer attempt: it touches TriviaReport only.
  */
 export async function recordReport(input: RecordReportInput): Promise<ReportOutcome> {
   const now = input.now ?? new Date();
   const text = input.text.replace(/\s+/g, " ").trim().slice(0, 500) || "flagged from Discord";
+  const eligible = input.eligible ?? (await reporterEligible(input.discordId, now));
   const created = await prisma.$transaction(async (tx) => {
     // Serialise this member's reports on this question: two flags at once must not both insert.
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(${REPORT_LOCK_NAMESPACE}::int, hashtext(${`${input.questionId}:${input.discordId}`}))`;
-    const existing = await tx.triviaReport.findFirst({ where: { questionId: input.questionId, discordId: input.discordId }, select: { id: true } });
+    const existing = await tx.triviaReport.findFirst({
+      where: { questionId: input.questionId, discordId: input.discordId, status: { not: "handled" }, createdAt: { gte: new Date(now.getTime() - REPORT_WINDOW_DAYS * DAY_MS) } },
+      select: { id: true },
+    });
     if (existing) return false;
-    await tx.triviaReport.create({ data: { questionId: input.questionId, discordId: input.discordId, text, createdAt: now } });
+    await tx.triviaReport.create({ data: { questionId: input.questionId, discordId: input.discordId, text, status: eligible ? "open" : "ineligible", createdAt: now } });
     return true;
   });
   if (!created) return { status: "duplicate" };
-  return { status: "recorded", pulled: await autoPullIfNeeded(input.questionId, now) };
+  return { status: "recorded", eligible, pulled: eligible ? await autoPullIfNeeded(input.questionId, now) : false };
 }
 
 /**
- * Pull the question when REPORT_PULL_MEMBERS different members reported it within the window. Production only (previews
+ * Pull the question when REPORT_PULL_MEMBERS different members have an OPEN report on it within the window. Only open rows
+ * count: ineligible reporters never do, and reports an admin already handled (dismissed, pulled or restored) never do, so a
+ * restore or a dismiss is not undone by the old reports. A restore also closes whatever is still open, which is the cutoff:
+ * only reports made afterwards count. Production only (previews
  * share the database and must not change its settings). Logged, never public. Returns whether it pulled it now.
  */
 export async function autoPullIfNeeded(questionId: string, now: Date = new Date(), env: Record<string, string | undefined> = process.env): Promise<boolean> {
   if (env.VERCEL_ENV !== "production") return false;
   try {
     const rows = await prisma.triviaReport.findMany({
-      where: { questionId, discordId: { not: null }, createdAt: { gte: new Date(now.getTime() - REPORT_WINDOW_DAYS * DAY_MS) } },
+      where: { questionId, status: "open", discordId: { not: null }, createdAt: { gte: new Date(now.getTime() - REPORT_WINDOW_DAYS * DAY_MS) } },
       select: { discordId: true },
     });
     const members = new Set(rows.map((r) => r.discordId));
@@ -155,6 +186,9 @@ export async function setQuestionDisabled(questionId: string, disabled: boolean,
     const current = Array.isArray(row?.value) ? (row!.value as unknown[]).filter((v): v is string => typeof v === "string") : [];
     if (current.includes(questionId) === disabled) return false;
     const next = disabled ? [...current, questionId] : current.filter((id) => id !== questionId);
+    // The same check the settings page applies, before this custom write: a bad list is never stored.
+    const valid = parseSetting(SETTING, next);
+    if (!valid.ok) throw new Error(`Cannot save the pulled questions: ${valid.error}`);
     await tx.appSetting.upsert({ where: { key: SETTING }, create: { key: SETTING, value: next, updatedBy: actor }, update: { value: next, updatedBy: actor } });
     await tx.appSettingChange.create({
       data: { key: SETTING, oldValue: row ? (row.value as Prisma.InputJsonValue) : Prisma.DbNull, newValue: next, changedBy: actor, note: disabled ? "Question pulled" : "Question restored" },

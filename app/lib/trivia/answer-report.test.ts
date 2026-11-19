@@ -60,7 +60,7 @@ beforeEach(() => {
   deferred = [];
   removeReaction = vi.fn(async () => undefined);
   reactTo = vi.fn(async () => undefined);
-  recordReport = vi.fn(async () => ({ status: "recorded", pulled: false }));
+  recordReport = vi.fn(async () => ({ status: "recorded", pulled: false, eligible: true }));
   rounds = { [QMSG]: closed(tf, 3), [CURRENT]: open(tf) };
   vi.mocked(claimWin).mockReset();
   vi.mocked(findOpenRound).mockReset();
@@ -84,7 +84,7 @@ describe("the flag reaction", () => {
   it("records a report 'flagged from Discord' on a question post, even with no round open, and is never an attempt", async () => {
     const d = deps();
     expect(await processReaction(reactionInput(FLAG), d)).toEqual({ status: "reported", pulled: false });
-    expect(recordReport).toHaveBeenCalledWith({ questionId: tf.id, discordId: USER, text: "flagged from Discord", now: NOW });
+    expect(recordReport).toHaveBeenCalledWith({ questionId: tf.id, discordId: USER, text: "flagged from Discord", now: NOW, eligible: true });
     // never graded, never claimed, never looked up as an attempt, no round lookup
     expect(claimWin).not.toHaveBeenCalled();
     expect(findOpenRound).not.toHaveBeenCalled();
@@ -157,7 +157,7 @@ describe("replies to a question post", () => {
   it("a reply to a past post with a report word is a report with the reply text, and gets a 👀", async () => {
     const d = deps();
     expect(await processAnswer(replyInput("this one is bad", QMSG), d)).toEqual({ status: "reported", pulled: false });
-    expect(recordReport).toHaveBeenCalledWith({ questionId: tf.id, discordId: USER, text: "reply: this one is bad", now: NOW });
+    expect(recordReport).toHaveBeenCalledWith({ questionId: tf.id, discordId: USER, text: "reply: this one is bad", now: NOW, eligible: true });
     await flush();
     expect(reactTo).toHaveBeenCalledWith(CHAN, "830000000000000900", [ACK_REACTION]);
     expect(claimWin).not.toHaveBeenCalled(); // not graded
@@ -237,7 +237,7 @@ describe("replies to a question post", () => {
   });
 
   it("the auto-pull outcome is passed through (nothing is said publicly)", async () => {
-    recordReport.mockResolvedValue({ status: "recorded", pulled: true });
+    recordReport.mockResolvedValue({ status: "recorded", pulled: true, eligible: true });
     const d = deps();
     expect(await processAnswer(replyInput("broken question", QMSG), d)).toEqual({ status: "reported", pulled: true });
     await flush();

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { FORWARD_RETRY_DELAYS_MS, MAX_FORWARD_CHARS, MAX_QUEUED_PER_CHANNEL, PRE_OPEN_BUFFER_MS, REFUSED_LOG_EVERY_MS, fetchTriviaRound, fetchTriviaState, postTriviaAnswer, TriviaForwarder, type ForwardBody, type ForwardResult, type TriviaForwardConfig, type TriviaForwardDeps, type TriviaMessage, type TriviaReaction, type AnyForwardBody, type TriviaRoundState } from './trivia-forward.js'
+import { REPORT_WORDS, hasReportWord, FORWARD_RETRY_DELAYS_MS, MAX_FORWARD_CHARS, MAX_QUEUED_PER_CHANNEL, PRE_OPEN_BUFFER_MS, REFUSED_LOG_EVERY_MS, fetchTriviaRound, fetchTriviaState, postTriviaAnswer, TriviaForwarder, type ForwardBody, type ForwardResult, type TriviaForwardConfig, type TriviaForwardDeps, type TriviaMessage, type TriviaReaction, type AnyForwardBody, type TriviaRoundState } from './trivia-forward.js'
 import { parseRemoteConfig, REMOTE_CONFIG_OFF } from './remote-config.js'
 
 const GUILD = '800000000000000001'
@@ -575,6 +575,38 @@ describe('flags and report replies (any time, on question posts of the last 7 da
     f.onMessage(msg({ id: '900000000000000400', content: long, reference: { messageId: POST_B } }))
     await f.idle()
     expect(bodies).toEqual([{ channelId: CHAN, messageId: '900000000000000400', authorId: '111111111111111111', content: long, replyTo: POST_B }])
+  })
+
+  it('outside an open round only a reply with a report word is forwarded straight away; an ordinary reply is ordinary chat', async () => {
+    const { f, bodies, post } = await ready(false)
+    f.onMessage(msg({ id: '900000000000000410', content: 'lol good one', reference: { messageId: POST_B } }))
+    await f.idle()
+    expect(post).not.toHaveBeenCalled()
+    f.onMessage(msg({ id: '900000000000000411', content: 'This is BROKEN', reference: { messageId: POST_B } }))
+    await f.idle()
+    expect(bodies).toHaveLength(1)
+    expect(bodies[0]).toMatchObject({ content: 'This is BROKEN', replyTo: POST_B })
+  })
+
+  it('a long ordinary reply outside a round is dropped (the 300-character allowance is for report words only)', async () => {
+    const { f, post } = await ready(false)
+    f.onMessage(msg({ content: 'thanks for the question everyone '.repeat(5), reference: { messageId: POST_B } }))
+    await f.idle()
+    expect(post).not.toHaveBeenCalled()
+  })
+
+  it('during an open round every reply to a question post is still forwarded (it may be a guess), report word or not', async () => {
+    const { f, bodies } = await ready(true)
+    f.onMessage(msg({ id: '900000000000000420', content: 'true', reference: { messageId: POST_A } }))
+    f.onMessage(msg({ id: '900000000000000421', content: 'a guess with no flaggy words in it', reference: { messageId: POST_A } }))
+    f.onMessage(msg({ id: '900000000000000422', content: 'this question is bad', reference: { messageId: POST_B } }))
+    await f.idle()
+    expect(bodies.map((b) => (b as { content: string }).content)).toEqual(['true', 'a guess with no flaggy words in it', 'this question is bad'])
+  })
+
+  it('the report word check is whole-word and case-insensitive', () => {
+    for (const w of REPORT_WORDS) expect(hasReportWord(`so ${w.toUpperCase()}.`)).toBe(true)
+    for (const t of ['badger', 'flagship', 'bandwidth', 'reporter', 'wronged']) expect(hasReportWord(t)).toBe(false)
   })
 
   it('a reply to an ordinary message stays under the normal rules: dropped while closed, 80 characters when open', async () => {

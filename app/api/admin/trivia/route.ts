@@ -35,7 +35,12 @@ export async function POST(request: Request) {
         return json({ ok: true, changed, closed });
       }
       case "enable":
-        return json({ ok: true, changed: await setQuestionDisabled(questionId, false, auth.session.discordId) });
+      {
+        // A restore closes whatever is still open: only reports made after it count toward a later auto-pull.
+        const changed = await setQuestionDisabled(questionId, false, auth.session.discordId);
+        const closed = await closeReports(questionId);
+        return json({ ok: true, changed, closed });
+      }
       case "dismiss":
         return json({ ok: true, closed: await closeReports(questionId) });
       default:
