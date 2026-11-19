@@ -204,7 +204,10 @@ export async function POST(request: NextRequest) {
 
     // Re-check missions that look at wallets (background, no-op unless enabled).
     const walletDiscordId = session.discordId;
-    after(() => emitMissionEvent(walletDiscordId, "wallet_connected", { memberId: String(memberId) }).then(() => undefined));
+    // With the signature switch on, a Solana paste does not satisfy the wallet mission, so no re-check.
+    if (chainType === "evm" || !(await toggleEnabled("wallets.requireSignature"))) {
+      after(() => emitMissionEvent(walletDiscordId, "wallet_connected", { memberId: String(memberId) }).then(() => undefined));
+    }
     if (chainType === "evm") {
       releaseSliceClaims(walletDiscordId);
       // New wallet: look for rsv.pizza check-ins made with it (background, no-op unless enabled).

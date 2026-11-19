@@ -23,6 +23,7 @@ import { computeCurrentLevel, paidLevelOf } from '../missions'
 import { getSheetData } from '../sheets/member-repository'
 import { runVerifiers, type MissionRow, type RunReport } from './engine'
 import { loadHoldPolicy } from './policy'
+import { toggleEnabled } from '../settings/toggles'
 import { defaultSources } from './sources'
 import { getVerifier } from './verifiers'
 import type { ReceivedVouchRow, VerifierSources, VerifyCtx, VouchRow } from './types'
@@ -220,12 +221,14 @@ export async function prefetchBatch(
   missions: Array<{ id: number; level: number }> = [],
 ): Promise<BatchData> {
   const members = discordIds.map((d) => memberIds?.get(d)).filter((m): m is string => !!m)
+  // With wallets.requireSignature on, only EVM wallets count (same rule as sources.countWallets).
+  const evmOnly = await toggleEnabled('wallets.requireSignature').catch(() => false)
   const [x, calls, wallets, completions, rewards, vouches, received] = await Promise.all([
     prisma.xAccount.findMany({ where: { discordId: { in: discordIds } }, select: { discordId: true, xUsername: true } }),
     prisma.callAttendance.groupBy({ by: ['discordId', 'crewId'], where: { discordId: { in: discordIds } }, _count: { _all: true } }),
     prisma.memberWallet.findMany({
       where: { OR: [{ discordId: { in: discordIds } }, ...(members.length ? [{ memberId: { in: members } }] : [])] },
-      select: { id: true, discordId: true, memberId: true },
+      select: { id: true, discordId: true, memberId: true, chainType: true },
     }),
     prisma.missionCompletion.findMany({
       where: { discordId: { in: discordIds }, status: 'APPROVED' },
@@ -280,7 +283,7 @@ export async function prefetchBatch(
   for (const d of discordIds) {
     const memberId = memberIds?.get(d)
     // Same rule as sources.countWallets: rows on the discordId or the memberId.
-    data.wallets.set(d, wallets.filter((w) => w.discordId === d || (!!memberId && w.memberId === memberId)).length)
+    data.wallets.set(d, wallets.filter((w) => (!evmOnly || w.chainType === 'evm') && (w.discordId === d || (!!memberId && w.memberId === memberId))).length)
   }
   for (const c of completions) {
     const s = data.approved.get(c.discordId) ?? new Set<number>()

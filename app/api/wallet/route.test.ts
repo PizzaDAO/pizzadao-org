@@ -3,18 +3,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
 const h = vi.hoisted(() => ({
+  emit: ((..._a: unknown[]) => undefined) as (...a: unknown[]) => void,
   required: false as boolean,
   save: (async (..._a: unknown[]) => ({}) as unknown) as (...a: unknown[]) => Promise<unknown>,
   verify: (async (..._a: unknown[]) => ({}) as unknown) as (...a: unknown[]) => Promise<unknown>,
 }))
 
-vi.mock('next/server', async (orig) => ({ ...(await orig<typeof import('next/server')>()), after: () => undefined }))
+vi.mock('next/server', async (orig) => ({ ...(await orig<typeof import('next/server')>()), after: (fn: () => unknown) => { void fn() } }))
 vi.mock('@/app/lib/session', () => ({ getSession: async () => ({ discordId: 'd1' }) }))
 vi.mock('@/app/lib/sheets/member-repository', () => ({ fetchMemberById: async () => ({ discordId: 'd1' }) }))
 vi.mock('@/app/lib/settings/toggles', () => ({ toggleEnabled: async () => h.required }))
 vi.mock('../profile/route', () => ({ writeToSheet: async () => undefined }))
 vi.mock('@/app/lib/events-attended/rsv', () => ({ clearWalletMatches: async () => undefined, refreshRsvEventsIfEnabled: async () => undefined }))
-vi.mock('@/app/lib/mission-verify/events', () => ({ emitMissionEvent: async () => undefined }))
+vi.mock('@/app/lib/mission-verify/events', () => ({ emitMissionEvent: (...a: unknown[]) => { h.emit(...a); return Promise.resolve() } }))
 vi.mock('@/app/lib/slices/claims', () => ({ promoteAwaitingWallet: async () => 0 }))
 vi.mock('@/app/lib/slices/mint-queue', () => ({ processMintQueueSafe: async () => undefined }))
 vi.mock('@/app/lib/wallet-lookup', () => ({
@@ -50,6 +51,7 @@ beforeEach(() => {
   h.required = false
   h.save = vi.fn(async () => ({ id: 1 }))
   h.verify = vi.fn(async () => undefined)
+  h.emit = vi.fn()
 })
 
 describe('POST /api/wallet with wallets.requireSignature', () => {
@@ -94,5 +96,14 @@ describe('POST /api/wallet with wallets.requireSignature', () => {
     const res = await post({ memberId: 'm1', walletAddress: SOL, chainType: 'solana' })
     expect(res.status).toBe(200)
     expect(h.verify).not.toHaveBeenCalled()
+  })
+
+  it('a Solana paste skips the wallet mission re-check when on, and triggers it when off', async () => {
+    h.required = true
+    await post({ memberId: 'm1', walletAddress: SOL, chainType: 'solana' })
+    expect(h.emit).not.toHaveBeenCalled()
+    h.required = false
+    await post({ memberId: 'm1', walletAddress: SOL, chainType: 'solana' })
+    expect(h.emit).toHaveBeenCalledTimes(1)
   })
 })

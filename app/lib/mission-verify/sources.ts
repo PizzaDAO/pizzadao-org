@@ -8,6 +8,7 @@ import { getChannel, getChannelMessage, resolveChannelId } from '../discord-chan
 import { getGuildRoles } from '../discord-interactions/guild-roles'
 import { getCurrentLevel, getPaidLevels } from '../missions'
 import { checkRarePizzaBox } from '../rare-pizza-box'
+import { toggleEnabled } from '../settings/toggles'
 import type { VerifierSources } from './types'
 
 export const defaultSources: VerifierSources = {
@@ -90,8 +91,10 @@ export const defaultSources: VerifierSources = {
   },
 
   async countWallets(discordId, memberId) {
+    // With wallets.requireSignature on, only EVM wallets count (a pasted Solana address does not).
+    const evmOnly = await toggleEnabled('wallets.requireSignature').catch(() => false)
     return prisma.memberWallet.count({
-      where: memberId ? { OR: [{ memberId }, { discordId }] } : { discordId },
+      where: { ...(memberId ? { OR: [{ memberId }, { discordId }] } : { discordId }), ...(evmOnly ? { chainType: 'evm' } : {}) },
     })
   },
 
@@ -161,8 +164,9 @@ export const defaultSources: VerifierSources = {
   rsvPizzaServiceKey: () => process.env.RSV_PIZZA_SERVICE_KEY?.trim() || null,
 
   async getWalletAddresses(discordId, memberId) {
+    const evmOnly = await toggleEnabled('wallets.requireSignature').catch(() => false)
     const rows = await prisma.memberWallet.findMany({
-      where: memberId ? { OR: [{ memberId }, { discordId }] } : { discordId },
+      where: { ...(memberId ? { OR: [{ memberId }, { discordId }] } : { discordId }), ...(evmOnly ? { chainType: 'evm' } : {}) },
       select: { walletAddress: true },
       orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
       take: 10,

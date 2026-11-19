@@ -4,7 +4,7 @@
 // it can only be redeemed by the member it was issued to, and no database table is needed. Single
 // use is enforced with a set-if-absent key in the shared KV store (cacheLock).
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
-import { createPublicClient, http, type Hex } from "viem";
+import { createPublicClient, http, recoverMessageAddress, type Hex } from "viem";
 import { mainnet, base, polygon, optimism, zora } from "viem/chains";
 import { parseSiweMessage, verifySiweMessage } from "viem/siwe";
 import { cacheLock } from "@/app/api/lib/cache";
@@ -137,9 +137,17 @@ export async function verifyWalletSiwe(input: VerifyWalletSiweInput): Promise<vo
   if (nonceState === "bad") throw new SiweError("bad_nonce");
   if (nonceState === "expired") throw new SiweError("expired");
 
-  const client = (input.getClient ?? defaultClient)(msg.chainId);
+  // EOA fast path: plain signature recovery, no RPC. Only contract wallets (EIP-1271 / 6492) need the
+  // chain; viem's verifySiweMessage asks the RPC first even for EOAs, so it is only the fallback.
   let ok = false;
   try {
+    const signer = await recoverMessageAddress({ message: input.message, signature: input.signature as Hex });
+    ok = signer.toLowerCase() === input.address.toLowerCase();
+  } catch {
+    ok = false;
+  }
+  if (!ok) try {
+    const client = (input.getClient ?? defaultClient)(msg.chainId);
     ok = await verifySiweMessage(client, {
       message: input.message,
       signature: input.signature as Hex,

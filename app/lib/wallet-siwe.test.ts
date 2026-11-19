@@ -7,6 +7,7 @@ import { createSiweMessage } from 'viem/siwe'
 process.env.SESSION_SECRET = 'test-secret'
 
 const used = vi.hoisted(() => new Set<string>())
+const contract = vi.hoisted(() => ({ ok: false }))
 vi.mock('@/app/api/lib/cache', () => ({
   cacheLock: async (key: string) => {
     if (used.has(key)) return null
@@ -27,6 +28,7 @@ vi.mock('viem/siwe', async (orig) => {
     ) => {
       const parsed = actual.parseSiweMessage(p.message)
       if (!actual.validateSiweMessage({ address: p.address, domain: p.domain, message: parsed, nonce: p.nonce, time: p.time })) return false
+      if (contract.ok) return true // a smart wallet the chain says is valid
       const who = await recoverMessageAddress({ message: p.message, signature: p.signature })
       return who.toLowerCase() === parsed.address?.toLowerCase()
     },
@@ -89,7 +91,10 @@ const code = async (p: Promise<unknown>) => {
   }
 }
 
-beforeEach(() => used.clear())
+beforeEach(() => {
+  used.clear()
+  contract.ok = false
+})
 
 describe('wallet nonce', () => {
   it('is alphanumeric and parses as a SIWE nonce', () => {
@@ -193,6 +198,31 @@ describe('verifyWalletSiwe', () => {
     const forged = await other.signMessage({ message: m.message })
     await code(verify({ message: m.message, signature: forged }))
     expect(used.size).toBe(0)
+  })
+})
+
+describe('verifyWalletSiwe RPC use', () => {
+  it('verifies an EOA by signature recovery without touching the RPC client', async () => {
+    const getClient = vi.fn(() => ({}) as never)
+    expect(await code(verify(await signed(), { getClient }))).toBe('ok')
+    expect(getClient).not.toHaveBeenCalled()
+  })
+
+  it('falls back to the chain for a contract wallet (signer differs from the address)', async () => {
+    const getClient = vi.fn(() => ({}) as never)
+    const contractWallet = privateKeyToAccount(generatePrivateKey())
+    const owner = privateKeyToAccount(generatePrivateKey())
+    const m = await signed({ address: contractWallet.address }, owner)
+    contract.ok = true
+    expect(await code(verify(m, { address: contractWallet.address, getClient }))).toBe('ok')
+    expect(getClient).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects when neither recovery nor the chain accepts it', async () => {
+    const other = privateKeyToAccount(generatePrivateKey())
+    const m = await signed()
+    const forged = await other.signMessage({ message: m.message })
+    expect(await code(verify({ message: m.message, signature: forged }))).toBe('bad_signature')
   })
 })
 
