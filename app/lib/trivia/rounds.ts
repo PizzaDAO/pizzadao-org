@@ -17,16 +17,24 @@ import { getQuestion, servable } from "./bank";
 import { MAX_WINS_PER_USER_PER_DAY, RECENT_ROUNDS_LOOKBACK, ROUND_MINUTES, STALE_REVEAL_MINUTES } from "./config";
 import { dayStartMs } from "./daily";
 import { cancelledMessage, explanationMessage, questionMessage, revealMessage, winnerMessage } from "./post";
+import { buildChoiceLabels, reactionsFor, type ChoiceLabels } from "./emoji";
+import { addQuestionReactions, resolveChoiceLabels } from "./reactions";
 import { pickQuestion } from "./schedule";
 import type { TriviaQuestion } from "./schema";
 
 export interface PostDeps {
   post(channelId: string, body: DiscordMessageBody): Promise<{ id: string | null }>;
+  /** Choice labels for a multiple-choice round (turtles or the fallback). Absent: the regional indicators. */
+  labels?(count: number): Promise<ChoiceLabels>;
+  /** Pre-add the bot's reactions to the question post, in order. Must not throw. Absent: none are added. */
+  addReactions?(channelId: string, messageId: string, reactions: string[]): Promise<void>;
 }
 
-/** Posts as the PizzaDAO bot (the same token the other cron posts use). */
+/** Posts as the PizzaDAO bot (the same token the other cron posts use), and pre-adds the answer reactions. */
 export const defaultPostDeps: PostDeps = {
   post: (channelId, body) => postDiscordMessage({ kind: "bot", channelId, botToken: process.env.DISCORD_BOT_TOKEN?.trim() ?? "" }, body),
+  labels: resolveChoiceLabels,
+  addReactions: addQuestionReactions,
 };
 
 type RoundRow = { id: number; questionId: string; channelId: string | null; messageId: string | null; rewardPep: number; openedAt: Date; closesAt: Date };
@@ -132,9 +140,24 @@ export async function openDiscordRound(opts: OpenOptions, deps: PostDeps = defau
     throw e;
   }
 
+  let labels: ChoiceLabels | undefined;
   try {
-    const posted = await deps.post(opts.channelId, questionMessage(q, opts.rewardPep));
+    if (q.type === "multiple_choice") labels = (await deps.labels?.(q.choices?.length ?? 0)) ?? buildChoiceLabels(q.choices?.length ?? 0, null);
+  } catch {
+    labels = buildChoiceLabels(q.choices?.length ?? 0, null);
+  }
+
+  try {
+    const posted = await deps.post(opts.channelId, questionMessage(q, opts.rewardPep, labels));
     if (posted.id) await prisma.triviaRound.update({ where: { id: roundId }, data: { messageId: posted.id } });
+    // The bot's own reactions, in order, so a player answers with one click. A failure never undoes the round.
+    if (posted.id && deps.addReactions) {
+      try {
+        await deps.addReactions(opts.channelId, posted.id, reactionsFor(q, labels ?? buildChoiceLabels(0, null)));
+      } catch (e) {
+        console.error(`[trivia] reactions failed for round ${roundId}: ${e instanceof Error ? e.message.slice(0, 120) : "error"}`);
+      }
+    }
     return { ok: true, roundId, questionId: q.id, messageId: posted.id };
   } catch (e) {
     // Nobody could have seen a question: close the round so the next tick can try again.
@@ -195,6 +218,9 @@ async function claimInTx(input: ClaimInput): Promise<ClaimResult> {
   const { round, discordId, messageId } = input;
   return prisma.$transaction(
     async (tx) => {
+      // One member's attempts in a round are serialised (a typed answer and a reaction at the same moment must not
+      // both pass the attempt cap): the lock is held to the end of this transaction.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`trivia-attempt:${round.id}:${discordId}`}))`;
       const dup = await tx.triviaAttempt.findUnique({ where: { messageId }, select: { correct: true, roundId: true } });
       if (dup) {
         const r = await tx.triviaRound.findUnique({ where: { id: dup.roundId }, select: { winnerMessageId: true } });
@@ -273,11 +299,11 @@ export async function expireRounds(now: Date = new Date(), deps: PostDeps = defa
 /** Post the winner reply and the explanation for a round just won. Failures are logged; the payout stands. */
 export async function announceWin(
   round: { id: number; channelId: string | null; questionId: string },
-  win: { discordId: string; messageId: string; rewardPep: number; paid: boolean },
+  win: { discordId: string; messageId: string; rewardPep: number; paid: boolean; /** The message the winner post replies to (a reaction win replies to the question post). */ replyToId?: string },
   deps: PostDeps = defaultPostDeps,
 ): Promise<void> {
   if (!round.channelId) return;
-  await safePost(deps, round.channelId, winnerMessage(win.discordId, win.rewardPep, win.paid, win.messageId), `winner for round ${round.id}`);
+  await safePost(deps, round.channelId, winnerMessage(win.discordId, win.rewardPep, win.paid, win.replyToId ?? win.messageId), `winner for round ${round.id}`);
   const q = getQuestion(round.questionId);
   if (q) await safePost(deps, round.channelId, explanationMessage(q), `explanation for round ${round.id}`);
 }

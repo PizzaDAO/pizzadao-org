@@ -13,7 +13,7 @@
 //   * attempt caps, the onboarded-member / account-age rules and the 3-wins-a-day cap;
 //   * expiry posts the reveal exactly once, however many ticks race, and pays nothing;
 //   * a dry-run round pays nothing; /trivia skip cancels without paying.
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
+import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from 'vitest'
 import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 
@@ -373,6 +373,184 @@ describe.skipIf(!isLocal)('Discord trivia under concurrency (real Postgres)', ()
       expect(posts.posted.filter((p) => p.content.includes('cancelled'))).toHaveLength(1)
       const u = await seedUser(0)
       expect(await L.answer.processAnswer({ channelId, messageId: snow(), discordId: u, content: correctText(tf) }, deps(() => true))).toEqual({ status: 'no_round' })
+      expect(await rewardRows([u])).toHaveLength(0)
+    }, 60_000)
+  })
+
+  describe('reaction answers', () => {
+    let mcq: any
+    const turtle = (i: number) => ({ id: L.config.CHOICE_EMOJI[i].id, name: L.config.CHOICE_EMOJI[i].name })
+    const removed: Array<{ messageId: string; reaction: string; userId: string }> = []
+    const rdeps = (member: (id: string) => boolean = () => true, posts = fakePosts()) => ({
+      ...posts.deps,
+      now: () => new Date(),
+      isMember: async (id: string) => member(id),
+      findAttempt: L.rounds.findAttemptByMessage,
+      throttled: async () => false,
+      removeReaction: async (_c: string, messageId: string, reaction: string, userId: string) => void removed.push({ messageId, reaction, userId }),
+      defer: (fn: () => Promise<void>) => void pend.push(fn),
+    })
+    let pend: Array<() => Promise<void>> = []
+    const settle = async () => {
+      const fns = pend
+      pend = []
+      for (const f of fns) await f()
+    }
+    const openMc = async (channelId: string, reward = 20, deps: any = fakePosts().deps) => {
+      const r: any = await L.rounds.openDiscordRound({ channelId, rewardPep: reward, question: mcq }, deps)
+      expect(r.ok).toBe(true)
+      const round = await roundOf(r.roundId)
+      return { id: r.roundId as number, round, messageId: round.messageId as string }
+    }
+    const rightIdx = () => mcq.choices.indexOf(mcq.answer)
+    const wrongIdx = () => (rightIdx() + 1) % 4
+
+    beforeEach(() => {
+      pend = []
+      removed.length = 0
+    })
+
+    beforeAll(() => {
+      mcq = L.bank.servable({ pool: 'discord' }).find((q: any) => q.type === 'multiple_choice')
+      expect(mcq).toBeTruthy()
+    })
+
+    it('opening a multiple-choice round posts the turtles and pre-adds the reactions in order after the post', async () => {
+      const channelId = chanId()
+      const seen: Array<{ kind: string; detail: string }> = []
+      const deps = {
+        post: async (_c: string, body: any) => (seen.push({ kind: 'post', detail: body.content }), { id: snow(-5000) }),
+        labels: async (n: number) => L.bank && (await import('./emoji')).buildChoiceLabels(n, new Set(L.config.CHOICE_EMOJI.map((e: any) => e.id))),
+        addReactions: async (_c: string, messageId: string, reactions: string[]) => void seen.push({ kind: 'react', detail: `${messageId}|${reactions.join(',')}` }),
+      }
+      const { id, messageId } = await openMc(channelId, 20, deps)
+      expect(seen.map((x) => x.kind)).toEqual(['post', 'react'])
+      for (let i = 0; i < 4; i++) expect(seen[0].detail).toContain(`<:${L.config.CHOICE_EMOJI[i].name}:${L.config.CHOICE_EMOJI[i].id}> ${mcq.choices[i]}`)
+      expect(seen[1].detail).toBe(`${messageId}|${L.config.CHOICE_EMOJI.map((e: any) => `${e.name}:${e.id}`).join(',')}`)
+      expect((await roundOf(id)).messageId).toBe(messageId)
+    }, 60_000)
+
+    it('true/false pre-adds the check then the cross; a failing reaction call never undoes the round', async () => {
+      const channelId = chanId()
+      const calls: string[][] = []
+      const deps = { post: async () => ({ id: snow(-5000) }), addReactions: async (_c: string, _m: string, r: string[]) => void calls.push(r) }
+      await openRound(channelId, 20, deps as any)
+      expect(calls).toEqual([[L.config.TF_REACTIONS.true, L.config.TF_REACTIONS.false]])
+      const channel2 = chanId()
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+      const bad = { post: async () => ({ id: snow(-5000) }), addReactions: async () => { throw new Error('Missing Access') } }
+      const r: any = await L.rounds.openDiscordRound({ channelId: channel2, rewardPep: 20, question: tf }, bad as any)
+      expect(r.ok).toBe(true)
+      expect((await roundOf(r.roundId)).status).toBe('OPEN')
+    }, 60_000)
+
+    it('a correct reaction wins once, pays once, and the winner post replies to the question', async () => {
+      const channelId = chanId()
+      const posts = fakePosts()
+      const { id, messageId } = await openMc(channelId, 20, posts.deps)
+      const u = await seedUser(0)
+      const out = await L.answer.processReaction({ channelId, messageId, discordId: u, emoji: turtle(rightIdx()) }, rdeps(() => true, posts))
+      expect(out).toEqual({ status: 'won', rewardPep: 20, paid: true })
+      await settle()
+      const after = await roundOf(id)
+      expect(after).toMatchObject({ status: 'WON', winnerDiscordId: u, winnerMessageId: `reaction:${messageId}:${u}` })
+      expect(await wallet(u)).toBe(20)
+      expect(await rewardRows([u])).toHaveLength(1)
+      expect(posts.posted.find((p) => p.content.includes('Correct!'))?.reference).toBe(messageId)
+      await expectLedgerConsistent(u)
+    }, 60_000)
+
+    it("a member's first reaction is their only attempt (a later one, even a different emoji, is a duplicate), and every pick is removed", async () => {
+      const channelId = chanId()
+      const { id, messageId } = await openMc(channelId)
+      const u = await seedUser(0)
+      const d = rdeps()
+      removed.length = 0
+      const first = await L.answer.processReaction({ channelId, messageId, discordId: u, emoji: turtle(wrongIdx()) }, d)
+      expect(first).toEqual({ status: 'wrong' })
+      const second = await L.answer.processReaction({ channelId, messageId, discordId: u, emoji: turtle(rightIdx()) }, d)
+      expect(second).toEqual({ status: 'duplicate' })
+      await settle()
+      expect(await L.prisma.triviaAttempt.count({ where: { roundId: id, discordId: u } })).toBe(1)
+      expect((await roundOf(id)).status).toBe('OPEN')
+      expect(removed.filter((r) => r.userId === u)).toHaveLength(2)
+      expect(removed.every((r) => r.messageId === messageId)).toBe(true)
+    }, 60_000)
+
+    it('a reaction and a typed answer from the same member at the same moment are still one attempt (20 members, both at once)', async () => {
+      const channelId = chanId()
+      const { id, messageId } = await openMc(channelId)
+      const users = await Promise.all(Array.from({ length: N }, () => seedUser(0)))
+      const d = rdeps()
+      // Both wrong, so the round stays open and every member's attempts can be counted.
+      const letter = String.fromCharCode(97 + wrongIdx())
+      await Promise.all(
+        users.flatMap((u) => [
+          L.answer.processReaction({ channelId, messageId, discordId: u, emoji: turtle(wrongIdx()) }, d),
+          L.answer.processAnswer({ channelId, messageId: snow(), discordId: u, content: letter }, d),
+        ]),
+      )
+      for (const u of users) expect(await L.prisma.triviaAttempt.count({ where: { roundId: id, discordId: u } })).toBe(1)
+      expect((await roundOf(id)).status).toBe('OPEN')
+      await settle()
+    }, 120_000)
+
+    it('a reaction and a typed correct answer racing across members still pay exactly once', async () => {
+      const channelId = chanId()
+      const { id, messageId } = await openMc(channelId)
+      const users = await Promise.all(Array.from({ length: N }, () => seedUser(0)))
+      const d = rdeps()
+      const letter = String.fromCharCode(97 + rightIdx())
+      const results = await Promise.all(
+        users.flatMap((u) => [
+          L.answer.processReaction({ channelId, messageId, discordId: u, emoji: turtle(rightIdx()) }, d),
+          L.answer.processAnswer({ channelId, messageId: snow(), discordId: u, content: letter }, d),
+        ]),
+      )
+      expect(results.filter((r: any) => r.status === 'won')).toHaveLength(1)
+      expect(await rewardRows(users)).toHaveLength(1)
+      for (const u of users) expect(await L.prisma.triviaAttempt.count({ where: { roundId: id, discordId: u } })).toBeLessThanOrEqual(1)
+      expect((await roundOf(id)).status).toBe('WON')
+      await settle()
+    }, 120_000)
+
+    it('a reaction on another message, after the round closed, or with an unrelated emoji is not counted and not removed', async () => {
+      const channelId = chanId()
+      const { id, messageId } = await openMc(channelId)
+      const u = await seedUser(0)
+      const d = rdeps()
+      removed.length = 0
+      expect(await L.answer.processReaction({ channelId, messageId: snow(-9000), discordId: u, emoji: turtle(0) }, d)).toEqual({ status: 'ignored', why: 'not_current_message' })
+      expect(await L.answer.processReaction({ channelId, messageId, discordId: u, emoji: { id: null, name: '\u{1F355}' } }, d)).toEqual({ status: 'ignored', why: 'not_a_choice' })
+      await L.prisma.triviaRound.update({ where: { id }, data: { status: 'EXPIRED' } })
+      expect(await L.answer.processReaction({ channelId, messageId, discordId: u, emoji: turtle(rightIdx()) }, d)).toEqual({ status: 'no_round' })
+      await settle()
+      expect(await L.prisma.triviaAttempt.count({ where: { roundId: id } })).toBe(0)
+      expect(removed).toHaveLength(0)
+    }, 60_000)
+
+    it('non-members and young accounts: the reaction is stored as correct, wins nothing, says nothing, and is removed', async () => {
+      const channelId = chanId()
+      const posts = fakePosts()
+      const { id, messageId } = await openMc(channelId, 20, posts.deps)
+      const outsider = await seedUser(0)
+      const d = rdeps((who) => who !== outsider, posts)
+      removed.length = 0
+      const before = posts.posted.length
+      expect(await L.answer.processReaction({ channelId, messageId, discordId: outsider, emoji: turtle(rightIdx()) }, d)).toEqual({ status: 'not_won', why: 'not_member' })
+      await settle()
+      expect(posts.posted.length).toBe(before)
+      expect((await roundOf(id)).status).toBe('OPEN')
+      expect(await L.prisma.triviaAttempt.count({ where: { roundId: id, correct: true } })).toBe(1)
+      expect(removed).toHaveLength(1)
+    }, 60_000)
+
+    it('a dry-run reaction win pays nothing', async () => {
+      const channelId = chanId()
+      const { id, messageId } = await openMc(channelId, 0)
+      const u = await seedUser(0)
+      expect(await L.answer.processReaction({ channelId, messageId, discordId: u, emoji: turtle(rightIdx()) }, rdeps())).toEqual({ status: 'won', rewardPep: 0, paid: false })
+      expect((await roundOf(id)).status).toBe('WON')
       expect(await rewardRows([u])).toHaveLength(0)
     }, 60_000)
   })

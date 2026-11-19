@@ -38,12 +38,30 @@ export interface TriviaForwardConfig {
 }
 
 export type ForwardBody = { channelId: string; messageId: string; authorId: string; content: string }
+/** A reaction on the question post (kind "reaction"): `messageId` is the message that was reacted to. */
+export type ReactionBody = { kind: 'reaction'; channelId: string; messageId: string; authorId: string; emoji: { id: string | null; name: string | null } }
+export type AnyForwardBody = ForwardBody | ReactionBody
+
+/** The slice of a discord.js reaction event this needs (structural). `emoji.id` is null for a unicode emoji. */
+export interface TriviaReaction {
+  messageId: string
+  channelId: string
+  guildId: string | null
+  emoji: { id: string | null; name: string | null }
+  user: { id: string; bot: boolean }
+}
+
+/** The state the app reports: is a round open, and which message is its question post. */
+export interface TriviaRoundState {
+  open: boolean
+  messageId: string | null
+}
 /** ok: delivered; retry: try again; drop: this message is refused for good (bad body); refused: the app rejected the key or route (401/403/404): drop it, never retry. */
 export type ForwardResult = 'ok' | 'retry' | 'drop' | 'refused'
 
 export interface TriviaForwardDeps {
   config(): TriviaForwardConfig
-  post(body: ForwardBody): Promise<ForwardResult>
+  post(body: AnyForwardBody): Promise<ForwardResult>
   sleep(ms: number): Promise<void>
   log(line: string): void
   /** Only this guild's messages are forwarded. */
@@ -70,8 +88,23 @@ export async function fetchTriviaState(appBaseUrl: string, apiKey: string, fetch
   }
 }
 
+/** Like fetchTriviaState, with the question post's message id (reactions are forwarded for that message only). */
+export async function fetchTriviaRound(appBaseUrl: string, apiKey: string, fetchImpl: typeof fetch = fetch): Promise<TriviaRoundState | null> {
+  try {
+    const res = await fetchImpl(`${appBaseUrl}/api/trivia/discord/state`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(4_000),
+    })
+    if (!res.ok) return null
+    const j = (await res.json().catch(() => null)) as { open?: unknown; messageId?: unknown } | null
+    return { open: j?.open === true, messageId: typeof j?.messageId === 'string' && /^\d{5,25}$/.test(j.messageId) ? j.messageId : null }
+  } catch {
+    return null
+  }
+}
+
 /** POST one answer to the app. Network errors, 5xx, 429 and 408 are retried; 401/403/404 (a key or deploy problem) are refused, not retried, so a bad key cannot cause a retry storm. */
-export async function postTriviaAnswer(appBaseUrl: string, apiKey: string, body: ForwardBody, fetchImpl: typeof fetch = fetch): Promise<ForwardResult> {
+export async function postTriviaAnswer(appBaseUrl: string, apiKey: string, body: AnyForwardBody, fetchImpl: typeof fetch = fetch): Promise<ForwardResult> {
   try {
     const res = await fetchImpl(`${appBaseUrl}/api/trivia/discord/answer`, {
       method: 'POST',
@@ -101,7 +134,8 @@ export class TriviaForwarder {
   private readonly pending = new Map<string, number>()
   private warnedEmpty = false
   private open = false
-  private recent: { at: number; m: TriviaMessage }[] = []
+  private recent: { at: number; body: AnyForwardBody }[] = []
+  private questionMessageId: string | null = null
   private lastRefusedLog = 0
   private refusedSince = 0
 
@@ -111,24 +145,28 @@ export class TriviaForwarder {
   ) {}
 
   /** A round opened or closed (from the state poll). On opening, the last few seconds of short messages are sent too. */
-  setOpen(open: boolean, now: number = Date.now()): void {
+  setOpen(open: boolean, now: number = Date.now(), messageId: string | null = null): void {
     const was = this.open
     this.open = open
+    this.questionMessageId = open ? messageId : null
     if (open && !was) {
       const keep = this.recent.filter((r) => now - r.at <= PRE_OPEN_BUFFER_MS)
       this.recent = []
-      for (const r of keep) this.enqueue(r.m)
+      // A reaction buffered before the round opened is sent only if it was on the question post (when we know it).
+      for (const r of keep) if (this.wantsBody(r.body)) this.enqueueBody(r.body)
     } else if (!open) {
       this.recent = this.recent.filter((r) => now - r.at <= PRE_OPEN_BUFFER_MS)
     }
   }
 
   /** Poll the app once and apply the answer. Never throws; a failed poll leaves the last state in force. */
-  async refreshState(fetchState: () => Promise<boolean | null>): Promise<void> {
+  async refreshState(fetchState: () => Promise<boolean | TriviaRoundState | null>): Promise<void> {
     try {
       if (!this.deps.config().enabled) return this.setOpen(false)
-      const open = await fetchState()
-      if (open !== null) this.setOpen(open)
+      const state = await fetchState()
+      if (state === null) return
+      if (typeof state === 'boolean') this.setOpen(state)
+      else this.setOpen(state.open, Date.now(), state.messageId)
     } catch (err) {
       this.deps.log(`trivia-forward state poll failed: ${err instanceof Error ? err.message.slice(0, 160) : 'error'}`)
     }
@@ -145,28 +183,54 @@ export class TriviaForwarder {
         this.deps.log('trivia-forward: a message in the trivia channel arrived with empty content (is MessageContent enabled?)')
       }
       if (!isCandidate(m, cfg, this.deps.guildId)) return
-      if (!this.open) {
-        const now = Date.now()
-        this.recent = this.recent.filter((r) => now - r.at <= PRE_OPEN_BUFFER_MS).slice(-50)
-        this.recent.push({ at: now, m })
-        return
-      }
-      this.enqueue(m)
+      this.accept({ channelId: m.channelId, messageId: m.id, authorId: m.author.id, content: m.content.trim() })
     } catch (err) {
       this.deps.log(`trivia-forward failed: ${err instanceof Error ? err.message.slice(0, 160) : 'error'}`)
     }
   }
 
-  private enqueue(m: TriviaMessage): void {
+  /**
+   * A member's reaction on a message in the trivia channel. Forwarded only while a round is open and only when it is on
+   * the question post (once the app has told us which message that is); bots, including our own pre-added reactions,
+   * are dropped. Returns at once; never throws.
+   */
+  onReaction(r: TriviaReaction): void {
     try {
-      const channel = m.channelId
+      const cfg = this.deps.config()
+      if (!cfg.enabled || !cfg.channelIds.includes(r.channelId)) return
+      if (r.guildId !== this.deps.guildId || r.user.bot) return
+      if (!r.emoji.id && !r.emoji.name) return
+      this.accept({ kind: 'reaction', channelId: r.channelId, messageId: r.messageId, authorId: r.user.id, emoji: { id: r.emoji.id, name: r.emoji.name } })
+    } catch (err) {
+      this.deps.log(`trivia-forward failed: ${err instanceof Error ? err.message.slice(0, 160) : 'error'}`)
+    }
+  }
+
+  /** Forward now when a round is open, else keep it for a few seconds in case one opens. */
+  private accept(body: AnyForwardBody): void {
+    if (!this.open) {
+      const now = Date.now()
+      this.recent = this.recent.filter((r) => now - r.at <= PRE_OPEN_BUFFER_MS).slice(-50)
+      this.recent.push({ at: now, body })
+      return
+    }
+    if (this.wantsBody(body)) this.enqueueBody(body)
+  }
+
+  /** Reactions go only to the question post, when it is known. */
+  private wantsBody(body: AnyForwardBody): boolean {
+    return !('kind' in body) || !this.questionMessageId || body.messageId === this.questionMessageId
+  }
+
+  private enqueueBody(body: AnyForwardBody): void {
+    try {
+      const channel = body.channelId
       const queued = this.pending.get(channel) ?? 0
       if (queued >= MAX_QUEUED_PER_CHANNEL) {
-        this.deps.log(`trivia-forward: queue full for channel ${channel}; dropped message ${m.id}`)
+        this.deps.log(`trivia-forward: queue full for channel ${channel}; dropped message ${body.messageId}`)
         return
       }
       this.pending.set(channel, queued + 1)
-      const body: ForwardBody = { channelId: channel, messageId: m.id, authorId: m.author.id, content: m.content.trim() }
       const prev = this.chains.get(channel) ?? Promise.resolve()
       const next = prev
         .then(() => this.deliver(body))
@@ -183,7 +247,7 @@ export class TriviaForwarder {
     await Promise.all([...this.chains.values()])
   }
 
-  private async deliver(body: ForwardBody): Promise<void> {
+  private async deliver(body: AnyForwardBody): Promise<void> {
     let result = await this.deps.post(body)
     for (let i = 0; result === 'retry' && i < this.delays.length; i++) {
       await this.deps.sleep(this.delays[i])
