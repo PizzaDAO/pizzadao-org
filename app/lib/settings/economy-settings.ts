@@ -165,7 +165,7 @@ export const ECONOMY_SETTINGS = {
     key: 'economy.roleIncome',
     area: 'economy',
     label: 'Role income table',
-    help: 'What /collect-income pays each role, and how often. Rows can be removed or made smaller or slower here, judged against the table in force before anything is saved (the ROLE_INCOME_JSON env table if set, else the built-in one); adding a role or paying more needs a code change. Reset restores that table.',
+    help: 'What /collect pays each role, and how often. Rows can be removed or made smaller or slower here, judged against the table in force before anything is saved (the ROLE_INCOME_JSON env table if set, else the built-in one); adding a role or paying more needs a code change. Reset restores that table.',
     schema: roleIncomeSchema,
     default: DEFAULT_ROLE_INCOME.map((r) => ({ ...r })),
     onReadFailure: 'lastKnownGood',

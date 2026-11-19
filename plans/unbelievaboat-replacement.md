@@ -1,6 +1,6 @@
 # Replace UnbelievaBoat with the $PEP economy
 
-**Status:** owner decisions made (2026-10-03, see §0). Part 1 (#134, merged): balance import tooling, `/balance`, `/work`, web crime API. Part 2 (branch `ub-replacement-2`): `/collect-income`, `/pay`, `/leaderboard`, blackjack/roulette/slots, `/shop` + `/buy`, store seed + item-grant scripts, crime and games cards on `/pep`. Everything that changes live behaviour is behind a flag or needs an owner step; nothing is live until the owner runs §4. **2026-10-03 (owner decision): `/rob` and `/peace` were removed entirely** (§7.4), and replies no longer label anything as cash or bank: there is one wallet, shown as $PEP.
+**Status:** owner decisions made (2026-10-03, see §0). Part 1 (#134, merged): balance import tooling, `/balance`, `/work`, web crime API. Part 2 (branch `ub-replacement-2`): `/collect`, `/pay`, `/leaderboard`, blackjack/roulette/slots, `/shop` + `/buy`, store seed + item-grant scripts, crime and games cards on `/pep`. Everything that changes live behaviour is behind a flag or needs an owner step; nothing is live until the owner runs §4. **2026-10-03 (owner decision): `/rob` and `/peace` were removed entirely** (§7.4), and replies no longer label anything as cash or bank: there is one wallet, shown as $PEP.
 **Guild:** PizzaDAO, `812097286003359764`
 
 ## 0. Owner decisions (2026-10-03)
@@ -21,7 +21,7 @@
 2. **No member loses a balance.** Every UB balance (cash + bank) is carried into $PEP once, auditable per user, with a signed snapshot kept for audit.
 3. **Nobody is paid twice.** The import is idempotent: one unique migration key per Discord ID. UB balances are zeroed at cutover.
 4. People who haven't onboarded keep their balance. It is held under their Discord ID and credited on their first login.
-5. The Discord habits people actually use keep working: `/work`, `/collect-income`, `/balance`, `/pay`, `/leaderboard`, the games and the store become **our** slash commands, and crime moves to the web app.
+5. The Discord habits people actually use keep working: `/work`, `/collect`, `/balance`, `/pay`, `/leaderboard`, the games and the store become **our** slash commands, and crime moves to the web app.
 6. Every payout, migrated or new, is a ledger row.
 
 Out of scope: **bounties.** UB has no bounty feature, and PizzaDAO's bounties already live in the Google Sheet behind the app.pizzadao.org task list, so there is nothing to migrate. Historical manual payouts (`/add-money` by staff) exist only in UB's **money audit log channel**. Export or keep that channel as the historical record (see §4, step 8).
@@ -71,7 +71,7 @@ Live configuration, read from the UB dashboard:
 - **/crime:** on. 30s cooldown, pays 2–420, 60% chance of a fine, fine is 5–55% (percent type).
 - **/slut, /rob and games** (blackjack, roulette, slots, russian-roulette, cock-fight, higher-lower) are in the menu, with settings unconfirmed. Owner decision: drop /rob (removed 2026-10-03, §7.4) and /slut, port blackjack/roulette/slots (§7.5).
 - **Chat money:** off (0–0).
-- **Role income (`/collect-income`):** 11 roles, all daily; amounts in the appendix (ported as-is, §7.2).
+- **Role income (`/collect`):** 11 roles, all daily; amounts in the appendix (ported as-is, §7.2).
 - **Store (4 items):**
 
   | Item | Price | Note |
@@ -96,7 +96,7 @@ Live configuration, read from the UB dashboard:
 | `/balance`, `/money` | **Built (#134)** | `/balance [member]`, ephemeral, read-only |
 | `/work` | **Built (#134)** | 30s, 10-100, PizzaDAO prompts, `WORK_REWARD` |
 | `/crime` | **Built, web only, off** | `POST /api/economy/crime` (#134) + **crime card on `/pep`** (this PR). Flag `PEP_CRIME_ENABLED=1` |
-| `/collect-income` | **Built** | §7.2. 11 roles, daily, `ROLE_INCOME` |
+| `/collect` | **Built** | §7.2. 11 roles, daily, `ROLE_INCOME` |
 | `/give-money` | **Built** as `/pay member amount` | Hardened `transfer()` (now deadlock-free, §7.1) |
 | `/leaderboard` | **Built** | Top 10 by wallet, names from the members sheet |
 | `/rob` | **Removed** (owner, 2026-10-03) | §7.4. `/peace` removed with it |
@@ -178,7 +178,7 @@ All commands work only in the PizzaDAO guild and are verified with Ed25519 (`DIS
 |---|---|
 | `/balance [member]` | Ephemeral, read-only (#134) |
 | `/work` | 30s, 10-100, prompt reply, `WORK_REWARD` (#134) |
-| `/collect-income` | §7.2 |
+| `/collect` | §7.2 |
 | `/pay member amount` | Positive whole amount, not yourself, not a bot. Uses `transfer()`: conditional debit + credit + `TRANSFER_SENT`/`TRANSFER_RECEIVED` rows. **Fixed in this PR:** two members paying each other at the same moment deadlocked (Postgres aborted one); both wallets are now locked in id order first |
 | `/leaderboard` | Top 10 by wallet, numbered `1 - <@user> 🍕 amount` (mentions inside the embed render as names and never ping, so the members-sheet name lookup was dropped) |
 | `/blackjack bet`, `/roulette bet space`, `/slots bet` | §7.5, flag `PEP_GAMES_ENABLED` |
@@ -187,7 +187,7 @@ All commands work only in the PizzaDAO guild and are verified with Ed25519 (`DIS
 
 Web: crime card and games card on `/pep`, shown only when `GET /api/economy/features` reports the flag on.
 
-### 7.2 Role income (`/collect-income`)
+### 7.2 Role income (`/collect`)
 - Table in code (`app/lib/pep-earn/income.ts`, `DEFAULT_ROLE_INCOME`) with the UB values from the appendix: every role daily, paid into the one $PEP wallet. Staff can override it without a code change with **`ROLE_INCOME_JSON`** (`[{"name":"Crew Member","amount":42,"intervalHours":24,"roleId":"..."}]`; invalid JSON falls back to the built-in table and logs a warning).
 - Role ids: Dread Pizza Roberts (`812131585327235113`) and Pizza Capo (`839206162837798945`) are pinned. The rest are resolved **by name** from `GET /guilds/{id}/roles` with the bot token, cached for an hour, matching names case-, space-, punctuation- and emoji-insensitively. A name that matches no role or several roles is skipped and logged (`[collect-income] unresolved roles`). Pin an id in `ROLE_INCOME_JSON` to fix either case.
 - The member's roles come from the interaction payload (`member.roles`), so no extra Discord call per use.
@@ -355,7 +355,7 @@ The scripts need Node ≥ 22.18. They re-exec themselves with `--experimental-tr
 
 ## Appendix: current UnbelievaBoat role income (read from the UB dashboard, 2026-10-03)
 
-All are *collectable* (via `/collect-income`), once per **1 day**, into the single $PEP wallet:
+All are *collectable* (via `/collect`), once per **1 day**, into the single $PEP wallet:
 
 | Role | PEP / day |
 |---|---|

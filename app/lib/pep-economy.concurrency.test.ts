@@ -902,7 +902,7 @@ describe.skipIf(!isLocal)('$PEP economy under concurrency (real Postgres)', () =
     await expectLedgerConsistent(user)
   }, 60_000)
 
-  // ---- UnbelievaBoat replacement: /pay, /collect-income, games, item grants ----
+  // ---- UnbelievaBoat replacement: /pay, /collect, games, item grants ----
 
   it(`${N} parallel /pay calls both ways between two members conserve PEP and don't deadlock`, async () => {
     const a = await seedUser(100)
@@ -916,7 +916,7 @@ describe.skipIf(!isLocal)('$PEP economy under concurrency (real Postgres)', () =
     await expectLedgerConsistent(b)
   }, 60_000)
 
-  it(`${N} parallel /collect-income calls pay each held role once`, async () => {
+  it(`${N} parallel /collect calls pay each held role once`, async () => {
     const user = await seedUser(0)
     const incomes = [
       { name: 'it Crew Member', amount: 42, intervalHours: 24, roleId: `7${RUN}01` },

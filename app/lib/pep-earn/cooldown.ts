@@ -1,6 +1,6 @@
 /**
  * Race-safe per-user cooldowns for PEP earning actions (/work, crime, and
- * later /collect-income per role). Call inside the payout's $transaction so
+ * later /collect per role). Call inside the payout's $transaction so
  * the cooldown and the payout commit or roll back together.
  *
  *   1. UPDATE ... SET lastAt = now WHERE lastAt <= now - cooldown  (1 row = ready)

@@ -1,10 +1,10 @@
 /**
- * /collect-income: UnbelievaBoat's role income, ported as-is (plan appendix).
+ * /collect: UnbelievaBoat's role income, ported as-is (plan appendix).
  *
  * Every configured role a member holds pays its amount once per interval
  * (default: daily). Each role has its own cooldown (EconomyCooldown action
  * "income:<roleId>"), claimed inside the payout transaction, so concurrent
- * /collect-income calls pay each role once. One ROLE_INCOME ledger row per
+ * /collect calls pay each role once. One ROLE_INCOME ledger row per
  * role paid. Like UB: no stacking, a missed day is simply not collected.
  *
  * Config lives in code (DEFAULT_ROLE_INCOME). Staff can override it without a
@@ -111,7 +111,7 @@ export async function collectIncome(
         continue
       }
       await creditInTx(tx, discordId, role.amount, 'ROLE_INCOME', `Role income: ${role.name}`, {
-        command: 'collect-income',
+        command: 'collect', // historic rows hold 'collect-income'
         roleId: role.roleId,
         roleName: role.name,
       })

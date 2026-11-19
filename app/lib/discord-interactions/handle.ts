@@ -452,7 +452,7 @@ async function command(i: Interaction, userId: string, deps: HandlerDeps, cur: s
       return out.ok('Shift complete!', `${text}\n\nEarned: ${amt(r.amount)}${today} • Balance: ${amt(r.balance)}`)
     }
 
-    case 'collect-income': {
+    case 'collect': {
       const r = await deps.collectIncome(userId, i.member?.roles ?? [])
       if (r.paid.length === 0 && r.waiting.length === 0) {
         return out.error("None of your roles pay income.", 'Role income comes from roles like Crew Member and Pizza Holder.')

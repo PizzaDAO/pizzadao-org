@@ -47,7 +47,7 @@ export const PEP_COMMANDS = [
     dm_permission: false,
   },
   {
-    name: 'collect-income',
+    name: 'collect',
     description: 'Collect the daily $PEP income from your roles',
     dm_permission: false,
   },

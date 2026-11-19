@@ -3,7 +3,7 @@
  * (submitters, duplicate-account matches, invitees, flagged members) via
  * resolvePeople (sheet → Discord → raw ID), and the roles / channels in the
  * verifiers' checkResult snapshots via the cached guild role and channel lists
- * (the same helpers /collect-income and the verifiers use). Everything is
+ * (the same helpers /collect and the verifiers use). Everything is
  * looked up in one parallel batch; any failure just leaves raw IDs.
  */
 import { getGuildChannels } from '../discord-channels'
