@@ -154,7 +154,8 @@ export const socialLinked: Verifier<{ platforms: string[] }> = {
 /**
  * L3.2 "Complete a task from a crew": the member leads (claimed) a crew task that is now Done, and
  * the person who moved it to Done is a lead of THAT task's crew (or an admin / Dread Pizza Roberts)
- * and is not the member. Who closed it comes from the task history (CrewTaskEvent actor); a task
+ * and is not the member. The member must already have led it when it was closed (a task claimed after it was
+ * Done never counts). Who closed it comes from the task history (CrewTaskEvent actor); a task
  * with no recorded closer, or one the member closed, never counts. Not stateful: a task moved back
  * out of Done later does not revoke an approval (like every automatic pass).
  */
@@ -176,7 +177,7 @@ export const crewTaskDone: Verifier<{ min: number }> = {
     const counted: Array<{ taskId: string; crewId: string; closedBy: string }> = []
     let sawUnverified = false
     for (const t of tasks) {
-      if (!t.closedBy || t.closedBy === ctx.discordId) continue
+      if (!t.closedBy || !t.ledWhenClosed || t.closedBy === ctx.discordId) continue
       const memoKey = `crew_task_done:${t.closedBy}:${t.crewId}`
       let ok = ctx.memo.get(memoKey) as boolean | undefined
       if (ok === undefined) {

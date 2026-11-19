@@ -163,6 +163,8 @@ export interface CrewTaskDoneRow {
   label: string
   /** Discord id of whoever moved the task to Done; null when the task history does not say. */
   closedBy: string | null
+  /** The member was already the task's lead when it moved to Done (no claim / lead change at or after that event). */
+  ledWhenClosed: boolean
 }
 
 export interface ReferralRow {

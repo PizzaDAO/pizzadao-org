@@ -15,7 +15,7 @@
  */
 import { register } from 'node:module'
 
-register('./alias-hooks.mjs', import.meta.url)
+register('../members/alias-hooks.mjs', import.meta.url)
 
 const LEVEL = 3
 const INDEX = 2

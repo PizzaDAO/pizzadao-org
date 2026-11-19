@@ -35,10 +35,10 @@ describe('crew_task_done verifier: yes/no matrix', () => {
   const v = VERIFIERS.crew_task_done
   // Roles: "lead-ops" leads crew ops, "lead-ev" leads crew events, "admin" is an admin; the member is "me".
   const canClose = async (id: string, crew: string) => (id === 'lead-ops' && crew === 'ops') || (id === 'lead-ev' && crew === 'events') || id === 'admin'
-  const run = (tasks: Array<{ crewId: string; closedBy: string | null }>, over: Partial<VerifierSources> = {}, memberId: string | null = 'm1') => {
+  const run = (tasks: Array<{ crewId: string; closedBy: string | null; ledWhenClosed?: boolean }>, over: Partial<VerifierSources> = {}, memberId: string | null = 'm1') => {
     const ctx: VerifyCtx = {
       discordId: 'me', memberId, trigger: 'event', now: new Date(), evidence: null, memo: new Map(),
-      sources: { getDoneCrewTasksLedBy: async () => tasks.map((t, i) => ({ taskId: `t${i}`, label: `T${i}`, ...t })), canCloseCrewTasks: canClose, ...over } as VerifierSources,
+      sources: { getDoneCrewTasksLedBy: async () => tasks.map((t, i) => ({ taskId: `t${i}`, label: `T${i}`, ledWhenClosed: true, ...t })), canCloseCrewTasks: canClose, ...over } as VerifierSources,
     }
     return v.check(ctx, { min: 1 })
   }
@@ -61,6 +61,9 @@ describe('crew_task_done verifier: yes/no matrix', () => {
   it('closed by the lead of a different crew: no', async () => {
     expect(await run([{ crewId: 'events', closedBy: 'lead-ops' }])).toMatchObject({ status: 'fail' })
   })
+  it('lead assigned at or after the Done event (claimed after Done): no', async () => {
+    expect(await run([{ crewId: 'ops', closedBy: 'lead-ops', ledWhenClosed: false }])).toMatchObject({ status: 'fail' })
+  })
   it('no recorded closer: no', async () => {
     expect(await run([{ crewId: 'ops', closedBy: null }])).toMatchObject({ status: 'fail' })
   })
@@ -79,24 +82,44 @@ describe('crew_task_done verifier: yes/no matrix', () => {
 })
 
 describe('who moved the task to Done (doneCrewTasksLedBy)', () => {
-  it('uses the latest update event that set a Done stage; ignores other changes, and open or skipped tasks', async () => {
-    db.crewTask.findMany.mockResolvedValue([
-      { id: 'a', crewId: 'ops', label: 'A', stage: 'Done' },
-      { id: 'b', crewId: 'ops', label: 'B', stage: 'doing' },
-      { id: 'c', crewId: 'ops', label: 'C', stage: 'skip' },
-      { id: 'd', crewId: 'ops', label: 'D', stage: 'done' },
-    ])
-    // newest first, as queried
+  const tasks = [
+    { id: 'a', crewId: 'ops', label: 'A', stage: 'Done' },
+    { id: 'b', crewId: 'ops', label: 'B', stage: 'doing' },
+    { id: 'c', crewId: 'ops', label: 'C', stage: 'skip' },
+    { id: 'd', crewId: 'ops', label: 'D', stage: 'done' },
+  ]
+  const ev = (id: number, taskId: string, action: string, actor: string, changes?: Record<string, unknown>) => ({ id, taskId, action, actor, data: changes ? { changes } : null })
+  const led = async (events: ReturnType<typeof ev>[], only = 'a') => {
+    db.crewTask.findMany.mockResolvedValue(tasks)
+    db.crewTaskEvent.findMany.mockResolvedValue([...events].sort((x, y) => y.id - x.id)) // newest first, as queried
+    return (await doneCrewTasksLedBy('m1')).find((t) => t.taskId === only)
+  }
+
+  it('uses the latest update event that set a Done stage; open or skipped tasks are left out', async () => {
+    db.crewTask.findMany.mockResolvedValue(tasks)
     db.crewTaskEvent.findMany.mockResolvedValue([
-      { taskId: 'a', actor: 'editor-2', data: { changes: { notes: 'tidy' } } },
-      { taskId: 'a', actor: 'lead-ops', data: { changes: { stage: 'Done' } } },
-      { taskId: 'a', actor: 'me', data: { changes: { stage: 'doing' } } },
+      ev(5, 'a', 'update', 'editor-2', { notes: 'tidy' }),
+      ev(4, 'a', 'update', 'lead-ops', { stage: 'Done' }),
+      ev(2, 'a', 'update', 'me', { stage: 'doing' }),
+      ev(1, 'a', 'claim', 'me'),
     ])
     expect(await doneCrewTasksLedBy('m1')).toEqual([
-      { taskId: 'a', crewId: 'ops', label: 'A', closedBy: 'lead-ops' },
-      { taskId: 'd', crewId: 'ops', label: 'D', closedBy: null },
+      { taskId: 'a', crewId: 'ops', label: 'A', closedBy: 'lead-ops', ledWhenClosed: true },
+      { taskId: 'd', crewId: 'ops', label: 'D', closedBy: null, ledWhenClosed: true },
     ])
     expect(db.crewTask.findMany.mock.calls[0][0].where).toMatchObject({ leadMemberId: 'm1', archived: false })
+  })
+  it('claimed before Done counts; claimed after Done does not count', async () => {
+    expect(await led([ev(1, 'a', 'claim', 'me'), ev(2, 'a', 'update', 'lead-ops', { stage: 'Done' })])).toMatchObject({ ledWhenClosed: true })
+    expect(await led([ev(1, 'a', 'update', 'lead-ops', { stage: 'Done' }), ev(2, 'a', 'claim', 'me')])).toMatchObject({ closedBy: 'lead-ops', ledWhenClosed: false })
+  })
+  it('lead set by the editor after Done does not count; before Done does', async () => {
+    expect(await led([ev(1, 'a', 'update', 'lead-ops', { stage: 'Done' }), ev(2, 'a', 'update', 'lead-ops', { leadMemberId: 'm1', leadName: 'Me' })])).toMatchObject({ ledWhenClosed: false })
+    expect(await led([ev(1, 'a', 'update', 'lead-ops', { leadMemberId: 'm1' }), ev(2, 'a', 'update', 'lead-ops', { stage: 'Done' })])).toMatchObject({ ledWhenClosed: true })
+  })
+  it('lead set in the same edit that closes it does not count; no lead events means lead since creation', async () => {
+    expect(await led([ev(1, 'a', 'update', 'lead-ops', { stage: 'Done', leadMemberId: 'm1' })])).toMatchObject({ ledWhenClosed: false })
+    expect(await led([ev(1, 'a', 'update', 'lead-ops', { stage: 'Done' })])).toMatchObject({ ledWhenClosed: true })
   })
   it('isDoneStage: done and complete, not skip', () => {
     expect([' Done ', 'complete', 'Completed'].every(isDoneStage)).toBe(true)

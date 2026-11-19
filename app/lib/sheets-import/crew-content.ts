@@ -425,8 +425,12 @@ export function crewTasksEditor(crewId: string): EditorSpec {
       await invalidateCrewMappingsCache()
       // Tasks that just moved to Done: let their leads' "Complete a task from a crew" mission notice (best effort).
       if (justClosed.length) {
-        const { emitCrewTaskDoneLater } = await import('@/app/lib/mission-verify/crew-task-event')
-        emitCrewTaskDoneLater(justClosed)
+        try {
+          const { emitCrewTaskDoneLater } = await import('@/app/lib/mission-verify/crew-task-event')
+          emitCrewTaskDoneLater(justClosed)
+        } catch (e) {
+          console.error('[crew-tasks] mission hook failed (save kept):', e instanceof Error ? e.message : e)
+        }
       }
       return counts
     },
