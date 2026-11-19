@@ -2,7 +2,7 @@
 import { describe, it, expect } from "vitest";
 import { buildChoiceLabels, emojiToReaction, judgeReaction, reactionBoolean, reactionChoiceIndex, reactionsFor } from "./emoji";
 import { questionMessage } from "./post";
-import { CHOICE_EMOJI, CHOICE_FALLBACK, TF_REACTIONS, reactionAttemptKey } from "./config";
+import { CHOICE_EMOJI, CHOICE_FALLBACK, FLAG_REACTION, TF_REACTIONS, reactionAttemptKey } from "./config";
 import { getBank } from "./bank";
 import type { TriviaQuestion } from "./schema";
 
@@ -53,15 +53,16 @@ describe("buildChoiceLabels", () => {
 });
 
 describe("reactionsFor", () => {
-  it("true/false pre-adds the check and the cross, in that order", () => {
-    expect(reactionsFor(tf, buildChoiceLabels(0, null))).toEqual([TF_REACTIONS.true, TF_REACTIONS.false]);
+  it("true/false pre-adds the check, the cross, then the flag", () => {
+    expect(reactionsFor(tf, buildChoiceLabels(0, null))).toEqual([TF_REACTIONS.true, TF_REACTIONS.false, FLAG_REACTION]);
   });
-  it("multiple choice pre-adds one reaction per choice, in order", () => {
-    expect(reactionsFor(mc, buildChoiceLabels(4, ALL))).toEqual(buildChoiceLabels(4, ALL).reactions);
-    expect(reactionsFor({ type: "multiple_choice", choices: ["a", "b", "c"] }, buildChoiceLabels(3, ALL))).toHaveLength(3);
+  it("multiple choice pre-adds one reaction per choice in order, then the flag last", () => {
+    expect(reactionsFor(mc, buildChoiceLabels(4, ALL))).toEqual([...buildChoiceLabels(4, ALL).reactions, FLAG_REACTION]);
+    expect(reactionsFor({ type: "multiple_choice", choices: ["a", "b", "c"] }, buildChoiceLabels(3, ALL))).toHaveLength(4);
   });
-  it("short answers get none", () => {
-    expect(reactionsFor(short, buildChoiceLabels(0, null))).toEqual([]);
+  it("short answers get only the flag; every question ends with it", () => {
+    expect(reactionsFor(short, buildChoiceLabels(0, null))).toEqual([FLAG_REACTION]);
+    for (const q of [tf, mc, short]) expect(reactionsFor(q, buildChoiceLabels(4, ALL)).at(-1)).toBe(FLAG_REACTION);
   });
 });
 
@@ -144,6 +145,10 @@ describe("question post with the turtles", () => {
 
   it("short answers are unchanged: no reaction hint", () => {
     expect(questionMessage(short, 20).content).not.toContain("react");
+  });
+
+  it("every post says the flag reports a bad question", () => {
+    for (const q of [tf, mc, short]) expect(questionMessage(q, 20, labels).content).toContain(`${FLAG_REACTION} reports a bad question`);
   });
 
   it("a dry run still says nothing is paid", () => {

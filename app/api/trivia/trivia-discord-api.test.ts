@@ -9,6 +9,7 @@ vi.mock("@/app/lib/trivia/cron", () => ({ runTriviaCron: vi.fn(async () => ({ st
 vi.mock("@/app/lib/trivia/enabled", () => ({ triviaLive: vi.fn(async () => false), isProductionDeploy: () => false }));
 vi.mock("@/app/lib/trivia/channel", () => ({ resolveTriviaChannel: vi.fn(async () => "850000000000000001") }));
 vi.mock("@/app/lib/trivia/rounds", () => ({ findOpenRound: vi.fn(async () => null) }));
+vi.mock("@/app/lib/trivia/reports", () => ({ recentQuestionPosts: vi.fn(async () => ["850000000000000010", "850000000000000011"]) }));
 vi.mock("@/app/lib/trivia/answer", () => ({ defaultAnswerDeps: vi.fn(() => ({})), processAnswer: vi.fn(async () => ({ status: "wrong" })), processReaction: vi.fn(async () => ({ status: "wrong" })) }));
 
 import { GET as cronGET } from "@/app/api/cron/trivia/route";
@@ -161,6 +162,13 @@ describe("POST /api/trivia/discord/answer, kind reaction", () => {
     expect(processReaction).not.toHaveBeenCalled();
   });
 
+  it("a reply carries its replyTo to the typed-answer path; a bad replyTo is a 400", async () => {
+    vi.mocked(triviaLive).mockResolvedValue(true);
+    await answer({ ...good, replyTo: "850000000000000010" }, "Bearer recorder-key");
+    expect(processAnswer).toHaveBeenCalledWith(expect.objectContaining({ replyTo: "850000000000000010", content: "true" }), expect.anything());
+    expect((await answer({ ...good, replyTo: "nope" }, "Bearer recorder-key")).status).toBe(400);
+  });
+
   it("a typed answer with kind message still works exactly as before", async () => {
     vi.mocked(triviaLive).mockResolvedValue(true);
     await answer({ ...good, kind: "message" }, "Bearer recorder-key");
@@ -180,7 +188,7 @@ describe("GET /api/trivia/discord/state", () => {
 
   it("closed while trivia is off (a preview too), without reading any round", async () => {
     const res = await state("Bearer recorder-key");
-    expect(await res.json()).toEqual({ ok: true, open: false });
+    expect(await res.json()).toEqual({ ok: true, open: false, recentMessageIds: [] });
     expect(findOpenRound).not.toHaveBeenCalled();
   });
 
@@ -189,7 +197,7 @@ describe("GET /api/trivia/discord/state", () => {
     vi.mocked(findOpenRound).mockResolvedValueOnce(null);
     expect(await (await state("Bearer recorder-key")).json()).toMatchObject({ ok: true, open: false });
     vi.mocked(findOpenRound).mockResolvedValueOnce({ id: 1, messageId: "850000000000000010" } as never);
-    expect(await (await state("Bearer recorder-key")).json()).toMatchObject({ ok: true, open: true, channelId: CHAN, messageId: "850000000000000010" });
+    expect(await (await state("Bearer recorder-key")).json()).toMatchObject({ ok: true, open: true, channelId: CHAN, messageId: "850000000000000010", recentMessageIds: ["850000000000000010", "850000000000000011"] });
     expect(findOpenRound).toHaveBeenCalledWith(CHAN);
   });
 });

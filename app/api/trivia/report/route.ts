@@ -7,6 +7,7 @@ import { rejectUnsafeWrite } from "@/app/lib/admin-guard";
 import { checkKeyedRateLimit, enforceRateLimit, rateLimitResponse } from "@/app/lib/rate-limit";
 import { servable } from "@/app/lib/trivia/bank";
 import { reply, withNoStore } from "@/app/lib/trivia/api";
+import { recordReport } from "@/app/lib/trivia/reports";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,7 +36,14 @@ export async function POST(request: NextRequest) {
   if (!servable({ pool: "web" }).some((q) => q.id === questionId)) return reply({ error: "Unknown question" }, 404);
 
   try {
-    await prisma.triviaReport.create({ data: { questionId, discordId: session?.discordId ?? null, text } });
+    if (session?.discordId) {
+      // Signed-in members go through the same path as Discord reports: eligibility (onboarded member, account age) is
+      // computed and stored on the row, one report per member per question per 7 days, and only eligible reports count
+      // toward the auto-pull (3 different members). A duplicate is accepted silently.
+      await recordReport({ questionId, discordId: session.discordId, text });
+    } else {
+      await prisma.triviaReport.create({ data: { questionId, discordId: null, text } });
+    }
   } catch (e) {
     console.error("[trivia] report not saved:", (e as Error).message);
     return reply({ error: "Could not save your report right now. Please try again later." }, 503);

@@ -30,7 +30,7 @@ describe('registration', () => {
   const cmd = (PEP_COMMANDS as readonly { name: string; description: string; options?: readonly Opt2[]; dm_permission?: boolean }[]).find((c) => c.name === 'trivia')!
 
   it('has leaderboard / start / skip, guild only', () => {
-    expect(cmd.options?.map((o) => o.name)).toEqual(['leaderboard', 'start', 'skip'])
+    expect(cmd.options?.map((o) => o.name)).toEqual(['leaderboard', 'start', 'skip', 'report'])
     expect(cmd.dm_permission).toBe(false)
     expect(cmd.options?.find((o) => o.name === 'leaderboard')?.options?.[0]).toMatchObject({ name: 'public', type: 5, required: false })
   })
@@ -125,7 +125,42 @@ const deps = (over: Partial<TriviaCommandDeps> = {}): TriviaCommandDeps => ({
   leaderboard: async () => ({ available: true, month: [{ rank: 1, name: 'Don Pepperoni', score: 3 }], allTime: [{ rank: 1, name: 'Don Pepperoni', score: 9 }, { rank: 2, name: 'Capo', score: 1 }] }),
   startRound: async () => ({ status: 'started', channelId: '900000000000000009' }),
   skipRound: async () => 'cancelled',
+  reportLatest: async () => ({ status: 'reported', question: 'How many bitcoins did Laszlo Hanyecz pay for two pizzas in May 2010?' }),
   ...over,
+})
+
+describe('/trivia report', () => {
+  it('is registered with an optional reason (max 200)', () => {
+    const cmd = (PEP_COMMANDS as readonly { name: string; options?: readonly { name: string; options?: readonly { name: string; required?: boolean; max_length?: number }[] }[] }[]).find((c) => c.name === 'trivia')!
+    expect(cmd.options?.find((o) => o.name === 'report')?.options?.[0]).toMatchObject({ name: 'reason', required: false, max_length: 200 })
+  })
+
+  it('any member may run it (not admin gated), ephemeral, carrying a cleaned reason', async () => {
+    const { deps, t } = make(undefined, false)
+    const r = await handleInteraction(run('report', [{ name: 'reason', type: 3, value: '  this   is\nbad  ' }]), deps)
+    expect(r.type).toBe(5)
+    expect(r.data?.flags).toBe(64)
+    expect(t.defer).toHaveBeenCalledWith(expect.objectContaining({ sub: 'report', discordId: USER, reason: 'this is bad' }))
+  })
+
+  it('without a reason the job carries none; it answers "not enabled" while trivia is off', async () => {
+    const a = make(undefined, false)
+    await handleInteraction(run('report'), a.deps)
+    expect(a.t.defer.mock.calls[0][0]).not.toHaveProperty('reason')
+    const b = make({ enabled: vi.fn(async () => false) }, false)
+    expect((await handleInteraction(run('report'), b.deps)).data?.embeds?.[0].description).toMatch(/isn't enabled/)
+  })
+
+  it("replies \"Thanks, reported '<question>'\" with the question shortened, and says if it was already reported", async () => {
+    const ok = await buildTriviaReply({ ...job('report'), reason: 'wrong' }, deps())
+    expect(ok.description).toMatch(/Thanks, reported 'How many bitcoins did Laszlo Hanyecz pay for two pizzas/)
+    expect(ok.description).toContain('…')
+    const reportLatest = vi.fn(async () => ({ status: 'duplicate' as const, question: 'Short one?' }))
+    expect((await buildTriviaReply(job('report'), deps({ reportLatest }))).description).toMatch(/already reported 'Short one\?'/)
+    expect(reportLatest).toHaveBeenCalledWith(USER, undefined)
+    expect((await buildTriviaReply(job('report'), deps({ reportLatest: async () => ({ status: 'none' }) }))).description).toMatch(/no trivia question/)
+    expect((await buildTriviaReply(job('report'), deps({ reportLatest: async () => ({ status: 'not_member' }) }))).description).toMatch(/members/)
+  })
 })
 
 describe('replies', () => {

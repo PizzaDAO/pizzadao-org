@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { FORWARD_RETRY_DELAYS_MS, MAX_FORWARD_CHARS, MAX_QUEUED_PER_CHANNEL, PRE_OPEN_BUFFER_MS, REFUSED_LOG_EVERY_MS, fetchTriviaRound, fetchTriviaState, postTriviaAnswer, TriviaForwarder, type ForwardBody, type ForwardResult, type TriviaForwardConfig, type TriviaForwardDeps, type TriviaMessage, type TriviaReaction, type AnyForwardBody, type TriviaRoundState } from './trivia-forward.js'
+import { REPORT_WORDS, hasReportWord, FORWARD_RETRY_DELAYS_MS, MAX_FORWARD_CHARS, MAX_QUEUED_PER_CHANNEL, PRE_OPEN_BUFFER_MS, REFUSED_LOG_EVERY_MS, fetchTriviaRound, fetchTriviaState, postTriviaAnswer, TriviaForwarder, type ForwardBody, type ForwardResult, type TriviaForwardConfig, type TriviaForwardDeps, type TriviaMessage, type TriviaReaction, type AnyForwardBody, type TriviaRoundState } from './trivia-forward.js'
 import { parseRemoteConfig, REMOTE_CONFIG_OFF } from './remote-config.js'
 
 const GUILD = '800000000000000001'
@@ -449,9 +449,9 @@ describe('reaction answers', () => {
 
   it('fetchTriviaRound reports whether a round is open and its question post', async () => {
     const ask = (r: Response | Error) => fetchTriviaRound('https://app.test', 'KEY', (async () => { if (r instanceof Error) throw r; return r }) as unknown as typeof fetch)
-    expect(await ask(new Response(JSON.stringify({ ok: true, open: true, messageId: QMSG }), { status: 200 }))).toEqual({ open: true, messageId: QMSG })
-    expect(await ask(new Response(JSON.stringify({ ok: true, open: false, messageId: null }), { status: 200 }))).toEqual({ open: false, messageId: null })
-    expect(await ask(new Response(JSON.stringify({ open: true, messageId: 'junk' }), { status: 200 }))).toEqual({ open: true, messageId: null })
+    expect(await ask(new Response(JSON.stringify({ ok: true, open: true, messageId: QMSG }), { status: 200 }))).toEqual({ open: true, messageId: QMSG, recentMessageIds: [] })
+    expect(await ask(new Response(JSON.stringify({ ok: true, open: false, messageId: null }), { status: 200 }))).toEqual({ open: false, messageId: null, recentMessageIds: [] })
+    expect(await ask(new Response(JSON.stringify({ open: true, messageId: 'junk' }), { status: 200 }))).toEqual({ open: true, messageId: null, recentMessageIds: [] })
     expect(await ask(new Response('{}', { status: 401 }))).toBeNull()
     expect(await ask(new Error('net'))).toBeNull()
   })
@@ -520,5 +520,133 @@ describe('reaction answers', () => {
     await f.refreshState(async () => ({ open: true, messageId: QMSG }))
     await f.idle()
     expect(post).not.toHaveBeenCalled()
+  })
+})
+
+const POST_A = '900000000000000300'
+const POST_B = '900000000000000301'
+const FLAG = '\u{1F6A9}'
+
+describe('flags and report replies (any time, on question posts of the last 7 days)', () => {
+  async function ready(open: boolean) {
+    const bodies: AnyForwardBody[] = []
+    const post = vi.fn(async (b: AnyForwardBody) => (bodies.push(b), 'ok' as ForwardResult))
+    const f = mk({ config: () => ON, post, sleep: async () => {}, log: vi.fn(), guildId: GUILD }, undefined, false)
+    await f.refreshState(async () => ({ open, messageId: open ? POST_A : null, recentMessageIds: [POST_A, POST_B] }))
+    return { f, bodies, post }
+  }
+
+  it('a flag on a recent question post is forwarded even when no round is open', async () => {
+    const { f, bodies } = await ready(false)
+    f.onReaction(react({ messageId: POST_B, emoji: { id: null, name: FLAG } }))
+    await f.idle()
+    expect(bodies).toEqual([{ kind: 'reaction', channelId: CHAN, messageId: POST_B, authorId: '111111111111111111', emoji: { id: null, name: FLAG } }])
+  })
+
+  it('a flag on a past post is forwarded while another round is open; a flag with a variation selector too', async () => {
+    const { f, bodies } = await ready(true)
+    f.onReaction(react({ messageId: POST_B, emoji: { id: null, name: FLAG } }))
+    f.onReaction(react({ messageId: POST_A, emoji: { id: null, name: `${FLAG}\uFE0F` } }))
+    await f.idle()
+    expect(bodies).toHaveLength(2)
+  })
+
+  it('a flag on any other message, by a bot, or in another channel is dropped', async () => {
+    const { f, post } = await ready(false)
+    f.onReaction(react({ messageId: '900000000000000999', emoji: { id: null, name: FLAG } }))
+    f.onReaction(react({ messageId: POST_A, emoji: { id: null, name: FLAG }, user: { id: '9', bot: true } }))
+    f.onReaction(react({ messageId: POST_A, emoji: { id: null, name: FLAG }, channelId: '800000000000000099' }))
+    await f.idle()
+    expect(post).not.toHaveBeenCalled()
+  })
+
+  it('a flag never waits in the pre-open buffer and never counts as a pick', async () => {
+    const { f, bodies } = await ready(false)
+    f.onReaction(react({ messageId: '900000000000000999', emoji: { id: null, name: FLAG } }))
+    await f.refreshState(async () => ({ open: true, messageId: POST_A, recentMessageIds: [POST_A] }))
+    await f.idle()
+    expect(bodies).toHaveLength(0)
+  })
+
+  it('a reply to a question post is forwarded with replyTo, up to 300 characters, even when no round is open', async () => {
+    const { f, bodies } = await ready(false)
+    const long = 'this question is bad because '.repeat(8).trim()
+    expect(long.length).toBeGreaterThan(80)
+    f.onMessage(msg({ id: '900000000000000400', content: long, reference: { messageId: POST_B } }))
+    await f.idle()
+    expect(bodies).toEqual([{ channelId: CHAN, messageId: '900000000000000400', authorId: '111111111111111111', content: long, replyTo: POST_B }])
+  })
+
+  it('outside an open round only a reply with a report word is forwarded straight away; an ordinary reply is ordinary chat', async () => {
+    const { f, bodies, post } = await ready(false)
+    f.onMessage(msg({ id: '900000000000000410', content: 'lol good one', reference: { messageId: POST_B } }))
+    await f.idle()
+    expect(post).not.toHaveBeenCalled()
+    f.onMessage(msg({ id: '900000000000000411', content: 'This is BROKEN', reference: { messageId: POST_B } }))
+    await f.idle()
+    expect(bodies).toHaveLength(1)
+    expect(bodies[0]).toMatchObject({ content: 'This is BROKEN', replyTo: POST_B })
+  })
+
+  it('a long ordinary reply outside a round is dropped (the 300-character allowance is for report words only)', async () => {
+    const { f, post } = await ready(false)
+    f.onMessage(msg({ content: 'thanks for the question everyone '.repeat(5), reference: { messageId: POST_B } }))
+    await f.idle()
+    expect(post).not.toHaveBeenCalled()
+  })
+
+  it('during an open round every reply to a question post is still forwarded (it may be a guess), report word or not', async () => {
+    const { f, bodies } = await ready(true)
+    f.onMessage(msg({ id: '900000000000000420', content: 'true', reference: { messageId: POST_A } }))
+    f.onMessage(msg({ id: '900000000000000421', content: 'a guess with no flaggy words in it', reference: { messageId: POST_A } }))
+    f.onMessage(msg({ id: '900000000000000422', content: 'this question is bad', reference: { messageId: POST_B } }))
+    await f.idle()
+    expect(bodies.map((b) => (b as { content: string }).content)).toEqual(['true', 'a guess with no flaggy words in it', 'this question is bad'])
+  })
+
+  it('the report word check is whole-word and case-insensitive', () => {
+    for (const w of REPORT_WORDS) expect(hasReportWord(`so ${w.toUpperCase()}.`)).toBe(true)
+    for (const t of ['badger', 'flagship', 'bandwidth', 'reporter', 'wronged']) expect(hasReportWord(t)).toBe(false)
+  })
+
+  it('a reply to an ordinary message stays under the normal rules: dropped while closed, 80 characters when open', async () => {
+    const { f, post } = await ready(false)
+    f.onMessage(msg({ content: 'this is bad', reference: { messageId: '900000000000000999' } }))
+    await f.idle()
+    expect(post).not.toHaveBeenCalled()
+    const open = await ready(true)
+    open.f.onMessage(msg({ content: 'x'.repeat(100), reference: { messageId: '900000000000000999' } }))
+    await open.f.idle()
+    expect(open.post).not.toHaveBeenCalled()
+  })
+
+  it('a reply over 300 characters is dropped; a reply to the open round carries replyTo too', async () => {
+    const { f, bodies } = await ready(true)
+    f.onMessage(msg({ content: 'x'.repeat(301), reference: { messageId: POST_A } }))
+    f.onMessage(msg({ id: '900000000000000401', content: 'true', reference: { messageId: POST_A } }))
+    await f.idle()
+    expect(bodies).toHaveLength(1)
+    expect(bodies[0]).toMatchObject({ content: 'true', replyTo: POST_A })
+  })
+
+  it('nothing is forwarded before the first poll names the recent posts, or after trivia is switched off', async () => {
+    const post = vi.fn(async () => 'ok' as ForwardResult)
+    let cfg: TriviaForwardConfig = ON
+    const f = mk({ config: () => cfg, post, sleep: async () => {}, log: vi.fn(), guildId: GUILD }, undefined, false)
+    f.onReaction(react({ messageId: POST_A, emoji: { id: null, name: FLAG } }))
+    await f.refreshState(async () => ({ open: false, messageId: null, recentMessageIds: [POST_A] }))
+    cfg = { enabled: false, channelIds: [CHAN] }
+    await f.refreshState(async () => ({ open: false, messageId: null, recentMessageIds: [POST_A] }))
+    f.onReaction(react({ messageId: POST_A, emoji: { id: null, name: FLAG } }))
+    await f.idle()
+    expect(post).not.toHaveBeenCalled()
+  })
+
+  it('fetchTriviaRound reads the recent posts (snowflakes only, at most 100)', async () => {
+    const ids = Array.from({ length: 120 }, (_, i) => String(900000000000000000n + BigInt(i)))
+    const ask = (body: unknown) => fetchTriviaRound('https://app.test', 'KEY', (async () => new Response(JSON.stringify(body), { status: 200 })) as unknown as typeof fetch)
+    const r = await ask({ open: false, messageId: null, recentMessageIds: [...ids, 'junk', 5] })
+    expect(r?.recentMessageIds).toHaveLength(100)
+    expect((await ask({ open: false }))?.recentMessageIds).toEqual([])
   })
 })

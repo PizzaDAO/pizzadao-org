@@ -16,6 +16,16 @@ const db = vi.hoisted(() => ({
 }));
 
 vi.mock("@/app/lib/session", () => ({ getSession: async () => session.value }));
+// Signed-in reports go through recordReport (eligibility, dedupe, auto-pull): its own tests are in reports.test.ts and the
+// real-database suite; here it just records what the route handed it.
+const recorded = vi.hoisted(() => ({ calls: [] as { questionId: string; discordId: string; text: string }[] }));
+vi.mock("@/app/lib/trivia/reports", async (importActual) => ({
+  ...(await importActual<typeof import("@/app/lib/trivia/reports")>()),
+  recordReport: vi.fn(async (i: { questionId: string; discordId: string; text: string }) => {
+    recorded.calls.push({ questionId: i.questionId, discordId: i.discordId, text: i.text });
+    return { status: "recorded", pulled: false, eligible: true };
+  }),
+}));
 vi.mock("@/app/lib/db", () => ({
   prisma: {
     triviaRound: {
@@ -321,12 +331,23 @@ describe("daily", () => {
 describe("report", () => {
   const post = (body: unknown, ip?: string) => reportPOST(req("/api/trivia/report", { method: "POST", body, ip }));
 
-  it("stores a report for a served question, with the Discord id when signed in", async () => {
+  it("a signed-in member's report goes through recordReport (eligibility, dedupe, auto-pull), with their Discord id", async () => {
     session.value = { discordId: "444" };
+    recorded.calls.length = 0;
     const q = webPool()[0];
     const res = await post({ questionId: q.id, text: "  The date looks wrong  " });
     expect(res.status).toBe(200);
-    expect(db.reports).toEqual([{ questionId: q.id, discordId: "444", text: "The date looks wrong" }]);
+    expect(recorded.calls).toEqual([{ questionId: q.id, discordId: "444", text: "The date looks wrong" }]);
+    expect(db.reports).toHaveLength(0); // the route no longer writes the row itself for members
+  });
+
+  it("a logged-out report is stored anonymously and can never count toward an auto-pull", async () => {
+    session.value = null;
+    recorded.calls.length = 0;
+    const q = webPool()[0];
+    expect((await post({ questionId: q.id, text: "The date looks wrong" })).status).toBe(200);
+    expect(db.reports).toEqual([{ questionId: q.id, discordId: null, text: "The date looks wrong" }]);
+    expect(recorded.calls).toHaveLength(0);
   });
 
   it("rejects short or long text, unknown, Discord-pool and held-back questions", async () => {

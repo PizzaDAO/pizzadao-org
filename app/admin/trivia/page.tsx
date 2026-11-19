@@ -12,7 +12,9 @@ import { prisma } from "@/app/lib/db";
 import { getSession } from "@/app/lib/session";
 import { isAdminDiscordId } from "@/app/lib/auth-guards";
 import { loginHrefFrom } from "@/app/lib/login-return";
-import { bankStats } from "@/app/lib/trivia/bank";
+import { bankStats, getQuestion } from "@/app/lib/trivia/bank";
+import { getDisabledIds, openReportGroups } from "@/app/lib/trivia/reports";
+import { ReportActions } from "./ReportActions";
 import { EditorialMasthead, EditorialPage, SectionHeading, paperCard } from "@/app/ui/shared/Editorial";
 
 export const runtime = "nodejs";
@@ -39,15 +41,17 @@ function Counts({ data }: { data: Record<string, number> }) {
 
 async function loadRuntime() {
   try {
-    const [rounds, reports, openReports] = await Promise.all([
+    const [rounds, reports, openReports, groups, disabledIds] = await Promise.all([
       prisma.triviaRound.findMany({ orderBy: { id: "desc" }, take: 25 }),
       prisma.triviaReport.findMany({ orderBy: { id: "desc" }, take: 50 }),
       prisma.triviaReport.count({ where: { status: "open" } }),
+      openReportGroups(),
+      getDisabledIds(),
     ]);
-    return { available: true as const, rounds, reports, openReports };
+    return { available: true as const, rounds, reports, openReports, groups, disabledIds };
   } catch (e) {
     console.error("[trivia] admin runtime data unavailable:", (e as Error).message);
-    return { available: false as const, rounds: [], reports: [], openReports: 0 };
+    return { available: false as const, rounds: [], reports: [], openReports: 0, groups: [], disabledIds: [] as string[] };
   }
 }
 
@@ -62,7 +66,7 @@ export default async function AdminTriviaPage() {
 
   return (
     <EditorialPage>
-      <EditorialMasthead overline="Admin" title={t("adminTitle")} dek="Read only. The bank is data/trivia/questions.json: change it with a PR. Phase 1 has no Discord rounds and pays no $PEP." />
+      <EditorialMasthead overline="Admin" title={t("adminTitle")} dek="The bank is data/trivia/questions.json: change it with a PR. Reported questions can be disabled here (they are pulled from Discord and the web at once)." />
 
       <div className="grid gap-6">
         <section className={`${paperCard} p-6`}>
@@ -105,7 +109,40 @@ export default async function AdminTriviaPage() {
         )}
 
         <section className={`${paperCard} p-6`}>
-          <SectionHeading overline="Reports" title="Problem reports" count={data.openReports} />
+          <SectionHeading overline="Reports" title="Reported questions" count={data.groups.length} />
+          <p className="mt-0 text-sm text-foreground/70">
+            Open reports grouped by question, newest first. Disabling pulls the question from Discord and the web at once (it is the pulled-questions setting; 3 different members reporting within 7 days does the same automatically).
+          </p>
+          {data.groups.length === 0 ? (
+            <p className="m-0 text-sm text-foreground/70">No open reports.</p>
+          ) : (
+            <ul className="m-0 grid list-none gap-4 p-0">
+              {data.groups.map((g) => {
+                const q = getQuestion(g.questionId);
+                const disabled = data.disabledIds.includes(g.questionId);
+                return (
+                  <li key={g.questionId} className="grid gap-2 border-b border-[hsl(var(--rule-warm)/0.3)] pb-4 text-sm">
+                    <p className="m-0">
+                      <span className="font-mono">{g.questionId}</span> · <strong className="tabular-nums">{g.count}</strong> report{g.count === 1 ? "" : "s"} from{" "}
+                      <strong className="tabular-nums">{g.members}</strong> member{g.members === 1 ? "" : "s"} · latest {g.latestAt.toISOString().slice(0, 16).replace("T", " ")} UTC
+                      {disabled && <strong className="ml-2 text-tomato">disabled</strong>}
+                    </p>
+                    {q && <p className="m-0 text-foreground/80">{q.question}</p>}
+                    <ul className="m-0 list-disc pl-5 text-foreground/70">
+                      {g.texts.map((t, i) => (
+                        <li key={i}>{t.text}</li>
+                      ))}
+                    </ul>
+                    <ReportActions questionId={g.questionId} disabled={disabled} />
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+
+        <section className={`${paperCard} p-6`}>
+          <SectionHeading overline="Reports" title="All reports" count={data.openReports} />
           {data.reports.length === 0 ? (
             <p className="m-0 text-sm text-foreground/70">No reports.</p>
           ) : (

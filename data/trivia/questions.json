@@ -346,8 +346,9 @@
           "note": "Offer and success posts"
         }
       ],
-      "status": "approved",
-      "pool": "discord"
+      "status": "rejected",
+      "rejectedReason": "Snax 2026-11-19: strawman, nobody thinks he baked them",
+      "notes": "Retired after a Discord report: the premise is a strawman."
     },
     {
       "id": "pd-013",

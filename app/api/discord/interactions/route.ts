@@ -45,7 +45,7 @@ import { runBountyCommand, type BountyJob, type BountyRow } from "@/app/lib/disc
 import { bountyPickChoices } from "@/app/lib/discord-interactions/bounty-choices";
 import { runTaskCommand, type TaskJob } from "@/app/lib/discord-interactions/task-command";
 import { runTriviaCommand, type TriviaJob } from "@/app/lib/discord-interactions/trivia-command";
-import { adminSkipRound, adminStartRound, discordLeaderboard } from "@/app/lib/trivia/admin";
+import { adminSkipRound, adminStartRound, discordLeaderboard, reportLatestQuestion } from "@/app/lib/trivia/admin";
 import { triviaLive } from "@/app/lib/trivia/enabled";
 import { addCrewChoices, findOpenDuplicate, myCrewTasks, openCrewTasks, taskPickChoices } from "@/app/lib/discord-interactions/task-choices";
 import { createCrewTask } from "@/app/lib/crew-tasks-write";
@@ -262,7 +262,7 @@ async function triviaRateLimit(discordId: string): Promise<Date | null> {
 /** The deferred /trivia work, after the type-5 reply has gone out. */
 function deferTrivia(job: TriviaJob) {
   after(async () => {
-    await runTriviaCommand(job, { leaderboard: discordLeaderboard, startRound: () => adminStartRound(), skipRound: () => adminSkipRound() });
+    await runTriviaCommand(job, { leaderboard: discordLeaderboard, startRound: () => adminStartRound(), skipRound: () => adminSkipRound(), reportLatest: reportLatestQuestion });
   });
 }
 

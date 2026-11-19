@@ -200,7 +200,7 @@ export const PEP_COMMANDS = [
     // Deferred (type 5). Answers "not enabled" until trivia.enabled is on (production only). start and skip are
     // admin only (checked by the handler, like /add-money). The answers themselves are typed in the trivia channel.
     name: 'trivia',
-    description: 'Discord trivia: the leaderboard (admins can also start or skip a round)',
+    description: 'Discord trivia: the leaderboard, report a bad question (admins can also start or skip a round)',
     options: [
       {
         type: SUB_COMMAND,
@@ -210,6 +210,12 @@ export const PEP_COMMANDS = [
       },
       { type: SUB_COMMAND, name: 'start', description: 'Admins: start a trivia round now in the trivia channel' },
       { type: SUB_COMMAND, name: 'skip', description: 'Admins: cancel the open trivia round (no $PEP is paid)' },
+      {
+        type: SUB_COMMAND,
+        name: 'report',
+        description: 'Report the latest trivia question as bad (only you see the reply)',
+        options: [{ type: STRING, name: 'reason', description: 'What is wrong with it (optional)', required: false, max_length: 200 }],
+      },
     ],
     dm_permission: false,
   },

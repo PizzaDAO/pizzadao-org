@@ -2,7 +2,7 @@
 //
 // Pure helpers for reaction answers (plans/trivia.md section 17): which emoji label the choices of a round, and
 // which choice (or true/false) a reaction means. No I/O: the guild's emoji list is passed in.
-import { CHOICE_EMOJI, CHOICE_FALLBACK, TF_REACTIONS } from "./config";
+import { CHOICE_EMOJI, CHOICE_FALLBACK, FLAG_REACTION, TF_REACTIONS } from "./config";
 import type { TriviaQuestion } from "./schema";
 
 /** A reaction as Discord reports it: a custom emoji has an id, a unicode one only a name. */
@@ -35,11 +35,15 @@ export function buildChoiceLabels(count: number, guildEmojiIds: ReadonlySet<stri
   return { display: [...letters], reactions: [...letters], fallback: true };
 }
 
-/** The reactions the bot pre-adds to a question post, in order. Short answers get none. */
+/** The reactions the bot pre-adds to a question post, in order: the picks, then the flag (every question has the flag). */
 export function reactionsFor(q: Pick<TriviaQuestion, "type" | "choices">, labels: ChoiceLabels): string[] {
-  if (q.type === "true_false") return [TF_REACTIONS.true, TF_REACTIONS.false];
-  if (q.type === "multiple_choice") return labels.reactions.slice(0, q.choices?.length ?? 0);
-  return [];
+  const picks =
+    q.type === "true_false"
+      ? [TF_REACTIONS.true, TF_REACTIONS.false]
+      : q.type === "multiple_choice"
+        ? labels.reactions.slice(0, q.choices?.length ?? 0)
+        : [];
+  return [...picks, FLAG_REACTION];
 }
 
 /** The REST form of a reaction event's emoji (`name:id` or the unicode name). Null when it has no usable name. */

@@ -5,9 +5,10 @@
 // here (bank, settings, caps). Answers reach this in Discord order (the recorder's per-channel serial queue).
 import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
 import { getQuestion } from "./bank";
-import { attemptsPerRound, MIN_ACCOUNT_AGE_DAYS, OUT_OF_TRIES_REACTION, reactionAttemptKey, REQUIRE_MEMBER, snowflakeAfter, snowflakeMs, WRONG_ATTEMPT_REACTION } from "./config";
+import { accountOldEnough, ACK_REACTION, attemptsPerRound, MIN_ACCOUNT_AGE_DAYS, OUT_OF_TRIES_REACTION, reactionAttemptKey, REQUIRE_MEMBER, snowflakeAfter, snowflakeMs, WRONG_ATTEMPT_REACTION } from "./config";
 import { emojiToReaction, judgeReaction, type ReactionEmoji } from "./emoji";
 import { markWrongAttempt, removeMemberReaction } from "./reactions";
+import { hasReportWord, isFlagEmoji, recordReport, roundByQuestionPost, type ReportOutcome, type ReportableRound } from "./reports";
 import { match } from "./match";
 import { announceWin, claimWin, defaultPostDeps, findAttemptByMessage, findOpenRound, hasRecentAttempt, type ClaimResult, type Eligibility, type PostDeps } from "./rounds";
 
@@ -18,6 +19,8 @@ export interface AnswerInput {
   /** Its author. */
   discordId: string;
   content: string;
+  /** The message this one replies to (Discord `message_reference`), when it is a reply. */
+  replyTo?: string;
 }
 
 export type AnswerOutcome =
@@ -27,7 +30,8 @@ export type AnswerOutcome =
   | { status: "wrong" }
   | { status: "won"; rewardPep: number; paid: boolean }
   | { status: "not_won"; why: "not_member" | "too_young" | "daily_cap" | "late" | "closed" | "attempts_exhausted" }
-  | { status: "duplicate" };
+  | { status: "duplicate" }
+  | { status: "reported"; pulled: boolean };
 
 export interface AnswerDeps extends PostDeps {
   now(): Date;
@@ -38,6 +42,11 @@ export interface AnswerDeps extends PostDeps {
   throttled(roundId: number, discordId: string, now: Date): Promise<boolean>;
   /** Remove a member's reaction after their attempt (never throws; absent: nothing is removed). */
   removeReaction?(channelId: string, messageId: string, reaction: string, userId: string): Promise<void>;
+  /** The question post a message or reaction is about, and recording a report (default: the real ones). */
+  roundByPost?(messageId: string, now: Date): Promise<ReportableRound | null>;
+  recordReport?(input: { questionId: string; discordId: string; text: string; now: Date; eligible?: boolean }): Promise<ReportOutcome>;
+  /** Add reactions to a member's own message (the 👀 on a report reply). Never throws. */
+  reactTo?(channelId: string, messageId: string, emojis: string[]): Promise<void>;
   /** Mark a wrong short-answer attempt on the member's own message (never throws; absent: nothing is added). */
   markWrong?(channelId: string, messageId: string, emojis: string[]): Promise<void>;
   /** Run after the response (Next after()): replies are posted off the request path. */
@@ -52,18 +61,22 @@ export const defaultAnswerDeps = (defer: (fn: () => Promise<void>) => void): Ans
   throttled: (roundId, id, now) => hasRecentAttempt(roundId, id, now),
   removeReaction: removeMemberReaction,
   markWrong: markWrongAttempt,
+  reactTo: markWrongAttempt,
+  roundByPost: roundByQuestionPost,
+  recordReport: (i) => recordReport(i),
   defer,
 });
 
-/** Account age rule: the snowflake carries the creation date. */
-export function accountOldEnough(discordId: string, now: Date): boolean {
-  const created = snowflakeMs(discordId);
-  return Number.isFinite(created) && now.getTime() - created >= MIN_ACCOUNT_AGE_DAYS * 24 * 60 * 60 * 1000;
-}
+export { accountOldEnough };
 
 /** The caller has already checked that trivia is live. Never throws for bad input (it is `ignored`). */
 export async function processAnswer(input: AnswerInput, deps: AnswerDeps): Promise<AnswerOutcome> {
   const now = deps.now();
+  // A reply to a question post that says the question is bad is a report, not an answer (see tryReplyReport).
+  if (input.replyTo) {
+    const reported = await tryReplyReport(input, input.replyTo, now, deps);
+    if (reported) return reported;
+  }
   const round = await findOpenRound(input.channelId, now);
   if (!round) return { status: "no_round" };
 
@@ -118,6 +131,66 @@ async function eligibilityFor(discordId: string, correct: boolean, now: Date, de
   return { ok: true };
 }
 
+/**
+ * A member who may report: an onboarded member on an account old enough. (Without this, throwaway accounts could pull
+ * any question with three flags.) Same two rules as winning.
+ */
+async function mayReport(discordId: string, now: Date, deps: AnswerDeps): Promise<boolean> {
+  return accountOldEnough(discordId, now) && (!REQUIRE_MEMBER || (await deps.isMember(discordId)));
+}
+
+/**
+ * A reply to a question post (current or within the last 7 days) that contains a report word ("bad", "wrong", "broken",
+ * "report", "flag", "incorrect", "outdated") is recorded as a report with the reply text and gets a 👀, instead of
+ * being graded. In an OPEN round a reply could also be a guess, so there:
+ *   - a single word is never a report ("wrong" may be a guess; it is graded as before), and
+ *   - a reply that is a correct answer is graded, not reported.
+ * Anything else with a report word (several words, none of them the right answer) is a report. Replies to a past
+ * round's post, or after the round closed, are reports whenever they contain a report word. Returns null to carry on
+ * as an ordinary answer.
+ */
+async function tryReplyReport(input: AnswerInput, replyTo: string, now: Date, deps: AnswerDeps): Promise<AnswerOutcome | null> {
+  if (!deps.roundByPost || !deps.recordReport || !hasReportWord(input.content)) return null;
+  const round = await deps.roundByPost(replyTo, now);
+  if (!round) return null;
+  const question = getQuestion(round.questionId);
+  if (!question) return null;
+  const open = round.status === "OPEN" && round.closesAt > now;
+  if (open) {
+    if (input.content.trim().split(/\s+/).length < 2) return null;
+    if (match(question, input.content, { strictBoolean: true }).verdict === "correct") return null;
+  }
+  if (!(await mayReport(input.discordId, now, deps))) return null;
+  const out = await deps.recordReport({ questionId: round.questionId, discordId: input.discordId, text: `reply: ${input.content}`, now, eligible: true });
+  if (out.status === "duplicate") return { status: "duplicate" };
+  const react = deps.reactTo;
+  if (react) deps.defer(() => react(input.channelId, input.messageId, [ACK_REACTION]));
+  return { status: "reported", pulled: out.pulled };
+}
+
+/**
+ * A member's flag reaction on a question post, the current one or one from the last 7 days: a report with the text
+ * "flagged from Discord". It is never an answer attempt (it never reaches the attempt tables or the caps) and is never
+ * judged as a pick. The member's flag is removed afterwards so the count does not snowball (the bot's own stays).
+ * Posts that are not question posts, and members who may not report, are left alone.
+ */
+async function processFlag(input: ReactionInput, deps: AnswerDeps): Promise<AnswerOutcome> {
+  const now = deps.now();
+  if (!deps.roundByPost || !deps.recordReport) return { status: "ignored", why: "not_a_choice" };
+  const round = await deps.roundByPost(input.messageId, now);
+  if (!round) return { status: "ignored", why: "not_current_message" };
+  if (!(await mayReport(input.discordId, now, deps))) return { status: "ignored", why: "not_a_choice" };
+  const reaction = emojiToReaction(input.emoji);
+  const removal: Promise<void> =
+    reaction && deps.removeReaction ? deps.removeReaction(input.channelId, input.messageId, reaction, input.discordId).catch(() => undefined) : Promise.resolve();
+  try {
+    const out = await deps.recordReport({ questionId: round.questionId, discordId: input.discordId, text: "flagged from Discord", now, eligible: true });
+    return out.status === "duplicate" ? { status: "duplicate" } : { status: "reported", pulled: out.pulled };
+  } finally {
+    await removal;
+  }
+}
+
 export interface ReactionInput {
   channelId: string;
   /** The message that was reacted to: it must be the current round's question post. */
@@ -135,6 +208,8 @@ export interface ReactionInput {
  * other emoji are not touched.
  */
 export async function processReaction(input: ReactionInput, deps: AnswerDeps): Promise<AnswerOutcome> {
+  // The flag is a report, handled before (and apart from) the picks: no round needs to be open, no attempt is made.
+  if (isFlagEmoji(input.emoji)) return processFlag(input, deps);
   const now = deps.now();
   const round = await findOpenRound(input.channelId, now);
   if (!round) return { status: "no_round" };

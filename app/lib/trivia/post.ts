@@ -3,7 +3,7 @@
 // Discord message builders for the loop (plans/trivia.md section 6). Pure. Every message sets
 // allowed_mentions explicitly: question and reveal posts ping nobody, the winner post pings only the winner.
 import { reveal } from "./bank";
-import { ROUND_MINUTES, TF_REACTIONS } from "./config";
+import { FLAG_REACTION, ROUND_MINUTES, TF_REACTIONS } from "./config";
 import type { ChoiceLabels } from "./emoji";
 import type { TriviaQuestion } from "./schema";
 import { DISCORD_MESSAGE_LIMIT, type DiscordMessageBody } from "@/app/lib/discord-rest";
@@ -46,7 +46,7 @@ export function questionMessage(q: TriviaQuestion, rewardPep: number, labels?: C
       : q.type === "multiple_choice"
         ? " · react with your pick, or type the answer"
         : "";
-  lines.push(`(${TYPE_LABEL[q.type]} · ${q.difficulty} · ${ROUND_MINUTES} min${how})`);
+  lines.push(`(${TYPE_LABEL[q.type]} · ${q.difficulty} · ${ROUND_MINUTES} min${how} · ${FLAG_REACTION} reports a bad question)`);
   return { content: fit(lines.join("\n")), allowed_mentions: NO_PINGS };
 }
 

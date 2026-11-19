@@ -8,6 +8,7 @@
 import { prisma } from "@/app/lib/db";
 import { getQuestion, servable } from "./bank";
 import { addDays, computeStreak, dailyQuestionFor, dayKeyUtc, nextDayStartMs } from "./daily";
+import { getDisabledIds } from "./reports";
 import type { TriviaQuestion } from "./schema";
 
 export interface DailyRound {
@@ -20,21 +21,25 @@ export interface DailyRound {
 /**
  * Today's web daily: the stored round if there is one, else computed (and stored, best effort). Null if the web pool is empty.
  *
- * If the stored question was pulled since (disabled, retired, or no longer a web question) the round is re-pointed at the
+ * If the stored question is no longer servable (retired, expired, or no longer a web question; NOT merely pulled: see below) the round is re-pointed at the
  * replacement and the answers already given to the pulled question are voided (deleted): they were graded against a
  * question that is no longer served, so keeping them would make the reveal, "% got it right" and streak disagree with
  * the question on screen. Those members can answer the replacement and win the day back.
  */
 export async function getDailyRound(now: Date = new Date()): Promise<DailyRound | null> {
   const dayKey = dayKeyUtc(now);
-  const pool = servable({ now, pool: "web" });
+  const pool = servable({ now, pool: "web", disabledIds: await getDisabledIds() });
   const computed = dailyQuestionFor(dayKey, pool);
+  // Today's stored question stays valid even if it has been PULLED (disabled) since: a pull stops it being picked from
+  // tomorrow, but never changes the question on screen mid-day or deletes anyone's answer and streak credit. Only a
+  // question that is no longer servable at all (retired, expired, moved out of the web pool) is re-pointed.
+  const stillServable = servable({ now, pool: "web" });
 
   try {
     const existing = await prisma.triviaRound.findUnique({ where: { dayKey } });
     if (existing) {
       const stored = getQuestion(existing.questionId);
-      if (stored && pool.some((q) => q.id === stored.id)) return { dayKey, question: stored, roundId: existing.id };
+      if (stored && stillServable.some((q) => q.id === stored.id)) return { dayKey, question: stored, roundId: existing.id };
       if (!computed) return null;
       await prisma.$transaction([
         prisma.triviaAttempt.deleteMany({ where: { roundId: existing.id } }),
@@ -64,7 +69,7 @@ export async function getDailyRound(now: Date = new Date()): Promise<DailyRound 
  * daily answer before a member's recorded attempt.
  */
 export async function practicePool(now: Date = new Date()): Promise<TriviaQuestion[]> {
-  const pool = servable({ now, pool: "web" });
+  const pool = servable({ now, pool: "web", disabledIds: await getDisabledIds() });
   const daily = await getDailyRound(now);
   const computed = dailyQuestionFor(dayKeyUtc(now), pool);
   const hidden = new Set([daily?.question.id, computed?.id].filter((x): x is string => !!x));

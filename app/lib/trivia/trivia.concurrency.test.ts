@@ -13,7 +13,7 @@
 //   * attempt caps, the onboarded-member / account-age rules and the 3-wins-a-day cap;
 //   * expiry posts the reveal exactly once, however many ticks race, and pays nothing;
 //   * a dry-run round pays nothing; /trivia skip cancels without paying.
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from 'vitest'
+import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from 'vitest'
 import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 
@@ -27,7 +27,8 @@ const isLocal = (() => {
 })()
 
 // The members sheet is never reached: eligibility is injected.
-vi.mock('../sheets/member-repository', () => ({ fetchMemberIdByDiscordId: vi.fn().mockResolvedValue(null) }))
+// Every seeded test user is an onboarded member unless a test says otherwise (reports check membership at write time).
+vi.mock('../sheets/member-repository', () => ({ fetchMemberIdByDiscordId: vi.fn().mockResolvedValue('m1') }))
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Libs = {
@@ -36,6 +37,9 @@ type Libs = {
   answer: typeof import('./answer')
   bank: typeof import('./bank')
   config: typeof import('./config')
+  reports: typeof import('./reports')
+  web: typeof import('./web')
+  settings: typeof import('../settings')
 }
 let L: Libs
 const N = 20
@@ -111,6 +115,9 @@ describe.skipIf(!isLocal)('Discord trivia under concurrency (real Postgres)', ()
       answer: await import('./answer'),
       bank: await import('./bank'),
       config: await import('./config'),
+      reports: await import('./reports'),
+      web: await import('./web'),
+      settings: await import('../settings'),
     }
     // `prisma db push` does not create the two partial unique indexes of the migration (Prisma cannot express them).
     await L.prisma.$executeRawUnsafe(
@@ -426,7 +433,7 @@ describe.skipIf(!isLocal)('Discord trivia under concurrency (real Postgres)', ()
       const { id, messageId } = await openMc(channelId, 20, deps)
       expect(seen.map((x) => x.kind)).toEqual(['post', 'react'])
       for (let i = 0; i < 4; i++) expect(seen[0].detail).toContain(`<:${L.config.CHOICE_EMOJI[i].name}:${L.config.CHOICE_EMOJI[i].id}> ${mcq.choices[i]}`)
-      expect(seen[1].detail).toBe(`${messageId}|${L.config.CHOICE_EMOJI.map((e: any) => `${e.name}:${e.id}`).join(',')}`)
+      expect(seen[1].detail).toBe(`${messageId}|${L.config.CHOICE_EMOJI.map((e: any) => `${e.name}:${e.id}`).join(',')},${L.config.FLAG_REACTION}`)
       expect((await roundOf(id)).messageId).toBe(messageId)
     }, 60_000)
 
@@ -435,7 +442,7 @@ describe.skipIf(!isLocal)('Discord trivia under concurrency (real Postgres)', ()
       const calls: string[][] = []
       const deps = { post: async () => ({ id: snow(-5000) }), addReactions: async (_c: string, _m: string, r: string[]) => void calls.push(r) }
       await openRound(channelId, 20, deps as any)
-      expect(calls).toEqual([[L.config.TF_REACTIONS.true, L.config.TF_REACTIONS.false]])
+      expect(calls).toEqual([[L.config.TF_REACTIONS.true, L.config.TF_REACTIONS.false, L.config.FLAG_REACTION]])
       const channel2 = chanId()
       vi.spyOn(console, 'error').mockImplementation(() => {})
       const bad = { post: async () => ({ id: snow(-5000) }), addReactions: async () => { throw new Error('Missing Access') } }
@@ -553,6 +560,271 @@ describe.skipIf(!isLocal)('Discord trivia under concurrency (real Postgres)', ()
       expect((await roundOf(id)).status).toBe('WON')
       expect(await rewardRows([u])).toHaveLength(0)
     }, 60_000)
+
+    describe('reports and pulled questions (real database)', () => {
+      const KEY = 'trivia.disabledQuestionIds'
+      let prevEnv: string | undefined
+      beforeEach(async () => {
+        prevEnv = process.env.VERCEL_ENV
+        await L.prisma.appSetting.deleteMany({ where: { key: KEY } })
+        L.settings.clearSettingsCache({ all: true })
+      })
+      afterEach(async () => {
+        if (prevEnv === undefined) delete process.env.VERCEL_ENV
+        else process.env.VERCEL_ENV = prevEnv
+        await L.prisma.appSetting.deleteMany({ where: { key: KEY } })
+        L.settings.clearSettingsCache({ all: true })
+      })
+      const reportsFor = (qid: string) => L.prisma.triviaReport.findMany({ where: { questionId: qid } })
+      const shortPool = () => L.bank.servable({ pool: 'discord' }).filter((q: any) => q.type === 'short_answer')
+
+      it('one report per member per question, even with 20 at once', async () => {
+        const qid = shortPool()[0].id
+        const u = await seedUser(0)
+        const results = await Promise.all(Array.from({ length: N }, () => L.reports.recordReport({ questionId: qid, discordId: u, text: 'x' })))
+        expect(results.filter((r: any) => r.status === 'recorded')).toHaveLength(1)
+        expect(results.filter((r: any) => r.status === 'duplicate')).toHaveLength(N - 1)
+        expect((await reportsFor(qid)).filter((r: any) => r.discordId === u)).toHaveLength(1)
+      }, 60_000)
+
+      it('3 different members within 7 days auto-pull the question (production only), logged and silent; the picker then skips it', async () => {
+        process.env.VERCEL_ENV = 'production'
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+        const dpool = L.bank.servable({ pool: 'discord' })
+        const qid = dpool[dpool.length - 1].id
+        const users = await Promise.all([seedUser(0), seedUser(0), seedUser(0)])
+        const a = await L.reports.recordReport({ questionId: qid, discordId: users[0], text: 'bad' })
+        const b = await L.reports.recordReport({ questionId: qid, discordId: users[1], text: 'bad' })
+        expect([a, b]).toEqual([{ status: 'recorded', pulled: false, eligible: true }, { status: 'recorded', pulled: false, eligible: true }])
+        expect(await L.reports.getDisabledIds()).not.toContain(qid)
+        const c = await L.reports.recordReport({ questionId: qid, discordId: users[2], text: 'bad' })
+        expect(c).toEqual({ status: 'recorded', pulled: true, eligible: true })
+        L.settings.clearSettingsCache()
+        expect(await L.reports.getDisabledIds()).toContain(qid)
+        expect(warn.mock.calls.some((x: unknown[]) => String(x[0]).includes(`auto-pulled ${qid}`))).toBe(true)
+        const row = await L.prisma.appSetting.findUnique({ where: { key: KEY } })
+        expect(row.value).toEqual([qid])
+        const audit = await L.prisma.appSettingChange.findFirst({ where: { key: KEY }, orderBy: { id: 'desc' } })
+        expect(audit.changedBy).toBe(L.reports.AUTOPULL_ACTOR)
+
+        const ch = chanId()
+        for (let i = 0; i < 40; i++) {
+          const r: any = await L.rounds.openDiscordRound({ channelId: ch, rewardPep: 20 }, fakePosts().deps)
+          expect(r.ok).toBe(true)
+          expect(r.questionId).not.toBe(qid)
+          await L.prisma.triviaRound.update({ where: { id: r.roundId }, data: { status: 'EXPIRED' } })
+        }
+      }, 120_000)
+
+      it('the auto-pull does nothing off production (previews share the database), and later reports do not pull twice', async () => {
+        delete process.env.VERCEL_ENV
+        const qid = shortPool()[1].id
+        const users = await Promise.all([seedUser(0), seedUser(0), seedUser(0)])
+        for (const u of users) expect((await L.reports.recordReport({ questionId: qid, discordId: u, text: 'bad' })).status).toBe('recorded')
+        expect(await L.reports.getDisabledIds()).not.toContain(qid)
+        process.env.VERCEL_ENV = 'production'
+        vi.spyOn(console, 'warn').mockImplementation(() => {})
+        expect(await L.reports.recordReport({ questionId: qid, discordId: await seedUser(0), text: 'bad' })).toEqual({ status: 'recorded', pulled: true, eligible: true })
+        expect(await L.reports.recordReport({ questionId: qid, discordId: await seedUser(0), text: 'bad' })).toEqual({ status: 'recorded', pulled: false, eligible: true })
+        const row = await L.prisma.appSetting.findUnique({ where: { key: KEY } })
+        expect(row.value.filter((x: string) => x === qid)).toHaveLength(1)
+      }, 60_000)
+
+      it('reports older than 7 days do not count toward the pull', async () => {
+        process.env.VERCEL_ENV = 'production'
+        const qid = shortPool()[2].id
+        const old = new Date(Date.now() - 8 * 86_400_000)
+        for (let i = 0; i < 3; i++) await L.prisma.triviaReport.create({ data: { questionId: qid, discordId: await seedUser(0), text: 'old', createdAt: old } })
+        expect(await L.reports.getDisabledIds()).not.toContain(qid)
+        expect(await L.reports.recordReport({ questionId: qid, discordId: await seedUser(0), text: 'new' })).toEqual({ status: 'recorded', pulled: false, eligible: true })
+      }, 60_000)
+
+      it('concurrent disables of different questions lose none (guarded read-modify-write)', async () => {
+        const ids = shortPool().slice(0, 4).map((q: any) => q.id)
+        await Promise.all(ids.map((id: string) => L.reports.setQuestionDisabled(id, true, 'tester')))
+        const row = await L.prisma.appSetting.findUnique({ where: { key: KEY } })
+        expect([...row.value].sort()).toEqual([...ids].sort())
+        expect(await L.reports.setQuestionDisabled(ids[0], false, 'tester')).toBe(true)
+        expect(await L.reports.setQuestionDisabled(ids[0], false, 'tester')).toBe(false)
+      }, 60_000)
+
+      it('the web practice pool and daily honour the disabled list', async () => {
+        const web = L.bank.servable({ pool: 'web' })
+        const target = web[0].id
+        expect((await L.web.practicePool()).some((q: any) => q.id === target) || true).toBe(true)
+        await L.reports.setQuestionDisabled(target, true, 'tester')
+        L.settings.clearSettingsCache()
+        expect((await L.web.practicePool()).some((q: any) => q.id === target)).toBe(false)
+        const daily = await L.web.getDailyRound()
+        if (daily) expect(daily.question.id).not.toBe(target)
+      }, 60_000)
+
+      it('a flag reaction through processReaction: recorded once, never an attempt, removed; a reply report likewise; posts older than 7 days are not reportable', async () => {
+        const channelId = chanId()
+        const { id, messageId } = await openMc(channelId)
+        const u = await seedUser(0)
+        const gone: string[] = []
+        const acks: string[][] = []
+        const d: any = {
+          ...fakePosts().deps,
+          now: () => new Date(),
+          isMember: async () => true,
+          findAttempt: L.rounds.findAttemptByMessage,
+          throttled: async () => false,
+          roundByPost: L.reports.roundByQuestionPost,
+          recordReport: (i: any) => L.reports.recordReport(i),
+          removeReaction: async (_c: string, _m: string, reaction: string) => void gone.push(reaction),
+          reactTo: async (_c: string, _m: string, emojis: string[]) => void acks.push(emojis),
+          defer: (fn: () => Promise<void>) => void pend.push(fn),
+        }
+        const flag = { id: null, name: L.config.FLAG_REACTION }
+        expect(await L.answer.processReaction({ channelId, messageId, discordId: u, emoji: flag }, d)).toEqual({ status: 'reported', pulled: false })
+        expect(await L.answer.processReaction({ channelId, messageId, discordId: u, emoji: flag }, d)).toEqual({ status: 'duplicate' })
+        expect(await L.prisma.triviaAttempt.count({ where: { roundId: id } })).toBe(0)
+        expect((await roundOf(id)).status).toBe('OPEN')
+        const rows = await reportsFor(mcq.id)
+        expect(rows.filter((r: any) => r.discordId === u && r.text === 'flagged from Discord')).toHaveLength(1)
+        expect(gone).toEqual([L.config.FLAG_REACTION, L.config.FLAG_REACTION])
+
+        const u2 = await seedUser(0)
+        await L.prisma.triviaRound.update({ where: { id }, data: { status: 'EXPIRED' } })
+        const out = await L.answer.processAnswer({ channelId, messageId: snow(), discordId: u2, content: 'this question is bad', replyTo: messageId }, d)
+        expect(out).toEqual({ status: 'reported', pulled: false })
+        await settle()
+        expect(acks).toEqual([[L.config.ACK_REACTION]])
+        expect(await L.prisma.triviaAttempt.count({ where: { roundId: id } })).toBe(0)
+        expect((await reportsFor(mcq.id)).some((r: any) => r.discordId === u2 && r.text === 'reply: this question is bad')).toBe(true)
+
+        await L.prisma.triviaRound.update({ where: { id }, data: { openedAt: new Date(Date.now() - 8 * 86_400_000) } })
+        expect(await L.reports.roundByQuestionPost(messageId)).toBeNull()
+        expect(await L.answer.processReaction({ channelId, messageId, discordId: await seedUser(0), emoji: flag }, d)).toMatchObject({ status: 'ignored' })
+      }, 90_000)
+
+      it('the recent question posts (for the recorder) are the last 7 days of this channel, newest first', async () => {
+        const channelId = chanId()
+        const a = await openMc(channelId)
+        await L.prisma.triviaRound.update({ where: { id: a.id }, data: { status: 'EXPIRED' } })
+        const b = await openMc(channelId)
+        expect(await L.reports.recentQuestionPosts(channelId)).toEqual([b.messageId, a.messageId])
+        await L.prisma.triviaRound.update({ where: { id: a.id }, data: { openedAt: new Date(Date.now() - 9 * 86_400_000) } })
+        expect(await L.reports.recentQuestionPosts(channelId)).toEqual([b.messageId])
+      }, 60_000)
+
+      describe('review fixes: eligibility, handled reports, the daily', () => {
+        const rec = (input: any): Promise<any> => L.reports.recordReport(input)
+        const prodWarn = () => {
+          process.env.VERCEL_ENV = 'production'
+          vi.spyOn(console, 'warn').mockImplementation(() => {})
+        }
+        const young = () => String((BigInt(Date.now() - 2 * 86_400_000 - EPOCH) << BigInt(22)) + BigInt(++seq))
+        const members = new Set<string>()
+        const eligibleUser = async () => {
+          const u = await seedUser(0)
+          members.add(u)
+          return u
+        }
+        beforeAll(async () => {
+          const repo = await import('../sheets/member-repository')
+          vi.mocked(repo.fetchMemberIdByDiscordId).mockImplementation(async (id: string) => (members.has(id) ? 'm1' : null))
+        })
+        afterAll(async () => {
+          const repo = await import('../sheets/member-repository')
+          vi.mocked(repo.fetchMemberIdByDiscordId).mockImplementation(async () => 'm1')
+        })
+        const dpool = () => L.bank.servable({ pool: 'discord' })
+        const openCount = (qid: string) => L.prisma.triviaReport.count({ where: { questionId: qid, status: 'open' } })
+
+        it('ineligible reports (non-members, young accounts) are stored as such and never count toward a pull, on the web path too', async () => {
+          prodWarn()
+          const qid = dpool()[3].id
+          // three signed-in web users who are not onboarded members: no eligible flag passed, so it is computed here
+          for (let i = 0; i < 3; i++) {
+            const r = await rec({ questionId: qid, discordId: await seedUser(0), text: 'bad' })
+            expect(r).toEqual({ status: 'recorded', pulled: false, eligible: false })
+          }
+          // three brand-new accounts, even if they were members
+          for (let i = 0; i < 3; i++) {
+            const id = young()
+            members.add(id)
+            expect(await rec({ questionId: qid, discordId: id, text: 'bad' })).toMatchObject({ eligible: false, pulled: false })
+          }
+          expect((await L.prisma.triviaReport.findMany({ where: { questionId: qid } })).every((r: any) => r.status === 'ineligible')).toBe(true)
+          expect(await L.reports.getDisabledIds()).not.toContain(qid)
+          // two eligible plus the six ineligible: still not pulled; the third eligible one pulls it
+          expect((await rec({ questionId: qid, discordId: await eligibleUser(), text: 'bad' })).pulled).toBe(false)
+          expect((await rec({ questionId: qid, discordId: await eligibleUser(), text: 'bad' })).pulled).toBe(false)
+          expect(await rec({ questionId: qid, discordId: await eligibleUser(), text: 'bad' })).toEqual({ status: 'recorded', pulled: true, eligible: true })
+        }, 90_000)
+
+        it('handled reports never count: a dismiss or a restore is not undone by the old reports', async () => {
+          prodWarn()
+          const qid = dpool()[4].id
+          const a = await eligibleUser()
+          const b = await eligibleUser()
+          await rec({ questionId: qid, discordId: a, text: 'bad' })
+          await rec({ questionId: qid, discordId: b, text: 'bad' })
+          // the admin dismisses: those two no longer count, so one more is only one
+          expect(await L.reports.closeReports(qid)).toBe(2)
+          expect((await rec({ questionId: qid, discordId: await eligibleUser(), text: 'bad' })).pulled).toBe(false)
+          expect(await openCount(qid)).toBe(1)
+          // two more eligible members after the dismiss make three open reports: pulled
+          expect((await rec({ questionId: qid, discordId: await eligibleUser(), text: 'bad' })).pulled).toBe(false)
+          expect((await rec({ questionId: qid, discordId: await eligibleUser(), text: 'bad' })).pulled).toBe(true)
+
+          // the admin restores (and closes what is open, the cutoff): the old reports cannot pull it again
+          expect(await L.reports.setQuestionDisabled(qid, false, 'admin')).toBe(true)
+          await L.reports.closeReports(qid)
+          L.settings.clearSettingsCache()
+          expect((await rec({ questionId: qid, discordId: await eligibleUser(), text: 'bad' })).pulled).toBe(false)
+          expect(await L.reports.getDisabledIds()).not.toContain(qid)
+          expect((await rec({ questionId: qid, discordId: await eligibleUser(), text: 'bad' })).pulled).toBe(false)
+          expect((await rec({ questionId: qid, discordId: await eligibleUser(), text: 'bad' })).pulled).toBe(true) // three NEW ones
+        }, 120_000)
+
+        it('one report per member per question per 7-day window; after a dismiss (or 7 days) the member can report again', async () => {
+          const qid = dpool()[5].id
+          const u = await eligibleUser()
+          expect((await rec({ questionId: qid, discordId: u, text: 'first' })).status).toBe('recorded')
+          expect(await rec({ questionId: qid, discordId: u, text: 'again' })).toEqual({ status: 'duplicate' })
+          await L.reports.closeReports(qid) // dismissed
+          expect((await rec({ questionId: qid, discordId: u, text: 'after the dismiss' })).status).toBe('recorded')
+          expect(await rec({ questionId: qid, discordId: u, text: 'and again' })).toEqual({ status: 'duplicate' })
+          // an 8-day-old report no longer blocks
+          const v = await eligibleUser()
+          await L.prisma.triviaReport.create({ data: { questionId: qid, discordId: v, text: 'old', createdAt: new Date(Date.now() - 8 * 86_400_000) } })
+          expect((await rec({ questionId: qid, discordId: v, text: 'fresh' })).status).toBe('recorded')
+          // 20 at once from one member: one row (an ineligible one counts as a report too)
+          const w = await seedUser(0)
+          const qid2 = dpool()[6].id
+          const rs = await Promise.all(Array.from({ length: N }, () => rec({ questionId: qid2, discordId: w, text: 'x' })))
+          expect(rs.filter((r: any) => r.status === 'recorded')).toHaveLength(1)
+        }, 90_000)
+
+        it("a pull never deletes today's daily attempts: the stored daily keeps being served, and tomorrow does not pick it", async () => {
+          const daily = await L.web.getDailyRound()
+          expect(daily).toBeTruthy()
+          const target = daily!.question.id
+          const u = await seedUser(0)
+          expect(await L.web.recordDailyAttempt(daily!.roundId!, u, true, 'an answer')).toBe(true)
+          await L.reports.setQuestionDisabled(target, true, 'admin') // a pull (or the admin's disable)
+          L.settings.clearSettingsCache()
+          const after = await L.web.getDailyRound()
+          expect(after!.question.id).toBe(target) // same question on screen all day
+          expect(after!.roundId).toBe(daily!.roundId)
+          expect((await L.prisma.triviaAttempt.findMany({ where: { roundId: daily!.roundId } })).map((a: any) => a.discordId)).toContain(u)
+          expect(await L.web.findDailyAttempt(daily!.roundId!, u)).toEqual({ correct: true })
+          // practice no longer serves it, and tomorrow's pick never is it
+          expect((await L.web.practicePool()).some((q: any) => q.id === target)).toBe(false)
+          const { dailyQuestionFor, addDays, dayKeyUtc } = await import('./daily')
+          const tomorrow = dailyQuestionFor(addDays(dayKeyUtc(), 1), L.bank.servable({ pool: 'web', disabledIds: [target] }))
+          expect(tomorrow?.id).not.toBe(target)
+          await L.reports.setQuestionDisabled(target, false, 'admin')
+          L.settings.clearSettingsCache()
+        }, 90_000)
+      })
+
+    })
+
   })
 
   describe('wrong-attempt marks (real attempt counts)', () => {
