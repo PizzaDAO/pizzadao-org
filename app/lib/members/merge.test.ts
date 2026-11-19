@@ -351,7 +351,9 @@ describe('coverage of the schema', () => {
   })
 
   // Member-id columns that are deliberately not merged: they hold a Discord id or a display name, or are audit-only (MemberNameReminder.memberId; its cooldown is keyed by Discord id).
-  const IGNORED = new Set(['ArticleReaction.memberId', 'MafiaRankCache.memberName', 'Proposal.proposerDiscordId', 'Proposal.proposerLabel', 'Vouch.followerId', 'Vouch.followeeId', 'MemberNameReminder.memberId'])
+  const IGNORED = new Set(['ArticleReaction.memberId', 'MafiaRankCache.memberName', 'Proposal.proposerDiscordId', 'Proposal.proposerLabel', 'Vouch.followerId', 'Vouch.followeeId', 'MemberNameReminder.memberId',
+    // The default-PFP job releases a merged member's dough ball back to the pool on its next run.
+    'DefaultPfpAssignment.memberId'])
   it('every member-id column in prisma/schema.prisma is handled or explicitly ignored', () => {
     const schema = readFileSync(join(__dirname, '../../../prisma/schema.prisma'), 'utf8')
     const handled = new Set([...TABLES.map((t) => `${t.model}.${t.field}`), ...IGNORED])

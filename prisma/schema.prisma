@@ -3508,6 +3508,7 @@ model ImageReviewCandidate {
   position  Int
   createdAt DateTime          @default(now())
   votes     ImageReviewVote[]
+  defaultPfpAssignment DefaultPfpAssignment?
 
   @@index([setId, position])
 }
@@ -3522,4 +3523,27 @@ model ImageReviewVote {
 
   @@id([candidateId, discordId])
   @@index([discordId])
+}
+
+/// A member's own dough-ball picture (the default PFP for members without one). One image per member
+/// and one member per image (candidateId is unique). Deleting the candidate drops the assignment so
+/// the member falls back and is reassigned by the job. No FK to Member on purpose (ids are sheet ids).
+model DefaultPfpAssignment {
+  memberId    String               @id
+  candidateId String               @unique
+  candidate   ImageReviewCandidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  source      String               @db.VarChar(16) // pool | generated
+  assignedAt  DateTime             @default(now())
+}
+
+/// One on-demand dough-ball generation (cost control and audit). costCents is an estimate booked
+/// before the call; refused and failed-without-billing calls are set to 0. No FK on purpose.
+model DefaultPfpGeneration {
+  id          Int      @id @default(autoincrement())
+  candidateId String?
+  status      String   @db.VarChar(16) // pending | ok | error | refused
+  costCents   Int
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
 }
