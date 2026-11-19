@@ -3,11 +3,11 @@
 // Discord message builders for the loop (plans/trivia.md section 6). Pure. Every message sets
 // allowed_mentions explicitly: question and reveal posts ping nobody, the winner post pings only the winner.
 import { reveal } from "./bank";
-import { ROUND_MINUTES } from "./config";
+import { ROUND_MINUTES, TF_REACTIONS } from "./config";
+import type { ChoiceLabels } from "./emoji";
 import type { TriviaQuestion } from "./schema";
 import { DISCORD_MESSAGE_LIMIT, type DiscordMessageBody } from "@/app/lib/discord-rest";
 
-const CHOICE_EMOJI = ["🅰️", "🅱️", "🅲", "🅳"] as const;
 const TYPE_LABEL: Record<TriviaQuestion["type"], string> = {
   true_false: "true or false",
   short_answer: "short answer",
@@ -26,8 +26,12 @@ function fit(content: string): string {
   return clip(content, DISCORD_MESSAGE_LIMIT - 20);
 }
 
-/** The question post. `rewardPep` 0 = a dry run: the post says nothing is paid. */
-export function questionMessage(q: TriviaQuestion, rewardPep: number): DiscordMessageBody {
+/**
+ * The question post. `rewardPep` 0 = a dry run: the post says nothing is paid. Multiple-choice choices are prefixed
+ * with `labels.display` (the turtle emoji, or the regional indicators when one is missing); the bot pre-adds the
+ * matching reactions right after posting, and true/false pre-adds the two below. Typed answers keep working.
+ */
+export function questionMessage(q: TriviaQuestion, rewardPep: number, labels?: ChoiceLabels): DiscordMessageBody {
   const head =
     rewardPep > 0
       ? `🎲 Trivia Time! First to answer correctly wins ${rewardPep} $PEP:`
@@ -35,8 +39,14 @@ export function questionMessage(q: TriviaQuestion, rewardPep: number): DiscordMe
   const lines = [head];
   if (q.label) lines.push(q.label);
   lines.push(`**${q.question}**`);
-  if (q.choices) lines.push(...q.choices.map((c, i) => `${CHOICE_EMOJI[i] ?? `${i + 1}.`} ${c}`));
-  lines.push(`(${TYPE_LABEL[q.type]} · ${q.difficulty} · ${ROUND_MINUTES} min)`);
+  if (q.choices) lines.push(...q.choices.map((c, i) => `${labels?.display[i] ?? `${String.fromCharCode(65 + i)}.`} ${c}`));
+  const how =
+    q.type === "true_false"
+      ? ` · react ${TF_REACTIONS.true} or ${TF_REACTIONS.false}, or type true / false`
+      : q.type === "multiple_choice"
+        ? " · react with your pick, or type the answer"
+        : "";
+  lines.push(`(${TYPE_LABEL[q.type]} · ${q.difficulty} · ${ROUND_MINUTES} min${how})`);
   return { content: fit(lines.join("\n")), allowed_mentions: NO_PINGS };
 }
 

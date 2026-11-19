@@ -190,6 +190,26 @@ export async function getGuildRoles(opts: DiscordOpts = {}): Promise<GuildRole[]
   return roles
 }
 
+let emojiCache: { guildId: string; ids: Set<string>; at: number } | null = null
+const EMOJI_TTL_MS = 5 * 60 * 1000
+
+/** Ids of the guild's custom emoji (cached 5 minutes), or null when they cannot be read. */
+export async function getGuildEmojiIds(opts: DiscordOpts = {}): Promise<Set<string> | null> {
+  const guildId = guild(opts)
+  if (!guildId) return null
+  const now = opts.now ?? Date.now()
+  if (emojiCache && emojiCache.guildId === guildId && now - emojiCache.at < EMOJI_TTL_MS) return emojiCache.ids
+  const r = await getJson(`/guilds/${guildId}/emojis`, opts)
+  if (!r.ok || !Array.isArray(r.json)) return emojiCache?.guildId === guildId ? emojiCache.ids : null
+  const ids = new Set((r.json as Array<{ id?: unknown }>).map((e) => String(e.id ?? '')).filter(Boolean))
+  emojiCache = { guildId, ids, at: now }
+  return ids
+}
+
+export function clearGuildEmojiCache() {
+  emojiCache = null
+}
+
 /** Normalize a channel name for matching: "#Show-and-Tell" / "🎨・show-and-tell" -> "show-and-tell". */
 export function normalizeChannelName(name: string): string {
   return name

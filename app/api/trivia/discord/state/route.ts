@@ -21,7 +21,9 @@ export async function GET(request: Request): Promise<NextResponse> {
     if (!(await triviaLive())) return reply({ ok: true, open: false });
     const channelId = await resolveTriviaChannel();
     if (!channelId) return reply({ ok: true, open: false });
-    return reply({ ok: true, open: !!(await findOpenRound(channelId)), channelId });
+    const round = await findOpenRound(channelId);
+    // messageId: the question post, so the recorder forwards reactions on that message only.
+    return reply({ ok: true, open: !!round, channelId, messageId: round?.messageId ?? null });
   } catch (err) {
     return internalError(err, "trivia/discord/state", "Could not read the trivia state");
   }

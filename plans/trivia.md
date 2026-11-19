@@ -256,7 +256,7 @@ model TriviaReport { id Int @id @default(autoincrement()); questionId String; di
      - No number found → `ignore`.
    - **choice:**
      - Accept a letter (`b`, `(b)`, `b)`, `b.`, `option b`) for the choice index, or the choice text / alias through the text matcher.
-     - On Discord the post lists choices as 🅰️–🅳.
+     - On Discord the post labels choices with the server's turtle emoji (A = Leonardo ... D = Michelangelo; regional-indicator fallback), see §17; typing the letter or the text still counts.
    - **text:**
      1. `rejects` first: an exact or fuzzy (≤ 1) match → `wrong`. This beats aliases.
      2. Exact match against `answer` + `aliases` (normalized) → `correct`.
@@ -535,3 +535,20 @@ Rejected (`bt-000`) and flagged entries are left as they are in the bank. They m
 - **Not built (by design):** the snowflake tie-break log of §7 (the serial queue makes it unreachable; the single conditional UPDATE is the real guard), `trivia.windowsUtc` / `trivia.roundMinutes` / `trivia.disabledQuestionIds` as editable settings (constants for launch), the web daily ensure step in the cron (the web page already creates its round on first view).
 - **Rename-proofing:** see §13.2.
 - **Go-live checklist:** see the PR description.
+
+## 17. Reaction answers (Discord)
+
+Snax answered a multiple-choice question by clicking a reaction in the first live test, so the post now asks for reactions and the bot reads them. Typed answers keep working exactly as before.
+
+- **The post.**
+  - Multiple choice: each choice is prefixed with a custom turtle emoji instead of A-D, in theme-song order: **A = `1_leonardo`, B = `1_donatello`, C = `1_raphael`, D = `1_michelangelo`** (ids in `CHOICE_EMOJI`, `app/lib/trivia/config.ts`, the only place the mapping lives). The hint line says "react with your pick, or type its letter".
+  - True/false: the post says "react ✅ or ❌, or type true / false".
+  - Short answer: unchanged, no reactions.
+- **Pre-added reactions.** Right after posting, the bot adds one reaction per choice (or ✅ then ❌), in order, about 350 ms apart (`addQuestionReactions`). A failure is logged (throttled) and never undoes the round. The bot checks its channel permissions first (read-only, `botChannelPerms`, reusing `computeChannelPermissions`): without Add Reactions or Read Message History it adds nothing and says so; without Manage Messages it still adds them and warns that picks stay visible.
+- **Fallback.** If any turtle needed for the round is missing from the server's emoji (deleted), or the emoji list cannot be read, the whole round uses the regional indicators 🇦 🇧 🇨 🇩 and logs it (throttled). Both sets always map to the same choice positions, so nothing is stored per round.
+- **Reading reactions (recorder).** Needs the non-privileged `GuildMessageReactions` intent (no Developer Portal switch) and the Message + Reaction partials, so a reaction on an uncached question post still fires. `messageReactionAdd` goes to the same per-channel queue as typed answers, in Discord order. Dropped in the recorder: bots (including the bot's own pre-added reactions), other channels and guilds, anything while no round is open, and any message other than the question post (the state poll `GET /api/trivia/discord/state` now also returns its `messageId`). Reactions in the 10 s before the poll sees a round open are kept and sent when it opens.
+- **The API.** `POST /api/trivia/discord/answer` takes `{ kind: "reaction", channelId, messageId, authorId, emoji: { id, name } }` (`messageId` = the message reacted to). The app maps the emoji to a choice (turtle id or regional indicator by position; ✅ = true, ❌ = false), so the mapping is not duplicated in the recorder (a deviation from sending `choiceIndex`). The route and the rules are the same as typed answers: open round, **must be the current question post**, eligibility (onboarded member, account age), the attempt cap (1 for true/false and multiple choice), the daily cap, `claimWin`, dry run.
+- **Dedupe: the first reaction is the only attempt.** The attempt key is `reaction:<question message id>:<member id>` (stored in `TriviaAttempt.messageId`); a later reaction by the same member, even a different emoji, is a duplicate. A member's attempts in a round are now serialised with a per-(round, member) Postgres advisory lock inside `claimWin`, so a typed answer and a reaction at the same moment, or any two near-simultaneous answers, can no longer both pass the attempt cap (found by the real-database test: without the lock both were recorded).
+- **Hiding picks.** Live reaction counts would show what others picked, so after a pick on the current question the app removes that member's reaction (`DELETE .../reactions/{emoji}/{userId}`, queued before the claim so even a failed claim hides it), whatever the outcome (wrong, right, duplicate, exhausted, ineligible). Later reactions by the same member are removed too and do not count. Reactions on other messages, with other emoji, or after the round closed are left alone. **The answer stays secret only if removal works:** it needs **Manage Messages** in the trivia channel. If Discord refuses, the app logs once per 5 minutes and carries on (answers still count; the picks are just visible). Nothing in code changes permissions.
+- **Leftovers.** When a round closes the bot's own reactions stay on the post; reactions added after close are ignored (no open round). A winner by reaction is announced as a reply to the question post (there is no answer message to reply to).
+- **Needed in Discord:** the bot needs Add Reactions, Read Message History and Manage Messages in the trivia channel (view and send already). The recorder needs a redeploy for the new intent and handler.

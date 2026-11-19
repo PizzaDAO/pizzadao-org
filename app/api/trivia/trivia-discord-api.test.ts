@@ -9,7 +9,7 @@ vi.mock("@/app/lib/trivia/cron", () => ({ runTriviaCron: vi.fn(async () => ({ st
 vi.mock("@/app/lib/trivia/enabled", () => ({ triviaLive: vi.fn(async () => false), isProductionDeploy: () => false }));
 vi.mock("@/app/lib/trivia/channel", () => ({ resolveTriviaChannel: vi.fn(async () => "850000000000000001") }));
 vi.mock("@/app/lib/trivia/rounds", () => ({ findOpenRound: vi.fn(async () => null) }));
-vi.mock("@/app/lib/trivia/answer", () => ({ defaultAnswerDeps: vi.fn(() => ({})), processAnswer: vi.fn(async () => ({ status: "wrong" })) }));
+vi.mock("@/app/lib/trivia/answer", () => ({ defaultAnswerDeps: vi.fn(() => ({})), processAnswer: vi.fn(async () => ({ status: "wrong" })), processReaction: vi.fn(async () => ({ status: "wrong" })) }));
 
 import { GET as cronGET } from "@/app/api/cron/trivia/route";
 import { POST as answerPOST } from "@/app/api/trivia/discord/answer/route";
@@ -17,7 +17,7 @@ import { GET as stateGET } from "@/app/api/trivia/discord/state/route";
 import { findOpenRound } from "@/app/lib/trivia/rounds";
 import { runTriviaCron } from "@/app/lib/trivia/cron";
 import { triviaLive } from "@/app/lib/trivia/enabled";
-import { processAnswer } from "@/app/lib/trivia/answer";
+import { processAnswer, processReaction } from "@/app/lib/trivia/answer";
 
 const CHAN = "850000000000000001";
 const good = { channelId: CHAN, messageId: "850000000000000009", authorId: "310000000000000000", content: "true" };
@@ -30,6 +30,7 @@ beforeEach(() => {
   vi.mocked(triviaLive).mockReset();
   vi.mocked(triviaLive).mockResolvedValue(false);
   vi.mocked(processAnswer).mockClear();
+  vi.mocked(processReaction).mockClear();
   vi.mocked(runTriviaCron).mockClear();
 });
 afterEach(() => {
@@ -110,6 +111,63 @@ describe("POST /api/trivia/discord/answer", () => {
   });
 });
 
+describe("POST /api/trivia/discord/answer, kind reaction", () => {
+  const reaction = { kind: "reaction", channelId: CHAN, messageId: "850000000000000010", authorId: "310000000000000000", emoji: { id: "814002564743692289", name: "1_raphael" } };
+
+  it("401 without the key, before anything is read", async () => {
+    expect((await answer(reaction)).status).toBe(401);
+    expect(triviaLive).not.toHaveBeenCalled();
+    expect(processReaction).not.toHaveBeenCalled();
+  });
+
+  it("400 for a malformed reaction (no emoji, a bad id, a long name, a text answer's fields only)", async () => {
+    for (const bad of [
+      { ...reaction, emoji: undefined },
+      { ...reaction, emoji: null },
+      { ...reaction, emoji: { id: "nope", name: "x" } },
+      { ...reaction, emoji: { id: null, name: "x".repeat(65) } },
+      { ...reaction, emoji: { id: null, name: null } },
+      { ...reaction, messageId: "x" },
+      { kind: "other", channelId: CHAN, messageId: "850000000000000010", authorId: "310000000000000000", content: "true" },
+    ]) {
+      expect((await answer(bad, "Bearer recorder-key")).status).toBe(400);
+    }
+    expect(processReaction).not.toHaveBeenCalled();
+    expect(processAnswer).not.toHaveBeenCalled();
+  });
+
+  it("off: 200 {status: off} and nothing is processed", async () => {
+    expect(await (await answer(reaction, "Bearer recorder-key")).json()).toEqual({ ok: true, status: "off" });
+    expect(processReaction).not.toHaveBeenCalled();
+  });
+
+  it("on: a reaction goes to processReaction with the emoji, never to the typed-answer path", async () => {
+    vi.mocked(triviaLive).mockResolvedValue(true);
+    const res = await answer(reaction, "Bearer recorder-key");
+    expect(await res.json()).toEqual({ ok: true, status: "wrong" });
+    expect(processReaction).toHaveBeenCalledWith({ channelId: CHAN, messageId: reaction.messageId, discordId: reaction.authorId, emoji: reaction.emoji }, expect.anything());
+    expect(processAnswer).not.toHaveBeenCalled();
+  });
+
+  it("a unicode emoji (no id) is accepted", async () => {
+    vi.mocked(triviaLive).mockResolvedValue(true);
+    await answer({ ...reaction, emoji: { id: null, name: "\u2705" } }, "Bearer recorder-key");
+    expect(processReaction).toHaveBeenCalledWith(expect.objectContaining({ emoji: { id: null, name: "\u2705" } }), expect.anything());
+  });
+
+  it("on: a reaction in any other channel is not processed", async () => {
+    vi.mocked(triviaLive).mockResolvedValue(true);
+    expect(await (await answer({ ...reaction, channelId: "850000000000000099" }, "Bearer recorder-key")).json()).toEqual({ ok: true, status: "no_round" });
+    expect(processReaction).not.toHaveBeenCalled();
+  });
+
+  it("a typed answer with kind message still works exactly as before", async () => {
+    vi.mocked(triviaLive).mockResolvedValue(true);
+    await answer({ ...good, kind: "message" }, "Bearer recorder-key");
+    expect(processAnswer).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("GET /api/trivia/discord/state", () => {
   const state = (auth?: string) => stateGET(new Request("https://x.test/api/trivia/discord/state", { headers: auth ? { authorization: auth } : {} }));
 
@@ -130,8 +188,8 @@ describe("GET /api/trivia/discord/state", () => {
     vi.mocked(triviaLive).mockResolvedValue(true);
     vi.mocked(findOpenRound).mockResolvedValueOnce(null);
     expect(await (await state("Bearer recorder-key")).json()).toMatchObject({ ok: true, open: false });
-    vi.mocked(findOpenRound).mockResolvedValueOnce({ id: 1 } as never);
-    expect(await (await state("Bearer recorder-key")).json()).toMatchObject({ ok: true, open: true, channelId: CHAN });
+    vi.mocked(findOpenRound).mockResolvedValueOnce({ id: 1, messageId: "850000000000000010" } as never);
+    expect(await (await state("Bearer recorder-key")).json()).toMatchObject({ ok: true, open: true, channelId: CHAN, messageId: "850000000000000010" });
     expect(findOpenRound).toHaveBeenCalledWith(CHAN);
   });
 });

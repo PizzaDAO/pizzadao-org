@@ -16,7 +16,7 @@ import { createR2Uploader } from './storage.js'
 import { postIngestWithRetry } from './ingest.js'
 import { handleDm, postFollowupInbound, type DmMessage } from './dm-forward.js'
 import { RemoteConfigClient } from './remote-config.js'
-import { fetchTriviaState, postTriviaAnswer, TriviaForwarder, type TriviaMessage } from './trivia-forward.js'
+import { fetchTriviaRound, postTriviaAnswer, TriviaForwarder, type TriviaMessage, type TriviaReaction } from './trivia-forward.js'
 import { ActivityCounter, postActivityBatch, toActivityEvent, type MessageLike } from './discord-activity.js'
 
 const log = (msg: string) => console.log(`${new Date().toISOString()} ${msg}`)
@@ -38,11 +38,14 @@ else intents.push(GatewayIntentBits.GuildMessages)
 // FOLLOWUP_DM_FORWARD (default off) adds DirectMessages, a NON-privileged intent (DM content is delivered
 // without MessageContent), and the Channel partial (DM channels are not cached).
 if (cfg.followupDmForward) intents.push(GatewayIntentBits.DirectMessages)
+// Discord trivia reaction answers: GuildMessageReactions is NOT privileged (no Developer Portal switch needed).
+intents.push(GatewayIntentBits.GuildMessageReactions)
 const client = new Client({
   intents,
   // Deletes/edits of messages we did not cache still fire (as partials); cache few messages, and
   // drop them quickly: only the call channel's chat matters.
-  partials: [...(cfg.captureVoiceChat ? [Partials.Message] : []), ...(cfg.followupDmForward ? [Partials.Channel] : [])],
+  // Message + Reaction partials: a reaction on a question post the bot has not cached still fires (trivia reaction answers).
+  partials: [Partials.Message, Partials.Reaction, ...(cfg.followupDmForward ? [Partials.Channel] : [])],
   makeCache: Options.cacheWithLimits({ ...Options.DefaultMakeCacheSettings, MessageManager: cfg.captureVoiceChat ? 50 : 0 }),
   sweepers: { ...Options.DefaultSweeperSettings, messages: { interval: 300, lifetime: 1800 } },
 })
@@ -140,8 +143,23 @@ const trivia = new TriviaForwarder({
   guildId: cfg.guildId,
 })
 client.on('messageCreate', (m) => trivia.onMessage(m as unknown as TriviaMessage))
+// Reaction answers: the bot pre-adds one reaction per choice to the question post and a member answers with one click.
+// Needs the GuildMessageReactions intent (not privileged) and the Reaction + Message partials (an uncached question post).
+client.on('messageReactionAdd', (reaction, user) => {
+  try {
+    trivia.onReaction({
+      messageId: reaction.message.id,
+      channelId: reaction.message.channelId,
+      guildId: reaction.message.guildId ?? null,
+      emoji: { id: reaction.emoji.id ?? null, name: reaction.emoji.name ?? null },
+      user: { id: user.id, bot: user.bot === true },
+    } satisfies TriviaReaction)
+  } catch (err) {
+    log(`trivia reaction failed: ${err instanceof Error ? err.message : String(err)}`)
+  }
+})
 // Forward only while a round is open: ask the app every 5 s (nothing is requested while trivia is off in the remote config).
-setInterval(() => void trivia.refreshState(() => fetchTriviaState(cfg.appBaseUrl, cfg.recorderApiKey)), 5_000).unref()
+setInterval(() => void trivia.refreshState(() => fetchTriviaRound(cfg.appBaseUrl, cfg.recorderApiKey)), 5_000).unref()
 if (cfg.followupDmForward) {
   // Own handler: fire and forget (retries run in the background), so it can never delay or break recording.
   const dmDeps = {

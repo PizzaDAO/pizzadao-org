@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { FORWARD_RETRY_DELAYS_MS, MAX_FORWARD_CHARS, MAX_QUEUED_PER_CHANNEL, PRE_OPEN_BUFFER_MS, REFUSED_LOG_EVERY_MS, fetchTriviaState, postTriviaAnswer, TriviaForwarder, type ForwardBody, type ForwardResult, type TriviaForwardConfig, type TriviaForwardDeps, type TriviaMessage } from './trivia-forward.js'
+import { FORWARD_RETRY_DELAYS_MS, MAX_FORWARD_CHARS, MAX_QUEUED_PER_CHANNEL, PRE_OPEN_BUFFER_MS, REFUSED_LOG_EVERY_MS, fetchTriviaRound, fetchTriviaState, postTriviaAnswer, TriviaForwarder, type ForwardBody, type ForwardResult, type TriviaForwardConfig, type TriviaForwardDeps, type TriviaMessage, type TriviaReaction, type AnyForwardBody, type TriviaRoundState } from './trivia-forward.js'
 import { parseRemoteConfig, REMOTE_CONFIG_OFF } from './remote-config.js'
 
 const GUILD = '800000000000000001'
@@ -332,5 +332,193 @@ describe('isolation from recording', () => {
     const { readFileSync } = await import('node:fs')
     const src = readFileSync(new URL('./trivia-forward.ts', import.meta.url), 'utf8')
     expect(src).not.toMatch(/from '\.\/(recorder|finalize|capture)\.js'/)
+  })
+})
+
+const QMSG = '900000000000000100'
+function react(over: Partial<TriviaReaction> = {}): TriviaReaction {
+  return { messageId: QMSG, channelId: CHAN, guildId: GUILD, emoji: { id: '814002564743692289', name: '1_raphael' }, user: { id: '111111111111111111', bot: false }, ...over }
+}
+
+describe('reaction answers', () => {
+  function setupReactions(open = true, questionId: string | null = QMSG) {
+    const bodies: AnyForwardBody[] = []
+    const post = vi.fn(async (b: AnyForwardBody) => (bodies.push(b), 'ok' as ForwardResult))
+    const f = mk({ config: () => ON, post, sleep: async () => {}, log: vi.fn(), guildId: GUILD }, undefined, false)
+    if (open) f.setOpen(true, Date.now(), questionId)
+    return { f, bodies, post }
+  }
+
+  it('forwards a human reaction on the question post as kind reaction with the emoji', async () => {
+    const { f, bodies } = setupReactions()
+    f.onReaction(react())
+    await f.idle()
+    expect(bodies).toEqual([{ kind: 'reaction', channelId: CHAN, messageId: QMSG, authorId: '111111111111111111', emoji: { id: '814002564743692289', name: '1_raphael' } }])
+  })
+
+  it('a unicode reaction goes with a null id', async () => {
+    const { f, bodies } = setupReactions()
+    f.onReaction(react({ emoji: { id: null, name: '\u2705' } }))
+    await f.idle()
+    expect(bodies[0]).toMatchObject({ emoji: { id: null, name: '\u2705' } })
+  })
+
+  it('ignores bots, including the bot\'s own pre-added reactions', async () => {
+    const { f, post } = setupReactions()
+    f.onReaction(react({ user: { id: '999', bot: true } }))
+    await f.idle()
+    expect(post).not.toHaveBeenCalled()
+  })
+
+  it('ignores reactions on any message other than the question post (once the app has said which it is)', async () => {
+    const { f, post } = setupReactions()
+    f.onReaction(react({ messageId: '900000000000000999' }))
+    await f.idle()
+    expect(post).not.toHaveBeenCalled() // no poller yet, so nothing to refresh either
+  })
+
+  it('without a known question post it forwards (the app checks the message), but never another channel or guild', async () => {
+    const { f, post } = setupReactions(true, null)
+    f.onReaction(react({ messageId: '900000000000000999' }))
+    f.onReaction(react({ channelId: '800000000000000099' }))
+    f.onReaction(react({ guildId: '5' }))
+    f.onReaction(react({ guildId: null }))
+    f.onReaction(react({ emoji: { id: null, name: null } }))
+    await f.idle()
+    expect(post).toHaveBeenCalledTimes(1)
+  })
+
+  it('forwards nothing while the round is closed, and nothing when trivia is off', async () => {
+    const closed = setupReactions(false)
+    closed.f.onReaction(react())
+    await closed.f.idle()
+    expect(closed.post).not.toHaveBeenCalled()
+    const off = new TriviaForwarder({ config: () => ({ enabled: false, channelIds: [CHAN] }), post: vi.fn(async () => 'ok' as ForwardResult), sleep: async () => {}, log: () => {}, guildId: GUILD })
+    off.setOpen(true, Date.now(), QMSG)
+    off.onReaction(react())
+    await off.idle()
+  })
+
+  it('a reaction seen just before the round was known open is sent when it opens, only if it was on the question post', async () => {
+    const { f, bodies } = setupReactions(false)
+    f.onReaction(react())
+    f.onReaction(react({ messageId: '900000000000000999', user: { id: '222222222222222222', bot: false } }))
+    f.setOpen(true, Date.now(), QMSG)
+    await f.idle()
+    expect(bodies).toHaveLength(1)
+    expect(bodies[0]).toMatchObject({ kind: 'reaction', messageId: QMSG })
+  })
+
+  it('reactions and typed answers share one per-channel queue, so they reach the app in Discord order', async () => {
+    const order: string[] = []
+    const f = mk({
+      config: () => ON,
+      post: async (b: AnyForwardBody) => {
+        await new Promise((r) => setTimeout(r, 'kind' in b ? 1 : 15))
+        order.push('kind' in b ? 'reaction' : b.content)
+        return 'ok'
+      },
+      sleep: async () => {},
+      log: () => {},
+      guildId: GUILD,
+    })
+    f.setOpen(true, Date.now(), QMSG)
+    f.onMessage(msg({ content: 'true' }))
+    f.onReaction(react())
+    await f.idle()
+    expect(order).toEqual(['true', 'reaction'])
+  })
+
+  it('a refused reaction is dropped, not retried; the throttled warning applies', async () => {
+    const post = vi.fn(async () => 'refused' as ForwardResult)
+    const log = vi.fn()
+    const f = mk({ config: () => ON, post, sleep: vi.fn(async () => {}), log, guildId: GUILD })
+    f.setOpen(true, Date.now(), QMSG)
+    f.onReaction(react())
+    await f.idle()
+    expect(post).toHaveBeenCalledTimes(1)
+    expect(log.mock.calls.flat().join(' ')).toContain('refused')
+  })
+
+  it('postTriviaAnswer sends the reaction body as is', async () => {
+    const body: AnyForwardBody = { kind: 'reaction', channelId: CHAN, messageId: QMSG, authorId: '1', emoji: { id: null, name: '\u274C' } }
+    const fetchImpl = vi.fn(async () => new Response('{}', { status: 200 }))
+    expect(await postTriviaAnswer('https://app.test', 'KEY', body, fetchImpl as unknown as typeof fetch)).toBe('ok')
+    expect(JSON.parse((fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].body as string)).toEqual(body)
+  })
+
+  it('fetchTriviaRound reports whether a round is open and its question post', async () => {
+    const ask = (r: Response | Error) => fetchTriviaRound('https://app.test', 'KEY', (async () => { if (r instanceof Error) throw r; return r }) as unknown as typeof fetch)
+    expect(await ask(new Response(JSON.stringify({ ok: true, open: true, messageId: QMSG }), { status: 200 }))).toEqual({ open: true, messageId: QMSG })
+    expect(await ask(new Response(JSON.stringify({ ok: true, open: false, messageId: null }), { status: 200 }))).toEqual({ open: false, messageId: null })
+    expect(await ask(new Response(JSON.stringify({ open: true, messageId: 'junk' }), { status: 200 }))).toEqual({ open: true, messageId: null })
+    expect(await ask(new Response('{}', { status: 401 }))).toBeNull()
+    expect(await ask(new Error('net'))).toBeNull()
+  })
+
+  it('refreshState passes the question post on, and a closed state forgets it', async () => {
+    const { f, bodies } = setupReactions(false)
+    await f.refreshState(async () => ({ open: true, messageId: QMSG }))
+    f.onReaction(react({ messageId: '900000000000000999' }))
+    f.onReaction(react())
+    await f.idle()
+    expect(bodies).toHaveLength(1)
+    await f.refreshState(async () => ({ open: false, messageId: null }))
+    f.onReaction(react())
+    await f.idle()
+    expect(bodies).toHaveLength(1)
+  })
+
+  it('a new round opening between two polls: the pick on the new post triggers an immediate poll and is then forwarded', async () => {
+    const NEW = '900000000000000200'
+    const bodies: AnyForwardBody[] = []
+    const post = vi.fn(async (b: AnyForwardBody) => (bodies.push(b), 'ok' as ForwardResult))
+    const f = mk({ config: () => ON, post, sleep: async () => {}, log: vi.fn(), guildId: GUILD }, undefined, false)
+    // The last poll saw round 1 (open, post QMSG).
+    await f.refreshState(async () => ({ open: true, messageId: QMSG }))
+    // Round 2 has opened since; the next poll (when asked) says so.
+    const poll = vi.fn(async () => ({ open: true, messageId: NEW }) as { open: boolean; messageId: string | null })
+    f.onReaction(react({ messageId: NEW })) // dropped as "another message" before; now buffered while the poll runs
+    // (the forwarder polls with the fetcher it was last given: hand it the updated one)
+    await f.refreshState(poll) // the 5 s tick, or the immediate poll: same code path
+    await f.idle()
+    expect(bodies).toHaveLength(1)
+    expect(bodies[0]).toMatchObject({ kind: 'reaction', messageId: NEW })
+  })
+
+  it('a pick on an unknown message while open polls immediately (debounced to one in flight, one per second), then forwards once the app names it', async () => {
+    const NEW = '900000000000000200'
+    const bodies: AnyForwardBody[] = []
+    const post = vi.fn(async (b: AnyForwardBody) => (bodies.push(b), 'ok' as ForwardResult))
+    const f = mk({ config: () => ON, post, sleep: async () => {}, log: vi.fn(), guildId: GUILD }, undefined, false)
+    let state: TriviaRoundState = { open: true, messageId: QMSG }
+    let release: () => void = () => {}
+    let calls = 0
+    const fetchState = vi.fn(async () => {
+      calls++
+      if (calls > 1) await new Promise<void>((r) => (release = r)) // the immediate poll is slow
+      return state
+    })
+    await f.refreshState(fetchState) // the regular tick: round 1
+    state = { open: true, messageId: NEW } // round 2 opened
+    for (let i = 0; i < 5; i++) f.onReaction(react({ messageId: NEW, user: { id: `22222222222222222${i}`, bot: false } }))
+    await new Promise((r) => setTimeout(r, 5))
+    expect(fetchState).toHaveBeenCalledTimes(2) // one immediate poll, not five
+    expect(bodies).toHaveLength(0)
+    release()
+    await new Promise((r) => setTimeout(r, 5))
+    await f.idle()
+    expect(bodies).toHaveLength(5) // all five picks sent once the new post was known
+    expect(bodies.every((b) => b.messageId === NEW)).toBe(true)
+  })
+
+  it('a pick on a message that is still not the question post after the poll ages out and is never sent', async () => {
+    const { f, post } = setupReactions()
+    await f.refreshState(async () => ({ open: true, messageId: QMSG }))
+    f.onReaction(react({ messageId: '900000000000000999' }))
+    await new Promise((r) => setTimeout(r, 5))
+    await f.refreshState(async () => ({ open: true, messageId: QMSG }))
+    await f.idle()
+    expect(post).not.toHaveBeenCalled()
   })
 })

@@ -276,3 +276,45 @@ export async function discordScheduledEventRequest(
     throw new DiscordPostError(`Discord API error ${res.status} on ${where}: ${text.slice(0, 300)}`, res.status);
   }
 }
+
+/** A reaction as the REST path wants it: a unicode emoji as is, a custom one as `name:id`. */
+export function reactionPath(emoji: string): string {
+  return encodeURIComponent(emoji);
+}
+
+async function reactionRequest(
+  method: "PUT" | "DELETE",
+  target: { channelId: string; messageId: string; emoji: string; botToken: string; userId?: string },
+  opts: DiscordPostOptions = {},
+): Promise<void> {
+  const doFetch = opts.fetchImpl ?? fetch;
+  const sleep = opts.sleep ?? defaultSleep;
+  const who = target.userId ?? "@me";
+  const url = `https://discord.com/api/v10/channels/${target.channelId}/messages/${target.messageId}/reactions/${reactionPath(target.emoji)}/${who}`;
+  for (let attempt = 1; ; attempt++) {
+    const res = await doFetch(url, { method, headers: { Authorization: `Bot ${target.botToken}` }, cache: "no-store" });
+    if (res.ok) return;
+    const text = await res.text().catch(() => "");
+    if (res.status === 429 && attempt < (opts.maxAttempts ?? 3)) {
+      const { retryAfterMs, cloudflare } = parseRateLimit(res.headers, text);
+      if (!cloudflare && (retryAfterMs ?? 1000) <= (opts.maxWaitMs ?? 5000)) {
+        await sleep((retryAfterMs ?? 1000) + 250);
+        continue;
+      }
+    }
+    throw new DiscordPostError(`Discord API error ${res.status} on a reaction (${method}): ${text.slice(0, 160)}`, res.status);
+  }
+}
+
+/** Add the bot's own reaction to a message (needs Add Reactions and Read Message History). */
+export function addDiscordReaction(target: { channelId: string; messageId: string; emoji: string; botToken: string }, opts?: DiscordPostOptions): Promise<void> {
+  return reactionRequest("PUT", target, opts);
+}
+
+/** Remove another member's reaction from a message (needs Manage Messages). */
+export function removeDiscordReaction(
+  target: { channelId: string; messageId: string; emoji: string; userId: string; botToken: string },
+  opts?: DiscordPostOptions,
+): Promise<void> {
+  return reactionRequest("DELETE", target, opts);
+}

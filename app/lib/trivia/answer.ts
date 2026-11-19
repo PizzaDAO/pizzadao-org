@@ -5,7 +5,9 @@
 // here (bank, settings, caps). Answers reach this in Discord order (the recorder's per-channel serial queue).
 import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
 import { getQuestion } from "./bank";
-import { attemptsPerRound, MIN_ACCOUNT_AGE_DAYS, REQUIRE_MEMBER, snowflakeAfter, snowflakeMs } from "./config";
+import { attemptsPerRound, MIN_ACCOUNT_AGE_DAYS, reactionAttemptKey, REQUIRE_MEMBER, snowflakeAfter, snowflakeMs } from "./config";
+import { emojiToReaction, judgeReaction, type ReactionEmoji } from "./emoji";
+import { removeMemberReaction } from "./reactions";
 import { match } from "./match";
 import { announceWin, claimWin, defaultPostDeps, findAttemptByMessage, findOpenRound, hasRecentAttempt, type ClaimResult, type Eligibility, type PostDeps } from "./rounds";
 
@@ -21,7 +23,7 @@ export interface AnswerInput {
 export type AnswerOutcome =
   | { status: "off" }
   | { status: "no_round" }
-  | { status: "ignored"; why: "before_question" | "rate_limited" | "not_an_answer" | "no_question" }
+  | { status: "ignored"; why: "before_question" | "rate_limited" | "not_an_answer" | "no_question" | "not_current_message" | "not_a_choice" }
   | { status: "wrong" }
   | { status: "won"; rewardPep: number; paid: boolean }
   | { status: "not_won"; why: "not_member" | "too_young" | "daily_cap" | "late" | "closed" | "attempts_exhausted" }
@@ -34,6 +36,8 @@ export interface AnswerDeps extends PostDeps {
   findAttempt(messageId: string): Promise<{ correct: boolean } | null>;
   /** True when this member already has an attempt in this round in the last 2 seconds (extras are ignored). */
   throttled(roundId: number, discordId: string, now: Date): Promise<boolean>;
+  /** Remove a member's reaction after their attempt (never throws; absent: nothing is removed). */
+  removeReaction?(channelId: string, messageId: string, reaction: string, userId: string): Promise<void>;
   /** Run after the response (Next after()): replies are posted off the request path. */
   defer(fn: () => Promise<void>): void;
 }
@@ -44,6 +48,7 @@ export const defaultAnswerDeps = (defer: (fn: () => Promise<void>) => void): Ans
   isMember: async (id) => !!(await fetchMemberIdByDiscordId(id)),
   findAttempt: findAttemptByMessage,
   throttled: (roundId, id, now) => hasRecentAttempt(roundId, id, now),
+  removeReaction: removeMemberReaction,
   defer,
 });
 
@@ -77,11 +82,7 @@ export async function processAnswer(input: AnswerInput, deps: AnswerDeps): Promi
   if (await deps.throttled(round.id, input.discordId, now)) return { status: "ignored", why: "rate_limited" };
 
   const correct = verdict === "correct";
-  let eligibility: Eligibility = { ok: true };
-  if (correct) {
-    if (!accountOldEnough(input.discordId, now)) eligibility = { ok: false, reason: "too_young" };
-    else if (REQUIRE_MEMBER && !(await deps.isMember(input.discordId))) eligibility = { ok: false, reason: "not_member" };
-  }
+  const eligibility = await eligibilityFor(input.discordId, correct, now, deps);
 
   const result = await claimWin({
     round: { id: round.id, rewardPep: round.rewardPep, questionId: round.questionId },
@@ -97,16 +98,81 @@ export async function processAnswer(input: AnswerInput, deps: AnswerDeps): Promi
   return finish(result, input, round, deps);
 }
 
+/** Only a correct answer needs the eligibility checks (cheap account age first, then membership). */
+async function eligibilityFor(discordId: string, correct: boolean, now: Date, deps: AnswerDeps): Promise<Eligibility> {
+  if (!correct) return { ok: true };
+  if (!accountOldEnough(discordId, now)) return { ok: false, reason: "too_young" };
+  if (REQUIRE_MEMBER && !(await deps.isMember(discordId))) return { ok: false, reason: "not_member" };
+  return { ok: true };
+}
+
+export interface ReactionInput {
+  channelId: string;
+  /** The message that was reacted to: it must be the current round's question post. */
+  messageId: string;
+  discordId: string;
+  emoji: ReactionEmoji;
+}
+
+/**
+ * A reaction on the question post, as a choice (plans/trivia.md section 17). The same rules as a typed answer: the
+ * open round, eligibility, the attempt cap (1 for true/false and multiple choice), the dedupe key and claimWin. The
+ * dedupe key is `reaction:<question message>:<member>`, so a member's FIRST reaction is their only reaction attempt
+ * (their later ones are duplicates). A pick on the current question is removed immediately, in parallel with the work and whatever the outcome, so
+ * the reaction counts never show what others chose; reactions after the round closed, on other messages, or with
+ * other emoji are not touched.
+ */
+export async function processReaction(input: ReactionInput, deps: AnswerDeps): Promise<AnswerOutcome> {
+  const now = deps.now();
+  const round = await findOpenRound(input.channelId, now);
+  if (!round) return { status: "no_round" };
+  if (!round.messageId || round.messageId !== input.messageId) return { status: "ignored", why: "not_current_message" };
+
+  const question = getQuestion(round.questionId);
+  if (!question) return { status: "ignored", why: "no_question" };
+  const judged = judgeReaction(question, input.emoji);
+  if (!judged) return { status: "ignored", why: "not_a_choice" };
+
+  // From here the pick is hidden again, and it must disappear at the same moment whatever the outcome: removal starts
+  // right now, before the duplicate check, the eligibility lookups (a Sheets read for correct picks only) and the claim,
+  // so neither the verdict nor the load can be told from how long the reaction stays. It runs alongside them and is
+  // awaited before returning (the request must not end first); a failure is swallowed (the remover logs it).
+  const reaction = emojiToReaction(input.emoji);
+  const removal: Promise<void> =
+    reaction && deps.removeReaction
+      ? deps.removeReaction(input.channelId, input.messageId, reaction, input.discordId).catch(() => undefined)
+      : Promise.resolve();
+  try {
+    const key = reactionAttemptKey(input.messageId, input.discordId);
+    if (await deps.findAttempt(key)) return { status: "duplicate" };
+
+    const eligibility = await eligibilityFor(input.discordId, judged.correct, now, deps);
+    const result = await claimWin({
+      round: { id: round.id, rewardPep: round.rewardPep, questionId: round.questionId },
+      discordId: input.discordId,
+      messageId: key,
+      answerText: `reaction:${judged.label}`,
+      correct: judged.correct,
+      eligibility,
+      maxAttempts: attemptsPerRound(question),
+      now,
+    });
+    return finish(result, { discordId: input.discordId, messageId: key, replyToId: input.messageId }, round, deps);
+  } finally {
+    await removal;
+  }
+}
+
 function finish(
   result: ClaimResult,
-  input: AnswerInput,
+  input: { discordId: string; messageId: string; replyToId?: string },
   round: { id: number; channelId: string | null; questionId: string },
   deps: AnswerDeps,
 ): AnswerOutcome {
   switch (result.kind) {
     case "won":
       deps.defer(() =>
-        announceWin(round, { discordId: input.discordId, messageId: input.messageId, rewardPep: result.rewardPep, paid: result.paid }, deps),
+        announceWin(round, { discordId: input.discordId, messageId: input.messageId, rewardPep: result.rewardPep, paid: result.paid, ...(input.replyToId ? { replyToId: input.replyToId } : {}) }, deps),
       );
       return { status: "won", rewardPep: result.rewardPep, paid: result.paid };
     case "wrong":

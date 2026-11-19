@@ -51,3 +51,32 @@ export function snowflakeAfter(a: string, b: string): boolean {
     return false;
   }
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// Reaction answers (plans/trivia.md section 17)
+// ---------------------------------------------------------------------------------------------------------------
+
+/**
+ * The server's custom turtle emoji, in theme-song order: choice A = Leonardo, B = Donatello, C = Raphael, D = Michelangelo.
+ * The single place the mapping lives. Rendered as `<:name:id>`; added as a reaction as `name:id`.
+ */
+export const CHOICE_EMOJI = [
+  { name: "1_leonardo", id: "814002498066710559" },
+  { name: "1_donatello", id: "814002525736796211" },
+  { name: "1_raphael", id: "814002564743692289" },
+  { name: "1_michelangelo", id: "814002543046688775" },
+] as const;
+
+/** Used for a round when any turtle emoji is missing from the server (deleted, or the guild cannot be read). */
+export const CHOICE_FALLBACK = ["\u{1F1E6}", "\u{1F1E7}", "\u{1F1E8}", "\u{1F1E9}"] as const; // regional indicators A B C D
+
+/** True/false reactions: the post pre-adds these two. */
+export const TF_REACTIONS = { true: "\u2705", false: "\u274C" } as const;
+
+/** Pause between the bot's pre-added reactions (Discord rate-limits reaction adds to about 4 per second). */
+export const REACTION_PACE_MS = 350;
+
+/** The attempt key of a reaction answer: the first reaction of a member on a question message is their only attempt. */
+export function reactionAttemptKey(questionMessageId: string, userId: string): string {
+  return `reaction:${questionMessageId}:${userId}`;
+}
