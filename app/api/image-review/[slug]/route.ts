@@ -1,4 +1,4 @@
-// GET /api/image-review/<slug> -> the set, its candidates, tallies, the viewer's votes and everyone's comments. Capos only.
+// GET /api/image-review/<slug> -> the set, its candidates, tallies, the viewer's votes and everyone's comments. Capos, Dread Pizza Roberts and members at the minimum level.
 import { NextResponse } from 'next/server'
 import { requireImageReviewer } from '@/app/lib/image-review/access'
 import { loadSet, SLUG_RE } from '@/app/lib/image-review/data'

@@ -13,7 +13,14 @@ type Candidate = {
   mine: { vote: Vote; comment: string | null } | null
   comments: Array<{ name: string; vote: Vote; comment: string; mine: boolean }>
 }
-type SetView = { slug: string; title: string; description: string | null; candidates: Candidate[] }
+type SetView = {
+  slug: string
+  title: string
+  description: string | null
+  candidates: Candidate[]
+  setComments: Array<{ name: string; comment: string; mine: boolean }>
+  myComment: string
+}
 
 export default function ReviewClient({ slug, isOwner }: { slug: string; isOwner: boolean }) {
   const [data, setData] = useState<SetView | null>(null)
@@ -21,6 +28,9 @@ export default function ReviewClient({ slug, isOwner }: { slug: string; isOwner:
   const [zoom, setZoom] = useState<Candidate | null>(null)
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState<string | null>(null)
+  const [overall, setOverall] = useState('')
+  const overallDirty = useRef(false)
+  const [overallBusy, setOverallBusy] = useState(false)
   const dirty = useRef<Set<string>>(new Set())
 
   const load = useCallback(async () => {
@@ -30,6 +40,7 @@ export default function ReviewClient({ slug, isOwner }: { slug: string; isOwner:
       const next = (await res.json()) as SetView
       setData(next)
       setError(null)
+      if (!overallDirty.current) setOverall(next.myComment)
       // Seed comment boxes from my saved comment, but never overwrite one I am typing in.
       setDrafts((d) => {
         const out = { ...d }
@@ -72,6 +83,26 @@ export default function ReviewClient({ slug, isOwner }: { slug: string; isOwner:
     }
   }
 
+  async function saveOverall() {
+    setOverallBusy(true)
+    try {
+      const res = await fetch(`/api/image-review/${slug}/comment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comment: overall }),
+      })
+      if (!res.ok) {
+        const b = (await res.json().catch(() => ({}))) as { error?: string }
+        setError(b.error ?? 'Could not save your feedback')
+      } else {
+        overallDirty.current = false
+        await load()
+      }
+    } finally {
+      setOverallBusy(false)
+    }
+  }
+
   if (error && !data) return <main className="p-6 text-center">{error}</main>
   if (!data) return <main className="p-6 text-center text-foreground/60">Loading...</main>
 
@@ -93,6 +124,35 @@ export default function ReviewClient({ slug, isOwner }: { slug: string; isOwner:
         )}
       </p>
       {error && <p role="alert" className="text-red-600 mt-2 text-sm">{error}</p>}
+      <section className="mt-5 rounded-xl border border-foreground/15 p-3 grid gap-2" aria-label="Overall feedback">
+        <h2 className="text-base font-semibold m-0">Overall feedback on the set</h2>
+        <textarea
+          value={overall}
+          maxLength={1000}
+          rows={3}
+          placeholder="What do you think of the set as a whole? (one comment per person, up to 1000 characters)"
+          aria-label="Overall feedback on the whole set"
+          onChange={(e) => {
+            overallDirty.current = true
+            setOverall(e.target.value)
+          }}
+          className="w-full rounded-lg border border-foreground/25 bg-transparent p-2 text-base"
+        />
+        {overall !== data.myComment && (
+          <button type="button" disabled={overallBusy} onClick={() => void saveOverall()} className="self-start min-h-11 px-4 rounded-lg border border-foreground/25 font-medium">
+            Save feedback
+          </button>
+        )}
+        {data.setComments.length > 0 && (
+          <ul className="text-sm space-y-1">
+            {data.setComments.map((m, i) => (
+              <li key={i}>
+                <span className="font-medium">{m.mine ? 'You' : m.name}</span>: {m.comment}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
       {data.candidates.length === 0 && <p className="mt-6 text-foreground/60">No candidates yet.</p>}
       <div className="grid gap-4 mt-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
         {data.candidates.map((c) => (

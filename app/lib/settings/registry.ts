@@ -2122,6 +2122,15 @@ export const SETTINGS = {
     max: 10,
     default: 2,
   }),
+  'imageReview.minCompletedLevel': intSetting({
+    key: 'imageReview.minCompletedLevel',
+    area: 'features',
+    label: 'Art review minimum level',
+    help: 'Highest level a member must have completed to view and vote in the art review (2 = Lv. 2 done). Capos and Dread Pizza Roberts always can.',
+    min: 0,
+    max: 10,
+    default: 2,
+  }),
   'pfp.restylePerUnlock': intSetting({
     key: 'pfp.restylePerUnlock',
     area: 'features',
