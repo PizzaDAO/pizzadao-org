@@ -22,7 +22,7 @@ export interface ClaimInput {
   taskName?: string | null
   /** Look the task up by its CrewTask id instead of its label (database crews only). */
   taskId?: string | null
-  /** Refuse to claim a task in a closed stage (done, skip, ...). Only with `taskId`. */
+  /** Refuse to claim a task in a closed stage (done, skip, ...). The web route sets it too: a task claimed after it was closed must never count for the crew task mission. */
   requireOpen?: boolean
   /**
    * Await the activation write instead of scheduling it. Callers already running inside after()
@@ -88,7 +88,7 @@ export async function claimCrewTask(input: ClaimInput): Promise<ClaimResult> {
   // Crews whose tasks live in the database (sheets.source.crewTasks): write CrewTask, not the sheet.
   if (typeof taskName === 'string' && taskName.trim()) {
     const dbCrew = await findDbTaskCrew(crewId, sheetUrl)
-    if (dbCrew) return claimInDb(discordId, dbCrew, taskName.trim(), action, sheetUrl, undefined, input.awaitActivation)
+    if (dbCrew) return claimInDb(discordId, dbCrew, taskName.trim(), action, sheetUrl, input.requireOpen ? { requireOpen: true } : undefined, input.awaitActivation)
   }
 
   if (typeof sheetUrl !== 'string' || typeof taskName !== 'string' || !sheetUrl || !taskName.trim()) {
@@ -299,7 +299,7 @@ async function claimInDb(
   taskName: string,
   action: ClaimAction,
   sheetUrl: string | null,
-  byId?: { taskId: string; requireOpen?: boolean },
+  byId?: { taskId?: string; requireOpen?: boolean },
   awaitActivation?: boolean,
 ): Promise<ClaimResult> {
   const member = await fetchMemberByDiscordId(discordId)
@@ -308,10 +308,10 @@ async function claimInDb(
     return fail(403, 'No member profile is linked to your Discord account')
   }
   let task: { id: string; label: string; leadMemberId: string | null; stage?: string } | undefined
-  if (byId) {
+  if (byId?.taskId) {
     task = (await prisma.crewTask.findFirst({ where: { id: byId.taskId, crewId: crew.id, archived: false }, select: { id: true, label: true, leadMemberId: true, stage: true } })) ?? undefined
   } else {
-    const tasks = await prisma.crewTask.findMany({ where: { crewId: crew.id, archived: false }, select: { id: true, label: true, leadMemberId: true } })
+    const tasks = await prisma.crewTask.findMany({ where: { crewId: crew.id, archived: false }, select: { id: true, label: true, leadMemberId: true, stage: true } })
     task = tasks.find((t) => t.label.trim() === taskName)
   }
   if (!task) return fail(404, 'Task not found')

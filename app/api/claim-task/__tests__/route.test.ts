@@ -20,7 +20,7 @@ const m = vi.hoisted(() => ({
 
 vi.mock('@/app/lib/auth-guards', () => ({ requireSession: m.requireSession }))
 vi.mock('@/app/lib/db', () => ({ prisma: m.prisma }))
-vi.mock('@/app/lib/crew-mappings', () => ({ getCrewMappings: m.getCrewMappings }))
+vi.mock('@/app/lib/crew-mappings', () => ({ getCrewMappings: m.getCrewMappings, isClosedStage: (s: string) => ['done', 'skip', 'complete', 'completed'].includes(s.trim().toLowerCase()) }))
 vi.mock('@/app/lib/sheets-import/source', () => ({ usesDb: m.usesDb }))
 vi.mock('@/app/lib/sheets/member-repository', () => ({
   fetchMemberByDiscordId: m.fetchMemberByDiscordId,
@@ -68,7 +68,7 @@ describe('claim-task: database path', () => {
   it('claims: conditional update, event, claim key with the sheet id, activation', async () => {
     const r = await json(await post({ crewId: 'kitchen', sheetUrl: SHEET_URL, taskName: 'Bake bread', action: 'claim' }))
     expect(r).toEqual({ status: 200, body: { success: true, action: 'claim' } })
-    expect(m.prisma.crewTask.findMany).toHaveBeenCalledWith({ where: { crewId: 'kitchen', archived: false }, select: { id: true, label: true, leadMemberId: true } })
+    expect(m.prisma.crewTask.findMany).toHaveBeenCalledWith({ where: { crewId: 'kitchen', archived: false }, select: { id: true, label: true, leadMemberId: true, stage: true } })
     expect(m.prisma.crewTask.updateMany).toHaveBeenCalledWith({
       where: { id: 't1', OR: [{ leadMemberId: null }, { leadMemberId: '' }, { leadMemberId: '42' }] },
       data: { leadMemberId: '42', leadName: 'Mario', updatedBy: 'd1' },
@@ -80,6 +80,14 @@ describe('claim-task: database path', () => {
       create: { memberId: '42', taskKey: 'SHEET123::Bake bread', taskName: 'Bake bread', sheetUrl: SHEET_URL },
     })
     expect(m.recordActivation).toHaveBeenCalledWith('first_contribution', { discordId: 'd1', code: 'task_claim' })
+  })
+
+  it('refuses to claim a task that is already Done (it must not count for the crew task mission)', async () => {
+    m.prisma.crewTask.findMany.mockResolvedValue([{ id: 't1', label: 'Bake bread', leadMemberId: null, stage: 'Done' }])
+    const r = await json(await post({ crewId: 'kitchen', taskName: 'Bake bread', action: 'claim' }))
+    expect(r).toEqual({ status: 409, body: { error: 'That task is closed' } })
+    expect(m.prisma.crewTask.updateMany).not.toHaveBeenCalled()
+    expect(m.prisma.crewTaskEvent.create).not.toHaveBeenCalled()
   })
 
   it('uses the crew: key prefix when the crew has no sheet', async () => {

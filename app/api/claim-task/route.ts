@@ -22,6 +22,7 @@ export async function POST(req: Request) {
       crewId: typeof crewId === 'string' ? crewId : null,
       sheetUrl: typeof sheetUrl === 'string' ? sheetUrl : null,
       taskName: typeof taskName === 'string' ? taskName : null,
+      requireOpen: true,
     })
     if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status })
     return NextResponse.json({ success: true, action: result.action })

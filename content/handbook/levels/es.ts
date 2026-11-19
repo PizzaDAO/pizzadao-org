@@ -27,6 +27,10 @@ Un aval es un miembro que dice "conozco a esta persona y es parte de la comunida
 - Avalarte a ti mismo no cuenta, ni tampoco los seguimientos importados de otras redes.
 - Pídelo a quienes conocen tu trabajo. Un mensaje corto después de una llamada suele bastar.
 
+## Completa una tarea de un crew {#crew-task}
+
+Cada crew tiene una lista de tareas en su página. Abre un [crew](/crews), elige una tarea abierta y reclámala con el botón Claim. En Discord puedes hacer lo mismo: /task list muestra las tareas abiertas y /task claim te convierte en su responsable. Haz el trabajo y pide al líder del crew que marque la tarea como Done. La misión se comprueba automáticamente cuando un líder del crew (o un admin) marca como Done una tarea que diriges. Marcar tú mismo tu tarea como Done no cuenta.
+
 ## La entrevista selfie {#selfie-interview}
 
 La entrevista selfie es un video corto donde cuentas tu experiencia en PizzaDAO: cómo nos encontraste, qué has disfrutado, en qué trabajas. Grábala con tu teléfono, súbela a un sitio que te dé un enlace (YouTube, X, Google Drive o Loom) y envía el enlace en la misión. Una persona revisora la ve y la aprueba. No hace falta guion ni estudio.

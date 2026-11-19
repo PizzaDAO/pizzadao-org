@@ -10,6 +10,7 @@
  *   article_published a published Article
  *   buddy_completed   a COMPLETED buddy pairing, as the buddy
  *   social_linked     a Telegram or Farcaster account linked (not X: that is level 1)
+ *   crew_task_done    led a crew task that a lead of that crew (or an admin) moved to Done (L3.2)
  *
  * Call streaks use attendance_count with { min, windowDays, crewId } (verifiers.ts); a post with
  * likes uses social_post with { minReplies: 0, minLikes } (semi.ts); hosting a party is gpp_host.
@@ -150,6 +151,58 @@ export const socialLinked: Verifier<{ platforms: string[] }> = {
   },
 }
 
+/**
+ * L3.2 "Complete a task from a crew": the member leads (claimed) a crew task that is now Done, and
+ * the person who moved it to Done is a lead of THAT task's crew (or an admin / Dread Pizza Roberts)
+ * and is not the member. The member must already have led it when it was closed (a task claimed after it was
+ * Done never counts). Who closed it comes from the task history (CrewTaskEvent actor); a task
+ * with no recorded closer, or one the member closed, never counts. Not stateful: a task moved back
+ * out of Done later does not revoke an approval (like every automatic pass).
+ */
+export const crewTaskDone: Verifier<{ min: number }> = {
+  key: 'crew_task_done',
+  mode: 'auto',
+  stateful: false,
+  parse: (p) => ({ min: positiveInt(asObject(p).min, 'min', 1) }),
+  async check(ctx, { min }) {
+    const { getDoneCrewTasksLedBy, canCloseCrewTasks } = ctx.sources
+    if (!getDoneCrewTasksLedBy || !canCloseCrewTasks) return { status: 'unknown', reason: "Can't check this right now" }
+    if (!ctx.memberId) return fail('No member profile found yet', 'Finish onboarding, then claim a crew task.')
+    let tasks
+    try {
+      tasks = await getDoneCrewTasksLedBy(ctx.memberId)
+    } catch {
+      return { status: 'unknown', reason: "Couldn't read your crew tasks right now" }
+    }
+    const counted: Array<{ taskId: string; crewId: string; closedBy: string }> = []
+    let sawUnverified = false
+    for (const t of tasks) {
+      if (!t.closedBy || !t.ledWhenClosed || t.closedBy === ctx.discordId) continue
+      const memoKey = `crew_task_done:${t.closedBy}:${t.crewId}`
+      let ok = ctx.memo.get(memoKey) as boolean | undefined
+      if (ok === undefined) {
+        try {
+          ok = await canCloseCrewTasks(t.closedBy, t.crewId)
+        } catch {
+          sawUnverified = true
+          continue
+        }
+        ctx.memo.set(memoKey, ok)
+      }
+      if (ok) counted.push({ taskId: t.taskId, crewId: t.crewId, closedBy: t.closedBy })
+    }
+    if (counted.length >= min) {
+      return { status: 'pass', evidence: { tasks: counted.length, need: min, taskId: counted[0].taskId, crewId: counted[0].crewId, closedBy: counted[0].closedBy } }
+    }
+    if (sawUnverified) return { status: 'unknown', reason: "Couldn't check who closed your task right now" }
+    return fail(
+      `${counted.length}/${min} crew tasks completed`,
+      'Claim an open task on a crew page (or /task claim in Discord), do the work, and ask the crew lead to mark it Done.',
+      { have: counted.length, need: min },
+    )
+  },
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const ACTIVITY_VERIFIERS: Array<Verifier<any>> = [
   buddyCompleted,
@@ -160,4 +213,5 @@ export const ACTIVITY_VERIFIERS: Array<Verifier<any>> = [
   bountyOrJob,
   articlePublished,
   socialLinked,
+  crewTaskDone,
 ]

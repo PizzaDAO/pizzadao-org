@@ -399,6 +399,7 @@ export function crewTasksEditor(crewId: string): EditorSpec {
     },
     async save(rows, actor, opts) {
       const existing = (await prisma.crewTask.findMany({ where: { crewId } })) as unknown as Row[]
+      const justClosed: string[] = []
       const counts = await saveCrewRows({
         rows,
         loadedAt: opts?.loadedAt,
@@ -408,6 +409,7 @@ export function crewTasksEditor(crewId: string): EditorSpec {
           // Blank stays blank, as on the sheet (not active, shown empty).
           const stage = text(r.stage)
           const due = orNull(r.due)
+          if (prev && isClosedStage(stage) && !isClosedStage(String(prev.stage ?? ''))) justClosed.push(String(prev.id))
           return {
             label: text(r.task), url: orNull(r.url), stage, priority: orNull(r.priority), due,
             // The sheet's own due text only stays while the date is unchanged.
@@ -421,6 +423,15 @@ export function crewTasksEditor(crewId: string): EditorSpec {
         onChange: (action, id, data) => (id ? [prisma.crewTaskEvent.create({ data: { taskId: id, crewId, action, actor, data: data as never } })] : []),
       })
       await invalidateCrewMappingsCache()
+      // Tasks that just moved to Done: let their leads' "Complete a task from a crew" mission notice (best effort).
+      if (justClosed.length) {
+        try {
+          const { emitCrewTaskDoneLater } = await import('@/app/lib/mission-verify/crew-task-event')
+          emitCrewTaskDoneLater(justClosed)
+        } catch (e) {
+          console.error('[crew-tasks] mission hook failed (save kept):', e instanceof Error ? e.message : e)
+        }
+      }
       return counts
     },
   }

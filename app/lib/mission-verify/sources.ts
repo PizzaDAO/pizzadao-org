@@ -6,10 +6,14 @@ import { prisma } from '../db'
 import { lookupGuildMembership } from '../discord'
 import { getChannel, getChannelMessage, resolveChannelId } from '../discord-channels'
 import { getGuildRoles } from '../discord-interactions/guild-roles'
+import { getCrewLeadMemberIds } from '../crew-leads'
+import { hasAnyRole } from '../discord'
+import { findMemberIdByDiscordId } from '../member-utils'
+import { ADMIN_ROLE_IDS, DREAD_PIZZA_ROBERTS_ROLE_ID } from '@/app/ui/constants'
 import { getCurrentLevel, getPaidLevels } from '../missions'
 import { checkRarePizzaBox } from '../rare-pizza-box'
 import { toggleEnabled } from '../settings/toggles'
-import type { VerifierSources } from './types'
+import type { CrewTaskDoneRow, VerifierSources } from './types'
 
 export const defaultSources: VerifierSources = {
   async getXAccount(discordId) {
@@ -59,6 +63,20 @@ export const defaultSources: VerifierSources = {
       case 'buddy_completed':
         return prisma.buddyPair.count({ where: { buddyDiscordId: discordId, status: 'COMPLETED' } })
     }
+  },
+
+  async getDoneCrewTasksLedBy(memberId) {
+    return doneCrewTasksLedBy(memberId)
+  },
+
+  async canCloseCrewTasks(discordId, crewId) {
+    // Lead status is checked NOW (the crew's current roster), not as of the day the task was closed.
+    // Unlike canManageCrew this does not swallow errors: a roster, member or Discord lookup failure
+    // throws, so the verifier answers "unknown" instead of "not a lead" (and retries later).
+    const leads = await getCrewLeadMemberIds(crewId)
+    const memberId = await findMemberIdByDiscordId(discordId)
+    if (memberId && leads.has(memberId)) return true
+    return hasAnyRole(discordId, [...ADMIN_ROLE_IDS, DREAD_PIZZA_ROBERTS_ROLE_ID])
   },
 
   async getMemberRoles(discordId) {
@@ -173,4 +191,47 @@ export const defaultSources: VerifierSources = {
     })
     return [...new Set(rows.map((r) => r.walletAddress.trim()).filter(Boolean))]
   },
+}
+
+/** Stages that mean "Done" (not "skip": a skipped task was not completed). */
+export function isDoneStage(stage: string | null | undefined): boolean {
+  const s = (stage ?? '').trim().toLowerCase()
+  return s === 'done' || s === 'complete' || s === 'completed'
+}
+
+/**
+ * Done crew tasks the member leads, each with who moved it to Done: the latest `update` CrewTaskEvent
+ * whose changes set the stage to a Done value (written by the crew-page editor, the call-task proposals
+ * and the Discord task commands; the actor is a Discord id). No such event = unknown closer (null).
+ */
+export async function doneCrewTasksLedBy(memberId: string): Promise<CrewTaskDoneRow[]> {
+  const tasks = await prisma.crewTask.findMany({
+    where: { leadMemberId: memberId, archived: false },
+    select: { id: true, crewId: true, label: true, stage: true },
+    take: 500,
+  })
+  const done = tasks.filter((t) => isDoneStage(t.stage))
+  if (done.length === 0) return []
+  const events = await prisma.crewTaskEvent.findMany({
+    where: { taskId: { in: done.map((t) => t.id) }, action: { in: ['update', 'claim', 'giveup'] } },
+    select: { id: true, taskId: true, action: true, actor: true, data: true },
+    orderBy: { id: 'desc' },
+  })
+  // Per task: the latest event that set a Done stage, and the latest event that changed who leads it
+  // (a claim or give-up, or an update that set leadMemberId). Events come newest first.
+  const closer = new Map<string, { id: number; actor: string }>()
+  const leadChange = new Map<string, number>()
+  for (const e of events) {
+    const changes = (e.data as { changes?: { stage?: unknown; leadMemberId?: unknown } } | null)?.changes
+    if (!closer.has(e.taskId) && e.action === 'update' && typeof changes?.stage === 'string' && isDoneStage(changes.stage)) closer.set(e.taskId, { id: e.id, actor: e.actor })
+    const changesLead = e.action === 'update' && !!changes && 'leadMemberId' in changes
+    if (!leadChange.has(e.taskId) && (e.action === 'claim' || e.action === 'giveup' || changesLead)) leadChange.set(e.taskId, e.id)
+  }
+  return done.map((t) => {
+    const c = closer.get(t.id)
+    const lastLead = leadChange.get(t.id)
+    // The member must have been the lead BEFORE the Done event: claiming (or being set as lead) at or
+    // after it does not count. No lead-change event at all = the lead was set at creation or import.
+    return { taskId: t.id, crewId: t.crewId, label: t.label, closedBy: c?.actor ?? null, ledWhenClosed: !c || lastLead === undefined || lastLead < c.id }
+  })
 }

@@ -27,6 +27,10 @@ Une recommandation, c'est un membre qui dit « je connais cette personne et elle
 - Se recommander soi-même ne compte pas, ni les abonnements importés d'autres réseaux.
 - Demande à des gens qui connaissent ton travail. Un court message après un appel suffit souvent.
 
+## Termine une tâche d'un crew {#crew-task}
+
+Chaque crew tient une liste de tâches sur sa page. Ouvre un [crew](/crews), choisis une tâche ouverte et réclame-la avec le bouton Claim. Sur Discord, tu peux faire pareil : /task list affiche les tâches ouvertes et /task claim te désigne responsable. Fais le travail, puis demande au lead du crew de marquer la tâche comme Done. La mission est vérifiée automatiquement dès qu'un lead du crew (ou un admin) a marqué Done une tâche que tu diriges. Marquer toi-même ta tâche comme Done ne compte pas.
+
 ## L'interview selfie {#selfie-interview}
 
 L'interview selfie est une courte vidéo où tu racontes ton expérience chez PizzaDAO : comment tu nous as trouvés, ce que tu as aimé, sur quoi tu travailles. Enregistre-la avec ton téléphone, mets-la en ligne là où tu obtiens un lien (YouTube, X, Google Drive ou Loom) et envoie le lien sur la mission. Une personne relectrice la regarde et l'approuve. Pas besoin de script ni de studio.
