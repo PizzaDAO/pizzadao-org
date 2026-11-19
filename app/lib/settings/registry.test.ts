@@ -98,7 +98,7 @@ describe('settings registry', () => {
       ['profile.eventsAttended.rsvLinkAudience', 'pizzadao.org'],
     ])
     // And the literal values today (a change here is a deliberate, reviewed change).
-    expect(SETTING_KEYS.filter((k) => !k.startsWith('guide.') && !k.startsWith('followups.') && !k.startsWith('payments.') && !k.startsWith('proposals.') && !k.startsWith('telegram.') && !k.startsWith('sheets.') && !k.startsWith('map.') && !k.startsWith('reminders.') && !k.startsWith('crews.') && !k.startsWith('members.') && !k.startsWith('profile.eventsAttended.') && !k.startsWith('calls.updates') && k !== 'discord.metalheadCommandEnabled' && !ECONOMY_KEYS.has(k)).map((k) => [k, SETTINGS[k].default])).toEqual([
+    expect(SETTING_KEYS.filter((k) => !k.startsWith('guide.') && !k.startsWith('followups.') && !k.startsWith('payments.') && !k.startsWith('proposals.') && !k.startsWith('telegram.') && !k.startsWith('sheets.') && !k.startsWith('map.') && !k.startsWith('reminders.') && !k.startsWith('crews.') && !k.startsWith('members.') && k !== 'wallets.requireSignature' && !k.startsWith('profile.eventsAttended.') && !k.startsWith('calls.updates') && k !== 'discord.metalheadCommandEnabled' && !ECONOMY_KEYS.has(k)).map((k) => [k, SETTINGS[k].default])).toEqual([
       ['calls.transcriptMinLevel', 6],
       ['calls.summaryMinLevel', 5],
       ['calls.actionItemsMinLevel', 4],

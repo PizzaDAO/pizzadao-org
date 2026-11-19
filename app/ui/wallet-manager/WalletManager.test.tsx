@@ -15,10 +15,12 @@ const useAccountMock = vi.fn();
 const useDisconnectMock = vi.fn();
 const disconnectAsyncMock = vi.fn();
 const useConnectModalMock = vi.fn();
+const signMessageAsyncMock = vi.fn();
 
 vi.mock("wagmi", () => ({
   useAccount: () => useAccountMock(),
   useDisconnect: () => useDisconnectMock(),
+  useSignMessage: () => ({ signMessageAsync: signMessageAsyncMock }),
 }));
 
 vi.mock("@rainbow-me/rainbowkit", () => ({
@@ -286,5 +288,64 @@ describe("WalletManager - failed load", () => {
       (c: unknown[]) => (c[1] as RequestInit | undefined)?.method === "POST",
     );
     expect(posts.length).toBe(0);
+  });
+});
+
+describe("WalletManager — wallet ownership signature", () => {
+  const NONCE = "a".repeat(60);
+
+  function mockApi(required: boolean) {
+    const fetchMock = global.fetch as unknown as ReturnType<typeof vi.fn>;
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      const method = init?.method || "GET";
+      if (url.startsWith("/api/wallet/nonce")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ nonce: NONCE, required, statement: "Link this wallet to PizzaDAO member member-1. This is free and sends no transaction." }),
+        });
+      }
+      if (method === "GET") return Promise.resolve({ ok: true, json: async () => ({ wallets: [] }) });
+      return Promise.resolve({ ok: true, json: async () => ({ success: true }) });
+    });
+    return fetchMock;
+  }
+
+  const posts = (fetchMock: ReturnType<typeof vi.fn>) =>
+    fetchMock.mock.calls.filter((c: unknown[]) => (c[1] as RequestInit | undefined)?.method === "POST");
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useDisconnectMock.mockReturnValue({ disconnectAsync: disconnectAsyncMock });
+    useConnectModalMock.mockReturnValue({ openConnectModal: vi.fn() });
+    useAccountMock.mockReturnValue({ address: CONNECTED_ADDRESS, isConnected: true, chainId: 1 });
+  });
+
+  it("signs a SIWE message and POSTs it when a signature is required", async () => {
+    const fetchMock = mockApi(true);
+    signMessageAsyncMock.mockResolvedValue("0xsig");
+    render(<WalletManager memberId="member-1" />);
+    await waitFor(() => expect(posts(fetchMock).length).toBe(1));
+    const body = JSON.parse((posts(fetchMock)[0][1] as RequestInit).body as string);
+    expect(body.signature).toBe("0xsig");
+    expect(body.message).toContain(`Nonce: ${NONCE}`);
+    expect(body.message).toContain(CONNECTED_ADDRESS);
+    expect(signMessageAsyncMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not save when the member declines to sign", async () => {
+    const fetchMock = mockApi(true);
+    signMessageAsyncMock.mockRejectedValue(Object.assign(new Error("User rejected the request"), { code: 4001 }));
+    render(<WalletManager memberId="member-1" />);
+    await waitFor(() => expect(screen.getByText(/Signature declined/i)).toBeInTheDocument());
+    expect(posts(fetchMock).length).toBe(0);
+  });
+
+  it("skips signing when the server does not require it", async () => {
+    const fetchMock = mockApi(false);
+    render(<WalletManager memberId="member-1" />);
+    await waitFor(() => expect(posts(fetchMock).length).toBe(1));
+    expect(signMessageAsyncMock).not.toHaveBeenCalled();
+    const body = JSON.parse((posts(fetchMock)[0][1] as RequestInit).body as string);
+    expect(body.signature).toBeUndefined();
   });
 });

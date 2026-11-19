@@ -170,6 +170,8 @@ export const TOGGLES = {
   'members.discordActivityCount': { env: 'DISCORD_ACTIVITY_COUNT_ENABLED', legacy: (raw) => !envKillsToggle(raw) },
   // On unless the env var is an explicit off: the 5-minute prewarm cron (reads pages only).
   'members.warmEnabled': { env: 'SITE_WARM_ENABLED', legacy: (raw) => !envKillsToggle(raw) },
+  // Off unless turned on: a new EVM wallet needs a signed ownership message (existing wallets are never affected).
+  'wallets.requireSignature': { env: 'WALLETS_REQUIRE_SIGNATURE', legacy: ON_WORDS },
   'features.exportEnabled': { env: 'FEATURES_EXPORT_ENABLED', legacy: ON_WORDS },
   'features.navLinkEnabled': { env: 'FEATURES_NAV_LINK_ENABLED', legacy: ON_WORDS },
   'features.showOps': { env: 'FEATURES_SHOW_OPS', legacy: ON_WORDS },
