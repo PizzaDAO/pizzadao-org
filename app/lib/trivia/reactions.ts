@@ -127,3 +127,19 @@ export async function removeMemberReaction(channelId: string, messageId: string,
     warnThrottled("remove-reaction-failed", `[trivia] could not remove a member's reaction (the bot needs Manage Messages): ${e instanceof Error ? e.message.slice(0, 160) : "error"}`);
   }
 }
+
+/**
+ * Mark a member's wrong short-answer attempt on their own message: a cross, then a lock when it was their last try, in
+ * order and paced. Never throws; a refusal (the bot lacks Add Reactions, the message is gone) is logged once per 5 minutes.
+ */
+export async function markWrongAttempt(channelId: string, messageId: string, emojis: string[]): Promise<void> {
+  for (let i = 0; i < emojis.length; i++) {
+    try {
+      await addDiscordReaction({ channelId, messageId, emoji: emojis[i], botToken: botToken() });
+    } catch (e) {
+      warnThrottled("mark-wrong-failed", `[trivia] could not mark a wrong attempt with a reaction: ${e instanceof Error ? e.message.slice(0, 160) : "error"}`);
+      return;
+    }
+    if (i < emojis.length - 1) await sleep(REACTION_PACE_MS);
+  }
+}

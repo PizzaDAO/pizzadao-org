@@ -80,3 +80,8 @@ export const REACTION_PACE_MS = 350;
 export function reactionAttemptKey(questionMessageId: string, userId: string): string {
   return `reaction:${questionMessageId}:${userId}`;
 }
+
+/** Added to a member's own message when a short-answer attempt is graded wrong (never for true/false or multiple choice). */
+export const WRONG_ATTEMPT_REACTION = "\u274C";
+/** Added after the wrong mark when it was the member's last allowed try. */
+export const OUT_OF_TRIES_REACTION = "\u{1F512}";

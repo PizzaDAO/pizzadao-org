@@ -555,6 +555,42 @@ describe.skipIf(!isLocal)('Discord trivia under concurrency (real Postgres)', ()
     }, 60_000)
   })
 
+  describe('wrong-attempt marks (real attempt counts)', () => {
+    it('a short answer: a cross for the 1st and 2nd wrong try, cross + lock on the 3rd, nothing for a 4th; true/false stays silent', async () => {
+      const short = L.bank.servable({ pool: 'discord' }).find((q: any) => q.type === 'short_answer' && q.match.kind === 'text')
+      const channelId = chanId()
+      const r: any = await L.rounds.openDiscordRound({ channelId, rewardPep: 20, question: short }, fakePosts().deps)
+      const u = await seedUser(0)
+      const marks: string[][] = []
+      const later: Array<() => Promise<void>> = []
+      const d: any = {
+        ...fakePosts().deps,
+        now: () => new Date(),
+        isMember: async () => true,
+        findAttempt: L.rounds.findAttemptByMessage,
+        throttled: async () => false,
+        markWrong: async (_c: string, _m: string, emojis: string[]) => void marks.push(emojis),
+        defer: (fn: () => Promise<void>) => void later.push(fn),
+      }
+      const outcomes = []
+      for (let i = 0; i < 4; i++) outcomes.push(await L.answer.processAnswer({ channelId, messageId: snow(), discordId: u, content: 'qzqzqz' }, d))
+      for (const f of later) await f()
+      expect(outcomes.map((o: any) => o.status)).toEqual(['wrong', 'wrong', 'wrong', 'not_won'])
+      expect(marks).toEqual([[L.config.WRONG_ATTEMPT_REACTION], [L.config.WRONG_ATTEMPT_REACTION], [L.config.WRONG_ATTEMPT_REACTION, L.config.OUT_OF_TRIES_REACTION]])
+      expect(await L.prisma.triviaAttempt.count({ where: { roundId: r.roundId, discordId: u } })).toBe(3)
+
+      // true/false: a wrong typed answer is recorded and says nothing
+      const ch2 = chanId()
+      await openRound(ch2)
+      const u2 = await seedUser(0)
+      marks.length = 0
+      later.length = 0
+      expect(await L.answer.processAnswer({ channelId: ch2, messageId: snow(), discordId: u2, content: wrongText(tf) }, d)).toEqual({ status: 'wrong' })
+      for (const f of later) await f()
+      expect(marks).toHaveLength(0)
+    }, 60_000)
+  })
+
   describe('expiry', () => {
     it('posts the reveal exactly once even when ticks race, and pays nothing', async () => {
       const channelId = chanId()
