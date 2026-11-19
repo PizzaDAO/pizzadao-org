@@ -5,9 +5,9 @@
 // here (bank, settings, caps). Answers reach this in Discord order (the recorder's per-channel serial queue).
 import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
 import { getQuestion } from "./bank";
-import { attemptsPerRound, MIN_ACCOUNT_AGE_DAYS, reactionAttemptKey, REQUIRE_MEMBER, snowflakeAfter, snowflakeMs } from "./config";
+import { attemptsPerRound, MIN_ACCOUNT_AGE_DAYS, OUT_OF_TRIES_REACTION, reactionAttemptKey, REQUIRE_MEMBER, snowflakeAfter, snowflakeMs, WRONG_ATTEMPT_REACTION } from "./config";
 import { emojiToReaction, judgeReaction, type ReactionEmoji } from "./emoji";
-import { removeMemberReaction } from "./reactions";
+import { markWrongAttempt, removeMemberReaction } from "./reactions";
 import { match } from "./match";
 import { announceWin, claimWin, defaultPostDeps, findAttemptByMessage, findOpenRound, hasRecentAttempt, type ClaimResult, type Eligibility, type PostDeps } from "./rounds";
 
@@ -38,6 +38,8 @@ export interface AnswerDeps extends PostDeps {
   throttled(roundId: number, discordId: string, now: Date): Promise<boolean>;
   /** Remove a member's reaction after their attempt (never throws; absent: nothing is removed). */
   removeReaction?(channelId: string, messageId: string, reaction: string, userId: string): Promise<void>;
+  /** Mark a wrong short-answer attempt on the member's own message (never throws; absent: nothing is added). */
+  markWrong?(channelId: string, messageId: string, emojis: string[]): Promise<void>;
   /** Run after the response (Next after()): replies are posted off the request path. */
   defer(fn: () => Promise<void>): void;
 }
@@ -49,6 +51,7 @@ export const defaultAnswerDeps = (defer: (fn: () => Promise<void>) => void): Ans
   findAttempt: findAttemptByMessage,
   throttled: (roundId, id, now) => hasRecentAttempt(roundId, id, now),
   removeReaction: removeMemberReaction,
+  markWrong: markWrongAttempt,
   defer,
 });
 
@@ -94,6 +97,15 @@ export async function processAnswer(input: AnswerInput, deps: AnswerDeps): Promi
     maxAttempts: attemptsPerRound(question),
     now,
   });
+
+  // Only a short-answer attempt graded wrong is marked on the member's message (a cross, plus a lock on their last try).
+  // True/false and multiple choice stay silent: one try, and a public cross on "true" would reveal the answer.
+  if (result.kind === "wrong" && question.type === "short_answer" && round.channelId && deps.markWrong) {
+    const mark = deps.markWrong;
+    const channelId = round.channelId;
+    const emojis = [WRONG_ATTEMPT_REACTION, ...(result.attemptsUsed !== undefined && result.attemptsUsed >= attemptsPerRound(question) ? [OUT_OF_TRIES_REACTION] : [])];
+    deps.defer(() => mark(channelId, input.messageId, emojis));
+  }
 
   return finish(result, input, round, deps);
 }

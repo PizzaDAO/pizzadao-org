@@ -193,7 +193,7 @@ export interface ClaimInput {
 
 export type ClaimResult =
   | { kind: "won"; rewardPep: number; paid: boolean }
-  | { kind: "wrong" }
+  | { kind: "wrong"; /** Recorded attempts of this member in the round, this one included. */ attemptsUsed?: number }
   | { kind: "ineligible"; reason: "not_member" | "too_young" }
   | { kind: "daily_cap" }
   | { kind: "late" }
@@ -239,7 +239,7 @@ async function claimInTx(input: ClaimInput): Promise<ClaimResult> {
       await tx.triviaAttempt.create({
         data: { roundId: round.id, discordId, messageId, correct: input.correct, answerText: input.answerText.slice(0, 120) },
       });
-      if (!input.correct) return { kind: "wrong" } as const;
+      if (!input.correct) return { kind: "wrong", attemptsUsed: used + 1 } as const;
       if (!input.eligibility.ok) return { kind: "ineligible", reason: input.eligibility.reason } as const;
 
       // A member wins at most MAX_WINS_PER_USER_PER_DAY a day; past that the round stays open for others.

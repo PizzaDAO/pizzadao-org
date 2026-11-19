@@ -395,9 +395,20 @@ function removeSequence(hay: string[], needle: string[]): string[] {
   return hay;
 }
 
+/** More words than the longest accepted answer plus this many cannot be a guess at a text answer. */
+const CHAT_EXTRA_TOKENS = 4;
+
 function matchText(q: MatchableQuestion, cleaned: string): Verdict {
-  const level = textLevel(cleaned, [q.answer, ...q.aliases], q.rejects, q.match.fuzzy ?? false);
-  return level === "exact" || level === "contain" ? "correct" : "wrong"; // a wrong guess counts as an attempt
+  const targets = [q.answer, ...q.aliases];
+  const level = textLevel(cleaned, targets, q.rejects, q.match.fuzzy ?? false);
+  if (level === "exact" || level === "contain") return "correct";
+  // A sentence much longer than any accepted answer is chat, not a guess: it matches nothing, so it is ignored and costs
+  // no attempt (and, in Discord, earns no cross). Short messages that miss stay wrong: a wrong guess counts as an attempt.
+  if (level === "none") {
+    const longest = Math.max(...targets.map((t) => canon(t).length));
+    if (canon(cleaned).length > longest + CHAT_EXTRA_TOKENS) return "ignore";
+  }
+  return "wrong";
 }
 
 // ---------------------------------------------------------------------------------------------------------------

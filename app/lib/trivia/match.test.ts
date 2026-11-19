@@ -277,3 +277,18 @@ describe("strict booleans (Discord rounds)", () => {
     expect(verdict("\u{1F44D}", false)).toBe("correct");
   });
 });
+
+describe("text answers: chat sentences are ignored, short misses are wrong attempts", () => {
+  const q = { answer: "Laszlo Hanyecz", aliases: ["Laszlo"], rejects: [], match: { kind: "text" as const, fuzzy: true }, choices: undefined };
+  it("a long sentence that matches nothing is not an attempt", () => {
+    expect(match(q, "hey everyone how is the call going today friends").verdict).toBe("ignore");
+    expect(match(q, "does anyone know when the next call starts tonight").verdict).toBe("ignore");
+  });
+  it("a short wrong guess is still an attempt", () => {
+    expect(match(q, "Hal Finney").verdict).toBe("wrong");
+    expect(match(q, "satoshi").verdict).toBe("wrong");
+  });
+  it("a correct answer inside a longer sentence still counts", () => {
+    expect(match(q, "i think it was laszlo hanyecz").verdict).toBe("correct");
+  });
+});
