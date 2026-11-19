@@ -3471,3 +3471,44 @@ model TriviaReport {
 
   @@index([status, createdAt])
 }
+
+// Capo image review: a set of generated candidates that capos vote yes/no on (with a comment) to tune a prompt.
+enum ImageReviewVoteValue {
+  YES
+  NO
+}
+
+model ImageReviewSet {
+  id          String                 @id @default(cuid())
+  slug        String                 @unique
+  title       String
+  description String?
+  createdAt   DateTime               @default(now())
+  candidates  ImageReviewCandidate[]
+}
+
+model ImageReviewCandidate {
+  id        String            @id @default(cuid())
+  setId     String
+  set       ImageReviewSet    @relation(fields: [setId], references: [id], onDelete: Cascade)
+  imageUrl  String
+  prompt    String
+  traits    Json              @default("{}")
+  position  Int
+  createdAt DateTime          @default(now())
+  votes     ImageReviewVote[]
+
+  @@index([setId, position])
+}
+
+model ImageReviewVote {
+  candidateId String
+  candidate   ImageReviewCandidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  discordId   String
+  vote        ImageReviewVoteValue
+  comment     String?
+  updatedAt   DateTime             @updatedAt
+
+  @@id([candidateId, discordId])
+  @@index([discordId])
+}
