@@ -5,6 +5,7 @@
  */
 import { createServer } from 'node:http'
 import { mkdirSync } from 'node:fs'
+import { join } from 'node:path'
 import { Client, GatewayIntentBits, Options, Partials, GuildScheduledEventRecurrenceRuleFrequency, type GuildScheduledEvent } from 'discord.js'
 import { generateDependencyReport } from '@discordjs/voice'
 import { loadConfig } from './config.js'
@@ -17,7 +18,7 @@ import { postIngestWithRetry } from './ingest.js'
 import { handleDm, postFollowupInbound, type DmMessage } from './dm-forward.js'
 import { RemoteConfigClient } from './remote-config.js'
 import { fetchTriviaRound, postTriviaAnswer, TriviaForwarder, type TriviaMessage, type TriviaReaction } from './trivia-forward.js'
-import { ActivityCounter, postActivityBatch, toActivityEvent, type MessageLike } from './discord-activity.js'
+import { ActivityCounter, postActivityBatchDetailed, toActivityEvent, type MessageLike } from './discord-activity.js'
 
 const log = (msg: string) => console.log(`${new Date().toISOString()} ${msg}`)
 
@@ -121,8 +122,9 @@ client.on('voiceStateUpdate', (o, n) => {
 client.on('messageCreate', (m) => recorder.onMessage(m))
 // Live message counts for the profile "Discord activity" block (counts only, no content; off unless the app's settings say so).
 const activity = new ActivityCounter({
-  post: (body) => postActivityBatch(cfg.appBaseUrl, cfg.recorderApiKey, body, log),
+  post: (body) => postActivityBatchDetailed(cfg.appBaseUrl, cfg.recorderApiKey, body, log),
   config: () => remote.get().discordActivity,
+  stateFile: join(cfg.dataDir, 'discord-activity-inflight.json'),
   log,
 })
 client.on('messageCreate', (m) => {
