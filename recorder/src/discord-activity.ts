@@ -6,12 +6,17 @@
  * `discordActivity`). Fire and forget: nothing here can block or fail recording.
  *
  * Idempotency: each batch has an id and the app applies an id once. A batch whose answer was lost (timeout,
- * 5xx) is resent with the SAME id and contents; new counts go into the next batch. A restart loses what is
- * in memory (at most one interval of counting), never double counts.
+ * 5xx, network error) is resent with the SAME id and contents, however long that takes (a 2-day app outage
+ * once silently dropped 2 days of counts, so a batch is never given up on for a transient failure); new
+ * counts keep accumulating in `pending` meanwhile and go into the next batch. Only a batch the app rejects
+ * as invalid (400/422) is dropped. The in-flight batch is persisted to DATA_DIR (when given) so a restart
+ * does not lose it; counts still in `pending` at a restart are lost (at most one interval), never double
+ * counted.
  *
  * Keep the body in sync with app/lib/discord-activity.ts.
  */
 import { randomUUID } from 'node:crypto'
+import { readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 
 export interface ActivityUserBatch {
   discordId: string
@@ -76,10 +81,17 @@ export const MAX_BATCH_USERS = 500
 const MAX_CHANNELS_PER_USER = 50
 /** Most distinct people waiting for a batch (a flood or a long outage never grows memory without bound). */
 const MAX_PENDING_USERS = 20_000
-/** A batch that still fails after this many sends is dropped. */
-const MAX_SEND_TRIES = 12
+/** Log a stuck batch as an error after this many consecutive failed tries, then at most once per LOG_EVERY_MS. */
+export const WARN_AFTER_TRIES = 3
+export const LOG_EVERY_MS = 3_600_000
 
-export type ActivityPostResult = 'ok' | 'duplicate' | 'off' | 'error'
+/** 'rejected' = the app says the batch is invalid (400/422): it will never succeed, so it is dropped. */
+export type ActivityPostResult = 'ok' | 'duplicate' | 'off' | 'rejected' | 'error'
+export interface ActivityPostOutcome {
+  result: ActivityPostResult
+  /** HTTP status, or a short reason ("timeout", "network error") for a failed try. */
+  status?: string
+}
 
 /** POST a batch. Never throws. */
 export async function postActivityBatch(
@@ -90,6 +102,18 @@ export async function postActivityBatch(
   fetchImpl: typeof fetch = fetch,
   timeoutMs = ACTIVITY_TIMEOUT_MS,
 ): Promise<ActivityPostResult> {
+  return (await postActivityBatchDetailed(appBaseUrl, apiKey, body, log, fetchImpl, timeoutMs)).result
+}
+
+/** Like postActivityBatch, but also says what went wrong. Never throws. */
+export async function postActivityBatchDetailed(
+  appBaseUrl: string,
+  apiKey: string,
+  body: ActivityBatchBody,
+  log: (msg: string) => void,
+  fetchImpl: typeof fetch = fetch,
+  timeoutMs = ACTIVITY_TIMEOUT_MS,
+): Promise<ActivityPostOutcome> {
   try {
     const res = await fetchImpl(`${appBaseUrl}/api/calls/recorder/discord-activity`, {
       method: 'POST',
@@ -97,32 +121,37 @@ export async function postActivityBatch(
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(timeoutMs),
     })
-    if (res.status === 204) return 'off'
-    // A request the app rejects as invalid will never succeed: drop it instead of retrying forever.
-    if (res.status === 400) {
-      log('discord activity: app rejected the batch (400); dropping it')
-      return 'duplicate'
+    if (res.status === 204) return { result: 'off' }
+    // A batch the app rejects as invalid will never succeed: drop it instead of retrying forever.
+    if (res.status === 400 || res.status === 422) {
+      log(`discord activity: app rejected the batch (${res.status}); dropping it`)
+      return { result: 'rejected', status: String(res.status) }
     }
     if (!res.ok) {
-      log(`discord activity: app answered ${res.status}`)
-      return 'error'
+      // 401/403/404 are misconfiguration (wrong RECORDER_API_KEY, route not deployed): retried, never dropped.
+      log(`discord activity: app answered ${res.status}${[401, 403, 404].includes(res.status) ? ' (misconfiguration? check RECORDER_API_KEY / app deploy); the batch is kept and retried' : ''}`)
+      return { result: 'error', status: String(res.status) }
     }
     const j = (await res.json().catch(() => null)) as { status?: string } | null
-    return j?.status === 'duplicate' ? 'duplicate' : 'ok'
+    return { result: j?.status === 'duplicate' ? 'duplicate' : 'ok' }
   } catch (err) {
     log(`discord activity: request failed (${err instanceof Error ? err.message : String(err)})`)
-    return 'error'
+    return { result: 'error', status: err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError') ? 'timeout' : 'network error' }
   }
 }
 
 const dayOf = (ms: number) => new Date(ms).toISOString().slice(0, 10)
 
 export interface ActivityCounterDeps {
-  post: (body: ActivityBatchBody) => Promise<ActivityPostResult>
+  post: (body: ActivityBatchBody) => Promise<ActivityPostResult | ActivityPostOutcome>
   /** Current remote config values (read each time, so a settings change applies without a restart). */
   config: () => { enabled: boolean; flushSeconds: number }
   log?: (msg: string) => void
   newId?: () => string
+  /** Clock (ms), injectable for tests. */
+  now?: () => number
+  /** File (in DATA_DIR) the in-flight batch is persisted to, so a restart does not lose it. Optional. */
+  stateFile?: string
 }
 
 export class ActivityCounter {
@@ -134,9 +163,46 @@ export class ActivityCounter {
   /** Last "counting on/off, every Ns" state logged (logged at start and whenever the settings change it). */
   private loggedState = ''
   private readonly newId: () => string
+  private readonly now: () => number
+  /** When the stuck-batch error line was last logged (-Infinity = not yet for the current failure streak). */
+  private lastWarnAt = -Infinity
+  /** New-person messages discarded at the MAX_PENDING_USERS cap (running total, shown in the log line). */
+  private discarded = 0
+  private lastDiscardLogAt = -Infinity
 
   constructor(private readonly d: ActivityCounterDeps) {
     this.newId = d.newId ?? (() => randomUUID())
+    this.now = d.now ?? Date.now
+    this.load()
+  }
+
+  private load(): void {
+    if (!this.d.stateFile) return
+    try {
+      const parsed = JSON.parse(readFileSync(this.d.stateFile, 'utf8')) as { body?: ActivityBatchBody; tries?: number } | null
+      if (parsed?.body && typeof parsed.body.batchId === 'string' && Array.isArray(parsed.body.users)) {
+        this.inflight = { body: parsed.body, tries: typeof parsed.tries === 'number' ? parsed.tries : 0 }
+        this.d.log?.(`discord activity: restored unsent batch ${parsed.body.batchId.slice(0, 8)} with ${parsed.body.users.length} user(s) from disk`)
+      }
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') this.d.log?.(`discord activity: could not read ${this.d.stateFile}: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
+  /** Persist the in-flight batch (or remove the file when there is none). Never throws. */
+  private save(): void {
+    const f = this.d.stateFile
+    if (!f) return
+    try {
+      if (!this.inflight) {
+        rmSync(f, { force: true })
+        return
+      }
+      writeFileSync(`${f}.tmp`, JSON.stringify({ body: this.inflight.body, tries: this.inflight.tries }))
+      renameSync(`${f}.tmp`, f)
+    } catch (err) {
+      this.d.log?.(`discord activity: could not persist the in-flight batch: ${err instanceof Error ? err.message : String(err)}`)
+    }
   }
 
   /** Count one message (only while counting is on). */
@@ -149,7 +215,17 @@ export class ActivityCounter {
     }
     let u = this.pending.get(e.discordId)
     if (!u) {
-      if (this.pending.size >= MAX_PENDING_USERS) return
+      if (this.pending.size >= MAX_PENDING_USERS) {
+        // Counts for new people are lost here (people already pending keep counting). Only reachable while
+        // batches are not draining (a long outage) or in a flood: say so, at most once an hour.
+        this.discarded++
+        const t = this.now()
+        if (t - this.lastDiscardLogAt >= LOG_EVERY_MS) {
+          this.lastDiscardLogAt = t
+          this.d.log?.(`discord activity: ERROR pending is full (${MAX_PENDING_USERS} users); discarded counts for ${this.discarded} new user message(s) so far. Is the app unreachable?`)
+        }
+        return
+      }
       u = { discordId: e.discordId, authorName: e.authorName, firstAt: new Date(e.atMs).toISOString(), lastAt: new Date(e.atMs).toISOString(), days: {}, channels: {}, replies: 0, threads: 0 }
       this.pending.set(e.discordId, u)
     }
@@ -205,6 +281,7 @@ export class ActivityCounter {
       if (!this.d.config().enabled) {
         this.pending.clear()
         this.inflight = null
+        this.save()
         return
       }
       if (this.inflight) {
@@ -218,6 +295,7 @@ export class ActivityCounter {
         if (users.length >= MAX_BATCH_USERS) break
       }
       this.inflight = { body: { batchId: this.newId(), users }, tries: 0 }
+      this.save()
       await this.send(this.inflight)
     } catch (err) {
       this.d.log?.(`discord activity flush failed: ${err instanceof Error ? err.message : String(err)}`)
@@ -226,21 +304,27 @@ export class ActivityCounter {
     }
   }
 
-  /** True when the batch is settled (acknowledged, a duplicate, switched off, or given up on). */
+  /** True when the batch is settled (acknowledged, a duplicate, switched off, or rejected as invalid). */
   private async send(b: { body: ActivityBatchBody; tries: number }): Promise<boolean> {
     b.tries++
-    const res = await this.d.post(b.body)
-    const what = res === 'ok' ? 'sent' : res === 'duplicate' ? 'already applied (duplicate)' : res === 'off' ? 'refused: counting is off in the app' : 'failed'
+    const raw = await this.d.post(b.body)
+    const { result: res, status } = typeof raw === 'string' ? ({ result: raw } as ActivityPostOutcome) : raw
+    const what = res === 'ok' ? 'sent' : res === 'duplicate' ? 'already applied (duplicate)' : res === 'off' ? 'refused: counting is off in the app' : res === 'rejected' ? 'rejected by the app as invalid; dropped' : 'failed'
     this.d.log?.(`discord activity: batch ${b.body.batchId.slice(0, 8)} with ${b.body.users.length} user(s) ${what}${b.tries > 1 ? ` (try ${b.tries})` : ''}`)
     if (res === 'error') {
-      if (b.tries >= MAX_SEND_TRIES) {
-        this.d.log?.('discord activity: dropping a batch after repeated failures')
-        this.inflight = null
-        return true
+      // Never dropped: the same id and payload are resent on every flush until the app takes it.
+      const t = this.now()
+      if (b.tries >= WARN_AFTER_TRIES && t - this.lastWarnAt >= LOG_EVERY_MS) {
+        this.lastWarnAt = t
+        this.d.log?.(`discord activity: batch ${b.body.batchId} failing for ${b.tries} tries (${status ?? 'error'}); still retrying`)
       }
+      this.save()
       return false
     }
+    if (b.tries > 1 && res !== 'rejected') this.d.log?.(`discord activity: batch ${b.body.batchId} delivered after ${b.tries} tries; recovered`)
+    this.lastWarnAt = -Infinity
     this.inflight = null
+    this.save()
     if (res === 'off') this.pending.clear()
     return true
   }
