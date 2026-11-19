@@ -99,7 +99,9 @@ describe('OAuth state', () => {
       JSON.stringify({ sessionId: 's', nonce, return_to: 'https://onboarding-zzz-pizza-dao.vercel.app' }),
     ).toString('base64url')
     expect(decodeOAuthState(`${forged}.${sig}`)).toEqual({ sessionId: '' })
-    expect(decodeOAuthState(`${body}.${sig.slice(0, -1)}A`)).toEqual({ sessionId: '' })
+    // Change the first signature character: it always carries full bits (the last one has padding bits).
+    const flipped = (sig[0] === 'A' ? 'B' : 'A') + sig.slice(1)
+    expect(decodeOAuthState(`${body}.${flipped}`)).toEqual({ sessionId: '' })
     expect(decodeOAuthState(`${body}.`)).toEqual({ sessionId: '' })
   })
 
