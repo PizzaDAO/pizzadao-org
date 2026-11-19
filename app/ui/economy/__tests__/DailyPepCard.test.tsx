@@ -30,7 +30,7 @@ describe("DailyPepCard", () => {
     await waitFor(() => expect(screen.getByRole("status").textContent).toContain("Collected 42 PEP"));
     expect(onCollected).toHaveBeenCalledWith(1042);
     expect(screen.getByTestId("daily-pep-wait").textContent).toMatch(/Next collect in 23h|Next collect in 24h/);
-    expect(screen.getByText("Also works in Discord: /collect-income")).toBeTruthy();
+    expect(screen.getByText("Also works in Discord: /collect")).toBeTruthy();
   });
 
   it("shows a countdown while waiting", async () => {

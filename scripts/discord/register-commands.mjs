@@ -3,7 +3,7 @@
  * Register the $PEP slash commands (app/lib/discord-interactions/commands.ts)
  * as GUILD commands of the PizzaDAO Discord application. DRY RUN BY DEFAULT.
  *
- * Commands: /balance /work /collect-income /pay /leaderboard /blackjack
+ * Commands: /balance /work /collect /pay /leaderboard /blackjack
  * /roulette /slots /shop /buy /add-money /remove-money /missions /vouch /level
  * /profile /progress /live /metalhead /task (list, claim, mine, drop, add) /trivia (leaderboard, start, skip). /trivia answers "not enabled" until trivia.enabled is on (production only); start and skip are admin only. /task answers "not enabled" until discord.taskCommandEnabled. /bounty is deliberately NOT registered (see BOUNTY_COMMAND in commands.ts). /live answers "not enabled" until calls.liveAnnounceCommandEnabled; /metalhead
  * until discord.metalheadCommandEnabled (and calls.updatesEnabled). /vouch, /level, /profile and /progress answer "not enabled"

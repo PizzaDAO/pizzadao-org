@@ -896,7 +896,7 @@
     "boxMafia": {
       "overline": "§ · box mafia",
       "headline": "Rejoignez la Box Mafia",
-      "body": "Détenez une Rare Pizzas Box pour obtenir le rôle Box Mafia sur Discord, plus {amount} PEP par jour avec /collect-income.",
+      "body": "Détenez une Rare Pizzas Box pour obtenir le rôle Box Mafia sur Discord, plus {amount} PEP par jour avec /collect.",
       "cta": "Obtenir une boîte",
       "notNow": "Pas maintenant",
       "ariaLabel": "Suggestion Box Mafia"
@@ -2653,7 +2653,7 @@
     "timeM": "{m} min",
     "timeS": "moins d''une minute",
     "success": "{amount} PEP récupérés. Nouveau solde : {balance}.",
-    "alsoDiscord": "Fonctionne aussi sur Discord : /collect-income",
+    "alsoDiscord": "Fonctionne aussi sur Discord : /collect",
     "noRoles": "Pas encore de PEP quotidien.",
     "getRole": "Obtenez le rôle {role} pour gagner {amount} PEP par jour.",
     "joinRoles": "Rôles qui rapportent du PEP quotidien : {roles}.",

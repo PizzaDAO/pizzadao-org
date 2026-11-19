@@ -15,7 +15,7 @@ const withNoStore = (r: NextResponse) => {
   return r
 }
 
-/** GET: what the signed-in member can collect right now (same cooldowns as /collect-income). */
+/** GET: what the signed-in member can collect right now (same cooldowns as /collect). */
 export async function GET() {
   const session = await getSession()
   if (!session?.discordId) return reply({ error: 'Not authenticated' }, 401)
@@ -35,7 +35,7 @@ export async function GET() {
 
 /**
  * POST: collect. Runs the exact collectIncome the slash command runs, so cooldowns and amounts are shared:
- * collecting here blocks /collect-income (and the reverse) until the next period.
+ * collecting here blocks /collect (and the reverse) until the next period.
  */
 export async function POST(request: NextRequest) {
   const unsafe = rejectUnsafeWrite(request)

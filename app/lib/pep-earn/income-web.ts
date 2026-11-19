@@ -1,7 +1,7 @@
 /**
  * Shared by the website's daily-PEP routes: the member's Discord roles (server-side, uncached)
  * plus the role income table resolved against the guild, i.e. the same inputs the
- * /collect-income slash command uses.
+ * /collect slash command uses.
  */
 import { fetchGuildMember, lookupGuildMembership } from '../discord'
 import { getGuildRoles } from '../discord-interactions/guild-roles'

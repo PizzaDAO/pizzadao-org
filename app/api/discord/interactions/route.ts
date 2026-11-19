@@ -8,7 +8,7 @@
 //
 // Env: DISCORD_PUBLIC_KEY (hex, Developer Portal > General Information),
 //      DISCORD_GUILD_ID, DISCORD_BOT_TOKEN (guild role names for
-//      /collect-income), optional PEP_EMOJI (e.g. <:pepperoni:973304305979367444>).
+//      /collect), optional PEP_EMOJI (e.g. <:pepperoni:973304305979367444>).
 // Flags: games.enabled (games).
 // /missions: deferred reply, then the verifier run (dry run unless
 //      missions.verifiersEnabled is edited in via the interaction webhook.

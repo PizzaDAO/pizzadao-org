@@ -193,7 +193,7 @@ describe('handleInteraction', () => {
       total: 462,
       balance: 5871,
     }))
-    const r = await handleInteraction(cmd('collect-income'), deps({ collectIncome }))
+    const r = await handleInteraction(cmd('collect'), deps({ collectIncome }))
     expect(collectIncome).toHaveBeenCalledWith(USER, ['r1', 'r2'])
     expect(r.data?.flags).toBeUndefined()
     expect(r.data?.allowed_mentions).toEqual({ parse: [] })
@@ -210,11 +210,11 @@ describe('handleInteraction', () => {
         '<@&900000000000000002>: next collection <t:1800000000:R>',
       ].join('\n'),
     )
-    const none = await handleInteraction(cmd('collect-income'), deps())
+    const none = await handleInteraction(cmd('collect'), deps())
     expect(none.data?.flags).toBe(64)
     expect(embed(none)?.color).toBe(RED)
     const waiting = await handleInteraction(
-      cmd('collect-income'),
+      cmd('collect'),
       deps({ collectIncome: vi.fn(async () => ({ paid: [], waiting: [{ name: 'X', roleId: '900000000000000002', readyAt: new Date(1_800_000_000_000) }], total: 0, balance: 1 })) }),
     )
     expect(embed(waiting)?.color).toBe(AMBER)
@@ -422,7 +422,7 @@ describe('handleInteraction', () => {
 
   it('registers the live commands (/bounty has a handler but is deliberately not registered)', () => {
     expect(PEP_COMMANDS.map((c) => c.name)).toEqual([
-      'balance', 'work', 'collect-income', 'pay', 'leaderboard', 'blackjack', 'roulette', 'slots', 'shop', 'buy',
+      'balance', 'work', 'collect', 'pay', 'leaderboard', 'blackjack', 'roulette', 'slots', 'shop', 'buy',
       'add-money', 'remove-money', 'missions', 'vouch', 'level', 'profile', 'progress', 'live', 'metalhead', 'task', 'trivia',
     ])
   })

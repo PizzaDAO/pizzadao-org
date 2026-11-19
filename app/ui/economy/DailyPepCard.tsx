@@ -3,7 +3,7 @@
 // app/ui/economy/DailyPepCard.tsx
 //
 // "Collect daily PEP" on the website. GET/POST /api/pep/collect-income run the same
-// collectIncome as the /collect-income slash command, so a collect here blocks the
+// collectIncome as the /collect slash command, so a collect here blocks the
 // command until the next period (and vice versa).
 
 import React, { useCallback, useEffect, useState } from "react";

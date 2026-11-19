@@ -1,5 +1,5 @@
 /**
- * Guild role list (id + name), used to resolve /collect-income role names to
+ * Guild role list (id + name), used to resolve /collect role names to
  * ids. Cached in memory per server instance for an hour; on a failed refresh
  * the stale list is kept. Returns null when there's no bot token or the very
  * first fetch fails (role income then only pays roles with a configured id).

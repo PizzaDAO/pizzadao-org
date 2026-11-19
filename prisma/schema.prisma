@@ -201,7 +201,7 @@ enum TransactionType {
   WORK_REWARD // Discord /work payout
   CRIME_REWARD // Web crime success
   CRIME_FINE // Web crime fine (negative)
-  ROLE_INCOME // Discord /collect-income payout (one row per role)
+  ROLE_INCOME // Discord /collect payout (one row per role)
   // ROB_*: legacy. /rob was removed (owner decision, 2026-10-03); kept so the
   // enum stays in sync with the DB and any historical rows still reconcile.
   ROB_STEAL // (removed /rob) robber's gain (+)
@@ -1285,7 +1285,7 @@ model PendingPepClaim {
 }
 
 // Per-user, per-action cooldown for earning commands (/work, crime, and later
-// /collect-income per role, e.g. action "income:<roleId>"). Claimed with a
+// /collect per role, e.g. action "income:<roleId>"). Claimed with a
 // conditional update / insert-on-conflict-do-nothing inside the payout
 // transaction, so concurrent invocations cannot both pay out.
 model EconomyCooldown {
