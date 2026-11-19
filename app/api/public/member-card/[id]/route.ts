@@ -13,6 +13,7 @@ import { withoutNonCrewIds } from "@/app/lib/crew-id";
 import { resolveMemberSince, monthPrecisionIso } from "@/app/lib/member-since";
 import { getPublicDiscordActivity, type PublicDiscordActivity } from "@/app/lib/discord-activity-public";
 import { resolvePfpUrlAsync } from "@/app/lib/pfp";
+import { DEFAULT_PFP_URL } from "@/app/lib/pfp-default";
 
 export const runtime = "nodejs";
 
@@ -91,7 +92,7 @@ export async function composeMemberCard(memberId: string): Promise<MemberCard | 
         // outside a request scope (tests)
     }
     const [pfpUrl, mission, rank, crewMappings, since, discordActivity] = await Promise.all([
-        safe(resolvePfpUrlAsync(memberId), null as string | null),
+        safe(resolvePfpUrlAsync(memberId), DEFAULT_PFP_URL as string),
         discordId ? safe(getUserProgressSummary(discordId), null) : Promise.resolve(null),
         withBudget(rankPromise, RANK_BUDGET_MS, null),
         safe(getCrewMappings(), { crews: [], cached: false }),

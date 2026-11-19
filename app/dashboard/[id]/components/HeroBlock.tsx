@@ -9,6 +9,7 @@
 "use client";
 
 import Link from "next/link";
+import { DEFAULT_PFP_ALT, pfpOrDefault } from "@/app/lib/pfp-default";
 import { ArrowUpRight, Send } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { PepAmount } from "../../../ui/economy";
@@ -51,7 +52,7 @@ function initialsOf(name: string): string {
 
 export function HeroBlock({
     name,
-    pfpUrl,
+    pfpUrl: pfpUrlProp,
     levelBadge,
     pepBalance,
     city,
@@ -62,6 +63,7 @@ export function HeroBlock({
 }: HeroBlockProps) {
     // Either prop name works; prefer levelBadge if both supplied.
     const badge = levelBadge ?? missionLevel ?? null;
+    const pfpUrl = pfpOrDefault(pfpUrlProp);
     const initials = initialsOf(name);
     const t = useTranslations("dashboard.hero");
     const tc = useTranslations("collectPep");
@@ -101,7 +103,7 @@ export function HeroBlock({
                     {pfpUrl ? (
                         <img
                             src={pfpUrl}
-                            alt={t("pfpAlt", { name })}
+                            alt={pfpUrlProp ? t("pfpAlt", { name }) : DEFAULT_PFP_ALT}
                             className="grain relative h-[88px] w-[88px] rounded-full object-cover md:h-[104px] md:w-[104px]"
                             style={{
                                 objectPosition: "top",

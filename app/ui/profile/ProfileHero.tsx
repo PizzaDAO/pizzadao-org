@@ -20,6 +20,7 @@ import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { formatMemberSince } from "@/app/lib/member-since-format";
 import { isOptimizableImage } from "@/app/lib/image-hosts";
+import { DEFAULT_PFP_ALT, pfpOrDefault } from "@/app/lib/pfp-default";
 import { ProfileActions, type ProfileActionsMode } from "./ProfileActions";
 
 interface ProfileHeroProps {
@@ -53,7 +54,7 @@ const HERO_SPOTLIGHT_STYLE: React.CSSProperties = {
 export function ProfileHero({
     memberId,
     name,
-    pfpUrl,
+    pfpUrl: pfpUrlProp,
     tagline,
     city,
     level,
@@ -93,6 +94,7 @@ export function ProfileHero({
         }
     }
 
+    const pfpUrl = pfpOrDefault(pfpUrlProp);
     const hasLevel = level !== null && level !== undefined && level !== "";
 
     return (
@@ -161,10 +163,10 @@ export function ProfileHero({
                 />
 
                 <div className="relative p-5 sm:p-7 flex items-start gap-4 flex-wrap sm:flex-nowrap">
-                    {pfpUrl && (
+                    {
                         <Image
                             src={pfpUrl}
-                            alt={`${name}'s profile`}
+                            alt={pfpUrlProp ? `${name}'s profile` : DEFAULT_PFP_ALT}
                             width={96}
                             height={96}
                             sizes="(min-width: 640px) 96px, 80px"
@@ -181,7 +183,7 @@ export function ProfileHero({
                                 (e.target as HTMLImageElement).style.display = "none";
                             }}
                         />
-                    )}
+                    }
 
                     <div className="flex-1 min-w-0 relative">
                         <p

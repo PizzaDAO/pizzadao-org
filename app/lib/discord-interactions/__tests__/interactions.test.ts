@@ -132,18 +132,14 @@ describe('handleInteraction', () => {
   it('every reply is an embed authored by the invoking member', async () => {
     const r = await handleInteraction(cmd('work'), deps())
     expect(r.data?.content).toBeUndefined()
-    expect(embed(r)?.author).toEqual({
-      name: 'Snax',
-      icon_url: `https://cdn.discordapp.com/avatars/${USER}/a_0123456789abcdef0123456789abcdef.gif`,
-    })
+    // The author icon is the default PizzaDAO PFP, never the invoker's Discord avatar.
+    expect(embed(r)?.author).toEqual({ name: 'Snax', icon_url: expect.stringMatching(/\/pfp\/default\.png$/) })
     const plain = { ...cmd('work'), member: { user: { id: USER, username: 'snax' }, nick: 'Chef' } }
     const a = embed(await handleInteraction(plain, deps()))?.author
     expect(a?.name).toBe('Chef')
-    expect(a?.icon_url).toMatch(/^https:\/\/cdn\.discordapp\.com\/embed\/avatars\/[0-5]\.png$/)
+    expect(a?.icon_url).toMatch(/\/pfp\/default\.png$/)
     const guildAvatar = { ...cmd('work'), member: { user: { id: USER }, avatar: 'abcdef0123456789abcdef0123456789' } }
-    expect(embed(await handleInteraction(guildAvatar, deps()))?.author?.icon_url).toBe(
-      `https://cdn.discordapp.com/guilds/${GUILD}/users/${USER}/avatars/abcdef0123456789abcdef0123456789.png`,
-    )
+    expect(embed(await handleInteraction(guildAvatar, deps()))?.author?.icon_url).not.toContain('discordapp.com')
   })
 
   it('/balance shows a Wallet field ephemerally for self and for another member, without pings', async () => {

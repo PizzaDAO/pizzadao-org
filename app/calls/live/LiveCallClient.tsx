@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { EditorialMasthead, EditorialPage, paperCard, pillInk, pillOutline } from "@/app/ui/shared/Editorial";
 import PersonLink from "@/app/ui/calls/PersonLink";
+import { DEFAULT_PFP_ALT, pfpOrDefault } from "@/app/lib/pfp-default";
 import type { LiveItemView, MemberCall, MemberLive, PublicLive } from "@/app/lib/calls/live-view";
 import type { PollView, QuestionView } from "@/app/lib/calls/live-qa";
 
@@ -371,14 +372,10 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 // ---- present -----------------------------------------------------------------------------------
 
-function Avatar({ name, url }: { name: string; url: string | null }) {
-    return url ? (
+function Avatar({ url }: { name: string; url: string | null }) {
+    return (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={url} alt="" width={32} height={32} loading="lazy" className="h-8 w-8 shrink-0 rounded-full object-cover" />
-    ) : (
-        <span aria-hidden className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-foreground/10 text-xs font-bold">
-            {Array.from(name)[0]?.toUpperCase() ?? "?"}
-        </span>
+        <img src={pfpOrDefault(url)} alt={url ? "" : DEFAULT_PFP_ALT} width={32} height={32} loading="lazy" className="h-8 w-8 shrink-0 rounded-full object-cover" />
     );
 }
 

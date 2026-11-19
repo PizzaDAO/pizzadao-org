@@ -5,6 +5,8 @@ import { holdLabel, loadHoldPolicy } from '@/app/lib/mission-verify/policy'
 import { missionReviewScope } from '@/app/lib/mission-review-access'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { UnauthorizedError, ForbiddenError } from '@/app/lib/errors/api-errors'
+import { resolvePfpUrlsAsync } from '@/app/lib/pfp'
+import { DEFAULT_PFP_URL } from '@/app/lib/pfp-default'
 import { loadReviewLabels } from '@/app/lib/mission-verify/review-labels'
 import { getFlaggedCompletions, getSignalViews } from '@/app/lib/mission-verify/review-extras'
 import { isAllGreen } from '@/app/lib/mission-verify/precheck'
@@ -13,7 +15,7 @@ import { approvalNeedsNote } from '@/app/lib/mission-verify/review-ids'
 export const runtime = 'nodejs'
 
 /** A person on the review panel: a display name instead of a bare Discord ID. */
-export type ReviewPerson = { name: string; discordId: string; memberId?: string; handle?: string; avatarUrl?: string }
+export type ReviewPerson = { name: string; discordId: string; memberId?: string; handle?: string; pfpUrl?: string }
 
 /** A Phase 4 pre-check (semi verifier / link preview), rendered by the panel itself. */
 const isPreCheck = (r: unknown) => !!r && typeof r === 'object' && Array.isArray((r as { checks?: unknown }).checks)
@@ -56,6 +58,13 @@ const GET_HANDLER = async () => {
     ],
     checks: autoChecks,
   })
+  // The member's own PFP (composed, hand-made, else the default). Never the Discord avatar.
+  const pfpMemberIds = [
+    ...pending.map(p => labels.person(p.discordId, p.memberId).memberId),
+    ...[...signals.values()].flat().flatMap(s => s.others.map(d => labels.person(d).memberId)),
+    ...flagged.map(f => labels.person(f.discordId).memberId),
+  ].filter((m): m is string => !!m)
+  const pfps = await resolvePfpUrlsAsync(pfpMemberIds)
   const personView = (discordId: string, memberId?: string | null): ReviewPerson => {
     const l = labels.person(discordId, memberId)
     return {
@@ -63,7 +72,7 @@ const GET_HANDLER = async () => {
       discordId,
       ...(l.memberId ? { memberId: l.memberId } : {}),
       ...(l.handle ? { handle: l.handle } : {}),
-      ...(l.avatarUrl ? { avatarUrl: l.avatarUrl } : {}),
+      pfpUrl: (l.memberId && pfps[l.memberId]) || DEFAULT_PFP_URL,
     }
   }
 

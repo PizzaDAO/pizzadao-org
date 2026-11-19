@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { isOptimizableImage } from "@/app/lib/image-hosts";
+import { DEFAULT_PFP_ALT, pfpOrDefault } from "@/app/lib/pfp-default";
 import { MemberHoverCard } from "../profile/MemberHoverCard";
 import type { Attendee } from "@/app/lib/calls/attendees";
 
@@ -12,13 +13,7 @@ const chip = "inline-flex min-h-11 max-w-full items-center gap-2 rounded-full bo
 function Chip({ a }: { a: Attendee }) {
     const body = (
         <>
-            {a.pfpUrl ? (
-                <Image src={a.pfpUrl} alt="" width={28} height={28} loading="lazy" unoptimized={!isOptimizableImage(a.pfpUrl)} className="h-7 w-7 shrink-0 rounded-full object-cover" />
-            ) : (
-                <span aria-hidden className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-foreground/10 text-xs font-bold">
-                    {Array.from(a.name)[0]?.toUpperCase() ?? "?"}
-                </span>
-            )}
+            <Image src={pfpOrDefault(a.pfpUrl)} alt={a.pfpUrl ? "" : DEFAULT_PFP_ALT} width={28} height={28} loading="lazy" unoptimized={!isOptimizableImage(pfpOrDefault(a.pfpUrl))} className="h-7 w-7 shrink-0 rounded-full object-cover" />
             <span className="min-w-0 truncate">{a.name}</span>
         </>
     );

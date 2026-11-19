@@ -12,6 +12,8 @@
  */
 import { realNick } from '../trainee-nick'
 import { sliceUnits } from '../display-name'
+import { SITE_URL } from '../site-url'
+import { DEFAULT_PFP_URL } from '../pfp-default'
 
 export const EMBED_COLOR = { success: 0x2ecc71, error: 0xe74c3c, cooldown: 0xf39c12 } as const
 export type Tone = keyof typeof EMBED_COLOR
@@ -51,27 +53,11 @@ export interface InvokerLike {
   avatar?: string | null
 }
 
-const CDN = 'https://cdn.discordapp.com'
-const HASH = /^(a_)?[0-9a-f]{16,64}$/i
 const SNOWFLAKE = /^\d{5,25}$/
 
-const ext = (hash: string) => (hash.startsWith('a_') ? 'gif' : 'png')
-
-/**
- * CDN avatar: the guild avatar, else the user avatar, else Discord's default
- * avatar (index (id >> 22) % 6 for the new username system).
- */
-export function avatarUrl(m: InvokerLike): string {
-  const id = m.user?.id ?? ''
-  if (SNOWFLAKE.test(id)) {
-    if (m.avatar && HASH.test(m.avatar) && m.guildId && SNOWFLAKE.test(m.guildId)) {
-      return `${CDN}/guilds/${m.guildId}/users/${id}/avatars/${m.avatar}.${ext(m.avatar)}`
-    }
-    const userAvatar = m.user?.avatar
-    if (userAvatar && HASH.test(userAvatar)) return `${CDN}/avatars/${id}/${userAvatar}.${ext(userAvatar)}`
-    return `${CDN}/embed/avatars/${Number((BigInt(id) >> BigInt(22)) % BigInt(6))}.png`
-  }
-  return `${CDN}/embed/avatars/0.png`
+/** The embed author icon: the default PizzaDAO PFP. A member's Discord avatar is never used as their picture. */
+export function avatarUrl(_m?: InvokerLike): string {
+  return `${SITE_URL}${DEFAULT_PFP_URL}`
 }
 
 export function displayName(m: InvokerLike): string {

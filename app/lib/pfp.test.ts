@@ -28,8 +28,9 @@ describe("resolvePfpUrl", () => {
     expect(resolvePfpUrl("7")).toBe("/pfp/default.jpg");
   });
 
-  it("returns null when there is no image and no default", () => {
-    expect(resolvePfpUrl("7")).toBeNull();
+  it("falls back to the built-in default image, never null and never a Discord avatar", () => {
+    expect(resolvePfpUrl("7")).toBe("/pfp/default.png");
+    expect(resolvePfpUrl("7")).not.toContain("discordapp");
   });
 
   it("never builds a path from an unsafe id", () => {
@@ -41,6 +42,6 @@ describe("resolvePfpUrl", () => {
 describe("resolvePfpUrls", () => {
   it("resolves many ids in one pass, de-duplicated", () => {
     existing.add("1.jpg");
-    expect(resolvePfpUrls(["1", "2", "1", " "])).toEqual({ "1": "/pfp/1.jpg", "2": null });
+    expect(resolvePfpUrls(["1", "2", "1", " "])).toEqual({ "1": "/pfp/1.jpg", "2": "/pfp/default.png" });
   });
 });

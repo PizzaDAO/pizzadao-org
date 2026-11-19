@@ -43,6 +43,13 @@ describe("resolvePfpUrlsAsync", () => {
     expect(await resolvePfpUrlsAsync(["1"])).toEqual({ "1": "/pfp/1.png" });
   });
 
+  it("uses the default when nothing else exists, and never a Discord avatar", async () => {
+    findMany.mockResolvedValue([]);
+    const out = await resolvePfpUrlsAsync(["9"]);
+    expect(out["9"]).toBe("/pfp/default.png");
+    expect(JSON.stringify(out)).not.toContain("discordapp");
+  });
+
   it("skips the query for unsafe ids", async () => {
     await resolvePfpUrlsAsync(["../x"]);
     expect(findMany).not.toHaveBeenCalled();

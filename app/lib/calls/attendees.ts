@@ -8,6 +8,7 @@
  */
 import { prisma } from '@/app/lib/db'
 import { resolvePfpUrlsAsync } from '@/app/lib/pfp'
+import { DEFAULT_PFP_URL } from '@/app/lib/pfp-default'
 import { attendanceCrewId, crewIdsFor, loadCrewAliases } from './crew-alias'
 import { callDay } from './attendance-from-recordings'
 import { loadAttendanceExcludes } from './attendance-exclude'
@@ -81,7 +82,7 @@ export async function loadCallAttendees(rec: AttendeeRecording, text: AttendeeTe
 
     const out: Attendee[] = [...byId].map(([discordId, display]) => {
       const m = memberOf.get(discordId)
-      if (m) return { name: m.name.trim() || display || text.fallback, memberId: m.id, pfpUrl: pfps[m.id] ?? null }
+      if (m) return { name: m.name.trim() || display || text.fallback, memberId: m.id, pfpUrl: pfps[m.id] ?? DEFAULT_PFP_URL }
       return { name: display || text.fallback, memberId: null, pfpUrl: null }
     })
     // Members first, then A to Z.

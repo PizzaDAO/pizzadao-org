@@ -9,6 +9,7 @@
 //
 // Prior: garlic-68749 (Phase 4b token migration).
 
+import { DEFAULT_PFP_ALT, DEFAULT_PFP_URL, pfpOrDefault } from "@/app/lib/pfp-default";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useToast } from "@/app/ui/shared/Toast";
@@ -163,7 +164,7 @@ function PreCheckBlock({ sub, pre }: { sub: Submission; pre: PreCheck }) {
   );
 }
 
-type Person = { name: string; discordId: string; memberId?: string; handle?: string; avatarUrl?: string };
+type Person = { name: string; discordId: string; memberId?: string; handle?: string; pfpUrl?: string };
 type CheckItem = { label: string; value: string; href?: string };
 
 type AccountSignal = { kind: string; label: string; key: string; others: string[]; othersLabeled?: Person[] };
@@ -191,10 +192,8 @@ function PersonName({ person, strong = true }: { person: Person; strong?: boolea
   const nameStyle = { fontWeight: strong ? 600 : 400, color: "hsl(var(--foreground))" } as const;
   return (
     <span title={`Discord ${person.discordId}`} style={{ display: "inline-flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
-      {person.avatarUrl && (
-        // eslint-disable-next-line @next/next/no-img-element -- Discord CDN avatar
-        <img src={person.avatarUrl} alt="" width={16} height={16} loading="lazy" referrerPolicy="no-referrer" style={{ borderRadius: 999 }} />
-      )}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={pfpOrDefault(person.pfpUrl)} alt={person.pfpUrl && person.pfpUrl !== DEFAULT_PFP_URL ? "" : DEFAULT_PFP_ALT} width={16} height={16} loading="lazy" style={{ borderRadius: 999 }} />
       {person.memberId ? (
         <Link href={`/profile/${person.memberId}`} style={{ ...nameStyle, textDecoration: "underline", textDecorationColor: "hsl(var(--rule-warm))" }}>
           {person.name}

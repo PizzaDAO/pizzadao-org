@@ -8,6 +8,7 @@ import {
 import { getBatchAttendanceSummary } from "@/app/lib/attendance";
 import { CREWS, TURTLES } from "@/app/ui/constants";
 import { resolvePfpUrlsAsync } from "@/app/lib/pfp";
+import { DEFAULT_PFP_URL } from "@/app/lib/pfp-default";
 
 export const runtime = "nodejs";
 
@@ -152,7 +153,7 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
   const start = (safePage - 1) * limit;
   const pageRows = enriched.slice(start, start + limit);
   const pfpUrls = await resolvePfpUrlsAsync(pageRows.map((m) => m.id));
-  const pageSlice = pageRows.map((m) => ({ ...m, pfpUrl: pfpUrls[String(m.id).trim()] ?? null }));
+  const pageSlice = pageRows.map((m) => ({ ...m, pfpUrl: pfpUrls[String(m.id).trim()] ?? DEFAULT_PFP_URL }));
 
   // Per-crew and per-turtle counts from the UNFILTERED result (v1 simple)
   const crewCounts = CREWS.map((c) => ({
