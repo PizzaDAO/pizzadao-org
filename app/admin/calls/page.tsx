@@ -13,6 +13,7 @@ import { dropAutoHeld } from "@/app/lib/calls/hold";
 import { listRecordingsPage, type ListRecordingsOpts, type SourceFilter } from "@/app/lib/calls/recordings";
 import { bulkActionMax } from "@/app/lib/calls/bulk";
 import { loadPostFilter } from "@/app/lib/calls/post-filters";
+import { prisma } from "@/app/lib/db";
 import AgendaPreview from "./AgendaPreview";
 import EventTimesPanel from "./EventTimesPanel";
 import { PostFilters } from "./PostFilters";
@@ -80,6 +81,8 @@ export default async function AdminCallsPage({ searchParams }: { searchParams: P
     };
     const postFilter = isOwner ? await loadPostFilter().catch(() => null) : null;
     const when = callDateTimeFormat(locale);
+    // Capo tools: link the newest art review set, if any (the tables may not exist yet).
+    const artSet = await prisma.imageReviewSet.findFirst({ orderBy: { createdAt: "desc" }, select: { slug: true, title: true } }).catch(() => null);
 
     return (
         <main className="min-h-screen bg-background text-foreground p-5 md:p-10">
@@ -88,6 +91,11 @@ export default async function AdminCallsPage({ searchParams }: { searchParams: P
                     <p className="overline text-tomato m-0">{t("overline")}</p>
                     <h1 className="font-[family-name:var(--font-display)] font-black text-3xl m-0">{t("title")}</h1>
                     <p className="m-0 text-foreground/70">{t("description")}</p>
+                    {artSet && (
+                        <Link href={`/capo/review/${artSet.slug}`} className="underline text-sm">
+                            Art review: {artSet.title}
+                        </Link>
+                    )}
                 </header>
 
                 {!isOwner ? null : postFilter ? (

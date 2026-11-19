@@ -123,6 +123,8 @@ export const RATE_LIMITS = {
   "pfp-compose": { limit: 20, windowSec: 10 * 60 },
   "pfp-upload": { limit: 10, windowSec: 10 * 60 },
   "pfp-restyle": { limit: 6, windowSec: 10 * 60 },
+  // Capo image review votes, per member.
+  "image-review-vote": { limit: 60, windowSec: 60 },
   // Daily PEP on the website (shares cooldowns with /collect-income): per IP and per member.
   "collect-income": { limit: 20, windowSec: 10 * 60 },
   "collect-income-status": { limit: 60, windowSec: 10 * 60 },
