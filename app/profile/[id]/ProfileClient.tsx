@@ -35,6 +35,7 @@ import { goBackOrFallback } from "../../lib/go-back";
 import { DisavowChip } from "../../disavow/_components/DisavowChip";
 import type { ReactNode } from "react";
 import type { ProfilePrefill } from "./profile-page-data";
+import { AdminMissionsPanel } from "./AdminMissionsPanel";
 import type { AttendanceResult } from "../../lib/attendance";
 
 
@@ -218,6 +219,8 @@ export function ProfileClient({ id, disavowWarning = null, buddySlot = null, ini
                 <EventsAttendedLazy memberId={id} isOwner={isOwner} />
 
                 <CollectionsLazy memberId={id} />
+
+                {session?.authenticated && session.canReviewMissions && !isOwner && <AdminMissionsPanel memberId={id} />}
 
                 <div className="mt-6 text-center">
                     <p className="overline text-foreground/35">§ End of the dossier</p>

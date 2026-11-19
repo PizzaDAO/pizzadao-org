@@ -67,6 +67,8 @@ export const RATE_LIMITS = {
   "progress-command": { limit: 1, windowSec: 120 },
   "missions-submit": { limit: 10, windowSec: 60 * 60 },
   "missions-bulk-review": { limit: 20, windowSec: 60 * 60 },
+  // Manual mission approvals from a member profile (a reviewer, per Discord id).
+  "missions-manual-approve": { limit: 30, windowSec: 60 * 60 },
   "referral-search": { limit: 60, windowSec: 60 },
   // /join?lane= remembering a lane card pick (plans/lane-cards-mission-onboarding.md).
   "lane-intent": { limit: 30, windowSec: 60 },
