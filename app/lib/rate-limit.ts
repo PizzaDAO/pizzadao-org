@@ -138,6 +138,10 @@ export const RATE_LIMITS = {
   "trivia-daily": { limit: 30, windowSec: 60 },
   "trivia-read": { limit: 120, windowSec: 60 },
   "trivia-report": { limit: 5, windowSec: 10 * 60 },
+  // Wallet ownership verification: nonce requests, per member (Discord id).
+  "wallet-nonce": { limit: 20, windowSec: 10 * 60 },
+  // Wallet signature verification attempts, per member.
+  "wallet-verify": { limit: 10, windowSec: 10 * 60 },
 } as const satisfies Record<string, RateLimitRule>;
 
 export type RateLimitName = keyof typeof RATE_LIMITS;

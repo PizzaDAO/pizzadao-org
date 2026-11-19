@@ -107,7 +107,20 @@ const warmPaths: SettingDef<string> = {
   input: { type: 'text', multiline: true, maxLength: 1000, placeholder: '/missions' },
 }
 
+const walletsRequireSignature: SettingDef<boolean> = {
+  key: 'wallets.requireSignature',
+  area: 'members',
+  label: 'Require a wallet signature to add an EVM wallet',
+  help: 'On: a member must sign a free message (no gas) with a new EVM wallet to prove it is theirs before it is saved; pasting an address is refused. Off: a wallet can be added without a signature, as before. Wallets already saved are never affected. Solana wallets are not checked. The WALLETS_REQUIRE_SIGNATURE env var set to off always wins; on preview deploys only the env var counts (set it to true there to test).',
+  schema: z.boolean(),
+  default: false,
+  onReadFailure: { value: false },
+  input: { type: 'bool' },
+  confirm: (from, to) => (to && !from ? 'New EVM wallets will need a signed message to be added.' : null),
+}
+
 export const MEMBERS_SETTINGS = {
+  'wallets.requireSignature': walletsRequireSignature,
   'members.discordActivityShow': discordActivityShow,
   'members.discordActivityCount': discordActivityCount,
   'members.discordActivityPublicRoleIds': discordActivityPublicRoleIds,

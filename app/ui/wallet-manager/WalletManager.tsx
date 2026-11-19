@@ -2,7 +2,9 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { ConnectButton, useConnectModal } from "@rainbow-me/rainbowkit";
-import { useAccount, useDisconnect } from "wagmi";
+import { useAccount, useDisconnect, useSignMessage } from "wagmi";
+import { createSiweMessage } from "viem/siwe";
+import { mainnet, base, polygon, optimism, zora } from "viem/chains";
 import { btn, input as inputStyle } from "../shared-styles";
 
 interface Wallet {
@@ -25,6 +27,18 @@ const displayFont =
 const monoFont =
   "var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace";
 
+const SIWE_CHAIN_IDS: number[] = [mainnet.id, base.id, polygon.id, optimism.id, zora.id];
+
+/** A signature the member declined (or closed) in their wallet. */
+function isUserRejection(e: unknown): boolean {
+  const err = e as { code?: number; name?: string; message?: string } | null;
+  return (
+    err?.code === 4001 ||
+    err?.name === "UserRejectedRequestError" ||
+    /reject|denied|declined|cancel/i.test(err?.message ?? "")
+  );
+}
+
 function truncateAddress(addr: string): string {
   if (addr.length <= 12) return addr;
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
@@ -41,11 +55,19 @@ export function WalletManager({ memberId }: WalletManagerProps) {
   const [manualAddress, setManualAddress] = useState("");
   const [manualChain, setManualChain] = useState<"evm" | "solana">("evm");
   const [manualLabel, setManualLabel] = useState("");
+  // Whether the server currently requires a signature for new EVM wallets (unknown until asked: then
+  // the server decides). Pasting an EVM address is only offered while it is not required.
+  const [signatureRequired, setSignatureRequired] = useState(false);
+  // True only while the wallet is being asked for a signature.
+  const [signing, setSigning] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editLabel, setEditLabel] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
-  const { address: connectedAddress, isConnected } = useAccount();
+  const { address: connectedAddress, isConnected, chainId: connectedChainId } = useAccount();
+  const { signMessageAsync } = useSignMessage();
+  // Bumped by "Try again" so the auto-save effect runs again for the same wallet.
+  const [retryTick, setRetryTick] = useState(0);
   const { disconnectAsync } = useDisconnect();
   const { openConnectModal } = useConnectModal();
   const [pendingReconnect, setPendingReconnect] = useState(false);
@@ -91,6 +113,20 @@ export function WalletManager({ memberId }: WalletManagerProps) {
   useEffect(() => {
     fetchWallets();
   }, [fetchWallets]);
+
+  // Learn whether a signature is required (decides whether pasting an EVM address is offered).
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/wallet/nonce?memberId=${encodeURIComponent(memberId)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && d && typeof d.required === "boolean") setSignatureRequired(d.required);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [memberId]);
 
   // RainbowKit's ConnectButton.Custom hands back a no-op openConnectModal
   // once a wallet is already connected (wagmi persists the connection
@@ -147,6 +183,49 @@ export function WalletManager({ memberId }: WalletManagerProps) {
       setSaving(true);
       setError(null);
       try {
+        // Wallet ownership: get a single-use nonce, then (when required) have the wallet sign a
+        // free message. Declining the signature means nothing is saved.
+        let message: string | undefined;
+        let signature: string | undefined;
+        // If the nonce call fails, or no signature is asked for, send the plain request and let the
+        // server decide.
+        let nonceData: { nonce: string; required: boolean; statement: string } | null = null;
+        try {
+          const nonceRes = await fetch(`/api/wallet/nonce?memberId=${encodeURIComponent(memberId)}`);
+          if (nonceRes.ok) nonceData = await nonceRes.json();
+        } catch {
+          nonceData = null;
+        }
+        if (nonceData && typeof nonceData.required === "boolean") setSignatureRequired(nonceData.required);
+        if (nonceData?.required) {
+          const chainId = connectedChainId && SIWE_CHAIN_IDS.includes(connectedChainId) ? connectedChainId : mainnet.id;
+          const issuedAt = new Date();
+          message = createSiweMessage({
+            domain: window.location.host,
+            uri: window.location.origin,
+            address: connectedAddress,
+            chainId,
+            nonce: nonceData.nonce,
+            statement: nonceData.statement,
+            version: "1",
+            issuedAt,
+            expirationTime: new Date(issuedAt.getTime() + 10 * 60 * 1000),
+          });
+          try {
+            setSigning(true);
+            signature = await signMessageAsync({ message });
+          } catch (e) {
+            lastFailedAddressRef.current = addr;
+            setError(
+              isUserRejection(e)
+                ? "Signature declined, so this wallet was not saved."
+                : "Couldn't sign with this wallet, so it was not saved."
+            );
+            return;
+          } finally {
+            setSigning(false);
+          }
+        }
         const res = await fetch("/api/wallet", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -154,6 +233,7 @@ export function WalletManager({ memberId }: WalletManagerProps) {
             memberId,
             walletAddress: connectedAddress,
             chainType: "evm",
+            ...(message && signature ? { message, signature } : {}),
           }),
         });
         if (res.ok) {
@@ -180,7 +260,7 @@ export function WalletManager({ memberId }: WalletManagerProps) {
       }
     }
     autoSave();
-  }, [isConnected, connectedAddress, wallets, memberId, saving, loading, loadFailed, fetchWallets]);
+  }, [isConnected, connectedAddress, connectedChainId, signMessageAsync, retryTick, wallets, memberId, saving, loading, loadFailed, fetchWallets]);
 
   const handleConnectDifferent = async () => {
     setPendingReconnect(true);
@@ -221,7 +301,7 @@ export function WalletManager({ memberId }: WalletManagerProps) {
         body: JSON.stringify({
           memberId,
           walletAddress: manualAddress.trim(),
-          chainType: manualChain,
+          chainType: signatureRequired ? "solana" : manualChain,
           label: manualLabel.trim() || undefined,
         }),
       });
@@ -461,6 +541,18 @@ export function WalletManager({ memberId }: WalletManagerProps) {
           }}
         >
           <span>{error}</span>
+          {isConnected && lastFailedAddressRef.current && (
+            <button
+              onClick={() => {
+                lastFailedAddressRef.current = null;
+                setError(null);
+                setRetryTick((n) => n + 1);
+              }}
+              style={{ ...btn("secondary"), fontSize: 12, padding: "4px 10px" }}
+            >
+              Try again
+            </button>
+          )}
           <button
             onClick={() => setError(null)}
             style={{
@@ -722,7 +814,9 @@ export function WalletManager({ memberId }: WalletManagerProps) {
       >
         {saving ? (
           <div style={{ fontSize: 13, color: "hsl(var(--muted-foreground))" }}>
-            Saving wallet…
+            {signing
+              ? "Sign a free message to prove this wallet is yours (no gas)."
+              : "Saving wallet…"}
           </div>
         ) : isConnected && connectedAddress ? (
           <>
@@ -780,7 +874,7 @@ export function WalletManager({ memberId }: WalletManagerProps) {
                 fontSize: 13,
               }}
             >
-              {showManualAdd ? "Cancel" : "Add Manually"}
+              {showManualAdd ? "Cancel" : signatureRequired ? "Add Solana Manually" : "Add Manually"}
             </button>
           </>
         ) : (
@@ -826,7 +920,7 @@ export function WalletManager({ memberId }: WalletManagerProps) {
                 fontSize: 13,
               }}
             >
-              {showManualAdd ? "Cancel" : "Add Manually"}
+              {showManualAdd ? "Cancel" : signatureRequired ? "Add Solana Manually" : "Add Manually"}
             </button>
           </>
         )}
@@ -847,29 +941,27 @@ export function WalletManager({ memberId }: WalletManagerProps) {
           }}
         >
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <select
-              value={manualChain}
-              onChange={(e) =>
-                setManualChain(e.target.value as "evm" | "solana")
-              }
-              style={{
-                ...inputStyle(),
-                padding: "8px 12px",
-                fontSize: 13,
-                width: "auto",
-                minWidth: 150,
-              }}
-            >
-              <option value="evm">EVM (Ethereum)</option>
-              <option value="solana">Solana</option>
-            </select>
+            {!signatureRequired && (
+              <select
+                value={manualChain}
+                onChange={(e) => setManualChain(e.target.value as "evm" | "solana")}
+                style={{
+                  ...inputStyle(),
+                  padding: "8px 12px",
+                  fontSize: 13,
+                  width: "auto",
+                  minWidth: 150,
+                }}
+              >
+                <option value="evm">EVM (Ethereum)</option>
+                <option value="solana">Solana</option>
+              </select>
+            )}
             <input
               type="text"
               value={manualAddress}
               onChange={(e) => setManualAddress(e.target.value)}
-              placeholder={
-                manualChain === "evm" ? "0x…" : "Solana address…"
-              }
+              placeholder={signatureRequired || manualChain === "solana" ? "Solana address…" : "0x…"}
               style={{
                 ...inputStyle(),
                 flex: 1,

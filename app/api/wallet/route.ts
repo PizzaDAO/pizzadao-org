@@ -15,6 +15,10 @@ import { clearWalletMatches, refreshRsvEventsIfEnabled } from "@/app/lib/events-
 import { emitMissionEvent } from "@/app/lib/mission-verify/events";
 import { promoteAwaitingWallet } from "@/app/lib/slices/claims";
 import { processMintQueueSafe } from "@/app/lib/slices/mint-queue";
+import { toggleEnabled } from "@/app/lib/settings/toggles";
+import { isValidEvmAddress, isValidSolanaAddress } from "@/app/lib/wallet-address";
+import { checkKeyedRateLimit, rateLimitResponse } from "@/app/lib/rate-limit";
+import { SiweError, requestHost, siweErrorMessage, verifyWalletSiwe } from "@/app/lib/wallet-siwe";
 
 /** A newly linked EVM wallet releases any Call Slices claims that were waiting for one. */
 function releaseSliceClaims(discordId: string) {
@@ -29,18 +33,12 @@ function releaseSliceClaims(discordId: string) {
 
 export const runtime = "nodejs";
 
+const MAX_MESSAGE_LENGTH = 2000;
+const MAX_SIGNATURE_LENGTH = 20000;
+
 // ---------------------------------------------------------------------------
 // Validation helpers
 // ---------------------------------------------------------------------------
-
-function isValidEvmAddress(addr: string): boolean {
-  return /^0x[0-9a-fA-F]{40}$/.test(addr);
-}
-
-function isValidSolanaAddress(addr: string): boolean {
-  // Base58 characters: 1-9, A-H, J-N, P-Z, a-k, m-z (no 0, I, O, l)
-  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(addr);
-}
 
 /**
  * Verify the authenticated user owns the given memberId.
@@ -136,10 +134,14 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { memberId, walletAddress, chainType = "evm", label } = body;
+    const { memberId, walletAddress, chainType = "evm", label, message, signature } = body;
 
     if (!memberId) {
       return NextResponse.json({ error: "Missing member ID" }, { status: 400 });
+    }
+
+    if (typeof walletAddress !== "string") {
+      return NextResponse.json({ error: "Invalid wallet address" }, { status: 400 });
     }
 
     // Validate wallet address based on chain type
@@ -167,6 +169,39 @@ export async function POST(request: NextRequest) {
     const ownership = await verifyOwnership(session, memberId);
     if (ownership instanceof NextResponse) return ownership;
 
+    // Wallet ownership verification for new EVM wallets (off by default: see wallets.requireSignature).
+    if (chainType === "evm") {
+      const required = await toggleEnabled("wallets.requireSignature");
+      if (required) {
+        if (typeof message !== "string" || typeof signature !== "string" || !message || !signature) {
+          return NextResponse.json(
+            { error: "Sign a free message with this wallet to prove it is yours", code: "signature_required" },
+            { status: 400 }
+          );
+        }
+        if (message.length > MAX_MESSAGE_LENGTH || signature.length > MAX_SIGNATURE_LENGTH) {
+          return NextResponse.json({ error: "Signature message is too large", code: "siwe_too_large" }, { status: 400 });
+        }
+        const limited = await checkKeyedRateLimit("wallet-verify", `${session.discordId}:${memberId}`);
+        if (!limited.success) return rateLimitResponse(limited);
+        try {
+          await verifyWalletSiwe({
+            message,
+            signature,
+            address: walletAddress,
+            memberId: String(memberId),
+            discordId: session.discordId,
+            host: requestHost(request),
+          });
+        } catch (e) {
+          if (e instanceof SiweError) {
+            return NextResponse.json({ error: siweErrorMessage(e.code), code: `siwe_${e.code}` }, { status: 400 });
+          }
+          throw e;
+        }
+      }
+    }
+
     // Save to DB (auto-primary if first wallet)
     const wallet = await saveWalletForMember(
       String(memberId),
@@ -182,7 +217,10 @@ export async function POST(request: NextRequest) {
 
     // Re-check missions that look at wallets (background, no-op unless enabled).
     const walletDiscordId = session.discordId;
-    after(() => emitMissionEvent(walletDiscordId, "wallet_connected", { memberId: String(memberId) }).then(() => undefined));
+    // With the signature switch on, a Solana paste does not satisfy the wallet mission, so no re-check.
+    if (chainType === "evm" || !(await toggleEnabled("wallets.requireSignature"))) {
+      after(() => emitMissionEvent(walletDiscordId, "wallet_connected", { memberId: String(memberId) }).then(() => undefined));
+    }
     if (chainType === "evm") {
       releaseSliceClaims(walletDiscordId);
       // New wallet: look for rsv.pizza check-ins made with it (background, no-op unless enabled).
