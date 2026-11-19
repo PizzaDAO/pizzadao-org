@@ -171,7 +171,7 @@ describe('handleInteraction', () => {
     const ok = await handleInteraction(cmd('work'), deps({ doWork: vi.fn(async () => ({ ok: true as const, amount: 57, balance: 9, prompt: 'x', earnedToday: 312, dailyCap: 420 })) }))
     expect(desc(ok)).toContain('(312/420 today)')
     const capped = await handleInteraction(cmd('work'), deps({ doWork: vi.fn(async () => ({ ok: false as const, capReached: true as const, resetAt: new Date(1_800_000_000_500), dailyCap: 420 })) }))
-    expect(desc(capped)).toMatch(/enough work today.*00:00 UTC.*<t:1800000001:R>/s)
+    expect(desc(capped)).toMatch(/enough work today[\s\S]*00:00 UTC[\s\S]*<t:1800000001:R>/)
   })
 
   it('refuses other guilds and DMs, and unknown commands, with red ephemeral embeds', async () => {
