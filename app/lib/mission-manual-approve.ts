@@ -29,9 +29,8 @@ export interface PanelMission {
   manual: boolean
 }
 
-/** Resolve a member id or Discord id to the member's Discord id (null when unknown). */
-export async function resolveTargetDiscordId(ref: { memberId?: unknown; discordId?: unknown }): Promise<string | null> {
-  if (typeof ref.discordId === 'string' && /^\d{5,25}$/.test(ref.discordId)) return ref.discordId
+/** Resolve a member id (sheet/DB lookup only; never a client-supplied Discord id) to the member's Discord id (null when unknown). */
+export async function resolveTargetDiscordId(ref: { memberId?: unknown }): Promise<string | null> {
   if (typeof ref.memberId === 'string' && ref.memberId.trim()) {
     const row = await fetchMemberById(ref.memberId.trim()).catch(() => null)
     const id = row?.discordId ? String(row.discordId) : ''
@@ -69,7 +68,7 @@ export async function listPanelMissions(reviewerId: string, targetDiscordId: str
         id: true,
         missionId: true,
         status: true,
-        events: { where: { via: MANUAL_VIA, action: 'APPROVED' }, select: { id: true }, take: 1 },
+        events: { where: { via: MANUAL_VIA, action: { in: ['APPROVED', 'RELEASED'] } }, select: { id: true }, take: 1 },
       },
     }),
   ])
@@ -131,6 +130,7 @@ export async function manualApproveMission(input: {
     })
 
   let completion = await find()
+  let created = false
   if (completion?.status === 'APPROVED') return done(completion.id)
 
   if (!completion) {
@@ -151,6 +151,7 @@ export async function manualApproveMission(input: {
         })
         return created
       })
+      created = true
     } catch (e) {
       // A concurrent manual approval created the row first: continue with it.
       if ((e as { code?: string })?.code !== 'P2002') throw e
@@ -187,6 +188,17 @@ export async function manualApproveMission(input: {
       const now = await prisma.missionCompletion.findUnique({ where: { id: completion.id }, select: { status: true } })
       if (now?.status === 'APPROVED') return done(completion.id)
     }
+    // Don't leave an empty manual submission in the review queue if the approval itself failed.
+    if (created) await discardEmptyManualRow(completion.id).catch(() => undefined)
     throw e
   }
+}
+
+/** Remove a row this request created (and its events) if it is still PENDING. */
+async function discardEmptyManualRow(id: number): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    if ((await tx.missionCompletion.count({ where: { id, status: 'PENDING' } })) !== 1) return
+    await tx.missionReviewEvent.deleteMany({ where: { completionId: id } })
+    await tx.missionCompletion.deleteMany({ where: { id, status: 'PENDING' } })
+  })
 }

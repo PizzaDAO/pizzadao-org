@@ -23,8 +23,8 @@ vi.mock('@/app/lib/sheets/member-repository', () => ({
 const db = vi.hoisted(() => ({
   appSetting: { findMany: vi.fn(async () => []) },
   mission: { findFirst: vi.fn(), findMany: vi.fn() },
-  missionCompletion: { findUnique: vi.fn(), findMany: vi.fn(), create: vi.fn(), updateMany: vi.fn() },
-  missionReviewEvent: { create: vi.fn() },
+  missionCompletion: { findUnique: vi.fn(), findMany: vi.fn(), create: vi.fn(), updateMany: vi.fn(), count: vi.fn(), deleteMany: vi.fn() },
+  missionReviewEvent: { create: vi.fn(), deleteMany: vi.fn() },
   $transaction: vi.fn(),
 }))
 vi.mock('@/app/lib/db', () => ({ prisma: db }))
@@ -135,6 +135,31 @@ describe('POST /api/missions/manual-approve', () => {
     expect(await res.json()).toMatchObject({ alreadyApproved: true, levelsPaid: [] })
   })
 
+  it('removes the empty row it created when approveMission fails', async () => {
+    as('capo', [CAPO])
+    mission(3)
+    row(null)
+    db.missionCompletion.count.mockResolvedValue(1)
+    vi.mocked(approveMission).mockRejectedValueOnce(new Error('boom'))
+    expect((await post(ok)).status).toBe(500)
+    expect(db.missionReviewEvent.deleteMany).toHaveBeenCalledWith({ where: { completionId: 42 } })
+    expect(db.missionCompletion.deleteMany).toHaveBeenCalledWith({ where: { id: 42, status: 'PENDING' } })
+  })
+
+  it('does not delete a pre-existing submission when approveMission fails', async () => {
+    as('capo', [CAPO])
+    mission(3)
+    row('PENDING')
+    vi.mocked(approveMission).mockRejectedValueOnce(new Error('boom'))
+    await post(ok)
+    expect(db.missionCompletion.deleteMany).not.toHaveBeenCalled()
+  })
+
+  it('validates the note before looking up the member', async () => {
+    as('capo', [CAPO])
+    expect((await post({ memberId: 'nope', missionId: 9, note: 'x' })).status).toBe(400)
+  })
+
   describe('permission matrix', () => {
     it('refuses someone with no reviewer role (L3)', async () => {
       as(NOBODY, [])
@@ -166,7 +191,8 @@ describe('POST /api/missions/manual-approve', () => {
       mission(3)
       row(null)
       expect((await post({ ...ok, memberId: 'm-self' })).status).toBe(403)
-      expect((await post({ discordId: '777777', missionId: 9, note: 'my own' })).status).toBe(403)
+      // A client-supplied Discord id is never accepted.
+      expect((await post({ discordId: '777777', missionId: 9, note: 'my own' })).status).toBe(400)
       expect(approveMission).not.toHaveBeenCalled()
     })
 
