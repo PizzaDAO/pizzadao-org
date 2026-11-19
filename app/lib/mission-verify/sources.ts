@@ -6,10 +6,12 @@ import { prisma } from '../db'
 import { lookupGuildMembership } from '../discord'
 import { getChannel, getChannelMessage, resolveChannelId } from '../discord-channels'
 import { getGuildRoles } from '../discord-interactions/guild-roles'
+import { canManageCrew } from '../crew-leads'
+import { isDreadPizzaRoberts } from '../mission-review-access'
 import { getCurrentLevel, getPaidLevels } from '../missions'
 import { checkRarePizzaBox } from '../rare-pizza-box'
 import { toggleEnabled } from '../settings/toggles'
-import type { VerifierSources } from './types'
+import type { CrewTaskDoneRow, VerifierSources } from './types'
 
 export const defaultSources: VerifierSources = {
   async getXAccount(discordId) {
@@ -59,6 +61,15 @@ export const defaultSources: VerifierSources = {
       case 'buddy_completed':
         return prisma.buddyPair.count({ where: { buddyDiscordId: discordId, status: 'COMPLETED' } })
     }
+  },
+
+  async getDoneCrewTasksLedBy(memberId) {
+    return doneCrewTasksLedBy(memberId)
+  },
+
+  async canCloseCrewTasks(discordId, crewId) {
+    // Lead of the crew (roster), or an admin role; Dread Pizza Roberts is always allowed. Both fail closed.
+    return (await canManageCrew(discordId, crewId)) || (await isDreadPizzaRoberts(discordId))
   },
 
   async getMemberRoles(discordId) {
@@ -173,4 +184,37 @@ export const defaultSources: VerifierSources = {
     })
     return [...new Set(rows.map((r) => r.walletAddress.trim()).filter(Boolean))]
   },
+}
+
+/** Stages that mean "Done" (not "skip": a skipped task was not completed). */
+export function isDoneStage(stage: string | null | undefined): boolean {
+  const s = (stage ?? '').trim().toLowerCase()
+  return s === 'done' || s === 'complete' || s === 'completed'
+}
+
+/**
+ * Done crew tasks the member leads, each with who moved it to Done: the latest `update` CrewTaskEvent
+ * whose changes set the stage to a Done value (written by the crew-page editor, the call-task proposals
+ * and the Discord task commands; the actor is a Discord id). No such event = unknown closer (null).
+ */
+export async function doneCrewTasksLedBy(memberId: string): Promise<CrewTaskDoneRow[]> {
+  const tasks = await prisma.crewTask.findMany({
+    where: { leadMemberId: memberId, archived: false },
+    select: { id: true, crewId: true, label: true, stage: true },
+    take: 500,
+  })
+  const done = tasks.filter((t) => isDoneStage(t.stage))
+  if (done.length === 0) return []
+  const events = await prisma.crewTaskEvent.findMany({
+    where: { taskId: { in: done.map((t) => t.id) }, action: 'update' },
+    select: { taskId: true, actor: true, data: true },
+    orderBy: { id: 'desc' },
+  })
+  const closer = new Map<string, string>()
+  for (const e of events) {
+    if (closer.has(e.taskId)) continue
+    const changes = (e.data as { changes?: { stage?: unknown } } | null)?.changes
+    if (typeof changes?.stage === 'string' && isDoneStage(changes.stage)) closer.set(e.taskId, e.actor)
+  }
+  return done.map((t) => ({ taskId: t.id, crewId: t.crewId, label: t.label, closedBy: closer.get(t.id) ?? null }))
 }

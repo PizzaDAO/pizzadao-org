@@ -13,7 +13,7 @@
 export type Trigger = 'on_demand' | 'discord' | 'event' | 'submit' | 'cron' | 'backfill'
 
 /** Events that re-run the verifiers for one member (route hooks). */
-export type MissionEvent = 'x_linked' | 'wallet_connected' | 'crew_joined' | 'attendance_synced' | 'referral_created' | 'vouch_created' | 'vouch_received' | 'level_reached'
+export type MissionEvent = 'x_linked' | 'wallet_connected' | 'crew_joined' | 'attendance_synced' | 'referral_created' | 'vouch_created' | 'vouch_received' | 'level_reached' | 'crew_task_done'
 
 export interface VerifyCtx {
   discordId: string
@@ -91,6 +91,14 @@ export interface VerifierSources {
    * check-ins, completed bounties, published articles, ...).
    */
   countActivity?(kind: ActivityKind, discordId: string, memberId: string | null): Promise<number>
+  /**
+   * Crew tasks the member leads (CrewTask.leadMemberId) that are in a Done stage, with who moved
+   * each to Done (the latest CrewTaskEvent that set the stage; null when the history does not say).
+   * Optional so older test doubles still compile: crew_task_done answers 'unknown' when absent.
+   */
+  getDoneCrewTasksLedBy?(memberId: string): Promise<CrewTaskDoneRow[]>
+  /** Whether this Discord user may close the crew's tasks: a lead of that crew, an admin, or Dread Pizza Roberts. Fails closed. */
+  canCloseCrewTasks?(discordId: string, crewId: string): Promise<boolean>
   /** The member's guild roles; null when Discord couldn't be asked; [] when not in the guild. */
   getMemberRoles(discordId: string): Promise<string[] | null>
   /** Guild role ids for these role names (case-insensitive, cached guild role list); null when unavailable. */
@@ -148,6 +156,14 @@ export type ActivityKind =
   | 'job_completed'
   | 'article_published'
   | 'buddy_completed'
+
+export interface CrewTaskDoneRow {
+  taskId: string
+  crewId: string
+  label: string
+  /** Discord id of whoever moved the task to Done; null when the task history does not say. */
+  closedBy: string | null
+}
 
 export interface ReferralRow {
   inviteeDiscordId: string

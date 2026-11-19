@@ -101,6 +101,11 @@ export async function updateCrewTask(
   if (res.count !== 1) return false
   await prisma.crewTaskEvent.create({ data: { taskId, crewId, action: 'update', actor, data: { ...(opts.eventData ?? {}), changes: patch } as never } })
   await invalidateCrewMappingsCache()
+  // A task that just moved to Done: let its lead's "Complete a task from a crew" mission notice (best effort).
+  if (patch.stage !== undefined && isClosedStage(patch.stage) && !isClosedStage(String(opts.prev.stage ?? ''))) {
+    const { emitCrewTaskDoneLater } = await import('@/app/lib/mission-verify/crew-task-event')
+    emitCrewTaskDoneLater([taskId])
+  }
   return true
 }
 

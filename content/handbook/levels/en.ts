@@ -27,6 +27,10 @@ A vouch is a member saying "I know this person and they are part of the communit
 - Vouching for yourself does not count, and neither do follows imported from other networks.
 - Ask people who know your work. A short message after a call is usually enough.
 
+## Complete a crew task {#crew-task}
+
+Every crew keeps a list of tasks on its page. Open a [crew](/crews), pick an open task, and claim it with the Claim button. In Discord you can do the same: /task list shows open tasks and /task claim makes you its lead. Do the work, then ask the crew's lead to mark the task Done. The mission is checked automatically once a crew lead (or an admin) has marked a task you lead as Done. Marking your own task Done does not count.
+
 ## The selfie interview {#selfie-interview}
 
 The selfie interview is a short video where you talk about your PizzaDAO experience: how you found us, what you have enjoyed, what you are working on. Record it on your phone, upload it somewhere that gives you a link (YouTube, X, Google Drive or Loom), and submit the link on the mission. A reviewer watches it and approves it. No script and no studio needed.

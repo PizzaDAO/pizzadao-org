@@ -19,6 +19,7 @@ export const CHECK_ID_KEYS: Record<string, IdKind> = {
   invitee: 'user',
   inviteeDiscordId: 'user',
   discordIds: 'user',
+  closedBy: 'user',
   messageId: 'message',
 }
 
@@ -39,6 +40,9 @@ const KEY_LABEL: Record<string, string> = {
   referrals: 'Referrals',
   flagged: 'Flagged',
   wallets: 'Wallets',
+  tasks: 'Crew tasks',
+  crewId: 'Crew',
+  closedBy: 'Marked Done by',
 }
 
 const SNOWFLAKE = /^\d{5,25}$/
