@@ -1,4 +1,4 @@
-// POST /api/image-review/<slug>/vote { candidateId, vote: "YES"|"NO", comment? } -> { ok: true }. Capos only; upserts.
+// POST /api/image-review/<slug>/vote { candidateId, vote: "YES"|"NO", comment? } -> { ok: true }. Capos, Dread Pizza Roberts and members at the minimum level; upserts.
 import { NextResponse } from 'next/server'
 import { requireImageReviewer } from '@/app/lib/image-review/access'
 import { castVote, parseVote, SLUG_RE } from '@/app/lib/image-review/data'

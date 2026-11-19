@@ -92,7 +92,7 @@ export default async function AdminCallsPage({ searchParams }: { searchParams: P
                     <h1 className="font-[family-name:var(--font-display)] font-black text-3xl m-0">{t("title")}</h1>
                     <p className="m-0 text-foreground/70">{t("description")}</p>
                     {artSet && (
-                        <Link href={`/capo/review/${artSet.slug}`} className="underline text-sm">
+                        <Link href={`/review/${artSet.slug}`} className="underline text-sm">
                             Art review: {artSet.title}
                         </Link>
                     )}

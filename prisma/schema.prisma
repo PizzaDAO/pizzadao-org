@@ -3485,6 +3485,17 @@ model ImageReviewSet {
   description String?
   createdAt   DateTime               @default(now())
   candidates  ImageReviewCandidate[]
+  setComments ImageReviewSetComment[]
+}
+
+model ImageReviewSetComment {
+  setId     String
+  set       ImageReviewSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+  discordId String
+  comment   String
+  updatedAt DateTime       @updatedAt
+
+  @@id([setId, discordId])
 }
 
 model ImageReviewCandidate {

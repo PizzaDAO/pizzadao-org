@@ -254,6 +254,7 @@ describe('settings registry', () => {
       ['pfp.restyleEnabled', false],
       ['pfp.allowedBaseKinds', ['mafia', 'restyle']],
       ['pfp.minCompletedLevel', 2],
+      ['imageReview.minCompletedLevel', 2],
       ['pfp.restylePerUnlock', 2],
       ['pfp.restyleDailyLimit', 3],
       ['pfp.restyleMonthlyBudgetUsd', 50],

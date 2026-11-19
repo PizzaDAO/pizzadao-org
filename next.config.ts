@@ -127,7 +127,9 @@ const nextConfig: NextConfig = {
     const communityCall = [...NON_ROSTER_CREW_IDS].map((id) => ({ source: `/crew/${id}`, destination: `/calls?crew=${COMMUNITY_CALL_ATTENDANCE_ID}`, permanent: false }));
     // Retired legacy poll voting (/vote/<pollId>): voting lives in the proposals system now.
     const retiredVote = ["/vote", "/vote/:path*"].map((source) => ({ source, destination: "/proposals", permanent: true }));
-    const legacy = [...appEntry, ...retiredVote, ...communityCall, ...legacyDashboardRedirects(), ...legacyAssetRedirects()];
+    // The art review moved from the capo-only path to the member-facing /review/<slug>.
+    const artReview = [{ source: "/capo/review/:slug", destination: "/review/:slug", permanent: false }];
+    const legacy = [...artReview, ...appEntry, ...retiredVote, ...communityCall, ...legacyDashboardRedirects(), ...legacyAssetRedirects()];
     return marketingHomeAtRoot() ? [...wizardParamRedirects(), ...legacy, { source: "/home", destination: "/", permanent: false }] : legacy;
   },
   async headers() {

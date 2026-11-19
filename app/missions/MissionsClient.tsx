@@ -121,7 +121,7 @@ const DISPLAY_FONT =
  * (app/missions/page.tsx). When it is null (DB unavailable) the client falls
  * back to fetching it on mount.
  */
-export default function MissionsClient({ initial }: { initial: MissionsResponse | null }) {
+export default function MissionsClient({ initial, reviewSlug = null }: { initial: MissionsResponse | null; reviewSlug?: string | null }) {
   const [data, setData] = useState<MissionsResponse | null>(initial);
   const toast = useToast();
   // /api/missions/pending is reviewer-only (mission-review-access.ts);
@@ -613,6 +613,28 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
             }}
           />
         </header>
+
+        {reviewSlug && (
+          <a
+            href={`/review/${reviewSlug}`}
+            data-testid="art-review-card"
+            className="paper-soft"
+            style={{
+              display: "block",
+              borderRadius: "var(--radius)",
+              border: "1px solid hsl(var(--rule-warm) / 0.55)",
+              padding: "14px 18px",
+              background: "hsl(var(--cream))",
+              textDecoration: "none",
+              color: "inherit",
+            }}
+          >
+            <strong>Help pick the default PFP</strong>
+            <span style={{ display: "block", marginTop: 2, color: "hsl(var(--muted-foreground))", fontSize: 14 }}>
+              Vote on the candidate art and leave feedback.
+            </span>
+          </a>
+        )}
 
         <TermExplanation term="missions" />
 
