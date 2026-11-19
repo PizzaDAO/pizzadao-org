@@ -56,6 +56,7 @@ describe('economy settings: lock to today\'s values', () => {
       ['work.minPep', 10],
       ['work.maxPep', 100],
       ['work.cooldownSeconds', 30],
+      ['work.dailyCapPep', 420],
       ['economy.jobRewardAmount', 50],
       ['economy.dailyJobsCount', 3],
       ['economy.adminGrantMax', 10_000],
@@ -75,7 +76,7 @@ describe('economy settings: lock to today\'s values', () => {
     for (const s of [undefined, snap()]) {
       expect(gameConfig(s)).toEqual({ minBet: 10, maxBet: 5000, cooldownMs: 3000, blackjackTimeoutMs: 300_000 })
       expect(crimeConfig(s)).toEqual({ min: 2, max: 420, failPercent: 60, fineMinPercent: 5, fineMaxPercent: 55, cooldownMs: 30_000 })
-      expect(workConfig(s)).toEqual({ min: 10, max: 100, cooldownMs: 30_000 })
+      expect(workConfig(s)).toEqual({ min: 10, max: 100, dailyCap: 420, cooldownMs: 30_000 })
       expect(roleIncomeConfig(undefined, s)).toBe(DEFAULT_ROLE_INCOME)
       expect(adminGrantMax({}, s)).toBe(10_000)
       expect(effectiveInt('economy.jobRewardAmount', s)).toBe(50)
@@ -115,6 +116,7 @@ describe('economy settings: bounds', () => {
       ['work.minPep', 11, 5],
       ['work.maxPep', 101, 50],
       ['work.cooldownSeconds', 29, 60],
+      ['work.dailyCapPep', 421, 200],
       ['economy.jobRewardAmount', 51, 25],
       ['economy.dailyJobsCount', 4, 1],
       ['economy.adminGrantMax', 10_001, 500],
@@ -336,5 +338,17 @@ describe('admin page baseline', () => {
     vi.stubEnv('SLICES_MAX_GAS_GWEI', '0.2')
     expect(baselineValue('slices.maxGasMilliGwei')).toBeCloseTo(200)
     expect(baselineValue('missions.slaHours')).toBe(48)
+  })
+})
+
+describe('work.dailyCapPep', () => {
+  it('validates as a whole number from 1 to 420 (stricter-only)', () => {
+    const schema = ECONOMY_SETTINGS['work.dailyCapPep'].schema
+    expect(schema.safeParse(200).success).toBe(true)
+    expect(schema.safeParse(421).success).toBe(false)
+    expect(schema.safeParse(0).success).toBe(false)
+    expect(schema.safeParse(1.5).success).toBe(false)
+    expect(workConfig(snap()).dailyCap).toBe(420)
+    expect(workConfig(snap({ 'work.dailyCapPep': 100 })).dailyCap).toBe(100)
   })
 })

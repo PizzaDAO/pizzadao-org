@@ -93,7 +93,11 @@ export interface HandlerDeps {
   /** Currency label, e.g. the guild's <:pepperoni:...> emoji. */
   currency?: string
   getWallet: (discordId: string) => Promise<number>
-  doWork: (discordId: string) => Promise<{ ok: true; amount: number; balance: number; prompt: string } | { ok: false; readyAt: Date }>
+  doWork: (discordId: string) => Promise<
+    | { ok: true; amount: number; balance: number; prompt: string; earnedToday?: number; dailyCap?: number }
+    | { ok: false; readyAt: Date }
+    | { ok: false; capReached: true; resetAt: Date; dailyCap: number }
+  >
   collectIncome: (discordId: string, roleIds: string[]) => Promise<IncomeResult & { unresolved?: string[] }>
   pay: (fromId: string, toId: string, amount: number) => Promise<unknown>
   leaderboard: () => Promise<Array<{ userId: string; balance: number }>>
@@ -441,9 +445,11 @@ async function command(i: Interaction, userId: string, deps: HandlerDeps, cur: s
 
     case 'work': {
       const r = await deps.doWork(userId)
+      if (!r.ok && 'capReached' in r) return out.wait("You've done enough work today.", `Come back after 00:00 UTC (${rel(r.resetAt)}).`)
       if (!r.ok) return out.wait("You're still on your break.", `You can /work again ${rel(r.readyAt)}.`)
       const text = r.prompt.split('{amount}').join(pep(r.amount))
-      return out.ok('Shift complete!', `${text}\n\nEarned: ${amt(r.amount)} • Balance: ${amt(r.balance)}`)
+      const today = r.dailyCap && r.dailyCap > 0 && r.earnedToday !== undefined ? ` (${r.earnedToday}/${r.dailyCap} today)` : ''
+      return out.ok('Shift complete!', `${text}\n\nEarned: ${amt(r.amount)}${today} • Balance: ${amt(r.balance)}`)
     }
 
     case 'collect-income': {

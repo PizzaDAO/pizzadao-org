@@ -143,6 +143,10 @@ export const ECONOMY_SETTINGS = {
     key: 'work.cooldownSeconds', label: 'Work: seconds between shifts', help: 'The WORK_COOLDOWN_SECONDS env var is used until this is saved.',
     min: 30, max: 86400, default: 30, unit: 's', looserWhen: 'lower',
   }),
+  'work.dailyCapPep': num({
+    key: 'work.dailyCapPep', label: 'Work: daily PEP cap', help: 'Most PEP one member can earn from /work per UTC day; the last shift of the day pays only what is left under the cap.',
+    min: 1, max: 420, default: 420, unit: 'PEP', looserWhen: 'higher',
+  }),
 
   // ---- Daily jobs, role income, admin grants ----
   'economy.jobRewardAmount': num({

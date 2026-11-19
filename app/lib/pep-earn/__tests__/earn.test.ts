@@ -9,7 +9,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 const state = vi.hoisted(() => ({
   wallets: new Map<string, number>(),
   cooldowns: new Map<string, Date>(),
-  ledger: [] as Array<{ userId: string; type: string; amount: number; description: string; metadata: unknown }>,
+  ledger: [] as Array<{ userId: string; type: string; amount: number; description: string; metadata: unknown; at: Date }>,
+  clock: new Date(),
 }))
 
 vi.mock('../../db', () => {
@@ -51,13 +52,39 @@ vi.mock('../../db', () => {
       findUnique: vi.fn(async ({ where }: { where: { id: string } }) => ({ id: where.id, wallet: state.wallets.get(where.id) ?? 0 })),
     },
   }
+  client.transaction = {
+    aggregate: vi.fn(async ({ where }: { where: { userId: string; type: string; createdAt: { gte: Date; lt: Date } } }) => {
+      const sum = state.ledger
+        .filter((l) => l.userId === where.userId && l.type === where.type && l.at >= where.createdAt.gte && l.at < where.createdAt.lt)
+        .reduce((a, l) => a + l.amount, 0)
+      return { _sum: { amount: sum } }
+    }),
+  }
+  const locks = new Map<string, Promise<void>>()
   client.$transaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
     const saved = { wallets: new Map(state.wallets), cooldowns: new Map(state.cooldowns), ledger: [...state.ledger] }
+    const held: Array<() => void> = []
+    // FOR UPDATE: a per-row mutex held until this transaction ends.
+    const tx = {
+      ...client,
+      $queryRaw: async (_s: TemplateStringsArray, id: string) => {
+        while (locks.has(id)) await locks.get(id)
+        let release!: () => void
+        locks.set(id, new Promise<void>((r) => (release = r)))
+        held.push(() => {
+          locks.delete(id)
+          release()
+        })
+        return []
+      },
+    }
     try {
-      return await fn(client)
+      return await fn(tx)
     } catch (e) {
       Object.assign(state, saved)
       throw e
+    } finally {
+      held.forEach((h) => h())
     }
   })
   return { prisma: client }
@@ -68,16 +95,19 @@ vi.mock('../../economy', () => ({
     if (!state.wallets.has(id)) state.wallets.set(id, 0)
     return { id, wallet: state.wallets.get(id) }
   }),
+  lockWallet: vi.fn(async (tx: { $queryRaw: (s: TemplateStringsArray, id: string) => Promise<unknown> }, id: string) => {
+    await tx.$queryRaw`SELECT id FROM "Economy" WHERE id = ${id} FOR UPDATE`
+  }),
 }))
 
 vi.mock('../../transactions', () => ({
   logTransaction: vi.fn(async (_tx: unknown, userId: string, type: string, amount: number, description: string, metadata: unknown) => {
-    state.ledger.push({ userId, type, amount, description, metadata })
+    state.ledger.push({ userId, type, amount, description, metadata, at: state.clock })
     return { id: state.ledger.length }
   }),
 }))
 
-import { doWork, workPrompts, DEFAULT_WORK_PROMPTS } from '../work'
+import { doWork, workConfig, workPrompts, DEFAULT_WORK_PROMPTS } from '../work'
 import { commitCrime } from '../crime'
 import { randInt } from '../cooldown'
 
@@ -111,7 +141,7 @@ describe('/work', () => {
   it('pays 10-100, writes WORK_REWARD, and enforces the 30s cooldown', async () => {
     const r = await doWork(U, { rng: seq(0.5, 0), now: t0 })
     expect(r).toMatchObject({ ok: true, amount: 55, balance: 1055, promptIndex: 0, prompt: DEFAULT_WORK_PROMPTS[0] })
-    expect(state.ledger).toEqual([{ userId: U, type: 'WORK_REWARD', amount: 55, description: 'Work shift', metadata: { command: 'work', promptIndex: 0 } }])
+    expect(state.ledger).toMatchObject([{ userId: U, type: 'WORK_REWARD', amount: 55, description: 'Work shift', metadata: { command: 'work', promptIndex: 0 } }])
 
     const blocked = await doWork(U, { now: at(29) })
     expect(blocked).toEqual({ ok: false, readyAt: at(30) })
@@ -125,6 +155,57 @@ describe('/work', () => {
     const results = await Promise.all([doWork(U, { rng: () => 0, now: t0 }), doWork(U, { rng: () => 0, now: t0 })])
     expect(results.filter((r) => r.ok)).toHaveLength(1)
     expect(state.ledger).toHaveLength(1)
+  })
+
+  describe('daily cap', () => {
+    const seed = (amount: number, at: Date) => state.ledger.push({ userId: U, type: 'WORK_REWARD', amount, description: 'x', metadata: null, at })
+    const go = (now: Date, rng = () => 0.5) => {
+      state.clock = now
+      return doWork(U, { rng, now })
+    }
+    beforeEach(() => vi.stubEnv('WORK_COOLDOWN_SECONDS', '0'))
+    afterEach(() => vi.unstubAllEnvs())
+
+    it('refuses once the cap is reached, without using the cooldown', async () => {
+      seed(420, t0)
+      const r = await go(t0)
+      expect(r).toEqual({ ok: false, capReached: true, resetAt: new Date('2026-10-03T00:00:00Z'), dailyCap: 420 })
+      expect(state.cooldowns.size).toBe(0)
+      expect(state.wallets.get(U)).toBe(1000)
+    })
+
+    it('pays only the remainder, then refuses', async () => {
+      seed(400, t0)
+      const r = await go(t0, () => 0.99)
+      expect(r).toMatchObject({ ok: true, amount: 20, earnedToday: 420, dailyCap: 420, balance: 1020 })
+      expect(await go(t0)).toMatchObject({ ok: false, capReached: true })
+    })
+
+    it('reports earned-today on a normal payout', async () => {
+      seed(257, t0)
+      expect(await go(t0, () => 0.5)).toMatchObject({ ok: true, amount: 55, earnedToday: 312, dailyCap: 420 })
+    })
+
+    it('two parallel calls at 400/420 pay at most 20 in total', async () => {
+      seed(400, t0)
+      state.clock = t0
+      const rs = await Promise.all([doWork(U, { rng: () => 0.99, now: t0 }), doWork(U, { rng: () => 0.99, now: t0 })])
+      const paid = rs.reduce((a, r) => a + (r.ok ? r.amount : 0), 0)
+      expect(paid).toBe(20)
+      expect(rs.filter((r) => r.ok)).toHaveLength(1)
+      expect(state.wallets.get(U)).toBe(1020)
+    })
+
+    it('resets at 00:00 UTC', async () => {
+      seed(420, new Date('2026-10-02T23:59:59Z'))
+      expect((await go(new Date('2026-10-02T23:59:59Z'))).ok).toBe(false)
+      expect(await go(new Date('2026-10-03T00:00:00Z'))).toMatchObject({ ok: true, earnedToday: 55 })
+    })
+
+    it('a cap of 0 means no cap', () => {
+      const settings = { isSet: (k: string) => k === 'work.dailyCapPep', get: () => 0, readFailed: false, invalidKeys: [] }
+      expect(workConfig(settings as never).dailyCap).toBe(0)
+    })
   })
 
   it('first-ever /work for a brand-new user creates the wallet', async () => {

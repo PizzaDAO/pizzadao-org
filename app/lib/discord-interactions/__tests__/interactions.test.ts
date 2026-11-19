@@ -167,6 +167,13 @@ describe('handleInteraction', () => {
     expect(desc(r)).toMatch(/^⏳ You're still on your break\.\n\n.*<t:1800000001:R>/)
   })
 
+  it('/work shows today\'s progress, and says to come back after 00:00 UTC at the cap', async () => {
+    const ok = await handleInteraction(cmd('work'), deps({ doWork: vi.fn(async () => ({ ok: true as const, amount: 57, balance: 9, prompt: 'x', earnedToday: 312, dailyCap: 420 })) }))
+    expect(desc(ok)).toContain('(312/420 today)')
+    const capped = await handleInteraction(cmd('work'), deps({ doWork: vi.fn(async () => ({ ok: false as const, capReached: true as const, resetAt: new Date(1_800_000_000_500), dailyCap: 420 })) }))
+    expect(desc(capped)).toMatch(/enough work today[\s\S]*00:00 UTC[\s\S]*<t:1800000001:R>/)
+  })
+
   it('refuses other guilds and DMs, and unknown commands, with red ephemeral embeds', async () => {
     const other = await handleInteraction({ ...cmd('work'), guild_id: '1' }, deps())
     expect(other.data?.flags).toBe(64)
