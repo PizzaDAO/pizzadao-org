@@ -2113,9 +2113,9 @@ export const SETTINGS = {
   'pfp.readyDmEnabled': boolSetting({
     key: 'pfp.readyDmEnabled',
     area: 'features',
-    label: 'PFP ready DM',
-    help: 'Send a Discord DM (at most one per member per 10 minutes) when a portrait or dress-up finishes, with a link to download it. Previews never send. The PFP_READY_DM_ENABLED env var set to off always wins.',
-    confirmOn: 'Members will get a Discord DM from the bot when their PFP picture is ready.',
+    label: 'PFP saved DM',
+    help: 'Send a Discord DM (at most one per member per 10 minutes) when they save their PFP, with a link to download it. Previews never send. The PFP_READY_DM_ENABLED env var set to off always wins.',
+    confirmOn: 'Members will get a Discord DM from the bot when they save their PFP.',
   }),
   'pfp.allowedBaseKinds': {
     key: 'pfp.allowedBaseKinds',
