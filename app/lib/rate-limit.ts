@@ -140,6 +140,8 @@ export const RATE_LIMITS = {
   "trivia-daily": { limit: 30, windowSec: 60 },
   "trivia-read": { limit: 120, windowSec: 60 },
   "trivia-report": { limit: 5, windowSec: 10 * 60 },
+  // Question suggestions: a burst guard per IP and per member. The real cap (5 per member per day) is in the database.
+  "trivia-suggest": { limit: 10, windowSec: 10 * 60 },
   // Wallet ownership verification: nonce requests, per member (Discord id).
   "wallet-nonce": { limit: 20, windowSec: 10 * 60 },
   // Wallet signature verification attempts, per member.

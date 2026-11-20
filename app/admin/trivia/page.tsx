@@ -14,7 +14,9 @@ import { isAdminDiscordId } from "@/app/lib/auth-guards";
 import { loginHrefFrom } from "@/app/lib/login-return";
 import { bankStats, getQuestion } from "@/app/lib/trivia/bank";
 import { getDisabledIds, openReportGroups } from "@/app/lib/trivia/reports";
+import { openSuggestions } from "@/app/lib/trivia/suggestions";
 import { ReportActions } from "./ReportActions";
+import { SuggestionActions } from "./SuggestionActions";
 import { EditorialMasthead, EditorialPage, SectionHeading, paperCard } from "@/app/ui/shared/Editorial";
 
 export const runtime = "nodejs";
@@ -41,17 +43,18 @@ function Counts({ data }: { data: Record<string, number> }) {
 
 async function loadRuntime() {
   try {
-    const [rounds, reports, openReports, groups, disabledIds] = await Promise.all([
+    const [rounds, reports, openReports, groups, disabledIds, suggestions] = await Promise.all([
       prisma.triviaRound.findMany({ orderBy: { id: "desc" }, take: 25 }),
-      prisma.triviaReport.findMany({ orderBy: { id: "desc" }, take: 50 }),
-      prisma.triviaReport.count({ where: { status: "open" } }),
+      prisma.triviaReport.findMany({ where: { kind: "report" }, orderBy: { id: "desc" }, take: 50 }),
+      prisma.triviaReport.count({ where: { kind: "report", status: "open" } }),
       openReportGroups(),
       getDisabledIds(),
+      openSuggestions(),
     ]);
-    return { available: true as const, rounds, reports, openReports, groups, disabledIds };
+    return { available: true as const, rounds, reports, openReports, groups, disabledIds, suggestions };
   } catch (e) {
     console.error("[trivia] admin runtime data unavailable:", (e as Error).message);
-    return { available: false as const, rounds: [], reports: [], openReports: 0, groups: [], disabledIds: [] as string[] };
+    return { available: false as const, rounds: [], reports: [], openReports: 0, groups: [], disabledIds: [] as string[], suggestions: [] as Awaited<ReturnType<typeof openSuggestions>> };
   }
 }
 
@@ -137,6 +140,54 @@ export default async function AdminTriviaPage() {
                   </li>
                 );
               })}
+            </ul>
+          )}
+        </section>
+
+        <section className={`${paperCard} p-6`}>
+          <SectionHeading overline={t("adminSuggestionsOverline")} title={t("adminSuggestionsTitle")} count={data.suggestions.length} />
+          <p className="mt-0 text-sm text-foreground/70">{t("adminSuggestionsHelp")}</p>
+          {data.suggestions.length === 0 ? (
+            <p className="m-0 text-sm text-foreground/70">{t("adminSuggestionsEmpty")}</p>
+          ) : (
+            <ul className="m-0 grid list-none gap-4 p-0">
+              {data.suggestions.map((s) => (
+                <li key={s.id} className="grid gap-2 border-b border-[hsl(var(--rule-warm)/0.3)] pb-4 text-sm">
+                  <p className="m-0 text-foreground/70">
+                    #{s.id} · {s.createdAt.toISOString().slice(0, 16).replace("T", " ")} UTC
+                  </p>
+                  {s.suggestion ? (
+                    <>
+                      <p className="m-0 font-semibold">{s.suggestion.question}</p>
+                      <p className="m-0">
+                        {t("adminAnswer")}: <strong>{s.suggestion.answer}</strong>
+                        {s.suggestion.aliases.length > 0 && <span className="text-foreground/70"> ({s.suggestion.aliases.join(", ")})</span>}
+                        {s.suggestion.category && <span className="text-foreground/70"> · {s.suggestion.category}</span>}
+                      </p>
+                      <p className="m-0 break-all">
+                        <a href={s.suggestion.source} target="_blank" rel="noopener noreferrer" className="text-tomato-readable underline underline-offset-2">
+                          {s.suggestion.source}
+                        </a>
+                      </p>
+                    </>
+                  ) : (
+                    <p className="m-0 text-tomato">{t("adminSuggestionUnreadable")}</p>
+                  )}
+                  {s.snippet && <pre className="m-0 max-h-48 overflow-auto rounded-xl bg-[hsl(var(--butter)/0.2)] p-3 text-xs">{s.snippet}</pre>}
+                  <SuggestionActions
+                    suggestionId={s.id}
+                    snippet={s.snippet}
+                    labels={{
+                      copy: t("adminCopySnippet"),
+                      copied: t("adminCopied"),
+                      copyFailed: t("adminCopyFailed"),
+                      added: t("adminMarkAdded"),
+                      dismiss: t("adminDismiss"),
+                      failed: t("adminSaveFailed"),
+                    }}
+                  />
+                </li>
+              ))}
             </ul>
           )}
         </section>

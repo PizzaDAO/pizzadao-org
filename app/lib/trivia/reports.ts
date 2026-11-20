@@ -154,7 +154,7 @@ export async function autoPullIfNeeded(questionId: string, now: Date = new Date(
   if (env.VERCEL_ENV !== "production") return false;
   try {
     const rows = await prisma.triviaReport.findMany({
-      where: { questionId, status: "open", discordId: { not: null }, createdAt: { gte: new Date(now.getTime() - REPORT_WINDOW_DAYS * DAY_MS) } },
+      where: { kind: "report", questionId, status: "open", discordId: { not: null }, createdAt: { gte: new Date(now.getTime() - REPORT_WINDOW_DAYS * DAY_MS) } },
       select: { discordId: true },
     });
     const members = new Set(rows.map((r) => r.discordId));
@@ -209,7 +209,7 @@ export interface ReportGroup {
 }
 
 export async function openReportGroups(limit = 200): Promise<ReportGroup[]> {
-  const rows = await prisma.triviaReport.findMany({ where: { status: "open" }, orderBy: { id: "desc" }, take: limit, select: { questionId: true, discordId: true, text: true, createdAt: true } });
+  const rows = await prisma.triviaReport.findMany({ where: { kind: "report", status: "open" }, orderBy: { id: "desc" }, take: limit, select: { questionId: true, discordId: true, text: true, createdAt: true } });
   const groups = new Map<string, ReportGroup & { ids: Set<string> }>();
   for (const r of rows) {
     const g = groups.get(r.questionId) ?? { questionId: r.questionId, count: 0, members: 0, latestAt: r.createdAt, texts: [], ids: new Set<string>() };

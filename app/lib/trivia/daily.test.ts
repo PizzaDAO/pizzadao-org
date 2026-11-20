@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, categoryCounts, computeStreak, dailyQuestionFor, dayKeyUtc, nextDayStartMs, pickPractice } from "./daily";
+import { addDays, categoryCounts, computeBestStreak, computeStreak, dailyQuestionFor, dayKeyUtc, nextDayStartMs, pickPractice } from "./daily";
 import { servable } from "./bank";
 
 const NOW = new Date("2026-11-18T12:00:00Z");
@@ -53,6 +53,21 @@ describe("streak", () => {
     expect(computeStreak(["2026-11-18", "2026-11-16"], "2026-11-18")).toBe(1);
     expect(computeStreak(["2026-11-10"], "2026-11-18")).toBe(0);
     expect(computeStreak([], "2026-11-18")).toBe(0);
+  });
+});
+
+describe("best streak", () => {
+  it("is the longest run of consecutive days, wherever it was", () => {
+    expect(computeBestStreak(["2026-11-01", "2026-11-02", "2026-11-03", "2026-11-10", "2026-11-11"])).toBe(3);
+    expect(computeBestStreak(["2026-12-31", "2027-01-01"])).toBe(2);
+  });
+  it("ignores order and duplicates, and is 0 with no plays", () => {
+    expect(computeBestStreak(["2026-11-03", "2026-11-01", "2026-11-02", "2026-11-02"])).toBe(3);
+    expect(computeBestStreak([])).toBe(0);
+  });
+  it("is never below the current streak", () => {
+    const days = ["2026-11-16", "2026-11-17", "2026-11-18"];
+    expect(computeBestStreak(days)).toBeGreaterThanOrEqual(computeStreak(days, "2026-11-18"));
   });
 });
 

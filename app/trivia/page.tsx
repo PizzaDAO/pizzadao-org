@@ -4,6 +4,7 @@ import { EditorialMasthead, EditorialPage, paperCard } from "@/app/ui/shared/Edi
 import DailyCard from "./_components/DailyCard";
 import PracticeCard from "./_components/PracticeCard";
 import LeaderboardCard from "./_components/LeaderboardCard";
+import SuggestCard from "./_components/SuggestCard";
 
 // Static shell: the question, answers and leaderboard are all fetched by the cards from /api/trivia/*, which never
 // sends an answer before an attempt. Works logged out.
@@ -21,6 +22,7 @@ export default async function TriviaPage() {
         <DailyCard />
         <PracticeCard />
         <LeaderboardCard />
+        <SuggestCard />
         <section className={`${paperCard} p-6 sm:p-8`} aria-labelledby="trivia-how-title">
           <p className="overline m-0 text-tomato-readable">{t("howOverline")}</p>
           <h2 id="trivia-how-title" className="font-display mb-0 mt-1 text-xl font-black md:text-2xl">

@@ -25,12 +25,22 @@ import { handleCallReviewButton, isCallReviewInteraction, type CallReviewDeps } 
 import type { MemberCommandJob, MemberCommandName } from './member-commands'
 import { BOUNTY_SUBCOMMANDS, type BountyJob } from './bounty-command'
 import { TASK_SUBCOMMANDS, type TaskJob } from './task-command'
-import { TRIVIA_ADMIN_SUBCOMMANDS, TRIVIA_SUBCOMMANDS, type TriviaJob } from './trivia-command'
+import {
+  readTriviaSuggestModal,
+  TRIVIA_ADMIN_SUBCOMMANDS,
+  TRIVIA_SUBCOMMANDS,
+  TRIVIA_SUGGEST_MODAL_ID,
+  triviaSuggestModal,
+  triviaSuggestReply,
+  type SuggestResult,
+  type TriviaJob,
+} from './trivia-command'
 import { cleanTaskText, parseDue, parsePriority } from './task-add'
 import { CREW_ID_PATTERN, normalizeCrewId } from '../crew-id'
 import { handleFollowUpInteraction, isFollowUpInteraction, type FollowUpInteractionDeps } from './followups'
 import { handleReminderInteraction, isReminderInteraction, type ReminderInteractionDeps } from './reminders'
 import { SITE_HOST, SITE_URL } from '@/app/lib/site-url'
+import { SUGGESTIONS_PER_DAY } from '@/app/lib/trivia/suggestion-core'
 
 type Option = { name: string; type: number; value?: unknown; focused?: boolean; options?: Option[] }
 type DiscordUser = { id: string; username?: string; global_name?: string | null; avatar?: string | null; bot?: boolean }
@@ -207,6 +217,8 @@ export interface HandlerDeps {
     enabled: () => Promise<boolean>
     rateLimit: (discordId: string) => Promise<Date | null>
     defer: (job: TriviaJob) => void
+    /** /trivia suggest, on the modal's submit: validate and store the suggestion (5 per member per day). Never throws. */
+    suggest: (discordId: string, input: { question: string; answer: string; aliases: string; source: string; category: string }) => Promise<SuggestResult>
   }
   /** Mission review card buttons and the Reject modal (./mission-review.ts). */
   missionReview?: MissionReviewDeps
@@ -395,6 +407,7 @@ export async function handleInteraction(i: Interaction, deps: HandlerDeps): Prom
         const value = i.data.components?.flatMap((r) => r.components ?? []).find((c) => c.custom_id === LIVE_STREAM_INPUT_ID)?.value
         return await startLive(i, deps, out, value)
       }
+      if (i.data?.custom_id === TRIVIA_SUGGEST_MODAL_ID) return await triviaSuggestSubmit(i, userId, deps, out)
       if (!deps.missionReview) return out.error('Unknown form.')
       return await handleReviewModal(i, userId, deps.missionReview, (h, b) => out.error(h, b))
     }
@@ -404,6 +417,20 @@ export async function handleInteraction(i: Interaction, deps: HandlerDeps): Prom
     if (err instanceof ApiError && err.statusCode < 500) return out.error(err.message)
     throw err
   }
+}
+
+/** /trivia suggest, modal submit: the same enabled check as the command, then validate + store + a private reply. */
+async function triviaSuggestSubmit(i: Interaction, userId: string, deps: HandlerDeps, out: Out): Promise<InteractionResponse> {
+  if (!deps.trivia || !(await deps.trivia.enabled())) return out.error("/trivia isn't enabled yet.")
+  let result: SuggestResult
+  try {
+    result = await deps.trivia.suggest(userId, readTriviaSuggestModal(i.data?.components))
+  } catch (err) {
+    console.error('[/trivia suggest] failed:', err instanceof Error ? err.message.slice(0, 160) : 'error')
+    result = { status: 'error' }
+  }
+  const [tone, headline, body] = triviaSuggestReply(result, SUGGESTIONS_PER_DAY)
+  return out.send(tone, headline, body, { ephemeral: true })
 }
 
 const LIVE_MODAL_ID = 'live:stream'
@@ -735,7 +762,7 @@ async function command(i: Interaction, userId: string, deps: HandlerDeps, cur: s
       if (!deps.trivia) return out.error("/trivia isn't enabled yet.")
       const subOpt = i.data?.options?.[0] as { name?: string; options?: Option[] } | undefined
       const sub = TRIVIA_SUBCOMMANDS.find((s) => s === subOpt?.name)
-      if (!sub) return out.error('Pick one of: leaderboard, start, skip, report.')
+      if (!sub) return out.error('Pick one of: leaderboard, start, skip, report, suggest.')
       // Admin gate first, so non-admins learn nothing else (same as /add-money).
       if (TRIVIA_ADMIN_SUBCOMMANDS.includes(sub) && !(await deps.isAdmin(i.member?.roles ?? []).catch(() => false))) {
         return out.error('Only admins can use this command.')
@@ -744,6 +771,8 @@ async function command(i: Interaction, userId: string, deps: HandlerDeps, cur: s
       if (!i.application_id || !i.token) return out.error('Could not start the command. Please try again.')
       const readyAt = await deps.trivia.rateLimit(userId)
       if (readyAt) return out.wait('Slow down.', `You can use /trivia again ${rel(readyAt)}.`)
+      // /trivia suggest: ask in a modal (the checks run again, and the daily cap applies, on submit).
+      if (sub === 'suggest') return { type: ResponseType.MODAL, data: triviaSuggestModal() }
       const isPublic = sub === 'leaderboard' && subOpt?.options?.find((o) => o.name === 'public')?.value === true
       const reasonRaw = sub === 'report' ? subOpt?.options?.find((o) => o.name === 'reason')?.value : undefined
       const reason = typeof reasonRaw === 'string' ? reasonRaw.replace(/\s+/g, ' ').trim().slice(0, 200) : ''

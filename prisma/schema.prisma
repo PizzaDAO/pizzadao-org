@@ -3468,8 +3468,12 @@ model TriviaReport {
   text       String   @db.VarChar(500)
   status     String   @default("open") @db.VarChar(16)
   createdAt  DateTime @default(now())
+  // "report" (a bad-question report) or "suggestion" (a community-suggested question: questionId is "" and payload holds it).
+  kind       String   @default("report") @db.VarChar(16)
+  payload    Json?
 
   @@index([status, createdAt])
+  @@index([kind, status, createdAt])
 }
 
 // Capo image review: a set of generated candidates that capos vote yes/no on (with a comment) to tune a prompt.
