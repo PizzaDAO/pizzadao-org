@@ -18,6 +18,8 @@ interface DailyResponse {
   question: PublicQuestionDto;
   /** $PEP a correct answer pays today; 0 or absent when the reward is off. */
   rewardPep?: number;
+  /** Set when loading retried a payout that failed earlier. */
+  reward?: AnswerResponse["reward"];
   streak?: number | null;
   bestStreak?: number | null;
   attempt: { correct: boolean; reveal: RevealDto; percentCorrect: number | null } | null;
@@ -103,7 +105,7 @@ export default function DailyCard() {
       ? { verdict: (prior.correct ? "correct" : "wrong") as "correct" | "wrong", reveal: prior.reveal, pct: prior.percentCorrect, recorded: true, already: true }
       : null;
   // The reward line after a correct answer given just now (nothing at all when the reward is off).
-  const reward = answered?.verdict === "correct" ? answered.reward : undefined;
+  const reward = answered?.verdict === "correct" ? answered.reward : !answered ? data?.reward : undefined;
   const rewardText =
     reward?.status === "paid"
       ? t("rewardPaid", { pep: reward.pep })

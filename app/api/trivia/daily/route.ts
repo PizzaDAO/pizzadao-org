@@ -18,7 +18,7 @@ import { publicView, reveal } from "@/app/lib/trivia/bank";
 import { match } from "@/app/lib/trivia/match";
 import { nextDayStartMs } from "@/app/lib/trivia/daily";
 import { MAX_ANSWER_INPUT, readAnswer, reply, withNoStore } from "@/app/lib/trivia/api";
-import { dailyRewardOffer, findDailyAttempt, getDailyRound, payDailyReward, percentCorrect, recordDailyAttempt, streakStatsFor } from "@/app/lib/trivia/web";
+import { dailyRewardConfigured, dailyRewardOffer, dailyRewardPaid, findDailyAttempt, getDailyRound, payDailyReward, percentCorrect, recordDailyAttempt, streakStatsFor } from "@/app/lib/trivia/web";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,8 +51,14 @@ export async function GET(request: NextRequest) {
   const bestStreak = stats.best;
   const mine = round.roundId ? await findDailyAttempt(round.roundId, session.discordId) : null;
   if (!mine) return reply({ ...base, streak, bestStreak, attempt: null });
+  // A correct attempt whose payout failed earlier is retried on load (a cheap row check first; idempotent).
+  const retried =
+    mine.correct && round.roundId && base.rewardPep > 0 && !(await dailyRewardPaid(session.discordId, round.dayKey))
+      ? await payDailyReward({ roundId: round.roundId, dayKey: round.dayKey, discordId: session.discordId })
+      : null;
   return reply({
     ...base,
+    ...(retried ? { reward: retried } : {}),
     streak,
     bestStreak,
     attempt: {
@@ -116,7 +122,7 @@ export async function POST(request: NextRequest) {
   if (!discordId) {
     // While a reward is on offer a logged-out verdict would be a free oracle (true/false and multiple choice found in a
     // few tries, then claimed signed in), so it gets no verdict at all: only a prompt to sign in.
-    if ((await dailyRewardOffer()) > 0) return reply({ signInToAnswer: true, recorded: false });
+    if (await dailyRewardConfigured()) return reply({ signInToAnswer: true, recorded: false });
     return reply({ verdict, alreadyAnswered: false, recorded: false, signInToReveal: true });
   }
 

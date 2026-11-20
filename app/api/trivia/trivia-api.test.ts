@@ -16,10 +16,12 @@ const db = vi.hoisted(() => ({
 }));
 
 // The reward is mocked at its two entry points: its own logic is tested in web-reward.test.ts and the real-Postgres suite.
-const reward = vi.hoisted(() => ({ offer: 0, status: "paid" as string, calls: 0 }));
+const reward = vi.hoisted(() => ({ configured: false, paid: false, offer: 0, status: "paid" as string, calls: 0 }));
 vi.mock("@/app/lib/trivia/web", async (importActual) => ({
   ...(await importActual<typeof import("@/app/lib/trivia/web")>()),
   dailyRewardOffer: async () => reward.offer,
+  dailyRewardConfigured: async () => reward.configured,
+  dailyRewardPaid: async () => reward.paid,
   payDailyReward: async () => {
     reward.calls++;
     return { pep: reward.offer, status: reward.status };
@@ -132,6 +134,8 @@ beforeEach(() => {
   db.attempts = [];
   db.reports.length = 0;
   db.down = false;
+  reward.configured = false;
+  reward.paid = false;
   reward.offer = 0;
   reward.status = "paid";
   reward.calls = 0;
@@ -272,6 +276,7 @@ describe("daily", () => {
   });
 
   it("logged out while a reward is on offer: no verdict at all (no oracle), only a sign-in prompt", async () => {
+    reward.configured = true;
     reward.offer = 5;
     const q = today();
     for (const a of [q.answer, wrongFor(q)]) {
@@ -294,6 +299,32 @@ describe("daily", () => {
     const second = await (await dailyPOST(req("/api/trivia/daily", { method: "POST", body: dailyBody(q.answer) }))).json();
     expect(second.alreadyAnswered).toBe(true);
     expect(second.reward).toEqual({ pep: 5, status: "paid" });
+    expect(reward.calls).toBe(2);
+  });
+
+  it("a preview (reward configured but not live, offer 0): logged out still gets no verdict", async () => {
+    reward.configured = true;
+    reward.offer = 0;
+    const q = today();
+    const body = await (await dailyPOST(req("/api/trivia/daily", { method: "POST", body: dailyBody(q.answer) }))).json();
+    expect(body.signInToAnswer).toBe(true);
+    expect(body.verdict).toBeUndefined();
+  });
+
+  it("GET retries a failed payout once for a correct attempt, and does not call the payout when already paid", async () => {
+    session.value = { discordId: "113" };
+    reward.offer = 5;
+    reward.status = "error";
+    const q = today();
+    await dailyPOST(req("/api/trivia/daily", { method: "POST", body: dailyBody(q.answer) }));
+    expect(reward.calls).toBe(1);
+    reward.status = "paid";
+    const g = await (await dailyGET(req("/api/trivia/daily"))).json();
+    expect(g.reward).toEqual({ pep: 5, status: "paid" });
+    expect(reward.calls).toBe(2);
+    reward.paid = true; // the reward row now exists
+    const g2 = await (await dailyGET(req("/api/trivia/daily"))).json();
+    expect(g2.reward).toBeUndefined();
     expect(reward.calls).toBe(2);
   });
 

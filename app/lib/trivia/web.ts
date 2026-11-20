@@ -231,3 +231,21 @@ export async function payDailyReward(
     return { pep: 0, status: "error" };
   }
 }
+
+/** True when a web daily reward is configured (setting above 0), whether or not it can be paid here (previews share the production question and database). */
+export async function dailyRewardConfigured(env: Record<string, string | undefined> = process.env): Promise<boolean> {
+  try {
+    return (await triviaSettings(env)).webDailyRewardPep > 0;
+  } catch {
+    return false;
+  }
+}
+
+/** Whether this member already has their reward row for the day (cheap check before retrying a payout). False when unavailable. */
+export async function dailyRewardPaid(discordId: string, dayKey: string): Promise<boolean> {
+  try {
+    return !!(await prisma.triviaDailyReward.findUnique({ where: { discordId_dayKey: { discordId, dayKey } }, select: { id: true } }));
+  } catch {
+    return false;
+  }
+}
