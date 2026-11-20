@@ -123,6 +123,9 @@ export const RATE_LIMITS = {
   "pfp-compose": { limit: 20, windowSec: 10 * 60 },
   "pfp-upload": { limit: 10, windowSec: 10 * 60 },
   "pfp-restyle": { limit: 6, windowSec: 10 * 60 },
+  // Public PFP download (the composed image is public anyway): per IP. The ready DM is at most one per member per 10 minutes.
+  "pfp-download": { limit: 30, windowSec: 10 * 60 },
+  "pfp-ready-dm": { limit: 1, windowSec: 10 * 60 },
   // Capo image review votes, per member.
   "image-review-vote": { limit: 60, windowSec: 60 },
   // Daily PEP on the website (shares cooldowns with /collect): per IP and per member.

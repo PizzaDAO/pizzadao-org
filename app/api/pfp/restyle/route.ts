@@ -2,6 +2,7 @@
 // AI dress up. Members only, rate limited. The server re-checks the outfit is unlocked and applies
 // the cost controls (settings pfp.restyle*). The result is a candidate base picture; the member
 // keeps it by saving through /api/pfp/compose with base kind "restyle".
+import { after } from 'next/server'
 import { memberPfpRoute } from '@/app/lib/pfp-assets/member-route'
 import { jsonBody } from '@/app/lib/pfp-assets/admin-route'
 import { isBaseKind } from '@/app/lib/pfp-assets/compose'
@@ -22,12 +23,16 @@ export const POST = memberPfpRoute(
     if (!base || !isBaseKind(base.kind)) throw new ValidationError('Choose a base picture', 'base')
     await assertCanEdit(discordId)
     await assertBaseKindAllowed(base.kind)
-    return restyleForMember({
+    const result = await restyleForMember({
       memberId,
       discordId,
       outfitId,
       base: { kind: base.kind, url: typeof base.url === 'string' ? base.url : undefined },
     })
+    // The picture is ready: a DM after the response (own setting, throttled; a failure is swallowed).
+    const ready = () => import('@/app/lib/pfp-dm').then((m) => m.maybeSendPfpReadyDm(discordId)).catch(() => {})
+    try { after(ready) } catch { void ready() }
+    return result
   },
   // Spends money: if the limiter's store is down, deny rather than allow.
   { rateLimit: 'pfp-restyle', rateLimitFailClosed: true },

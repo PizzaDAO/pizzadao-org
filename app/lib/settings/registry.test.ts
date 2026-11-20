@@ -252,6 +252,8 @@ describe('settings registry', () => {
       ['crime.enabled', false],
       ['portrait.enabled', false],
       ['pfp.restyleEnabled', false],
+      ['pfp.unlockedDmEnabled', false],
+      ['pfp.readyDmEnabled', false],
       ['pfp.allowedBaseKinds', ['mafia', 'restyle']],
       ['pfp.minCompletedLevel', 2],
       ['imageReview.minCompletedLevel', 2],

@@ -871,6 +871,10 @@ export async function checkAndAwardLevelReward(discordId: string, level: number)
     linkUrl: '/missions',
   }).catch(() => {})
 
+  // First time at the PFP level: a one-time DM (own setting, off by default; never fails the payout).
+  const pfpDm = () => import('./pfp-dm').then(m => m.maybeSendPfpUnlockedDm(discordId, level)).catch(() => {})
+  try { after(pfpDm) } catch { void pfpDm() }
+
   // Graduating from Pizza Noob (anchovy-52918): drop the Discord role. Never
   // blocks or fails the payout; the 10-minute sweep retries anything missed.
   if (level === PIZZA_NOOB_GRADUATE_LEVEL) {
