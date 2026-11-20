@@ -905,6 +905,72 @@ describe.skipIf(!isLocal)('Discord trivia under concurrency (real Postgres)', ()
     }, 60_000)
   })
 
+  describe('web daily reward (trivia.webDailyRewardPep)', () => {
+    const KEYS = ['trivia.webDailyRewardPep', 'trivia.enabled', 'trivia.dryRun']
+    const env = { VERCEL_ENV: 'production' }
+    const setSetting = async (key: string, value: unknown) => {
+      await L.prisma.appSetting.upsert({ where: { key }, create: { key, value, updatedBy: 'test' }, update: { value } })
+      L.settings.clearSettingsCache({ all: true })
+    }
+    beforeEach(async () => {
+      await L.prisma.appSetting.deleteMany({ where: { key: { in: KEYS } } })
+      await setSetting('trivia.enabled', true)
+      await setSetting('trivia.webDailyRewardPep', 5)
+    })
+    afterEach(async () => {
+      await L.prisma.appSetting.deleteMany({ where: { key: { in: KEYS } } })
+      L.settings.clearSettingsCache({ all: true })
+    })
+    const dailyRows = (id: string) => L.prisma.transaction.findMany({ where: { userId: id, type: 'TRIVIA_DAILY_REWARD' } })
+    const pay = (roundId: number, id: string) => L.web.payDailyReward({ roundId, dayKey: 'k', discordId: id }, new Date(), env)
+
+    it(`${N} parallel correct submissions pay exactly once (wallet +5, one TRIVIA_DAILY_REWARD row, no Discord win counted)`, async () => {
+      const daily = await L.web.getDailyRound()
+      const u = await seedUser(0)
+      expect(await L.web.recordDailyAttempt(daily!.roundId!, u, true, 'x')).toBe(true)
+      const results = await Promise.all(Array.from({ length: N }, () => pay(daily!.roundId!, u)))
+      expect(results.filter((r: any) => r.status === 'paid')).toHaveLength(1)
+      expect(await wallet(u)).toBe(5)
+      expect(await dailyRows(u)).toHaveLength(1)
+      expect(await rewardRows([u])).toHaveLength(0)
+      expect(await L.prisma.triviaRound.count({ where: { winnerDiscordId: u } })).toBe(0)
+      await expectLedgerConsistent(u)
+    }, 60_000)
+
+    it('a re-pointed daily (attempts voided, member answers again) pays once: one ledger row, one reward row', async () => {
+      const daily = await L.web.getDailyRound()
+      const u = await seedUser(0)
+      await L.web.recordDailyAttempt(daily!.roundId!, u, true, 'x')
+      expect((await pay(daily!.roundId!, u)).status).toBe('paid')
+      await L.prisma.triviaAttempt.deleteMany({ where: { roundId: daily!.roundId } }) // what getDailyRound does on a re-point
+      await L.web.recordDailyAttempt(daily!.roundId!, u, true, 'y')
+      const again = await Promise.all(Array.from({ length: 5 }, () => pay(daily!.roundId!, u)))
+      expect(again.every((r: any) => r.status === 'already')).toBe(true)
+      expect(await wallet(u)).toBe(5)
+      expect(await dailyRows(u)).toHaveLength(1)
+      expect(await L.prisma.triviaDailyReward.count({ where: { discordId: u } })).toBe(1)
+      await expectLedgerConsistent(u)
+    }, 60_000)
+
+    it('a wrong attempt, dry run and a 0 setting pay nothing', async () => {
+      const daily = await L.web.getDailyRound()
+      const wrong = await seedUser(0)
+      await L.web.recordDailyAttempt(daily!.roundId!, wrong, false, 'x')
+      await pay(daily!.roundId!, wrong)
+      const dry = await seedUser(0)
+      await L.web.recordDailyAttempt(daily!.roundId!, dry, true, 'x')
+      await setSetting('trivia.dryRun', true)
+      expect((await pay(daily!.roundId!, dry)).status).toBe('off')
+      await setSetting('trivia.dryRun', false)
+      await setSetting('trivia.webDailyRewardPep', 0)
+      expect((await pay(daily!.roundId!, dry)).status).toBe('off')
+      for (const id of [wrong, dry]) {
+        expect(await wallet(id)).toBe(0)
+        expect(await dailyRows(id)).toHaveLength(0)
+      }
+    }, 60_000)
+  })
+
   it('the ledger reconciles: every TRIVIA_REWARD row belongs to a WON round with that winner', async () => {
     const rows = await L.prisma.transaction.findMany({ where: { type: 'TRIVIA_REWARD' } })
     for (const r of rows) {

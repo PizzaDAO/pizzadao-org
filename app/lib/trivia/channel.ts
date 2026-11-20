@@ -21,9 +21,9 @@ export async function resolveTriviaChannel(): Promise<string | null> {
 }
 
 /** The effective trivia settings in one read (cached ~30 s). */
-export async function triviaSettings(env: Record<string, string | undefined> = process.env): Promise<{ rewardPep: number; dryRun: boolean; roundsPerDay: number }> {
+export async function triviaSettings(env: Record<string, string | undefined> = process.env): Promise<{ rewardPep: number; webDailyRewardPep: number; dryRun: boolean; roundsPerDay: number }> {
   const s = await loadSettings();
   // Dry run (nothing paid) wins whenever there is doubt: the env var on, a saved on, or settings that could not be read.
   const dryRun = s.readFailed || s.get("trivia.dryRun") || ["1", "true", "on", "yes"].includes((env.TRIVIA_DRY_RUN ?? "").trim().toLowerCase());
-  return { rewardPep: s.get("trivia.rewardPep"), dryRun, roundsPerDay: s.get("trivia.roundsPerDay") };
+  return { rewardPep: s.get("trivia.rewardPep"), webDailyRewardPep: s.readFailed ? 0 : s.get("trivia.webDailyRewardPep"), dryRun, roundsPerDay: s.get("trivia.roundsPerDay") };
 }

@@ -18,7 +18,7 @@ import { publicView, reveal } from "@/app/lib/trivia/bank";
 import { match } from "@/app/lib/trivia/match";
 import { nextDayStartMs } from "@/app/lib/trivia/daily";
 import { MAX_ANSWER_INPUT, readAnswer, reply, withNoStore } from "@/app/lib/trivia/api";
-import { findDailyAttempt, getDailyRound, percentCorrect, recordDailyAttempt, streakStatsFor } from "@/app/lib/trivia/web";
+import { dailyRewardConfigured, dailyRewardOffer, dailyRewardPaid, findDailyAttempt, getDailyRound, payDailyReward, percentCorrect, recordDailyAttempt, streakStatsFor } from "@/app/lib/trivia/web";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
     resetsAt: new Date(nextDayStartMs(round.dayKey)).toISOString(),
     signedIn: !!session?.discordId,
     question: publicView(round.question),
+    rewardPep: await dailyRewardOffer(),
   };
   if (!session?.discordId) return reply({ ...base, attempt: null });
 
@@ -50,8 +51,14 @@ export async function GET(request: NextRequest) {
   const bestStreak = stats.best;
   const mine = round.roundId ? await findDailyAttempt(round.roundId, session.discordId) : null;
   if (!mine) return reply({ ...base, streak, bestStreak, attempt: null });
+  // A correct attempt whose payout failed earlier is retried on load (a cheap row check first; idempotent).
+  const retried =
+    mine.correct && round.roundId && base.rewardPep > 0 && !(await dailyRewardPaid(session.discordId, round.dayKey))
+      ? await payDailyReward({ roundId: round.roundId, dayKey: round.dayKey, discordId: session.discordId })
+      : null;
   return reply({
     ...base,
+    ...(retried ? { reward: retried } : {}),
     streak,
     bestStreak,
     attempt: {
@@ -94,7 +101,10 @@ export async function POST(request: NextRequest) {
     if (!discordId || !round.roundId) return null;
     const mine = await findDailyAttempt(round.roundId, discordId);
     if (!mine) return null;
+    // A correct attempt whose payout failed earlier is retried here (idempotent: paid at most once per day).
+    const reward = mine.correct ? await payDailyReward({ roundId: round.roundId, dayKey: round.dayKey, discordId }) : null;
     return reply({
+      ...(reward ? { reward } : {}),
       verdict: mine.correct ? "correct" : "wrong",
       alreadyAnswered: true,
       recorded: true,
@@ -109,7 +119,12 @@ export async function POST(request: NextRequest) {
   const { verdict } = match(q, answer);
   if (verdict === "ignore") return reply({ verdict: "ignore" });
   // Logged out: nothing is recorded, so nothing is revealed. Only a recorded attempt gets the answer text.
-  if (!discordId) return reply({ verdict, alreadyAnswered: false, recorded: false, signInToReveal: true });
+  if (!discordId) {
+    // While a reward is on offer a logged-out verdict would be a free oracle (true/false and multiple choice found in a
+    // few tries, then claimed signed in), so it gets no verdict at all: only a prompt to sign in.
+    if (await dailyRewardConfigured()) return reply({ signInToAnswer: true, recorded: false });
+    return reply({ verdict, alreadyAnswered: false, recorded: false, signInToReveal: true });
+  }
 
   let recorded = false;
   if (round.roundId) {
@@ -123,6 +138,8 @@ export async function POST(request: NextRequest) {
   // Not recorded (the tables are unavailable): the member gets the verdict but not the answer, which would
   // otherwise be free to retry for. The answer text only ever goes with a recorded attempt.
   if (!recorded) return reply({ verdict, alreadyAnswered: false, recorded: false });
+  // A correct, recorded attempt may earn the optional reward; payDailyReward never throws and never blocks the answer.
+  const reward = verdict === "correct" && round.roundId ? await payDailyReward({ roundId: round.roundId, dayKey: round.dayKey, discordId }) : null;
   return reply({
     verdict,
     alreadyAnswered: false,
@@ -130,5 +147,6 @@ export async function POST(request: NextRequest) {
     reveal: reveal(q),
     percentCorrect: round.roundId ? await percentCorrect(round.roundId) : null,
     ...(await streakFields(discordId, round.dayKey)),
+    ...(reward ? { reward } : {}),
   });
 }

@@ -212,6 +212,7 @@ enum TransactionType {
   ADMIN_GRANT // Discord /add-money by an admin (+)
   ADMIN_REMOVE // Discord /remove-money by an admin (-)
   TRIVIA_REWARD // Discord trivia win (plans/trivia.md); written from phase 2, added now so the enum stays in sync
+  TRIVIA_DAILY_REWARD // Web daily trivia answer paid once per member per day (trivia.webDailyRewardPep)
 }
 
 model Transaction {
@@ -3459,6 +3460,18 @@ model TriviaAttempt {
   @@unique([roundId, discordId, messageId])
   @@index([roundId, discordId])
   @@index([discordId, createdAt])
+}
+
+// One row per member per web daily date that earned $PEP (trivia.webDailyRewardPep). The unique key is the
+// exactly-once guard; it does not depend on TriviaAttempt rows (a re-pointed daily deletes those).
+model TriviaDailyReward {
+  id        Int      @id @default(autoincrement())
+  discordId String
+  dayKey    String
+  pep       Int
+  createdAt DateTime @default(now())
+
+  @@unique([discordId, dayKey])
 }
 
 model TriviaReport {
