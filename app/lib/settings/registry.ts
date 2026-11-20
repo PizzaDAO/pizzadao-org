@@ -2131,6 +2131,16 @@ export const SETTINGS = {
     max: 10,
     default: 2,
   }),
+  'pfp.lockedReviewLink': textSetting({
+    key: 'pfp.lockedReviewLink',
+    area: 'features',
+    label: 'PFP page: dough-ball review link',
+    help: 'Page path members below the PFP level are pointed to under "What\'s left", e.g. /review/<set-slug> (only members who can use the art review get the link). Empty hides the line.',
+    maxLength: 200,
+    placeholder: '/review/<set-slug>',
+    check: (v) => v === '' || (v.startsWith('/') && !v.startsWith('//')),
+    checkMessage: 'Use a path on this site, starting with a single /',
+  }),
   'pfp.restylePerUnlock': intSetting({
     key: 'pfp.restylePerUnlock',
     area: 'features',
