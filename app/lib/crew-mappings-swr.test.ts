@@ -10,7 +10,7 @@ vi.mock("@/app/lib/sheets-import/source", () => ({
 }))
 const crewRows = vi.hoisted(() => ({ findMany: vi.fn() }))
 vi.mock("@/app/lib/db", () => ({ prisma: { crew: crewRows } }))
-vi.mock("@/app/lib/crew-content", () => ({ loadCrewTasks: vi.fn(async () => []) }))
+vi.mock("@/app/lib/crew-content", () => ({ loadCrewTasks: vi.fn(async () => []), loadCrewTaskSummaries: vi.fn(async () => []) }))
 
 import { cacheDel, cacheSet } from "@/app/api/lib/cache"
 import { getCrewMappings } from "./crew-mappings"

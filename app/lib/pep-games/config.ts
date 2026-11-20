@@ -45,7 +45,7 @@ export function gameConfig(settings?: Settings) {
   }
 }
 
-/** The config with the current settings (cached ~30s). */
+/** The config with the current settings (cached ~60s). */
 export async function loadGameConfig() {
   return gameConfig(await loadSettings())
 }

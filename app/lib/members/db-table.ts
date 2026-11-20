@@ -6,6 +6,7 @@
  * Server-side only. The cells include private columns: only the existing allow-listed readers
  * (members-list.ts and friends) may turn them into public output.
  */
+import { createHash } from 'crypto'
 import type { GvizCell, GvizRow } from '@/app/lib/types/gviz'
 import type { MemberCells } from './upsert'
 
@@ -41,19 +42,87 @@ export function memberValueRows(payload: MembersPayload): unknown[][] {
   return [payload.headers, ...sorted.map((m) => (Array.isArray(m.cells) ? m.cells : []).map((c) => c?.v ?? c?.f ?? ''))]
 }
 
+type MemoRow = { cells: MemberCells; position: number; updatedAt: number; merged: boolean }
+
+/**
+ * Every Member row this instance has loaded, by id. A load first reads only (id, updatedAt,
+ * mergedInto) for the whole table and then fetches the cells of just the rows that are new or
+ * changed since, so a full read moves a few KB instead of every member's cells. App writes go
+ * through Prisma, which stamps updatedAt (@updatedAt). A manual SQL edit of a Member row must set
+ * "updatedAt" = now() as well; one that does not is still picked up by the periodic full reload.
+ */
+const rowMemo = new Map<string, MemoRow>()
+
+/**
+ * How old this instance's last full load (every row's cells) may get before the next load is a
+ * full one again: the backstop for writes that did not bump updatedAt.
+ */
+export const MEMBERS_FULL_RELOAD_MS = 15 * 60_000
+let lastFullLoadAt = 0
+
+/** Test hook: forget the rows this instance has loaded. */
+export function clearMembersRowMemo(): void {
+  rowMemo.clear()
+  lastFullLoadAt = 0
+}
+
 /** `includeMerged` also returns tombstoned (merged-away) rows: id allocation must treat their ids as taken. */
-export async function loadMembersPayload(opts: { includeMerged?: boolean } = {}): Promise<MembersPayload> {
+export async function loadMembersPayload(opts: { includeMerged?: boolean; now?: number } = {}): Promise<MembersPayload> {
   const { prisma } = await import('@/app/lib/db')
-  const [layout, rows] = await Promise.all([
+  const now = opts.now ?? Date.now()
+  const [layout, stamps] = await Promise.all([
     prisma.memberTableLayout.findUnique({ where: { id: 1 } }),
-    prisma.member.findMany({ where: opts.includeMerged ? {} : { mergedInto: null }, select: { id: true, cells: true, position: true, updatedAt: true } }),
+    prisma.member.findMany({ select: { id: true, updatedAt: true, mergedInto: true } }),
   ])
   if (!layout) throw new Error('Members table is not imported yet')
-  let latest = layout.updatedAt.getTime()
-  for (const r of rows) latest = Math.max(latest, r.updatedAt.getTime())
+  if (now - lastFullLoadAt > MEMBERS_FULL_RELOAD_MS) {
+    rowMemo.clear()
+    lastFullLoadAt = now
+  }
+  const changed = new Set(
+    stamps
+      .filter((s) => {
+        const memo = rowMemo.get(s.id)
+        return !memo || memo.updatedAt !== s.updatedAt.getTime() || memo.merged !== (s.mergedInto != null)
+      })
+      .map((s) => s.id),
+  )
+  const fetched = new Map<string, { cells: unknown; position: number; updatedAt: Date; mergedInto: string | null }>()
+  const ids = [...changed]
+  for (let i = 0; i < ids.length; i += 1000) {
+    const rows = await prisma.member.findMany({
+      where: { id: { in: ids.slice(i, i + 1000) } },
+      select: { id: true, cells: true, position: true, updatedAt: true, mergedInto: true },
+    })
+    for (const r of rows) fetched.set(r.id, r)
+  }
+  const out: MembersPayload['rows'] = []
+  const seen = new Set<string>()
+  // The full-load time is in the key too: a full reload may pick up an edit that kept its updatedAt.
+  const hash = createHash('sha256').update(`${layout.updatedAt.getTime()}:${lastFullLoadAt}`)
+  for (const s of stamps) {
+    // A changed row comes from the second read (newer if written in between); one missing from it
+    // was deleted in between and is dropped, never served from the memo.
+    let row: MemoRow | undefined
+    if (changed.has(s.id)) {
+      const f = fetched.get(s.id)
+      if (!f) continue
+      row = { cells: (Array.isArray(f.cells) ? f.cells : []) as MemberCells, position: f.position, updatedAt: f.updatedAt.getTime(), merged: f.mergedInto != null }
+      rowMemo.set(s.id, row)
+    } else {
+      row = rowMemo.get(s.id)
+      if (!row) continue
+    }
+    seen.add(s.id)
+    if (row.merged && !opts.includeMerged) continue
+    hash.update(`|${s.id}:${row.updatedAt}:${row.merged ? 1 : 0}`)
+    out.push({ id: s.id, cells: row.cells, position: row.position })
+  }
+  for (const id of rowMemo.keys()) if (!seen.has(id)) rowMemo.delete(id)
   return {
     headers: (Array.isArray(layout.headers) ? layout.headers : []).map((h) => String(h ?? '')),
-    rows: rows.map((r) => ({ id: r.id, cells: (Array.isArray(r.cells) ? r.cells : []) as MemberCells, position: r.position })),
-    version: `${rows.length}:${latest}`,
+    rows: out,
+    // Any row added, removed, edited or merged changes it (memo key for the parsed table).
+    version: `${out.length}:${hash.digest('hex').slice(0, 16)}`,
   }
 }

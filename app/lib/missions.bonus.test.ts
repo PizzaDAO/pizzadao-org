@@ -12,6 +12,7 @@ vi.mock('./notifications', () => ({ createNotification: vi.fn().mockResolvedValu
 vi.mock('./discord', () => ({ getMembersWithRoles: vi.fn().mockResolvedValue([]) }))
 
 import { computeCurrentLevel, getCurrentLevel, payBonusRewards, REQUIRED_MISSION_WHERE, settleLevels } from './missions'
+import { clearMissionCaches } from './mission-cache'
 import { creditInTx } from './economy'
 import { prisma } from './db'
 
@@ -34,13 +35,14 @@ let reviewedAt: Date
 let setAt: Date | null
 
 beforeEach(() => {
+  clearMissionCaches() // the Mission rows are cached per instance
   vi.clearAllMocks()
   approved = []
   reviewedAt = new Date('2026-11-05T00:00:00Z')
   setAt = null
   mockFn(prisma.$transaction).mockImplementation(async (fn: (tx: unknown) => unknown) => fn(prisma))
-  mockFn(prisma.mission.findMany).mockImplementation(async ({ where }: { where: Record<string, unknown> }) =>
-    ALL.filter((m) => matches(m, where)).map((m) => ({ ...m, reward: 100, levelTitle: null })),
+  mockFn(prisma.mission.findMany).mockImplementation(async ({ where = {} }: { where?: Record<string, unknown> } = {}) =>
+    ALL.filter((m) => matches(m, where)).map((m) => ({ ...m, reward: 100, levelTitle: null, isActive: true })),
   )
   mockFn(prisma.missionCompletion.findMany).mockImplementation(async (args: { where: { mission?: unknown } }) =>
     args.where.mission

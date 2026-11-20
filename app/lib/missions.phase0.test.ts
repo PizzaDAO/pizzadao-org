@@ -21,6 +21,7 @@ import {
   reviewHistory,
   MAX_MISSION_ATTEMPTS,
 } from './missions'
+import { clearMissionCaches } from './mission-cache'
 import { prisma } from './db'
 import { getMembersWithRoles } from './discord'
 
@@ -28,14 +29,15 @@ const mockFn = (f: unknown) => f as ReturnType<typeof vi.fn>
 
 // L1: 1 mission, L2: 2, L3: 1, L9 (beyond the old hard-coded 8): 1
 const MISSIONS = [
-  { id: 1, level: 1 },
-  { id: 2, level: 2 },
-  { id: 3, level: 2 },
-  { id: 4, level: 3 },
-  { id: 9, level: 9 },
+  { id: 1, level: 1, isActive: true },
+  { id: 2, level: 2, isActive: true },
+  { id: 3, level: 2, isActive: true },
+  { id: 4, level: 3, isActive: true },
+  { id: 9, level: 9, isActive: true },
 ]
 
 beforeEach(() => {
+  clearMissionCaches() // the Mission rows are cached per instance
   vi.clearAllMocks()
   mockFn(prisma.$transaction).mockImplementation(async (fn: (tx: unknown) => unknown) => fn(prisma))
   mockFn(prisma.$queryRaw).mockResolvedValue([])

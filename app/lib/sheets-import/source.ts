@@ -66,7 +66,7 @@ export function resolveSource(key: SheetSourceKey, settings: Settings, env: Env 
   return parsed ? { ...parsed, reason: 'setting' } : { ...SHEET, reason: 'default' }
 }
 
-/** The effective source for a data set right now (settings cached ~30s). Never throws. */
+/** The effective source for a data set right now (settings cached ~60s). Never throws. */
 export async function getSource(key: SheetSourceKey, env: Env = process.env): Promise<ResolvedSource> {
   // The env var or a preview decides without reading settings (no database round trip).
   if ((env[SHEET_SOURCES[key].env] ?? '').trim() || env.VERCEL_ENV !== 'production') return resolveSource(key, NO_SETTINGS, env)

@@ -5,14 +5,16 @@ vi.mock('@/app/lib/db')
 
 import { prisma } from '@/app/lib/db'
 import { completedLevelBy, computeCurrentLevel, missionStatsFor } from './missions'
+import { clearMissionCaches } from './mission-cache'
 
 const missions = [
-  { id: 1, level: 1 },
-  { id: 2, level: 1 },
-  { id: 3, level: 2 },
+  { id: 1, level: 1, isActive: true },
+  { id: 2, level: 1, isActive: true },
+  { id: 3, level: 2, isActive: true },
 ]
 
 beforeEach(() => {
+  clearMissionCaches() // the Mission rows are cached per instance
   vi.mocked(prisma.mission.findMany).mockReset().mockResolvedValue(missions as never)
   vi.mocked(prisma.missionCompletion.findMany).mockReset().mockResolvedValue([
     { discordId: 'a', missionId: 1 },

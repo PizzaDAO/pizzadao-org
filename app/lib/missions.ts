@@ -2,7 +2,7 @@ import { after } from 'next/server'
 import { completedLevel, titleForLevel } from '@/app/lib/level-display'
 import { prisma } from './db'
 import { PIZZA_NOOB_GRADUATE_LEVEL } from './trainee-nick'
-import { Prisma, type ReviewAction } from '@prisma/client'
+import { Prisma, type Mission, type ReviewAction } from '@prisma/client'
 import { creditInTx, getOrCreateEconomy, lockWallet } from './economy'
 import { createNotification } from './notifications'
 import { clearReviewNotifications, REVIEW_LINK_URL } from './review-notifications'
@@ -13,6 +13,8 @@ import { getSetting } from './settings'
 import { ValidationError, NotFoundError, ConflictError } from './errors/api-errors'
 import { invalidateProfileSummaryForDiscord } from './profile-summary-invalidate'
 import { approvalNeedsNote, NEW_REVIEW_ROUND } from './mission-verify/review-ids'
+import { cachedMissionRows } from './mission-cache'
+import { tableFingerprint } from './db-fingerprint'
 
 // ===== QUERIES =====
 
@@ -27,14 +29,25 @@ export const REQUIRED_MISSION_WHERE = { isActive: true, bonus: false, level: { g
 /** The level number of the "Anytime" bonus section. */
 export const ANYTIME_LEVEL = 0
 
+/** REQUIRED_MISSION_WHERE as an in-memory test, for rows from missionRows(). */
+export const isRequiredMission = (m: { isActive: boolean; bonus: boolean; level: number }): boolean =>
+  m.isActive && !m.bonus && m.level > 0
+
+/**
+ * Every Mission row (active or not), in level then index order, cached ~60s per instance
+ * (mission-cache.ts; admin edits clear it; an unchanged table is re-checked by fingerprint, not
+ * re-read). For reads that tolerate that staleness: listing missions and working out levels.
+ * Payouts (settleLevels, checkAndAwardLevelReward) read fresh.
+ */
+export function missionRows(): Promise<Mission[]> {
+  return cachedMissionRows(() => prisma.mission.findMany({ orderBy: [{ level: 'asc' }, { index: 'asc' }] }), Date.now(), () => tableFingerprint('Mission'))
+}
+
 /**
  * Get all active missions grouped by level
  */
 export async function getMissionsByLevel() {
-  const missions = await prisma.mission.findMany({
-    where: { isActive: true },
-    orderBy: [{ level: 'asc' }, { index: 'asc' }],
-  })
+  const missions = (await missionRows()).filter((m) => m.isActive)
 
   // Group by level
   const grouped: Record<number, typeof missions> = {}
@@ -47,12 +60,12 @@ export async function getMissionsByLevel() {
 }
 
 /**
- * Get a user's mission completion progress
+ * Get a user's mission completion progress (the completion rows only: callers take the missions
+ * from getMissionsByLevel, so each row no longer carries its own copy of the mission).
  */
 export async function getUserMissionProgress(discordId: string) {
   return prisma.missionCompletion.findMany({
     where: { discordId },
-    include: { mission: true },
   })
 }
 
@@ -103,7 +116,7 @@ async function bulkMissionState(
   discordIds: readonly string[],
   who: string,
 ): Promise<{ missions: Array<{ id: number; level: number }>; approvedBy: Map<string, Set<number>>; paidBy: Map<string, Set<number>> }> {
-  const missions = (await prisma.mission.findMany({ where: REQUIRED_MISSION_WHERE, select: { id: true, level: true } })) ?? []
+  const missions = (await missionRows()).filter(isRequiredMission)
   if (missions.length === 0) throw new Error(`${who}: no active missions`)
   const approvedBy = new Map<string, Set<number>>()
   const paidBy = new Map<string, Set<number>>()
@@ -226,24 +239,18 @@ export async function getCurrentLevel(discordId: string) {
       where: { discordId, status: 'APPROVED' },
       select: { missionId: true },
     }),
-    prisma.mission.findMany({
-      where: REQUIRED_MISSION_WHERE,
-      select: { id: true, level: true },
-    }),
+    missionRows().then((rows) => rows.filter(isRequiredMission)),
     getPaidLevels(discordId),
   ])
 
-  return computeCurrentLevel(missions ?? [], new Set((completions ?? []).map(c => c.missionId)), paidLevels)
+  return computeCurrentLevel(missions, new Set((completions ?? []).map(c => c.missionId)), paidLevels)
 }
 
 /**
  * Get level title for a given level number
  */
 export async function getLevelTitle(level: number): Promise<string | null> {
-  const mission = await prisma.mission.findFirst({
-    where: { level, levelTitle: { not: null } },
-    select: { levelTitle: true },
-  })
+  const mission = (await missionRows()).find((m) => m.level === level && m.levelTitle != null)
   return mission?.levelTitle ?? null
 }
 
@@ -935,15 +942,9 @@ export async function getUserProgressSummary(discordId: string) {
       where: { discordId },
       include: { mission: true },
     }),
-    prisma.mission.findMany({
-      where: REQUIRED_MISSION_WHERE,
-      orderBy: [{ level: 'asc' }, { index: 'asc' }],
-    }),
+    missionRows().then((rows) => rows.filter(isRequiredMission)),
     getPaidLevels(discordId),
-    prisma.mission.findMany({
-      where: { levelTitle: { not: null } },
-      select: { level: true, levelTitle: true },
-    }),
+    missionRows().then((rows) => rows.filter((m) => m.levelTitle != null)),
   ])
 
   const approvedIds = new Set(

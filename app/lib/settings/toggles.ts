@@ -209,7 +209,7 @@ export function resolveToggle(key: ToggleKey, settings: Settings, env: Env = pro
   return def.legacy(raw)
 }
 
-/** Whether a switch is on right now (settings cached ~30s). Never throws. */
+/** Whether a switch is on right now (settings cached ~60s). Never throws. */
 export async function toggleEnabled(key: ToggleKey, env: Env = process.env): Promise<boolean> {
   return resolveToggle(key, await loadSettings(), env)
 }

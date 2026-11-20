@@ -271,8 +271,8 @@ export function rankCrewTasks(
 
 /** Open tasks of a crew from the database (CrewTask), ranked like the sheet path. */
 export async function fetchCrewTasksFromDb(crewId: string, detail = false): Promise<{ tasks: CrewTask[]; totalCount: number; all?: CrewTaskDetail[] }> {
-  const { loadCrewTasks } = await import("@/app/lib/crew-content");
-  const rows = await loadCrewTasks(crewId);
+  const { loadCrewTaskSummaries } = await import("@/app/lib/crew-content");
+  const rows = await loadCrewTaskSummaries(crewId);
   const open: RankableTask[] = rows
     .filter((t) => !isClosedStage(t.stage) && t.label.trim())
     .map((t) => ({

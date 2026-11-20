@@ -87,8 +87,55 @@ export function setCachedMissionsList(data: any) {
   missionsListCache = { data, timestamp: Date.now() }
 }
 
-/** After an admin edit of missions: drop the list and every member's cached progress in this instance. */
+// ===== Mission rows cache (every Mission row, shared by the level and progress reads) =====
+
+/**
+ * How long one load of the Mission table is reused in this instance. Admin edits clear it here at
+ * once (clearMissionCaches); other instances see them within this window.
+ */
+export const MISSION_ROWS_CACHE_MS = 60_000
+
+let missionRows: { rows: unknown[]; at: number; fp: string | null } | null = null
+let missionRowsInflight: Promise<unknown[]> | null = null
+
+/**
+ * The cached Mission rows, loading them with `load` when stale. Concurrent callers share one load.
+ * With `fingerprint` (db-fingerprint.ts), an expired copy is kept when the table is unchanged, so
+ * the refresh moves 32 bytes instead of every row; it is taken before the load, so a change landing
+ * during the load is caught next time. A failed load is not cached (it rejects, as the query did),
+ * and neither is an empty table, so a fail-closed "no active missions" check keeps asking.
+ */
+export async function cachedMissionRows<T>(
+  load: () => Promise<T[]>,
+  now: number = Date.now(),
+  fingerprint: () => Promise<string | null> = async () => null,
+): Promise<T[]> {
+  if (missionRows && now - missionRows.at < MISSION_ROWS_CACHE_MS) return missionRows.rows as T[]
+  if (!missionRowsInflight) {
+    const prev = missionRows
+    const p: Promise<unknown[]> = (async () => {
+      const fp = await fingerprint().catch(() => null)
+      if (fp && prev?.fp === fp) return { list: prev.rows, fp }
+      const rows = await load()
+      return { list: Array.isArray(rows) ? (rows as unknown[]) : [], fp }
+    })()
+      .then(({ list, fp }) => {
+        // Only the load still current may fill the cache (an admin edit may have cleared it meanwhile).
+        if (list.length > 0 && missionRowsInflight === p) missionRows = { rows: list, at: now, fp }
+        return list
+      })
+      .finally(() => {
+        if (missionRowsInflight === p) missionRowsInflight = null
+      })
+    missionRowsInflight = p
+  }
+  return missionRowsInflight as Promise<T[]>
+}
+
+/** After an admin edit of missions: drop the lists and every member's cached progress in this instance. */
 export function clearMissionCaches() {
   missionsListCache = null
+  missionRows = null
+  missionRowsInflight = null
   progressCache.clear()
 }

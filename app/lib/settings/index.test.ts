@@ -32,7 +32,7 @@ describe('settings read path', () => {
     expect(await getSetting('calls.transcriptMinLevel')).toBe(9)
   })
 
-  it('caches for ~30s with a single query, then re-reads', async () => {
+  it('caches for ~60s with a single query, then re-reads', async () => {
     findMany.mockResolvedValue([])
     const t0 = 1_000_000
     await loadSettings(t0)
@@ -48,6 +48,77 @@ describe('settings read path', () => {
     clearSettingsCache()
     findMany.mockResolvedValueOnce([] as never)
     expect(await getSetting('missions.maxAttempts')).toBe(3)
+  })
+
+  it('a read already in flight when the cache is cleared does not cache its (older) rows', async () => {
+    let release!: (rows: unknown) => void
+    findMany.mockReturnValueOnce(new Promise((r) => (release = r)) as never)
+    const old = loadSettings()
+    clearSettingsCache() // a save lands while the read is in flight
+    release([{ key: 'missions.maxAttempts', value: 5 }])
+    expect((await old).get('missions.maxAttempts')).toBe(5)
+    findMany.mockResolvedValueOnce([] as never)
+    expect(await getSetting('missions.maxAttempts')).toBe(3)
+    expect(findMany).toHaveBeenCalledTimes(2)
+  })
+
+  describe('fingerprint check on expiry', () => {
+    const fp = vi.mocked(prisma.$queryRawUnsafe)
+    beforeEach(() => fp.mockReset())
+    afterEach(() => fp.mockReset())
+
+    it('an unchanged fingerprint reuses the snapshot without reading the rows', async () => {
+      fp.mockResolvedValue([{ fp: 'aaa' }] as never)
+      findMany.mockResolvedValue([{ key: 'missions.maxAttempts', value: 5 }] as never)
+      const t0 = 2_000_000
+      expect((await loadSettings(t0)).get('missions.maxAttempts')).toBe(5)
+      expect((await loadSettings(t0 + SETTINGS_CACHE_MS + 1)).get('missions.maxAttempts')).toBe(5)
+      expect((await loadSettings(t0 + 2 * SETTINGS_CACHE_MS + 2)).get('missions.maxAttempts')).toBe(5)
+      expect(findMany).toHaveBeenCalledTimes(1)
+      expect(fp).toHaveBeenCalledTimes(3)
+    })
+
+    it('a changed fingerprint reads the rows again', async () => {
+      fp.mockResolvedValueOnce([{ fp: 'aaa' }] as never).mockResolvedValueOnce([{ fp: 'bbb' }] as never)
+      findMany.mockResolvedValueOnce([{ key: 'missions.maxAttempts', value: 5 }] as never).mockResolvedValueOnce([] as never)
+      const t0 = 3_000_000
+      await loadSettings(t0)
+      expect((await loadSettings(t0 + SETTINGS_CACHE_MS + 1)).get('missions.maxAttempts')).toBe(3)
+      expect(findMany).toHaveBeenCalledTimes(2)
+    })
+
+    it('no fingerprint to compare (e.g. an odd result) falls back to the full read', async () => {
+      fp.mockResolvedValue([] as never)
+      findMany.mockResolvedValue([] as never)
+      const t0 = 4_000_000
+      await loadSettings(t0)
+      await loadSettings(t0 + SETTINGS_CACHE_MS + 1)
+      expect(findMany).toHaveBeenCalledTimes(2)
+    })
+
+    it('a failing fingerprint query is a read failure at once (no second query), cached briefly', async () => {
+      findMany.mockResolvedValueOnce([{ key: 'calls.transcriptMinLevel', value: 8 }] as never)
+      const t0 = 4_500_000
+      expect((await loadSettings(t0)).get('calls.transcriptMinLevel')).toBe(8)
+      fp.mockRejectedValue(new Error('db down'))
+      const s = await loadSettings(t0 + SETTINGS_CACHE_MS + 1)
+      expect(s.readFailed).toBe(true)
+      expect(s.get('calls.transcriptMinLevel')).toBe(8) // last known good
+      expect(s.get('missions.humanReleaseMinLevel')).toBe(1) // strictest
+      expect(findMany).toHaveBeenCalledTimes(1)
+      fp.mockResolvedValue([{ fp: 'aaa' }] as never)
+      findMany.mockResolvedValue([] as never)
+      expect((await loadSettings(t0 + SETTINGS_CACHE_MS + 1000)).readFailed).toBe(true) // still the cached failure
+      expect((await loadSettings(t0 + SETTINGS_CACHE_MS + 7000)).readFailed).toBe(false)
+    })
+
+    it('a failed read is never reused on a matching fingerprint', async () => {
+      fp.mockResolvedValue([{ fp: 'aaa' }] as never)
+      findMany.mockRejectedValueOnce(new Error('db down')).mockResolvedValue([] as never)
+      const t0 = 6_000_000
+      expect((await loadSettings(t0)).readFailed).toBe(true)
+      expect((await loadSettings(t0 + 6000)).readFailed).toBe(false)
+    })
   })
 
   it('dedupes concurrent loads into one query', async () => {

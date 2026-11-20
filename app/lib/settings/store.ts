@@ -1,6 +1,6 @@
 /**
  * Writes for the admin settings page: validate, store and audit in one transaction, then clear
- * the local cache (other instances catch up within ~30s). The audit row records who/when/old/new.
+ * the local cache (other instances catch up within ~60s). The audit row records who/when/old/new.
  */
 import { prisma } from '@/app/lib/db'
 import { clearSettingsCache, loadSettings } from './index'

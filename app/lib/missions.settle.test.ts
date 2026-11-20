@@ -14,6 +14,7 @@ vi.mock('./discord', () => ({ getMembersWithRoles: vi.fn().mockResolvedValue([])
 vi.mock('./trainee-nick-run', () => ({ removePizzaNoobOnGraduate: vi.fn().mockResolvedValue('removed') }))
 
 import { approveMission, settleLevels, completedLevelBy } from './missions'
+import { clearMissionCaches } from './mission-cache'
 import { removePizzaNoobOnGraduate } from './trainee-nick-run'
 import { prisma } from './db'
 
@@ -31,13 +32,14 @@ let approved: number[]
 let paidLevels: number[]
 
 beforeEach(() => {
+  clearMissionCaches() // the Mission rows are cached per instance
   vi.clearAllMocks()
   approved = []
   paidLevels = []
   mockFn(prisma.$transaction).mockImplementation(async (fn: (tx: unknown) => unknown) => fn(prisma))
   mockFn(prisma.$queryRaw).mockResolvedValue([])
   mockFn(prisma.economy.update).mockResolvedValue({})
-  mockFn(prisma.mission.findMany).mockImplementation(async ({ where }: { where: { level?: number | object } }) =>
+  mockFn(prisma.mission.findMany).mockImplementation(async ({ where = {} }: { where?: { level?: number | object } } = {}) =>
     typeof where.level !== 'number' ? MISSIONS : MISSIONS.filter((m) => m.level === where.level),
   )
   mockFn(prisma.missionCompletion.findMany).mockImplementation(async () => approved.map((missionId) => ({ missionId })))
@@ -122,7 +124,7 @@ describe('completedLevelBy', () => {
   it('counts a paid ledger row even when the level has no active missions now', async () => {
     mockFn(prisma.missionCompletion.findMany).mockResolvedValue([])
     mockFn(prisma.transaction.findMany).mockResolvedValue([{ userId: 'p', metadata: { level: 2 }, description: null }])
-    mockFn(prisma.mission.findMany).mockResolvedValue([{ id: 1, level: 1 }, { id: 4, level: 3 }])
+    mockFn(prisma.mission.findMany).mockResolvedValue([{ id: 1, level: 1, isActive: true }, { id: 4, level: 3, isActive: true }])
     expect(await completedLevelBy(['p', 'q'], 2)).toEqual(new Set(['p']))
   })
 
