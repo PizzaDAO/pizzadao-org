@@ -339,7 +339,21 @@ export interface SweepDeps extends CallCardDeps {
   /** Ids of calls with a posted card that is open or was resolved recently. */
   /** `cursor` rotates through open cards so more than `limit` of them all get checked over successive runs. */
   listExisting: (resolvedSince: Date, limit: number, cursor: number) => Promise<string[]>
+  /**
+   * Cheap change markers (no transcript) for existing-card candidates, plus a key for the settings that
+   * feed the hold check. When absent the sweep re-checks every candidate every run.
+   */
+  markers?: (ids: string[]) => Promise<Map<string, string>>
+  filterKey?: () => Promise<string>
+  /** The capo-review toggle (changes the card's buttons), part of the memo key. */
+  interactive?: () => Promise<boolean>
+  /** Memo of the last sweep per id. Defaults to a module-level one (per server instance). */
+  memo?: Map<string, { key: string; at: number }>
 }
+
+/** Unchanged cards are fully re-checked at least this often, so nothing gets stuck on a stale memo. */
+export const SWEEP_FULL_RECHECK_MS = 3 * 3_600_000
+const sweepMemo = new Map<string, { key: string; at: number }>()
 
 export const SWEEP_EXISTING_LIMIT = 50
 const SWEEP_EVERY_MS = 10 * 60 * 1000
@@ -367,7 +381,28 @@ export async function syncDueCallReviewCards(limit = 5, deps: SweepDeps = defaul
       if (posted >= limit) break
       if ((await syncCallReviewCard(id, run)) === 'posted') posted++
     }
-    for (const id of existing) if ((await syncCallReviewCard(id, run)) === 'edited') edited++
+    // Skip cards whose cheap marker is unchanged since their last sweep (the full row, transcript included,
+    // is only loaded by syncCallReviewCard for the ones that remain).
+    const memo = deps.memo ?? sweepMemo
+    const keys = new Map<string, string>()
+    if (deps.markers && existing.length) {
+      const [markers, fk] = await Promise.all([deps.markers(existing), deps.filterKey ? deps.filterKey() : Promise.resolve('')])
+      // Channel, its privacy this run and the interactive toggle also change what a card must be, so a flip re-checks all.
+      const channel = await deps.channelId()
+      const priv = channel ? await run.channelIsPrivate(channel) : false
+      const inter = deps.interactive ? await deps.interactive() : false
+      for (const [id, m] of markers) keys.set(id, `${m}|${fk}|${channel}|${priv}|${inter}`)
+    }
+    for (const id of existing) {
+      const key = keys.get(id)
+      const prev = memo.get(id)
+      if (key !== undefined && prev && prev.key === key && now.getTime() - prev.at < SWEEP_FULL_RECHECK_MS) continue
+      const outcome = await syncCallReviewCard(id, run)
+      if (outcome === 'edited') edited++
+      if (key !== undefined && (outcome === 'unchanged' || outcome === 'edited' || outcome === 'no_card_needed')) memo.set(id, { key, at: now.getTime() })
+      else memo.delete(id)
+    }
+    if (memo.size > 2000) memo.clear()
     return { posted, edited, checked: fresh.length + existing.length }
   } catch (err) {
     console.error('[calls/review-cards] sweep failed:', errText(err))
@@ -531,6 +566,25 @@ export const defaultSweepDeps: SweepDeps = {
       select: { id: true },
     })
     return rows.map((r) => r.id)
+  },
+  async markers(ids) {
+    // Everything that feeds the render or the hold check except the transcript itself; no large columns.
+    const rows = await prisma.callRecording.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, updatedAt: true, status: true, reviewHoldAt: true, redactionsUpdatedAt: true, summaryGeneratedAt: true, summaryEditedAt: true, reviewedAt: true, reviewCard: { select: { messageId: true } } },
+    })
+    return new Map(
+      rows.map((r) => [
+        r.id,
+        [r.updatedAt, r.status, r.reviewHoldAt, r.redactionsUpdatedAt, r.summaryGeneratedAt, r.summaryEditedAt, r.reviewedAt, r.reviewCard?.messageId]
+          .map((v) => (v instanceof Date ? v.getTime() : (v ?? '')))
+          .join('~'),
+      ]),
+    )
+  },
+  interactive: () => toggleEnabled('calls.capoReviewEnabled').catch(() => false),
+  async filterKey() {
+    return createHash('sha1').update(JSON.stringify(await loadPostFilter().catch(() => null))).digest('hex')
   },
   async listExisting(resolvedSince, limit, cursor) {
     // Open cards first, rotating through them so more than `limit` all get checked over successive runs.

@@ -13,6 +13,7 @@ import {
   renderHash,
   syncCallReviewCard,
   syncDueCallReviewCards,
+  SWEEP_FULL_RECHECK_MS,
   type CallCardView,
   type SweepDeps,
 } from './review-cards'
@@ -433,5 +434,74 @@ describe('syncDueCallReviewCards', () => {
     const { state, deps } = makeDeps(view(), { listExisting: async () => ['rec1'] })
     state.v.card = { channelId: '111111111111111111', messageId: '222222222222222222', renderedHash: 'stale', resolvedAt: null, claimedAt: NOW }
     expect(await syncDueCallReviewCards(5, deps)).toMatchObject({ posted: 0, edited: 1 })
+  })
+})
+
+describe('sweep change markers', () => {
+  function setup(markerOf: () => string) {
+    const memo = new Map<string, { key: string; at: number }>()
+    let t = NOW.getTime()
+    const card = { channelId: '111111111111111111', messageId: '222222222222222222', renderedHash: renderHash(renderCallReviewCard(view(), { appUrl: APP })), resolvedAt: null, claimedAt: null }
+    const load = vi.fn(async (id: string) => view({ id, card }))
+    const mk = () => makeDeps(view({ card }), { listExisting: async () => ['rec1'], load, markers: async () => new Map([['rec1', markerOf()]]), filterKey: async () => 'f', memo, now: () => new Date(t) })
+    return { load, mk, advance: (ms: number) => (t += ms) }
+  }
+
+  it('does not load the row (transcript) again when the marker is unchanged', async () => {
+    const s = setup(() => 'm1')
+    const { deps } = s.mk()
+    await syncDueCallReviewCards(5, deps)
+    expect(s.load).toHaveBeenCalledTimes(1)
+    await syncDueCallReviewCards(5, deps)
+    await syncDueCallReviewCards(5, deps)
+    expect(s.load).toHaveBeenCalledTimes(1)
+  })
+
+  it('loads again when the marker changes', async () => {
+    let m = 'm1'
+    const s = setup(() => m)
+    const { deps } = s.mk()
+    await syncDueCallReviewCards(5, deps)
+    m = 'm2'
+    await syncDueCallReviewCards(5, deps)
+    expect(s.load).toHaveBeenCalledTimes(2)
+  })
+
+  it('re-checks when channel privacy flips with an unchanged marker', async () => {
+    const s = setup(() => 'm1')
+    let priv = true
+    const { deps } = s.mk()
+    deps.channelIsPrivate = async () => priv
+    await syncDueCallReviewCards(5, deps)
+    await syncDueCallReviewCards(5, deps)
+    expect(s.load).toHaveBeenCalledTimes(1)
+    priv = false
+    await syncDueCallReviewCards(5, deps)
+    expect(s.load).toHaveBeenCalledTimes(2)
+  })
+
+  it('re-checks when the interactive toggle flips with an unchanged marker', async () => {
+    const s = setup(() => 'm1')
+    let on = true
+    const { deps } = s.mk()
+    deps.interactive = async () => on
+    await syncDueCallReviewCards(5, deps)
+    await syncDueCallReviewCards(5, deps)
+    expect(s.load).toHaveBeenCalledTimes(1)
+    on = false
+    await syncDueCallReviewCards(5, deps)
+    expect(s.load).toHaveBeenCalledTimes(2)
+  })
+
+  it('does a full re-check after the interval', async () => {
+    const s = setup(() => 'm1')
+    const { deps } = s.mk()
+    await syncDueCallReviewCards(5, deps)
+    s.advance(SWEEP_FULL_RECHECK_MS - 1000)
+    await syncDueCallReviewCards(5, deps)
+    expect(s.load).toHaveBeenCalledTimes(1)
+    s.advance(2000)
+    await syncDueCallReviewCards(5, deps)
+    expect(s.load).toHaveBeenCalledTimes(2)
   })
 })
