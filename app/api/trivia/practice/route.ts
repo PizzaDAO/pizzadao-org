@@ -9,7 +9,7 @@ import { getSession } from "@/app/lib/session";
 import { rejectUnsafeWrite } from "@/app/lib/admin-guard";
 import { checkKeyedRateLimit, enforceRateLimit, rateLimitResponse } from "@/app/lib/rate-limit";
 import { getQuestion, publicView, reveal } from "@/app/lib/trivia/bank";
-import { practicePool } from "@/app/lib/trivia/web";
+import { practicePoolOrNull } from "@/app/lib/trivia/web";
 import { categoryCounts, pickPractice } from "@/app/lib/trivia/daily";
 import { match } from "@/app/lib/trivia/match";
 import { CATEGORIES, type TriviaCategory } from "@/app/lib/trivia/schema";
@@ -22,7 +22,8 @@ export async function GET(request: NextRequest) {
   const limited = await enforceRateLimit(request, "trivia-read");
   if (limited) return withNoStore(limited);
 
-  const pool = await practicePool();
+  // Fails closed: when today's daily cannot be read, nothing is served (it is unknown which question to hide).
+  const pool = (await practicePoolOrNull()) ?? [];
   const raw = request.nextUrl.searchParams.get("category");
   const category = raw && (CATEGORIES as readonly string[]).includes(raw) ? (raw as TriviaCategory) : null;
   if (raw && raw !== "all" && !category) return reply({ error: "Unknown category" }, 400);
@@ -53,8 +54,11 @@ export async function POST(request: NextRequest) {
 
   // Only a question that is currently served on the web can be checked: not a Discord one, not a held-back one.
   // Today's daily is not served by practice either: its answer must not be learnable before a recorded attempt.
+  // Fails closed: if today's daily cannot be read, nothing is checked (no reveal can give today's answer away).
+  const pool = await practicePoolOrNull();
+  if (!pool) return reply({ error: "Practice is unavailable right now. Please try again later." }, 503);
   const q = await getQuestion(questionId);
-  if (!q || !(await practicePool()).some((s) => s.id === q.id)) return reply({ error: "Unknown question" }, 404);
+  if (!q || !pool.some((s) => s.id === q.id)) return reply({ error: "Unknown question" }, 404);
 
   const { verdict } = match(q, answer);
   if (verdict === "ignore") return reply({ verdict: "ignore" });

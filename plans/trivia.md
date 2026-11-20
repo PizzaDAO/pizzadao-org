@@ -589,11 +589,13 @@ schedule is predictable, so anyone could look up the answer to a paid Discord ro
   schema is never served. Unreachable database: the last good copy is served; with none, the bank is empty. An empty bank
   means no Discord round opens (`no_question`, logged) and the web daily answers 503: nothing is posted or paid.
 - **Exposed questions:** `exposed = true` = the answer is public: in git history (everything imported from the old file,
-  `--exposed`), or revealed since. A Discord round that closes (expired or won) and a question served as the web daily are
-  marked exposed automatically (`updatedBy = system:revealed`). The web daily and the Discord picker prefer unexposed
+  `--exposed`), or revealed since. A Discord round that closes (expired or won) is marked exposed automatically
+  (`updatedBy = system:revealed`); a web daily's question is marked once its day is over (when a later day's daily is
+  first read, before that day's pick), never during its own day, so today's computed pick never moves mid-day. The web daily and the Discord picker prefer unexposed
   questions among the ones not used recently and fall back to exposed ones (logged) only when none is left.
 - **Practice serves exposed web questions only** (minus today's daily): it reveals the answer after any attempt, so an
-  unexposed question there would be an oracle for a future daily. With nothing exposed, practice is empty.
+  unexposed question there would be an oracle for a future daily. With nothing exposed, practice is empty. It fails
+  closed: if today's daily round cannot be read (no round id), practice serves nothing and answers checks with a 503.
 - **Clearing exposed:** question ids are public and history maps id -> answer, so rewording the text keeps the flag. Only
   an answer that is genuinely new (not the old answer, not an old alias, not accepted by the old matcher) clears it, or
   the admin unticks it by hand.

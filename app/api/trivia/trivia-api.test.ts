@@ -182,12 +182,15 @@ describe("practice", () => {
     expect(JSON.stringify(await res.json())).not.toContain(daily.explanation.slice(0, 20));
   });
 
-  it("practice keeps working with the tables down and still hides the computed daily", async () => {
+  it("fails closed with the tables down: today's daily is unknown, so nothing is served or checked", async () => {
     db.down = true;
-    const daily = dailyQuestionFor(dayKeyUtc(), WEB)!;
-    const body = await (await practiceGET(req("/api/trivia/practice"))).json();
-    expect(body.questions.length).toBe(10);
-    expect(body.questions.some((q: { id: string }) => q.id === daily.id)).toBe(false);
+    const res = await practiceGET(req("/api/trivia/practice"));
+    expect(res.status).toBe(200);
+    expect((await res.json()).questions).toEqual([]);
+    const q = WEB.find((x) => x.id !== dailyQuestionFor(dayKeyUtc(), WEB)!.id)!;
+    const post = await practicePOST(req("/api/trivia/practice", { method: "POST", body: { questionId: q.id, answer: q.answer } }));
+    expect(post.status).toBe(503);
+    expect(JSON.stringify(await post.json())).not.toContain("reveal");
   });
 
   it("never serves a Discord-pool question, even across many draws", async () => {
@@ -497,7 +500,7 @@ describe("an empty or unreachable bank", () => {
     expect(reward.calls).toBe(0);
     const practice = await (await practiceGET(req("/api/trivia/practice"))).json();
     expect(practice.questions).toEqual([]);
-    expect((await practicePOST(req("/api/trivia/practice", { method: "POST", body: { questionId: "pd-901", answer: "10000" } }))).status).toBe(404);
+    expect((await practicePOST(req("/api/trivia/practice", { method: "POST", body: { questionId: "pd-901", answer: "10000" } }))).status).toBe(503); // no daily: practice is closed
     expect((await reportPOST(req("/api/trivia/report", { method: "POST", body: { questionId: "pd-901", text: "something is off" } }))).status).toBe(404);
     warn.mockRestore();
   });

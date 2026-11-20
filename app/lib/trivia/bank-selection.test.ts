@@ -65,7 +65,7 @@ import { pickDailyQuestion, preferUnexposed } from "./exposed";
 import { pickQuestion, slotsForDay } from "./schedule";
 import { announceWin, expireRounds, openDiscordRound } from "./rounds";
 import { prisma } from "@/app/lib/db";
-import { getDailyRound, practicePool } from "./web";
+import { getDailyRound, practicePool, practicePoolOrNull, resetRecentDailyCache } from "./web";
 import { runTriviaCron } from "./cron";
 import type { TriviaQuestion } from "./schema";
 
@@ -79,6 +79,7 @@ beforeEach(() => {
   db.rounds = [];
   db.recentDaily = [];
   db.dueDiscord = [];
+  resetRecentDailyCache();
   db.transactions = 0;
   db.writes = 0;
   warn = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -280,11 +281,23 @@ describe("today's stored daily vs a partial bank (previews share the production 
 });
 
 describe("a revealed answer marks the question exposed", () => {
-  it("a question served as the web daily", async () => {
+  it("a web daily: never during its own day (today's pick must not move), only once a later day's daily is read", async () => {
     const round = await getDailyRound(NOW);
-    const row = fakeBank.rows.get(round!.question.id)!;
-    expect(row).toMatchObject({ exposed: true, updatedBy: "system:revealed" });
-    expect((await getBank()).exposedIds.has(round!.question.id)).toBe(true); // the cache was dropped
+    const id = round!.question.id;
+    for (let i = 0; i < 3; i++) await getDailyRound(NOW);
+    expect(fakeBank.rows.get(id)!.exposed).toBe(false);
+    // the computed pick is the same all day (here: the stored round's read fails, so the computed one is served)
+    vi.mocked(prisma.triviaRound.findUnique).mockRejectedValueOnce(new Error("down"));
+    expect((await getDailyRound(NOW))!.question.id).toBe(id);
+
+    // the next day: yesterday's round is in the history, so its question is marked before today's pick
+    const tomorrow = new Date(NOW.getTime() + 24 * 60 * 60 * 1000);
+    db.recentDaily = [{ questionId: id }];
+    const next = await getDailyRound(tomorrow);
+    expect(fakeBank.rows.get(id)).toMatchObject({ exposed: true, updatedBy: "system:revealed" });
+    expect((await getBank()).exposedIds.has(id)).toBe(true); // the cache was dropped
+    expect(next!.question.id).not.toBe(id);
+    expect(fakeBank.rows.get(next!.question.id)!.exposed).toBe(false);
   });
 
   it("a Discord round that expires, or is won", async () => {
@@ -303,6 +316,25 @@ describe("a revealed answer marks the question exposed", () => {
     const { deps, posted } = fakePost();
     expect(await expireRounds(NOW, deps)).toBe(1);
     expect(posted.length).toBe(1); // the reveal still went out (from the cached bank)
+  });
+});
+
+describe("practice fails closed when today's daily cannot be read", () => {
+  it("the round read fails (the daily falls back to its computed pick with no round id): practice is null / empty", async () => {
+    fakeBank.setExposed([...fakeBank.rows.keys()]);
+    invalidateBank();
+    db.rounds.push({ id: 1, dayKey: TODAY, questionId: "pd-901", surface: "WEB_DAILY" });
+    vi.mocked(prisma.triviaRound.findUnique).mockRejectedValue(new Error("down"));
+    try {
+      expect((await getDailyRound(NOW))!.roundId).toBeNull();
+      expect(await practicePoolOrNull(NOW)).toBeNull();
+      expect(await practicePool(NOW)).toEqual([]); // so the stored daily pd-901 can never be revealed by practice
+    } finally {
+      vi.mocked(prisma.triviaRound.findUnique).mockImplementation((async ({ where }: { where: { dayKey: string } }) => db.rounds.find((r) => r.dayKey === where.dayKey) ?? null) as never);
+    }
+    const pool = await practicePoolOrNull(NOW);
+    expect(pool).not.toBeNull();
+    expect(pool!.some((q) => q.id === "pd-901")).toBe(false);
   });
 });
 
