@@ -23,7 +23,9 @@ interface DailyResponse {
   attempt: { correct: boolean; reveal: RevealDto; percentCorrect: number | null } | null;
 }
 interface AnswerResponse {
-  verdict: "correct" | "wrong" | "ignore";
+  verdict?: "correct" | "wrong" | "ignore";
+  /** Logged out while a reward is on offer: no verdict is given, only a prompt to sign in. */
+  signInToAnswer?: boolean;
   alreadyAnswered?: boolean;
   recorded?: boolean;
   signInToReveal?: boolean;
@@ -31,7 +33,7 @@ interface AnswerResponse {
   percentCorrect?: number | null;
   streak?: number | null;
   bestStreak?: number | null;
-  reward?: { pep: number; status: "paid" | "ineligible" | "off" | "already"; reason?: "not_member" | "too_young" };
+  reward?: { pep: number; status: "paid" | "ineligible" | "off" | "already" | "error"; reason?: "not_member" | "too_young" };
 }
 
 function useCountdown(resetsAt: string | undefined): { h: number; m: number } | null {
@@ -53,6 +55,7 @@ export default function DailyCard() {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<AnswerResponse | null>(null);
   const [nudge, setNudge] = useState(false);
+  const [needSignIn, setNeedSignIn] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [shared, setShared] = useState<"idle" | "copied" | "failed">("idle");
   const left = useCountdown(data?.resetsAt);
@@ -87,6 +90,7 @@ export default function DailyCard() {
       return setReloadKey((k) => k + 1);
     }
     if (!r.ok || !r.data) return setState("error");
+    if (r.data.signInToAnswer) return setNeedSignIn(true);
     if (r.data.verdict === "ignore") return setNudge(true);
     setResult(r.data);
   }
@@ -107,7 +111,9 @@ export default function DailyCard() {
         ? t("rewardAlready")
         : reward?.status === "ineligible"
           ? t(reward.reason === "too_young" ? "rewardTooYoung" : "rewardNotMember")
-          : null;
+          : reward?.status === "error"
+            ? t("rewardError")
+            : null;
   // A verdict with no answer text: logged out (sign in to see it) or not recorded (tables unavailable).
   const verdictOnly = result && result.verdict !== "ignore" && !result.reveal ? { verdict: result.verdict, signIn: !!result.signInToReveal } : null;
   const streak = answered?.streak ?? data?.streak ?? null;
@@ -170,6 +176,11 @@ export default function DailyCard() {
               <p className="mb-2 mt-3 text-sm text-foreground/75">{t("rewardOffer", { pep: data.rewardPep })}</p>
             )}
             {!shown && !verdictOnly && <AnswerForm question={data.question} busy={busy} onSubmit={submit} />}
+            {needSignIn && (
+              <p role="alert" className="mb-0 mt-3 text-sm text-tomato-readable">
+                {t("signInToAnswer", { pep: data.rewardPep ?? 0 })}
+              </p>
+            )}
             {nudge && (
               <p role="alert" className="mb-0 mt-3 text-sm text-tomato-readable">
                 {t("notAnAnswer")}

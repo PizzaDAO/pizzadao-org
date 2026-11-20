@@ -3454,13 +3454,24 @@ model TriviaAttempt {
   messageId  String?     @unique // Discord: idempotency for recorder retries
   correct    Boolean
   answerText String?     @db.VarChar(120) // truncated; kept 30 days, then nulled by the scrub cron
-  rewardedPep Int? // Web daily only: $PEP paid for this attempt (set once, atomically, with the ledger row)
   createdAt  DateTime    @default(now())
   round      TriviaRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
 
   @@unique([roundId, discordId, messageId])
   @@index([roundId, discordId])
   @@index([discordId, createdAt])
+}
+
+// One row per member per web daily date that earned $PEP (trivia.webDailyRewardPep). The unique key is the
+// exactly-once guard; it does not depend on TriviaAttempt rows (a re-pointed daily deletes those).
+model TriviaDailyReward {
+  id        Int      @id @default(autoincrement())
+  discordId String
+  dayKey    String
+  pep       Int
+  createdAt DateTime @default(now())
+
+  @@unique([discordId, dayKey])
 }
 
 model TriviaReport {

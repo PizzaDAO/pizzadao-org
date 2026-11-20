@@ -15,6 +15,16 @@ const db = vi.hoisted(() => ({
   down: false,
 }));
 
+// The reward is mocked at its two entry points: its own logic is tested in web-reward.test.ts and the real-Postgres suite.
+const reward = vi.hoisted(() => ({ offer: 0, status: "paid" as string, calls: 0 }));
+vi.mock("@/app/lib/trivia/web", async (importActual) => ({
+  ...(await importActual<typeof import("@/app/lib/trivia/web")>()),
+  dailyRewardOffer: async () => reward.offer,
+  payDailyReward: async () => {
+    reward.calls++;
+    return { pep: reward.offer, status: reward.status };
+  },
+}));
 vi.mock("@/app/lib/session", () => ({ getSession: async () => session.value }));
 // Signed-in reports go through recordReport (eligibility, dedupe, auto-pull): its own tests are in reports.test.ts and the
 // real-database suite; here it just records what the route handed it.
@@ -122,6 +132,9 @@ beforeEach(() => {
   db.attempts = [];
   db.reports.length = 0;
   db.down = false;
+  reward.offer = 0;
+  reward.status = "paid";
+  reward.calls = 0;
 });
 
 describe("practice", () => {
@@ -256,6 +269,41 @@ describe("daily", () => {
     const wrong = await (await dailyPOST(req("/api/trivia/daily", { method: "POST", body: dailyBody(wrongFor(q)) }))).json();
     expect(wrong.verdict).toBe("wrong");
     expect(keysDeep(wrong).has("reveal")).toBe(false);
+  });
+
+  it("logged out while a reward is on offer: no verdict at all (no oracle), only a sign-in prompt", async () => {
+    reward.offer = 5;
+    const q = today();
+    for (const a of [q.answer, wrongFor(q)]) {
+      const body = await (await dailyPOST(req("/api/trivia/daily", { method: "POST", body: dailyBody(a) }))).json();
+      expect(body.signInToAnswer).toBe(true);
+      expect(body.verdict).toBeUndefined();
+      expect(keysDeep(body).has("reveal")).toBe(false);
+    }
+    expect(db.attempts).toHaveLength(0);
+  });
+
+  it("signed in, correct: the reward comes back; a retry after a failed payout pays again via the already-answered path", async () => {
+    session.value = { discordId: "111" };
+    reward.offer = 5;
+    reward.status = "error";
+    const q = today();
+    const first = await (await dailyPOST(req("/api/trivia/daily", { method: "POST", body: dailyBody(q.answer) }))).json();
+    expect(first.reward).toEqual({ pep: 5, status: "error" });
+    reward.status = "paid";
+    const second = await (await dailyPOST(req("/api/trivia/daily", { method: "POST", body: dailyBody(q.answer) }))).json();
+    expect(second.alreadyAnswered).toBe(true);
+    expect(second.reward).toEqual({ pep: 5, status: "paid" });
+    expect(reward.calls).toBe(2);
+  });
+
+  it("signed in, wrong: no payout is attempted", async () => {
+    session.value = { discordId: "112" };
+    reward.offer = 5;
+    const q = today();
+    const body = await (await dailyPOST(req("/api/trivia/daily", { method: "POST", body: dailyBody(wrongFor(q)) }))).json();
+    expect(body.reward).toBeUndefined();
+    expect(reward.calls).toBe(0);
   });
 
   it("signed in: one recorded attempt per day; a second submit returns the first result, and GET then reveals", async () => {

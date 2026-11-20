@@ -95,7 +95,10 @@ export async function POST(request: NextRequest) {
     if (!discordId || !round.roundId) return null;
     const mine = await findDailyAttempt(round.roundId, discordId);
     if (!mine) return null;
+    // A correct attempt whose payout failed earlier is retried here (idempotent: paid at most once per day).
+    const reward = mine.correct ? await payDailyReward({ roundId: round.roundId, dayKey: round.dayKey, discordId }) : null;
     return reply({
+      ...(reward ? { reward } : {}),
       verdict: mine.correct ? "correct" : "wrong",
       alreadyAnswered: true,
       recorded: true,
@@ -110,7 +113,12 @@ export async function POST(request: NextRequest) {
   const { verdict } = match(q, answer);
   if (verdict === "ignore") return reply({ verdict: "ignore" });
   // Logged out: nothing is recorded, so nothing is revealed. Only a recorded attempt gets the answer text.
-  if (!discordId) return reply({ verdict, alreadyAnswered: false, recorded: false, signInToReveal: true });
+  if (!discordId) {
+    // While a reward is on offer a logged-out verdict would be a free oracle (true/false and multiple choice found in a
+    // few tries, then claimed signed in), so it gets no verdict at all: only a prompt to sign in.
+    if ((await dailyRewardOffer()) > 0) return reply({ signInToAnswer: true, recorded: false });
+    return reply({ verdict, alreadyAnswered: false, recorded: false, signInToReveal: true });
+  }
 
   let recorded = false;
   if (round.roundId) {

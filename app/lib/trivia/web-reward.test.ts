@@ -8,7 +8,8 @@ const st = vi.hoisted(() => ({
   settings: { rewardPep: 20, webDailyRewardPep: 5, dryRun: false, roundsPerDay: 3 },
   live: true,
   member: true,
-  attempts: [] as { roundId: number; discordId: string; messageId: string | null; correct: boolean; rewardedPep: number | null }[],
+  attempts: [] as { roundId: number; discordId: string; messageId: string | null; correct: boolean }[],
+  rewards: [] as { discordId: string; dayKey: string }[],
   credits: [] as { userId: string; amount: number; type: string }[],
   locks: [] as unknown[],
   failCredit: false,
@@ -28,10 +29,14 @@ vi.mock("@/app/lib/db", () => {
   const tx = {
     $executeRaw: async (...args: unknown[]) => void st.locks.push(args),
     triviaAttempt: {
-      updateMany: async ({ where, data }: { where: { roundId: number; discordId: string }; data: { rewardedPep: number } }) => {
-        const a = st.attempts.find((x) => x.roundId === where.roundId && x.discordId === where.discordId && x.messageId === null && x.correct && x.rewardedPep === null);
-        if (!a) return { count: 0 };
-        a.rewardedPep = data.rewardedPep;
+      findFirst: async ({ where }: { where: { roundId: number; discordId: string } }) =>
+        st.attempts.find((x) => x.roundId === where.roundId && x.discordId === where.discordId && x.messageId === null && x.correct) ?? null,
+    },
+    triviaDailyReward: {
+      createMany: async ({ data }: { data: { discordId: string; dayKey: string }[] }) => {
+        const d = data[0];
+        if (st.rewards.some((r) => r.discordId === d.discordId && r.dayKey === d.dayKey)) return { count: 0 };
+        st.rewards.push(d);
         return { count: 1 };
       },
     },
@@ -46,7 +51,7 @@ const NOW = new Date("2026-11-20T12:00:00Z");
 const youngId = String((BigInt(NOW.getTime() - 1420070400000 - 60_000) << BigInt(22)) + BigInt(1)); // created a minute ago
 
 function attempt(discordId: string, correct = true) {
-  st.attempts.push({ roundId: 1, discordId, messageId: null, correct, rewardedPep: null });
+  st.attempts.push({ roundId: 1, discordId, messageId: null, correct });
 }
 const pay = (discordId: string) => payDailyReward({ roundId: 1, dayKey: "2026-11-20", discordId }, NOW, {});
 
@@ -56,6 +61,7 @@ beforeEach(() => {
   st.member = true;
   st.attempts = [];
   st.credits = [];
+  st.rewards = [];
   st.locks = [];
   st.failCredit = false;
 });
@@ -83,6 +89,7 @@ describe("payDailyReward", () => {
     attempt(OLD, false);
     expect((await pay(OLD)).status).toBe("already");
     expect(st.credits.length).toBe(0);
+    expect(st.rewards.length).toBe(0);
   });
 
   it("ineligible: not an onboarded member, or an account under 7 days old", async () => {
@@ -93,7 +100,7 @@ describe("payDailyReward", () => {
     attempt(youngId);
     expect(await pay(youngId)).toEqual({ pep: 5, status: "ineligible", reason: "too_young" });
     expect(st.credits.length).toBe(0);
-    expect(st.attempts.every((a) => a.rewardedPep === null)).toBe(true);
+    expect(st.rewards.length).toBe(0);
   });
 
   it("setting 0, trivia not live: off, nothing paid", async () => {
@@ -116,12 +123,22 @@ describe("payDailyReward", () => {
     log.mockRestore();
   });
 
-  it("a payout failure is swallowed and the attempt stays claimable", async () => {
+  it("a payout failure is swallowed and reported as error", async () => {
     attempt(OLD);
     st.failCredit = true;
     const err = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    await expect(pay(OLD)).resolves.toEqual({ pep: 0, status: "off" });
+    await expect(pay(OLD)).resolves.toEqual({ pep: 0, status: "error" });
     err.mockRestore();
+  });
+
+  it("a re-pointed daily (attempt rows deleted, member answers again) never pays twice", async () => {
+    attempt(OLD);
+    expect((await pay(OLD)).status).toBe("paid");
+    st.attempts = []; // getDailyRound voids the attempts when the stored question stops being servable
+    attempt(OLD); // the member answers the replacement correctly
+    expect((await pay(OLD)).status).toBe("already");
+    expect(st.credits.length).toBe(1);
+    expect(st.rewards.length).toBe(1);
   });
 
   it("does not touch the Discord daily cap (it only reads attempts and the ledger, never TriviaRound wins)", async () => {

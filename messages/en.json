@@ -2958,6 +2958,8 @@
     "rewardNotMember": "Finish onboarding to earn $PEP",
     "rewardTooYoung": "Your Discord account is too new to earn $PEP yet",
     "rewardAlready": "You already earned $PEP for today",
+    "rewardError": "Could not pay your $PEP just now. Reload later to try again.",
+    "signInToAnswer": "Sign in with Discord to answer and earn $PEP.",
     "notRecordedNoAnswer": "Your answer could not be recorded right now, so the answer is not shown. Try again later.",
     "streakLabel": "Daily streak",
     "streakCurrent": "Current streak",

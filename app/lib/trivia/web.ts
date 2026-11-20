@@ -170,7 +170,7 @@ export const DAILY_REWARD_LOCK_NAMESPACE = 742019347;
 export interface DailyReward {
   /** $PEP paid (status "paid") or on offer. 0 when off. */
   pep: number;
-  status: "paid" | "ineligible" | "off" | "already";
+  status: "paid" | "ineligible" | "off" | "already" | "error";
   /** Why an ineligible member was not paid. */
   reason?: "not_member" | "too_young";
 }
@@ -189,9 +189,9 @@ export async function dailyRewardOffer(env: Record<string, string | undefined> =
 /**
  * Pay the web daily reward for a member's recorded, correct attempt. Same eligibility as a Discord win (onboarded member,
  * Discord account at least 7 days old). Exactly once per member per day, enforced in the database: the attempt row (unique
- * per round and member) is claimed with a conditional UPDATE (rewardedPep IS NULL) under an advisory lock, and the wallet
+ * per round and member) is checked, then a TriviaDailyReward row (unique per member and day, independent of attempt rows) is inserted under an advisory lock, and the wallet
  * credit and TRIVIA_DAILY_REWARD ledger row are written in that same transaction. It never counts toward the Discord
- * 3-wins-a-day cap (that counts WON Discord rounds). Never throws: any failure is logged and reported as "off".
+ * 3-wins-a-day cap (that counts WON Discord rounds). Never throws: any failure is logged and reported as "error".
  */
 export async function payDailyReward(
   input: { roundId: number; dayKey: string; discordId: string },
@@ -213,10 +213,12 @@ export async function payDailyReward(
     const paid = await prisma.$transaction(
       async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(${DAILY_REWARD_LOCK_NAMESPACE}::int, hashtext(${`${input.dayKey}:${input.discordId}`}))`;
-        const claimed = await tx.triviaAttempt.updateMany({
-          where: { roundId: input.roundId, discordId: input.discordId, messageId: null, correct: true, rewardedPep: null },
-          data: { rewardedPep: pep },
-        });
+        // Only a recorded, correct attempt of this round earns it (a voided or wrong one does not).
+        const mine = await tx.triviaAttempt.findFirst({ where: { roundId: input.roundId, discordId: input.discordId, messageId: null, correct: true }, select: { id: true } });
+        if (!mine) return false;
+        // The dedicated row is the exactly-once key (unique per member and day), independent of attempt rows, which a
+        // re-pointed daily deletes. ON CONFLICT DO NOTHING (no aborted transaction): count 0 means already paid today.
+        const claimed = await tx.triviaDailyReward.createMany({ data: [{ discordId: input.discordId, dayKey: input.dayKey, pep }], skipDuplicates: true });
         if (claimed.count !== 1) return false;
         await creditInTx(tx, input.discordId, pep, "TRIVIA_DAILY_REWARD", "Trivia web daily", { roundId: input.roundId, dayKey: input.dayKey });
         return true;
@@ -226,6 +228,6 @@ export async function payDailyReward(
     return { pep, status: paid ? "paid" : "already" };
   } catch (e) {
     console.error("[trivia] web daily reward failed:", (e as Error).message);
-    return { pep: 0, status: "off" };
+    return { pep: 0, status: "error" };
   }
 }

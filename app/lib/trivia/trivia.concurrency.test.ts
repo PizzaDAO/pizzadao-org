@@ -937,6 +937,21 @@ describe.skipIf(!isLocal)('Discord trivia under concurrency (real Postgres)', ()
       await expectLedgerConsistent(u)
     }, 60_000)
 
+    it('a re-pointed daily (attempts voided, member answers again) pays once: one ledger row, one reward row', async () => {
+      const daily = await L.web.getDailyRound()
+      const u = await seedUser(0)
+      await L.web.recordDailyAttempt(daily!.roundId!, u, true, 'x')
+      expect((await pay(daily!.roundId!, u)).status).toBe('paid')
+      await L.prisma.triviaAttempt.deleteMany({ where: { roundId: daily!.roundId } }) // what getDailyRound does on a re-point
+      await L.web.recordDailyAttempt(daily!.roundId!, u, true, 'y')
+      const again = await Promise.all(Array.from({ length: 5 }, () => pay(daily!.roundId!, u)))
+      expect(again.every((r: any) => r.status === 'already')).toBe(true)
+      expect(await wallet(u)).toBe(5)
+      expect(await dailyRows(u)).toHaveLength(1)
+      expect(await L.prisma.triviaDailyReward.count({ where: { discordId: u } })).toBe(1)
+      await expectLedgerConsistent(u)
+    }, 60_000)
+
     it('a wrong attempt, dry run and a 0 setting pay nothing', async () => {
       const daily = await L.web.getDailyRound()
       const wrong = await seedUser(0)

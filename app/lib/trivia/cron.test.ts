@@ -35,7 +35,7 @@ beforeEach(() => {
   vi.mocked(resolveTriviaChannel).mockReset();
   vi.mocked(resolveTriviaChannel).mockResolvedValue(CHAN);
   vi.mocked(triviaSettings).mockReset();
-  vi.mocked(triviaSettings).mockResolvedValue({ rewardPep: 20, dryRun: false, roundsPerDay: 3 });
+  vi.mocked(triviaSettings).mockResolvedValue({ rewardPep: 20, webDailyRewardPep: 0, dryRun: false, roundsPerDay: 3 });
   vi.mocked(expireRounds).mockClear();
   vi.mocked(findOpenRound).mockReset();
   vi.mocked(findOpenRound).mockResolvedValue(null);
@@ -96,7 +96,7 @@ describe("the tick", () => {
   });
 
   it("a dry run opens the round with no reward", async () => {
-    vi.mocked(triviaSettings).mockResolvedValue({ rewardPep: 20, dryRun: true, roundsPerDay: 3 });
+    vi.mocked(triviaSettings).mockResolvedValue({ rewardPep: 20, webDailyRewardPep: 0, dryRun: true, roundsPerDay: 3 });
     await runTriviaCron(DUE, post);
     expect(openDiscordRound).toHaveBeenCalledWith(expect.objectContaining({ rewardPep: 0 }), post);
   });
