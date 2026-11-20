@@ -36,6 +36,7 @@
 import { after, NextResponse } from "next/server";
 import { verifyDiscordRequest } from "@/app/lib/discord-interactions/verify";
 import { memberNamesByDiscordId } from "@/app/lib/member-names";
+import { resolvePfpUrlAsync } from "@/app/lib/pfp";
 import { handleInteraction, type HandlerDeps, type Interaction, type MetalheadJob, type ProgressJob } from "@/app/lib/discord-interactions/handle";
 import { liveCallChoices, metalheadEnabled, runMetalheadCommand } from "@/app/lib/call-updates/command";
 import { progressEnabled, runProgressCommand } from "@/app/lib/calls/progress-command";
@@ -381,9 +382,19 @@ const reminders: ReminderInteractionDeps = {
 };
 
 function deps(guildId: string | undefined, settings: Settings): HandlerDeps {
+  // One member lookup per request, shared by the name and PFP deps.
+  const memo = new Map<string, ReturnType<typeof memberNamesByDiscordId>>()
+  const lookupMember = async (id: string) => {
+    if (!memo.has(id)) memo.set(id, memberNamesByDiscordId([id]))
+    return (await memo.get(id)!).get(id)
+  }
   return {
     guildId,
-    memberName: async (id) => (await memberNamesByDiscordId([id])).get(id)?.name ?? null,
+    memberName: async (id) => (await lookupMember(id))?.name ?? null,
+    memberPfp: async (id) => {
+      const m = await lookupMember(id)
+      return m ? resolvePfpUrlAsync(m.memberId) : null
+    },
     currency: process.env.PEP_EMOJI?.trim() || "$PEP",
     getWallet,
     doWork,

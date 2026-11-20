@@ -129,6 +129,40 @@ describe('handleInteraction', () => {
     })
   })
 
+  describe('member website PFP in the author icon', () => {
+    const icon = async (d: HandlerDeps) => embed(await handleInteraction(cmd('work'), d))?.author?.icon_url
+
+    it('uses a composed https PFP and looks it up by Discord id', async () => {
+      const memberPfp = vi.fn(async () => 'https://cdn.example.com/composed/1.png')
+      expect(await icon(deps({ memberPfp }))).toBe('https://cdn.example.com/composed/1.png')
+      expect(memberPfp).toHaveBeenCalledWith(USER)
+    })
+
+    it('makes a site-relative static path absolute', async () => {
+      const got = await icon(deps({ memberPfp: async () => '/pfp/42.png' }))
+      expect(got).toMatch(/^https:\/\/.+\/pfp\/42\.png$/)
+    })
+
+    it('rejects non-https URLs', async () => {
+      expect(await icon(deps({ memberPfp: async () => 'http://example.com/a.png' }))).toMatch(/\/pfp\/default\.png$/)
+    })
+
+    it('keeps the default icon on timeout', async () => {
+      vi.useFakeTimers()
+      try {
+        const p = icon(deps({ memberPfp: () => new Promise<string | null>(() => {}) }))
+        await vi.advanceTimersByTimeAsync(400)
+        expect(await p).toMatch(/\/pfp\/default\.png$/)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('keeps the default icon on lookup error', async () => {
+      expect(await icon(deps({ memberPfp: async () => { throw new Error('db down') } }))).toMatch(/\/pfp\/default\.png$/)
+    })
+  })
+
   it('every reply is an embed authored by the invoking member', async () => {
     const r = await handleInteraction(cmd('work'), deps())
     expect(r.data?.content).toBeUndefined()
