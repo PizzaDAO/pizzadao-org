@@ -12,11 +12,11 @@ describe("share text", () => {
     expect(shareEmojiLine(true, null)).toBe("🍕✅");
   });
 
-  it("carries only the day, the emoji line and the link: never the question or the answer", () => {
+  it("carries only the day, the emoji line and the link: never the question or the answer", async () => {
     const v = shareValues({ dayKey: "2026-11-20", correct: true, streak: 3, url: "https://pizzadao.org/trivia" });
     expect(v).toEqual({ date: "2026-11-20", emojis: "🍕✅ 🔥3", url: "https://pizzadao.org/trivia" });
     const text = en.trivia.shareText.replace("{date}", v.date).replace("{emojis}", v.emojis).replace("{url}", v.url);
     expect(text.split("\n")).toEqual(["Pizza Trivia 2026-11-20", "🍕✅ 🔥3", "Play: https://pizzadao.org/trivia"]);
-    for (const q of getBank().questions.filter((x) => x.answer.length > 5)) expect(text.toLowerCase()).not.toContain(q.answer.toLowerCase());
+    for (const q of (await getBank()).questions.filter((x) => x.answer.length > 5)) expect(text.toLowerCase()).not.toContain(q.answer.toLowerCase());
   });
 });

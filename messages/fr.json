@@ -2995,14 +2995,12 @@
     "suggestInvalid_generic": "Vérifie le formulaire et réessaie.",
     "adminSuggestionsOverline": "Communauté",
     "adminSuggestionsTitle": "Questions proposées",
-    "adminSuggestionsHelp": "Les plus récentes en dernier. Copie l'extrait JSON dans data/trivia/questions.json via une PR (c'est un brouillon : signalé, avec une explication provisoire), puis marque la proposition comme ajoutée.",
+    "adminSuggestionsHelp": "Les plus anciennes d'abord. « Ajouter à la banque » crée une question brouillon à partir de la proposition (signalée, donc pas encore servie, avec une explication provisoire) et marque la proposition comme ajoutée : vérifie ensuite sa source, complète-la et approuve-la dans l'éditeur de la banque ci-dessus.",
     "adminSuggestionsEmpty": "Aucune proposition ouverte.",
     "adminAnswer": "Réponse",
     "adminSuggestionUnreadable": "Cette proposition est illisible.",
-    "adminCopySnippet": "Copier l'extrait JSON",
-    "adminCopied": "Copié.",
-    "adminCopyFailed": "Impossible de copier.",
-    "adminMarkAdded": "Marquer comme ajoutée",
+    "adminAddToBank": "Ajouter à la banque",
+    "adminAddedToBank": "Ajoutée à la banque sous {id}.",
     "adminDismiss": "Écarter",
     "adminSaveFailed": "Enregistrement impossible. Réessaie."
   }

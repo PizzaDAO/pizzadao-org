@@ -1,7 +1,26 @@
 // app/lib/trivia/schema.ts
 //
-// zod schema + types for the trivia question bank (data/trivia/questions.json). plans/trivia.md §3.1 and §4.2.
-// The bank is validated once at load (bank.ts) and again in CI (bank.test.ts).
+// zod schema + types for the trivia question bank. plans/trivia.md §3.1 and §4.2.
+//
+// The bank lives in the database (TriviaQuestion, one row per question, the object below in its `data` column), never
+// in git: the repo is public. Every write (admin editor, import script) and every read (bank.ts) validates with
+// QuestionSchema; approved questions must also pass lintQuestion (bank-lint.ts: answer and aliases match, rejects fail).
+//
+// Content rules (they were the header notes of the old data/trivia/questions.json):
+//  - Only status=approved is served. flagged / needs_snax / rejected entries stay in the bank as a record (so they are
+//    not re-added) and are never served.
+//  - `match.kind` picks the matcher (boolean | number | text | choice). For number questions `answer` is the canonical
+//    number; for choice questions it is the exact text of the correct choice.
+//  - `rejects` are near-misses that must never be accepted, even fuzzily.
+//  - Every non-rejected question has an explanation and at least one https source. Where sources disagree, say so and
+//    word the question around the disagreement.
+//  - Every approved question has a `pool`: "discord" (reserved for the Discord rounds, never served on the web) or "web"
+//    (practice + the web daily; also the only pool just-for-fun questions may use). A question keeps its pool forever:
+//    never re-derive it (the original split was per category, sorted by id, every 3rd question -> discord).
+//  - just-for-fun questions carry a `label` banner and are never in the discord pool.
+//  - `validUntil` retires a question at the end of that day (UTC); re-check it well before then.
+//  - One fact per question, with a source. No current prices or counts without a year. Never state a meme as fact
+//    (label it just-for-fun). No personal details beyond what the person made public.
 import { z } from "zod";
 
 export const CATEGORIES = [

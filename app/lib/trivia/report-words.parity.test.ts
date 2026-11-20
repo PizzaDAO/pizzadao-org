@@ -30,8 +30,8 @@ describe("report words: app and recorder agree", () => {
 
 describe("the pulled list schema covers the whole bank", () => {
   const schema = TRIVIA_SETTINGS["trivia.disabledQuestionIds"].schema;
-  it("takes every question id in the bank at once", () => {
-    const ids = getBank().questions.map((q) => q.id);
+  it("takes every question id in the bank at once", async () => {
+    const ids = (await getBank()).questions.map((q) => q.id);
     expect(ids.length).toBeLessThan(1000);
     expect(schema.safeParse(ids).success).toBe(true);
   });

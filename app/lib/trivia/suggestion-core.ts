@@ -1,8 +1,8 @@
 // app/lib/trivia/suggestion-core.ts
 //
 // Community question suggestions (plans/trivia.md section 10, phase 3), the pure half: validation of what a member typed
-// (Discord modal or web form) and the JSON snippet an admin pastes into data/trivia/questions.json. No database, no
-// network: suggestions.ts stores them as TriviaReport rows with kind = "suggestion".
+// (Discord modal or web form) and the draft bank entry "Add to bank" creates (suggestions.ts addSuggestionToBank). No
+// database, no network: suggestions.ts stores them as TriviaReport rows with kind = "suggestion".
 import { CATEGORIES, QuestionSchema, type TriviaCategory, type TriviaQuestion } from "./schema";
 
 export const SUGGEST_QUESTION_MIN = 8;
@@ -114,7 +114,7 @@ export function nextQuestionId(category: TriviaCategory, existingIds: Iterable<s
 export const DEFAULT_SUGGESTION_CATEGORY: TriviaCategory = "pizzadao";
 
 /**
- * A draft entry in the exact schema of data/trivia/questions.json. It is `status: "flagged"` (not served: a reviewer
+ * A draft entry in the exact bank schema (QuestionSchema). It is `status: "flagged"` (not served: a reviewer
  * checks the sources and flips it to approved with a pool, as plans/trivia.md section 10 says) and the fields a member
  * cannot know (difficulty, explanation) are placeholders to edit. The type and matcher are inferred from the answer.
  * Always parses with QuestionSchema (suggestion tests enforce it).
@@ -142,7 +142,7 @@ export function buildQuestionSnippet(s: SuggestionPayload, existingIds: Iterable
   return { ...base, ...label, type: "short_answer", answer: s.answer, aliases, match: { kind: "text", fuzzy: s.answer.length > 4 } };
 }
 
-/** The snippet as pretty JSON, ready to paste into the questions array. Throws if it would not pass the bank schema. */
+/** The draft as pretty JSON (the admin queue's preview). Throws if it would not pass the bank schema. */
 export function snippetJson(s: SuggestionPayload, existingIds: Iterable<string>, suggestionId?: number): string {
   const q = buildQuestionSnippet(s, existingIds, suggestionId);
   QuestionSchema.parse(q);

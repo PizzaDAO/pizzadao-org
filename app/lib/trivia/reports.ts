@@ -179,7 +179,7 @@ export const DISABLED_LIST_LOCK_NAMESPACE = 742019345;
  * changed. Unknown ids are refused.
  */
 export async function setQuestionDisabled(questionId: string, disabled: boolean, actor: string): Promise<boolean> {
-  if (!getQuestion(questionId)) throw new Error(`Unknown question ${questionId}`);
+  if (!(await getQuestion(questionId))) throw new Error(`Unknown question ${questionId}`);
   const changed = await prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(${DISABLED_LIST_LOCK_NAMESPACE}::int, hashtext(${SETTING}))`;
     const row = await tx.appSetting.findUnique({ where: { key: SETTING }, select: { value: true } });

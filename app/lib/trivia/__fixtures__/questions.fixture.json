@@ -1,0 +1,870 @@
+{
+  "version": 1,
+  "verifiedAt": "2026-01-01",
+  "notes": "MADE-UP test fixture (Fixture Town). Not the real bank: that lives in the TriviaQuestion table and is never committed.",
+  "questions": [
+    {
+      "id": "pd-901",
+      "category": "pizza-day",
+      "type": "short_answer",
+      "difficulty": "easy",
+      "question": "How many olives were on the record-setting Fixture Town pizza?",
+      "answer": "10000",
+      "aliases": [
+        "10,000",
+        "10k",
+        "ten thousand",
+        "10000 olives",
+        "10,000 olives"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "Made-up fixture fact: the answer is 10000.",
+      "sources": [
+        {
+          "url": "https://example.com/fixture-town",
+          "note": "Made-up test source"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "pd-903",
+      "category": "pizza-day",
+      "type": "true_false",
+      "difficulty": "easy",
+      "question": "Fixture Town's first pizzeria was built on the moon.",
+      "answer": "false",
+      "aliases": [],
+      "rejects": [],
+      "match": {
+        "kind": "boolean"
+      },
+      "explanation": "Made-up fixture fact: the answer is false.",
+      "sources": [
+        {
+          "url": "https://example.com/fixture-town",
+          "note": "Made-up test source"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "pd-904",
+      "category": "pizza-day",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "How many dollars did a slice cost at the first Fixture Town fair?",
+      "answer": "0.99",
+      "aliases": [
+        ".99",
+        "0.99 dollars"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "Made-up fixture fact: the answer is 0.99.",
+      "sources": [
+        {
+          "url": "https://example.com/fixture-town",
+          "note": "Made-up test source"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "pd-905",
+      "category": "pizza-day",
+      "type": "multiple_choice",
+      "difficulty": "easy",
+      "question": "Which shop baked the first Fixture Town deep dish?",
+      "answer": "Slice Shack's",
+      "aliases": [
+        "slice shacks",
+        "slice shack",
+        "slice shack's pizza"
+      ],
+      "rejects": [
+        "crust corners",
+        "crust corner's"
+      ],
+      "match": {
+        "kind": "choice"
+      },
+      "explanation": "Made-up fixture fact: the answer is Slice Shack's.",
+      "sources": [
+        {
+          "url": "https://example.com/fixture-town",
+          "note": "Made-up test source"
+        }
+      ],
+      "status": "approved",
+      "choices": [
+        "Crust Corner's",
+        "Slice Shack's",
+        "Oven Owls",
+        "Dough Dome"
+      ],
+      "pool": "web"
+    },
+    {
+      "id": "pd-906",
+      "category": "pizza-day",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "What is the name of the Fixture Town pizza festival?",
+      "answer": "Dough Day",
+      "aliases": [
+        "dough festival"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "text",
+        "fuzzy": true
+      },
+      "explanation": "Made-up fixture fact: the answer is Dough Day.",
+      "sources": [
+        {
+          "url": "https://example.com/fixture-town",
+          "note": "Made-up test source"
+        }
+      ],
+      "status": "approved",
+      "pool": "web",
+      "validUntil": "2099-12-31"
+    },
+    {
+      "id": "pr-901",
+      "category": "protocol",
+      "type": "short_answer",
+      "difficulty": "easy",
+      "question": "How many dollars does a Fixture Town oven license cost?",
+      "answer": "50",
+      "aliases": [
+        "fifty",
+        "50 dollars"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "Made-up fixture fact: the answer is 50.",
+      "sources": [
+        {
+          "url": "https://example.com/fixture-town",
+          "note": "Made-up test source"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "pr-904",
+      "category": "protocol",
+      "type": "short_answer",
+      "difficulty": "hard",
+      "question": "How many tons of flour does the Fixture Town mill grind per hour?",
+      "answer": "3.125",
+      "aliases": [
+        "3.125 tons"
+      ],
+      "rejects": [
+        "6.25"
+      ],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "Made-up fixture fact: the answer is 3.125.",
+      "sources": [
+        {
+          "url": "https://example.com/fixture-town",
+          "note": "Made-up test source"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "eb-904",
+      "category": "early-bitcoin",
+      "type": "short_answer",
+      "difficulty": "easy",
+      "question": "How many ovens did Fixture Town have in its first year?",
+      "answer": "9",
+      "aliases": [
+        "nine"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "Made-up fixture fact: the answer is 9.",
+      "sources": [
+        {
+          "url": "https://example.com/fixture-town",
+          "note": "Made-up test source"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "eb-913",
+      "category": "early-bitcoin",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "Who ran the first Fixture Town pizza cart?",
+      "answer": "Marla Crust",
+      "aliases": [
+        "marla",
+        "crust"
+      ],
+      "rejects": [
+        "mona",
+        "pete dough"
+      ],
+      "match": {
+        "kind": "text",
+        "fuzzy": true
+      },
+      "explanation": "Made-up fixture fact: the answer is Marla Crust.",
+      "sources": [
+        {
+          "url": "https://example.com/fixture-town",
+          "note": "Made-up test source"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "eb-920",
+      "category": "early-bitcoin",
+      "type": "short_answer",
+      "difficulty": "hard",
+      "question": "How many grains of salt has the Fixture Town bakery used, roughly?",
+      "answer": "273000000000",
+      "aliases": [
+        "273 billion",
+        "273,000,000,000",
+        "273b"
+      ],
+      "rejects": [
+        "27 million",
+        "136 billion"
+      ],
+      "match": {
+        "kind": "number",
+        "tolerance": 1000000000
+      },
+      "explanation": "Made-up fixture fact: the answer is 273000000000.",
+      "sources": [
+        {
+          "url": "https://example.com/fixture-town",
+          "note": "Made-up test source"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "eb-930",
+      "category": "satoshi",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "What did the Fixture Town baker sign his letters with?",
+      "answer": "a rolling pin",
+      "aliases": [
+        "rolling pin",
+        "pin"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "text",
+        "fuzzy": true
+      },
+      "explanation": "Made-up fixture fact: the answer is a rolling pin.",
+      "sources": [
+        {
+          "url": "https://example.com/fixture-town",
+          "note": "Made-up test source"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "mb-901",
+      "category": "myth-busting",
+      "type": "true_false",
+      "difficulty": "medium",
+      "question": "Fixture Town ovens are heated with wood.",
+      "answer": "true",
+      "aliases": [],
+      "rejects": [],
+      "match": {
+        "kind": "boolean"
+      },
+      "explanation": "Made-up fixture fact: the answer is true.",
+      "sources": [
+        {
+          "url": "https://example.com/fixture-town",
+          "note": "Made-up test source"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "pz-905",
+      "category": "pizzadao",
+      "type": "short_answer",
+      "difficulty": "easy",
+      "question": "What colour is the Fixture Town pizza flag?",
+      "answer": "Red",
+      "aliases": [
+        "crimson"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "text",
+        "fuzzy": false
+      },
+      "explanation": "Made-up fixture fact: the answer is Red.",
+      "sources": [
+        {
+          "url": "https://example.com/fixture-town",
+          "note": "Made-up test source"
+        }
+      ],
+      "status": "approved",
+      "pool": "web"
+    },
+    {
+      "id": "fun-901",
+      "category": "just-for-fun",
+      "type": "true_false",
+      "difficulty": "easy",
+      "question": "Fixture Town pizza is best eaten with a spoon.",
+      "answer": "false",
+      "aliases": [],
+      "rejects": [],
+      "match": {
+        "kind": "boolean"
+      },
+      "explanation": "Made-up fixture fact: the answer is false.",
+      "sources": [
+        {
+          "url": "https://example.com/fixture-town",
+          "note": "Made-up test source"
+        }
+      ],
+      "status": "approved",
+      "pool": "web",
+      "label": "Just for fun"
+    },
+    {
+      "id": "fun-902",
+      "category": "just-for-fun",
+      "type": "short_answer",
+      "difficulty": "easy",
+      "question": "Which topping combo won the Fixture Town spicy contest?",
+      "answer": "mango jalapeño",
+      "aliases": [
+        "mango jalapeno",
+        "mango and jalapeno",
+        "mango and jalapeño",
+        "mango & jalapeno",
+        "jalapeno mango",
+        "mango and jalapenos",
+        "mango jalapenos"
+      ],
+      "rejects": [
+        "mango",
+        "tropical"
+      ],
+      "match": {
+        "kind": "text",
+        "fuzzy": true
+      },
+      "explanation": "Made-up fixture fact: the answer is mango jalapeño.",
+      "sources": [
+        {
+          "url": "https://example.com/fixture-town",
+          "note": "Made-up test source"
+        }
+      ],
+      "status": "approved",
+      "pool": "web",
+      "label": "Just for fun"
+    },
+    {
+      "id": "pd-902",
+      "category": "pizza-day",
+      "type": "true_false",
+      "difficulty": "easy",
+      "question": "The Fixture Town oven is older than the town hall.",
+      "answer": "true",
+      "aliases": [],
+      "rejects": [],
+      "match": {
+        "kind": "boolean"
+      },
+      "explanation": "Made-up fixture fact: the answer is true.",
+      "sources": [
+        {
+          "url": "https://example.com/fixture-town",
+          "note": "Made-up test source"
+        }
+      ],
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "pd-909",
+      "category": "pizza-day",
+      "type": "short_answer",
+      "difficulty": "hard",
+      "question": "What number is painted on the Fixture Town oven door?",
+      "answer": "48121",
+      "aliases": [
+        "48,121",
+        "oven 48121"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "Made-up fixture fact: the answer is 48121.",
+      "sources": [
+        {
+          "url": "https://example.com/fixture-town",
+          "note": "Made-up test source"
+        }
+      ],
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "pd-910",
+      "category": "pizza-day",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "In what year did Fixture Town bake its first pizza?",
+      "answer": "1987",
+      "aliases": [],
+      "rejects": [],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "Made-up fixture fact: the answer is 1987.",
+      "sources": [
+        {
+          "url": "https://example.com/fixture-town",
+          "note": "Made-up test source"
+        }
+      ],
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "pd-915",
+      "category": "pizza-day",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "Which oven model does the Fixture Town bakery use?",
+      "answer": "Brick Oven Deluxe",
+      "aliases": [
+        "brick",
+        "brick oven",
+        "brick deluxe",
+        "deluxe"
+      ],
+      "rejects": [
+        "gas",
+        "electric"
+      ],
+      "match": {
+        "kind": "text",
+        "fuzzy": true
+      },
+      "explanation": "Made-up fixture fact: the answer is Brick Oven Deluxe.",
+      "sources": [
+        {
+          "url": "https://example.com/fixture-town",
+          "note": "Made-up test source"
+        }
+      ],
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "pr-909",
+      "category": "protocol",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "How many sesame seeds were counted at the Fixture Town bakery?",
+      "answer": "100000000",
+      "aliases": [
+        "100,000,000",
+        "100 million",
+        "100m",
+        "1e8",
+        "10^8"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "Made-up fixture fact: the answer is 100000000.",
+      "sources": [
+        {
+          "url": "https://example.com/fixture-town",
+          "note": "Made-up test source"
+        }
+      ],
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "eb-909",
+      "category": "early-bitcoin",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "Which newspaper printed the first Fixture Town pizza review?",
+      "answer": "The Gazette",
+      "aliases": [
+        "gazette",
+        "the gazette of fixture",
+        "gazette of fixture",
+        "fixture gazette"
+      ],
+      "rejects": [
+        "new york gazette",
+        "daily gazette",
+        "nyg",
+        "dg"
+      ],
+      "match": {
+        "kind": "text",
+        "fuzzy": true
+      },
+      "explanation": "Made-up fixture fact: the answer is The Gazette.",
+      "sources": [
+        {
+          "url": "https://example.com/fixture-town",
+          "note": "Made-up test source"
+        }
+      ],
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "eb-924",
+      "category": "early-bitcoin",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "Who opened the second Fixture Town pizzeria?",
+      "answer": "Rita Calzone",
+      "aliases": [
+        "calzone",
+        "rita"
+      ],
+      "rejects": [
+        "tony pepperoni",
+        "pepperoni"
+      ],
+      "match": {
+        "kind": "text",
+        "fuzzy": true
+      },
+      "explanation": "Made-up fixture fact: the answer is Rita Calzone.",
+      "sources": [
+        {
+          "url": "https://example.com/fixture-town",
+          "note": "Made-up test source"
+        }
+      ],
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "eb-927",
+      "category": "early-bitcoin",
+      "type": "multiple_choice",
+      "difficulty": "hard",
+      "question": "What share of Fixture Town orders are delivered?",
+      "answer": "Over 60%",
+      "aliases": [
+        "60",
+        "60%",
+        "over 60"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "choice"
+      },
+      "explanation": "Made-up fixture fact: the answer is Over 60%.",
+      "sources": [
+        {
+          "url": "https://example.com/fixture-town",
+          "note": "Made-up test source"
+        }
+      ],
+      "status": "approved",
+      "choices": [
+        "About 5%",
+        "About 25%",
+        "Over 60%",
+        "About 95%"
+      ],
+      "pool": "discord"
+    },
+    {
+      "id": "eb-933",
+      "category": "satoshi",
+      "type": "short_answer",
+      "difficulty": "hard",
+      "question": "What was the Fixture Town chef's email address?",
+      "answer": "chef@fixture.test",
+      "aliases": [
+        "chef at fixture.test",
+        "chef@fixture"
+      ],
+      "rejects": [
+        "cook@fixture.test"
+      ],
+      "match": {
+        "kind": "text",
+        "fuzzy": false
+      },
+      "explanation": "Made-up fixture fact: the answer is chef@fixture.test.",
+      "sources": [
+        {
+          "url": "https://example.com/fixture-town",
+          "note": "Made-up test source"
+        }
+      ],
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "jc-906",
+      "category": "jercos",
+      "type": "multiple_choice",
+      "difficulty": "medium",
+      "question": "How much did the Fixture Town pizza oven cost?",
+      "answer": "$120",
+      "aliases": [
+        "120",
+        "120 dollars"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "choice"
+      },
+      "explanation": "Made-up fixture fact: the answer is $120.",
+      "sources": [
+        {
+          "url": "https://example.com/fixture-town",
+          "note": "Made-up test source"
+        }
+      ],
+      "status": "approved",
+      "choices": [
+        "$12",
+        "$120",
+        "$12,000",
+        "$1.2 million"
+      ],
+      "pool": "discord"
+    },
+    {
+      "id": "pz-906",
+      "category": "pizzadao",
+      "type": "short_answer",
+      "difficulty": "easy",
+      "question": "What percent of Fixture Town votes did the pizza party win?",
+      "answer": "51",
+      "aliases": [
+        "51%",
+        "51 percent"
+      ],
+      "rejects": [
+        "49"
+      ],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "Made-up fixture fact: the answer is 51.",
+      "sources": [
+        {
+          "url": "https://example.com/fixture-town",
+          "note": "Made-up test source"
+        }
+      ],
+      "status": "approved",
+      "pool": "discord"
+    },
+    {
+      "id": "pz-910",
+      "category": "pizzadao",
+      "type": "multiple_choice",
+      "difficulty": "easy",
+      "question": "Which herb tops the Fixture Town special?",
+      "answer": "Basil",
+      "aliases": [
+        "sweet basil",
+        "basil leaves"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "choice"
+      },
+      "explanation": "Made-up fixture fact: the answer is Basil.",
+      "sources": [
+        {
+          "url": "https://example.com/fixture-town",
+          "note": "Made-up test source"
+        }
+      ],
+      "status": "approved",
+      "choices": [
+        "Basil",
+        "Oregano",
+        "Thyme",
+        "Parsley"
+      ],
+      "pool": "discord"
+    },
+    {
+      "id": "pz-916",
+      "category": "pizzadao",
+      "type": "multiple_choice",
+      "difficulty": "medium",
+      "question": "Where is the Fixture Town pizza baked?",
+      "answer": "Oven",
+      "aliases": [
+        "oven door"
+      ],
+      "rejects": [],
+      "match": {
+        "kind": "choice"
+      },
+      "explanation": "Made-up fixture fact: the answer is Oven.",
+      "sources": [
+        {
+          "url": "https://example.com/fixture-town",
+          "note": "Made-up test source"
+        }
+      ],
+      "status": "approved",
+      "choices": [
+        "Oven",
+        "Grill",
+        "Smoker",
+        "Fryer"
+      ],
+      "pool": "discord"
+    },
+    {
+      "id": "pz-908",
+      "category": "pizzadao",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "question": "How many members did the Fixture Town pizza club have?",
+      "answer": "42",
+      "aliases": [],
+      "rejects": [],
+      "match": {
+        "kind": "number",
+        "tolerance": 0
+      },
+      "explanation": "Made-up fixture fact: the answer is 42.",
+      "sources": [
+        {
+          "url": "https://example.com/fixture-town",
+          "note": "Made-up test source"
+        }
+      ],
+      "status": "flagged",
+      "notes": "Unverified count."
+    },
+    {
+      "id": "eb-935",
+      "category": "early-bitcoin",
+      "type": "true_false",
+      "difficulty": "medium",
+      "question": "The Fixture Town mill was built before the bakery.",
+      "answer": "true",
+      "aliases": [],
+      "rejects": [],
+      "match": {
+        "kind": "boolean"
+      },
+      "explanation": "Made-up fixture fact: the answer is true.",
+      "sources": [
+        {
+          "url": "https://example.com/fixture-town",
+          "note": "Made-up test source"
+        }
+      ],
+      "status": "needs_snax"
+    },
+    {
+      "id": "pd-912",
+      "category": "pizza-day",
+      "type": "true_false",
+      "difficulty": "easy",
+      "question": "The Fixture Town mayor baked every pizza himself.",
+      "answer": "false",
+      "aliases": [],
+      "rejects": [],
+      "match": {
+        "kind": "boolean"
+      },
+      "explanation": "Made-up fixture fact: the answer is false.",
+      "sources": [
+        {
+          "url": "https://example.com/fixture-town",
+          "note": "Made-up test source"
+        }
+      ],
+      "status": "rejected",
+      "rejectedReason": "Fixture 2026-01-01: strawman"
+    },
+    {
+      "id": "bt-900",
+      "category": "pizza-day",
+      "type": "short_answer",
+      "difficulty": "easy",
+      "question": "What was the original Fixture Town question?",
+      "answer": "nothing",
+      "aliases": [],
+      "rejects": [],
+      "match": {
+        "kind": "text",
+        "fuzzy": false
+      },
+      "explanation": "",
+      "sources": [],
+      "status": "rejected",
+      "rejectedReason": "Fixture 2026-01-01: replaced"
+    }
+  ]
+}

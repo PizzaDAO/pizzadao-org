@@ -143,15 +143,16 @@ describe("pickQuestion", () => {
     for (let i = 0; i < 30; i++) expect(pickQuestion([...fun, q("aa-001", "easy")], { recentIds: [] })?.id).toBe("aa-001");
   });
 
-  it("from the real discord pool: only discord, approved, never fun", () => {
-    const pool = servable({ pool: "discord" });
+  it("from the (fixture) discord pool: only discord, approved, never fun", async () => {
+    const pool = await servable({ pool: "discord" });
+    const all = (await getBank()).questions;
     expect(pool.length).toBeGreaterThan(0);
     for (let i = 0; i < 100; i++) {
       const p = pickQuestion(pool, { recentIds: [] })!;
       expect(p.pool).toBe("discord");
       expect(p.status).toBe("approved");
       expect(p.id.startsWith("fun-")).toBe(false);
-      expect(getBank().questions.find((x) => x.id === p.id)?.category).not.toBe("just-for-fun");
+      expect(all.find((x) => x.id === p.id)?.category).not.toBe("just-for-fun");
     }
   });
 });

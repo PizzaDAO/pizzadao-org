@@ -18,7 +18,7 @@ const MSG = "830000000000000005";
 const OLD_USER = "300000000000000000"; // created 2016
 const NEW_USER = String((BigInt(NOW.getTime() - 2 * 86_400_000 - 1420070400000) << BigInt(22))); // 2 days old
 
-const pool = servable({ pool: "discord" });
+const pool = await servable({ pool: "discord" });
 const tf = pool.find((q) => q.type === "true_false")!;
 const short = pool.find((q) => q.type === "short_answer" && q.match.kind === "text")!;
 const mc = pool.find((q) => q.type === "multiple_choice");

@@ -23,7 +23,7 @@ beforeEach(() => {
 describe("POST /api/admin/trivia", () => {
   it("a non-admin is refused before anything is read or written", async () => {
     vi.mocked(requireAdmin).mockResolvedValue({ ok: false, response: Response.json({ error: "Forbidden" }, { status: 403 }) } as never);
-    const res = await call({ action: "disable", questionId: "pd-004" });
+    const res = await call({ action: "disable", questionId: "pd-905" });
     expect(res.status).toBe(403);
     expect(setQuestionDisabled).not.toHaveBeenCalled();
   });
@@ -34,23 +34,23 @@ describe("POST /api/admin/trivia", () => {
   });
 
   it("disable writes the pulled list as the admin and closes the question's reports", async () => {
-    const res = await call({ action: "disable", questionId: "pd-004" });
+    const res = await call({ action: "disable", questionId: "pd-905" });
     expect(await res.json()).toEqual({ ok: true, changed: true, closed: 2 });
-    expect(setQuestionDisabled).toHaveBeenCalledWith("pd-004", true, "900000000000000001");
-    expect(closeReports).toHaveBeenCalledWith("pd-004");
+    expect(setQuestionDisabled).toHaveBeenCalledWith("pd-905", true, "900000000000000001");
+    expect(closeReports).toHaveBeenCalledWith("pd-905");
   });
 
   it("enable restores; dismiss only closes the reports", async () => {
-    await call({ action: "enable", questionId: "pd-004" });
-    expect(setQuestionDisabled).toHaveBeenCalledWith("pd-004", false, "900000000000000001");
+    await call({ action: "enable", questionId: "pd-905" });
+    expect(setQuestionDisabled).toHaveBeenCalledWith("pd-905", false, "900000000000000001");
     vi.mocked(setQuestionDisabled).mockClear();
-    expect(await (await call({ action: "dismiss", questionId: "pd-004" })).json()).toEqual({ ok: true, closed: 2 });
+    expect(await (await call({ action: "dismiss", questionId: "pd-905" })).json()).toEqual({ ok: true, closed: 2 });
     expect(setQuestionDisabled).not.toHaveBeenCalled();
   });
 
   it("an unknown question is a 404 and an unknown action a 400", async () => {
     expect((await call({ action: "disable", questionId: "zz-999" })).status).toBe(404);
-    expect((await call({ action: "explode", questionId: "pd-004" })).status).toBe(400);
+    expect((await call({ action: "explode", questionId: "pd-905" })).status).toBe(400);
     expect(setQuestionDisabled).not.toHaveBeenCalled();
   });
 });

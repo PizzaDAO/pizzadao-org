@@ -13,7 +13,7 @@
 import { prisma } from "@/app/lib/db";
 import { creditInTx, getOrCreateEconomy } from "@/app/lib/economy";
 import { DiscordPostError, postDiscordMessage, type DiscordMessageBody } from "@/app/lib/discord-rest";
-import { getQuestion, servable } from "./bank";
+import { filterServable, getBank, getQuestion } from "./bank";
 import { MAX_WINS_PER_USER_PER_DAY, RECENT_ROUNDS_LOOKBACK, ROUND_MINUTES, STALE_REVEAL_MINUTES } from "./config";
 import { dayStartMs } from "./daily";
 import { cancelledMessage, explanationMessage, questionMessage, revealMessage, winnerMessage } from "./post";
@@ -109,9 +109,15 @@ export async function openDiscordRound(opts: OpenOptions, deps: PostDeps = defau
   const now = opts.now ?? new Date();
   let question = opts.question;
   if (!question) {
-    const pool = servable({ now, pool: "discord", disabledIds: opts.disabledIds ?? (await getDisabledIds()) });
+    const bank = await getBank();
+    const pool = filterServable(bank.questions, { now, pool: "discord", disabledIds: opts.disabledIds ?? (await getDisabledIds()) });
+    if (pool.length === 0) {
+      // Never open (or pay for) a round without a question: an empty or unreachable bank is a skipped slot, not an error.
+      console.warn(`[trivia] no Discord round: ${bank.available ? (bank.questions.length === 0 ? "the question bank is empty" : "no servable discord question") : "the question bank is unavailable"}`);
+      return { ok: false, reason: "no_question" };
+    }
     const recent = await recentDiscordRounds();
-    question = pickQuestion(pool, { recentIds: recent.map((r) => r.questionId), rng: opts.rng }) ?? undefined;
+    question = pickQuestion(pool, { recentIds: recent.map((r) => r.questionId), rng: opts.rng, exposedIds: bank.exposedIds }) ?? undefined;
   }
   if (!question) return { ok: false, reason: "no_question" };
   const q = question;
@@ -293,7 +299,7 @@ export async function expireRounds(now: Date = new Date(), deps: PostDeps = defa
     const flipped = await prisma.triviaRound.updateMany({ where: { id: r.id, status: "OPEN", closesAt: { lte: now } }, data: { status: "EXPIRED" } });
     if (flipped.count !== 1) continue; // someone won it, or another run expired it
     expired++;
-    const q = getQuestion(r.questionId);
+    const q = await getQuestion(r.questionId);
     const fresh = now.getTime() - r.closesAt.getTime() <= STALE_REVEAL_MINUTES * 60_000;
     if (q && r.channelId && r.messageId && fresh) await safePost(deps, r.channelId, revealMessage(q), `reveal for round ${r.id}`);
   }
@@ -308,7 +314,7 @@ export async function announceWin(
 ): Promise<void> {
   if (!round.channelId) return;
   await safePost(deps, round.channelId, winnerMessage(win.discordId, win.rewardPep, win.paid, win.replyToId ?? win.messageId), `winner for round ${round.id}`);
-  const q = getQuestion(round.questionId);
+  const q = await getQuestion(round.questionId);
   if (q) await safePost(deps, round.channelId, explanationMessage(q), `explanation for round ${round.id}`);
 }
 

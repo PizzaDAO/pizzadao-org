@@ -2995,14 +2995,12 @@
     "suggestInvalid_generic": "Please check the form and try again.",
     "adminSuggestionsOverline": "Community",
     "adminSuggestionsTitle": "Suggested questions",
-    "adminSuggestionsHelp": "Newest last. Copy the JSON snippet into data/trivia/questions.json in a PR (it is a draft: flagged, with a placeholder explanation), then mark the suggestion added.",
+    "adminSuggestionsHelp": "Oldest first. \"Add to bank\" creates a draft question from the suggestion (flagged, so not served yet, with a placeholder explanation) and marks the suggestion added: then check its source, finish it and approve it in the bank editor above.",
     "adminSuggestionsEmpty": "No open suggestions.",
     "adminAnswer": "Answer",
     "adminSuggestionUnreadable": "This suggestion could not be read.",
-    "adminCopySnippet": "Copy JSON snippet",
-    "adminCopied": "Copied.",
-    "adminCopyFailed": "Could not copy.",
-    "adminMarkAdded": "Mark added",
+    "adminAddToBank": "Add to bank",
+    "adminAddedToBank": "Added to the bank as {id}.",
     "adminDismiss": "Dismiss",
     "adminSaveFailed": "Could not save. Try again."
   }

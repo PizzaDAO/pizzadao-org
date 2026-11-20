@@ -15,6 +15,7 @@ vi.mock("@/app/lib/db", () => {
       return row;
     },
     findMany: async ({ where }: { where: { kind: string; status: string } }) => db.rows.filter((r) => r.kind === where.kind && r.status === where.status).sort((a, b) => a.id - b.id),
+    findFirst: async ({ where }: { where: { id: number; kind: string; status: string } }) => db.rows.find((r) => r.id === where.id && r.kind === where.kind && r.status === where.status) ?? null,
     updateMany: async ({ where, data }: { where: { id: number; kind: string; status: string }; data: { status: string } }) => {
       const hit = db.rows.filter((r) => r.id === where.id && r.kind === where.kind && r.status === where.status);
       hit.forEach((r) => (r.status = data.status));
@@ -25,8 +26,10 @@ vi.mock("@/app/lib/db", () => {
   return { prisma: { triviaReport, $transaction: async (fn: (t: typeof tx) => unknown) => fn(tx) } };
 });
 
-import { closeSuggestion, openSuggestions, submitSuggestion, suggestionsRemaining } from "./suggestions";
+import { addSuggestionToBank, closeSuggestion, openSuggestions, submitSuggestion, suggestionsRemaining } from "./suggestions";
 import { SUGGESTIONS_PER_DAY } from "./suggestion-core";
+import { fakeBank } from "./__fixtures__/fake-bank-store";
+import { getQuestion, invalidateBank, servable } from "./bank";
 
 const NOW = new Date("2026-12-10T15:00:00Z");
 const input = (n = 0) => ({ question: `Which year did pizza question number ${n} happen?`, answer: "2010", source: "https://example.com/a" });
@@ -90,5 +93,42 @@ describe("the admin queue", () => {
     expect(db.rows[0].status).toBe("added");
     expect(await closeSuggestion(1, "dismissed")).toBe(false);
     expect(await openSuggestions()).toEqual([]);
+  });
+});
+
+describe("addSuggestionToBank (Add to bank)", () => {
+  beforeEach(() => {
+    fakeBank.reset();
+    invalidateBank();
+  });
+
+  it("creates a flagged draft with the next free id (not served), records the actor, and marks the suggestion added", async () => {
+    const s = await submitSuggestion("100000000000000001", { ...input(1), category: "pizza-day" }, NOW);
+    if (s.status !== "recorded") throw new Error("not recorded");
+    const out = await addSuggestionToBank(s.id, "900000000000000001");
+    expect(out).toEqual({ status: "added", questionId: "pd-916", existed: false }); // the fixture's pizza-day ids go up to pd-915
+    const row = fakeBank.rows.get("pd-916")!;
+    expect(row).toMatchObject({ status: "flagged", pool: null, exposed: false, updatedBy: "900000000000000001" });
+    expect((await getQuestion("pd-916"))!.notes).toContain(`#${s.id}`);
+    expect((await servable({ pool: "web" })).some((q) => q.id === "pd-916")).toBe(false);
+    expect(db.rows.find((r) => r.id === s.id)!.status).toBe("added");
+  });
+
+  it("is idempotent (a draft from this suggestion already exists: just closes it) and refuses a closed one", async () => {
+    const s = await submitSuggestion("100000000000000001", input(2), NOW);
+    if (s.status !== "recorded") throw new Error("not recorded");
+    const first = await addSuggestionToBank(s.id, "a");
+    db.rows.find((r) => r.id === s.id)!.status = "open"; // as if the close had failed
+    const again = await addSuggestionToBank(s.id, "a");
+    expect(again).toEqual({ status: "added", questionId: first.status === "added" ? first.questionId : "", existed: true });
+    expect(await addSuggestionToBank(s.id, "a")).toEqual({ status: "not_open" });
+    expect(await addSuggestionToBank(9999, "a")).toEqual({ status: "not_open" });
+  });
+
+  it("an unreadable payload is refused without touching the bank", async () => {
+    db.rows.push({ id: 50, kind: "suggestion", discordId: "1", text: "x", status: "open", questionId: "", payload: { question: "?" }, createdAt: NOW });
+    const before = fakeBank.rows.size;
+    expect(await addSuggestionToBank(50, "a")).toEqual({ status: "unreadable" });
+    expect(fakeBank.rows.size).toBe(before);
   });
 });

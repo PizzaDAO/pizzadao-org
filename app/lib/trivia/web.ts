@@ -11,8 +11,9 @@ import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
 import { triviaSettings } from "./channel";
 import { accountOldEnough, REQUIRE_MEMBER } from "./config";
 import { triviaLive } from "./enabled";
-import { getQuestion, servable } from "./bank";
-import { addDays, computeBestStreak, computeStreak, dailyQuestionFor, dayKeyUtc, nextDayStartMs } from "./daily";
+import { filterServable, getBank } from "./bank";
+import { addDays, computeBestStreak, computeStreak, dayKeyUtc, nextDayStartMs } from "./daily";
+import { pickDailyQuestion } from "./exposed";
 import { getDisabledIds } from "./reports";
 import type { TriviaQuestion } from "./schema";
 
@@ -31,19 +32,50 @@ export interface DailyRound {
  * question that is no longer served, so keeping them would make the reveal, "% got it right" and streak disagree with
  * the question on screen. Those members can answer the replacement and win the day back.
  */
-export async function getDailyRound(now: Date = new Date()): Promise<DailyRound | null> {
+/** Question ids of the web dailies before `dayKey`, newest first; cached per day (past days do not change). */
+let recentDailyCache: { dayKey: string; ids: string[] } | null = null;
+async function recentDailyIds(dayKey: string): Promise<string[]> {
+  if (recentDailyCache?.dayKey === dayKey) return recentDailyCache.ids;
+  try {
+    const rows: { questionId: string }[] = await prisma.triviaRound.findMany({
+      where: { surface: "WEB_DAILY", dayKey: { lt: dayKey } },
+      orderBy: { dayKey: "desc" },
+      take: 200,
+      select: { questionId: true },
+    });
+    const ids = rows.map((r) => r.questionId);
+    recentDailyCache = { dayKey, ids };
+    return ids;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The web pool for today and the question the day computes from it: the web pool minus pulled questions, preferring
+ * unexposed questions (exposed.ts pickDailyQuestion; the recent dailies are only read while exposed ones are left).
+ * `stillServable` ignores pulls: see getDailyRound.
+ */
+async function dailyContext(now: Date): Promise<{ dayKey: string; pool: TriviaQuestion[]; computed: TriviaQuestion | null; stillServable: TriviaQuestion[] }> {
   const dayKey = dayKeyUtc(now);
-  const pool = servable({ now, pool: "web", disabledIds: await getDisabledIds() });
-  const computed = dailyQuestionFor(dayKey, pool);
+  const bank = await getBank();
+  const pool = filterServable(bank.questions, { now, pool: "web", disabledIds: await getDisabledIds() });
+  const anyExposed = pool.some((q) => bank.exposedIds.has(q.id));
+  const computed = pickDailyQuestion(dayKey, pool, { exposedIds: bank.exposedIds, recentIds: anyExposed ? await recentDailyIds(dayKey) : [] });
+  return { dayKey, pool, computed, stillServable: filterServable(bank.questions, { now, pool: "web" }) };
+}
+
+export async function getDailyRound(now: Date = new Date()): Promise<DailyRound | null> {
   // Today's stored question stays valid even if it has been PULLED (disabled) since: a pull stops it being picked from
   // tomorrow, but never changes the question on screen mid-day or deletes anyone's answer and streak credit. Only a
   // question that is no longer servable at all (retired, expired, moved out of the web pool) is re-pointed.
-  const stillServable = servable({ now, pool: "web" });
+  // An empty or unreachable bank computes nothing and changes nothing: no round is stored or re-pointed (bank.ts logs it).
+  const { dayKey, computed, stillServable } = await dailyContext(now);
 
   try {
     const existing = await prisma.triviaRound.findUnique({ where: { dayKey } });
     if (existing) {
-      const stored = getQuestion(existing.questionId);
+      const stored = stillServable.find((q) => q.id === existing.questionId);
       if (stored && stillServable.some((q) => q.id === stored.id)) return { dayKey, question: stored, roundId: existing.id };
       if (!computed) return null;
       await prisma.$transaction([
@@ -74,9 +106,8 @@ export async function getDailyRound(now: Date = new Date()): Promise<DailyRound 
  * daily answer before a member's recorded attempt.
  */
 export async function practicePool(now: Date = new Date()): Promise<TriviaQuestion[]> {
-  const pool = servable({ now, pool: "web", disabledIds: await getDisabledIds() });
+  const { pool, computed } = await dailyContext(now);
   const daily = await getDailyRound(now);
-  const computed = dailyQuestionFor(dayKeyUtc(now), pool);
   const hidden = new Set([daily?.question.id, computed?.id].filter((x): x is string => !!x));
   return pool.filter((q) => !hidden.has(q.id));
 }

@@ -85,7 +85,7 @@ export async function processAnswer(input: AnswerInput, deps: AnswerDeps): Promi
     return { status: "ignored", why: "before_question" };
   }
 
-  const question = getQuestion(round.questionId);
+  const question = await getQuestion(round.questionId);
   if (!question) return { status: "ignored", why: "no_question" };
 
   // A retry of a message already recorded (the recorder retries after a 5xx) is answered from the store, before any
@@ -153,7 +153,7 @@ async function tryReplyReport(input: AnswerInput, replyTo: string, now: Date, de
   if (!deps.roundByPost || !deps.recordReport || !hasReportWord(input.content)) return null;
   const round = await deps.roundByPost(replyTo, now);
   if (!round) return null;
-  const question = getQuestion(round.questionId);
+  const question = await getQuestion(round.questionId);
   if (!question) return null;
   const open = round.status === "OPEN" && round.closesAt > now;
   if (open) {
@@ -215,7 +215,7 @@ export async function processReaction(input: ReactionInput, deps: AnswerDeps): P
   if (!round) return { status: "no_round" };
   if (!round.messageId || round.messageId !== input.messageId) return { status: "ignored", why: "not_current_message" };
 
-  const question = getQuestion(round.questionId);
+  const question = await getQuestion(round.questionId);
   if (!question) return { status: "ignored", why: "no_question" };
   const judged = judgeReaction(question, input.emoji);
   if (!judged) return { status: "ignored", why: "not_a_choice" };

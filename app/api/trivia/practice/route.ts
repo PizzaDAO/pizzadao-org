@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
 
   // Only a question that is currently served on the web can be checked: not a Discord one, not a held-back one.
   // Today's daily is not served by practice either: its answer must not be learnable before a recorded attempt.
-  const q = getQuestion(questionId);
+  const q = await getQuestion(questionId);
   if (!q || !(await practicePool()).some((s) => s.id === q.id)) return reply({ error: "Unknown question" }, 404);
 
   const { verdict } = match(q, answer);
