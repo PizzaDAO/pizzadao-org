@@ -3,7 +3,7 @@ import { addDays, categoryCounts, computeBestStreak, computeStreak, dailyQuestio
 import { servable } from "./bank";
 
 const NOW = new Date("2026-11-18T12:00:00Z");
-const pool = servable({ now: NOW, pool: "web" });
+const pool = await servable({ now: NOW, pool: "web" });
 
 describe("daily question", () => {
   it("is stable for a day and the same for everyone", () => {
@@ -23,8 +23,8 @@ describe("daily question", () => {
     expect(seen.size).toBe(pool.length);
   });
 
-  it("only ever picks from the pool it is given (never a Discord question)", () => {
-    const discordIds = new Set(servable({ now: NOW, pool: "discord" }).map((q) => q.id));
+  it("only ever picks from the pool it is given (never a Discord question)", async () => {
+    const discordIds = new Set((await servable({ now: NOW, pool: "discord" })).map((q) => q.id));
     let day = "2026-12-01";
     for (let i = 0; i < 200; i++) {
       expect(discordIds.has(dailyQuestionFor(day, pool)!.id)).toBe(false);

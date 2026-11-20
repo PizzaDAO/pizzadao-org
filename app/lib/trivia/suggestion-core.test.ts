@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, it, expect } from "vitest";
+import { beforeAll, describe, it, expect } from "vitest";
 import { getBank } from "./bank";
 import { QuestionSchema } from "./schema";
 import { buildQuestionSnippet, isHttpUrl, nextQuestionId, parseCategory, snippetJson, validateSuggestion, type SuggestionPayload } from "./suggestion-core";
@@ -63,8 +63,8 @@ describe("nextQuestionId", () => {
     expect(nextQuestionId("just-for-fun", ["fun-002"])).toBe("fun-003");
   });
 
-  it("is free in the real bank for every category", () => {
-    const ids = new Set(getBank().questions.map((q) => q.id));
+  it("is free in the (fixture) bank for every category", async () => {
+    const ids = new Set((await getBank()).questions.map((q) => q.id));
     for (const c of ["pizza-day", "jercos", "early-bitcoin", "satoshi", "protocol", "myth-busting", "pizzadao", "just-for-fun"] as const) {
       expect(ids.has(nextQuestionId(c, ids))).toBe(false);
     }
@@ -72,7 +72,10 @@ describe("nextQuestionId", () => {
 });
 
 describe("buildQuestionSnippet", () => {
-  const ids = getBank().questions.map((q) => q.id);
+  let ids: string[] = [];
+  beforeAll(async () => {
+    ids = (await getBank()).questions.map((q) => q.id);
+  });
 
   it("is a valid bank entry: flagged (not served), no pool, one https source", () => {
     const q = buildQuestionSnippet(payload(), ids, 7);

@@ -1,7 +1,7 @@
 # PizzaDAO Trivia: Discord bot + pizzadao.org/trivia + vetted question bank
 
 **Status:** decisions approved by Snax (2026-11-18, §13). Phase 1 merged (PR #410). Phase 2 (the Discord loop) implemented on branch `oregano-27514-trivia-discord` (task `oregano-27514`); phase 3 not started.
-**Question bank:** [`data/trivia/questions.json`](../data/trivia/questions.json) (moved from `plans/` in phase 1): 95 entries (90 approved, 4 flagged, 1 rejected), each with sources. `fun-002` was approved by Snax; each approved entry carries a `pool` (see §8.1).
+**Question bank:** the `TriviaQuestion` table (phase 4, §19). It used to be `data/trivia/questions.json` in this public repo, so every answer is in git history; it was removed from the repo, imported into the database with `scripts/trivia/import-bank.ts --exposed`, and is edited at `/admin/trivia`. At the move: 95 entries (89 approved, 4 flagged, 2 rejected), each with sources; each approved entry carries a `pool` (see §8.1).
 **Owner repo:** `PizzaDAO/pizzadao-org` (this repo). It serves `pizzadao.org` today (`app.pizzadao.org` 307s to the apex), runs the $PEP economy, the Discord HTTP-interactions bot and the Railway gateway worker (`recorder/`, "Metalhead").
 
 > Local checkout note: the local `main` is ~174 commits behind `origin/main`. The implementer must branch from `origin/main`.
@@ -33,7 +33,7 @@
 
 ## 3. Question bank
 
-### 3.1 Format (`data/trivia/questions.json`)
+### 3.1 Format (one `TriviaQuestion.data` object; schema in `app/lib/trivia/schema.ts`)
 
 ```jsonc
 {
@@ -143,7 +143,7 @@ That is 89 approved entries (90 with `fun-002`, approved by Snax), more than the
 ## 4. Architecture
 
 ```
-data/trivia/questions.json  ──(build-time import, zod-validated)──►  app/lib/trivia/bank.ts
+TriviaQuestion table  ──(60 s in-process cache, zod-validated per row)──►  app/lib/trivia/bank.ts
                                                                        │
  Vercel cron /api/cron/trivia ──► rounds.ts: pick question, open round ─┤──► postDiscordMessage (#trivia)
                                                                        │
@@ -208,7 +208,7 @@ model TriviaReport { id Int @id @default(autoincrement()); questionId String; di
 
 | File | Purpose |
 |---|---|
-| `data/trivia/questions.json` | Bank (moved from `plans/trivia-questions.json`) |
+| `TriviaQuestion` (DB) | Bank (was `data/trivia/questions.json`; see §19) |
 | `app/lib/trivia/schema.ts` | zod schema + types for the bank |
 | `app/lib/trivia/bank.ts` | Load + validate once; `servable(now, settings)` filters status/validUntil/disabled ids; `publicView(q)` strips `answer/aliases/rejects` |
 | `app/lib/trivia/match.ts` | Pure matcher (§5). No I/O |
@@ -401,14 +401,14 @@ Every approved question has an explicit `pool` field in the bank:
 
 ## 10. Moderation and adding questions
 
-- **Add or edit questions:** a PR to `data/trivia/questions.json`. CI (§11) enforces schema, unique ids, https sources, MC answer in choices, no `validUntil` in the past, and that aliases match / rejects fail.
+- **Add or edit questions:** the bank editor at `/admin/trivia` (never a PR: the repo is public). Every save enforces the schema, unique ids, https sources, MC answer in choices, and (for approved questions) that aliases match / rejects fail (`bank-lint.ts`).
   - New community questions arrive as `status: flagged` until a reviewer checks the sources and flips them to `approved`.
   - Suggested review: Snax or anyone with `ADMIN_ROLE_IDS`.
-- **Community suggestions** (phase 3): `/trivia suggest` modal and a web form → `TriviaReport` with `kind=suggestion`. `/admin/trivia` turns a suggestion into a JSON snippet to paste into a PR.
+- **Community suggestions** (phase 3): `/trivia suggest` modal and a web form → `TriviaReport` with `kind=suggestion`. `/admin/trivia` "Add to bank" turns a suggestion into a flagged draft row (then marks it added).
 - **Instant pull:** `/admin/trivia` "Disable" (writes `trivia.disabledQuestionIds`), or `/trivia skip` (admin): cancels the open round with no payout and posts "Round cancelled".
-- **Disputes:** an admin pays a missed correct answer by hand with the existing `/add-money` (logged), then fixes aliases in a PR.
+- **Disputes:** an admin pays a missed correct answer by hand with the existing `/add-money` (logged), then fixes aliases in the bank editor.
 - **Retirement:** `validUntil` plus a CI warning 60 days ahead. Before each GPP season (April), re-check every `pizzadao` and dated question.
-- **Content rules** (in the JSON header and `/admin/trivia` help):
+- **Content rules** (in the `app/lib/trivia/schema.ts` header):
   - One fact per question, with a source.
   - No current prices or counts without a year.
   - Never state a meme as fact; label it `just-for-fun`.
@@ -417,8 +417,8 @@ Every approved question has an explicit `pool` field in the bank:
 ## 11. Verification
 
 **Unit (vitest, `npm run test:run`):**
-- `match.test.ts`: table-driven from the bank (§5).
-- `bank.test.ts`: the schema validator over `data/trivia/questions.json`; servable filters; `publicView` never contains answer fields (deep key scan).
+- `match.test.ts`: table-driven from the made-up fixture bank (`app/lib/trivia/__fixtures__/questions.fixture.json`, §5).
+- `bank.test.ts`: the loader (cache, invalidation, outages) over the fixture; servable filters; `publicView` never contains answer fields (deep key scan).
 - `rounds.test.ts`:
   - Pick avoids repeats.
   - Windows are deterministic per date.
@@ -576,3 +576,40 @@ Snax answered a multiple-choice question by clicking a reaction in the first liv
 - **Recorder gating:** the state poll now also returns `recentMessageIds` (question posts of the last 7 days in the trivia channel). The recorder forwards a 🚩 on those posts even when no round is open, and replies to them (up to 300 characters, with `replyTo`) when a round is open (they may be guesses) or, outside a round, only when the reply contains a report word (a copy of the app's word list; a parity test keeps them equal); everything else keeps the open-round gating of §17. Flag and pick reactions travel the same per-channel queue.
 - **Admin:** `/admin/trivia` lists open reports grouped by question (count, distinct members, latest, sample texts), newest first, with one-click **Disable question** / **Restore** / **Dismiss reports** (`POST /api/admin/trivia`, admin only).
 - **Not built:** reports do not notify anyone; a pulled question that is the open round's keeps running (the round already posted it).
+
+## 19. Phase 4: the bank moves to the database (oregano-27514)
+
+**Why:** the repo is public and `data/trivia/questions.json` held every answer; the daily API exposes question ids and the
+schedule is predictable, so anyone could look up the answer to a paid Discord round or the web daily.
+
+- **Storage:** `TriviaQuestion` (`id` = the question id, `status` / `pool` / `category` indexed copies, `data` = the full
+  question object, validated with `QuestionSchema` on every write and read, `exposed`, `createdAt`, `updatedAt`, `updatedBy`).
+  Migration `20261230090000_trivia_question_bank` (additive).
+- **Loader (`bank.ts`):** in-process cache, 60 s TTL, invalidated by admin writes in the same instance. A row that fails the
+  schema is never served. Unreachable database: the last good copy is served; with none, the bank is empty. An empty bank
+  means no Discord round opens (`no_question`, logged) and the web daily answers 503: nothing is posted or paid.
+- **Exposed questions:** `exposed = true` = the answer is public: in git history (everything imported from the old file,
+  `--exposed`), or revealed since. A Discord round that closes (expired or won) is marked exposed automatically
+  (`updatedBy = system:revealed`); a web daily's question is marked once its day is over (when a later day's daily is
+  first read, before that day's pick), never during its own day, so today's computed pick never moves mid-day. The web daily and the Discord picker prefer unexposed
+  questions among the ones not used recently and fall back to exposed ones (logged) only when none is left.
+- **Practice serves exposed web questions only** (minus today's daily): it reveals the answer after any attempt, so an
+  unexposed question there would be an oracle for a future daily. With nothing exposed, practice is empty. It fails
+  closed: if today's daily round cannot be read (no round id), practice serves nothing and answers checks with a 503.
+- **Clearing exposed:** question ids are public and history maps id -> answer, so rewording the text keeps the flag. Only
+  an answer that is genuinely new (not the old answer, not an old alias, not accepted by the old matcher) clears it, or
+  the admin unticks it by hand.
+- **Today's daily and a partial bank:** if the stored daily question is missing from the bank (unavailable, mid-import, a
+  row failing the schema) the daily answers 503 and nothing is re-pointed or deleted (previews share the production
+  database). Only a question that exists and is genuinely not servable (retired, expired, moved pool) is re-pointed.
+- **Import:** `npx tsx scripts/trivia/import-bank.ts <file.json> [--apply] [--exposed] [--force] [--as-of <date>]`: dry run by
+  default; every entry is schema- and lint-checked (nothing is written if one fails); all writes in one transaction. A row
+  last written by anything but the import (an admin edit, a reveal) is skipped as "edited in admin", and a row updated
+  after `--as-of` (default the file's mtime) as "newer"; `--force` overwrites both. Output is ids, field paths and counts,
+  never text or answers.
+- **Editor:** `/admin/trivia` lists and filters the bank (status, pool, category, exposed), creates and edits questions (form
+  or raw JSON), approves / flags / retires, moves pools. API: `/api/admin/trivia/questions` (admin only, same-origin JSON).
+  Every update is guarded by the updatedAt of the row it read (409 if it changed). The open Discord round's answer,
+  aliases, rejects and matcher cannot change (409); the editor asks before changing today's web daily (a status or pool
+  change re-points it and deletes today's attempts) or the open round's question.
+- **Tests** run on a made-up fixture bank behind an in-memory store (`vitest.setup.ts` mocks `bank-store.ts`).

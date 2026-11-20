@@ -21,9 +21,9 @@ const USER = "300000000000000000";
 const YOUNG = String(BigInt(NOW.getTime() - 2 * 86_400_000 - 1420070400000) << BigInt(22));
 const FLAG = { id: null, name: FLAG_REACTION };
 
-const bank = getBank().questions.filter((q) => q.status === "approved");
+const bank = (await getBank()).questions.filter((q) => q.status === "approved");
 const tf = bank.find((q) => q.type === "true_false")!;
-const mc = bank.find((q) => q.id === "jc-006")!;
+const mc = bank.find((q) => q.id === "jc-906")!;
 const short = bank.find((q) => q.type === "short_answer" && q.match.kind === "text")!;
 
 let deferred: Array<() => Promise<void>>;
@@ -200,7 +200,7 @@ describe("replies to a question post", () => {
     });
 
     it("a reply that is the right answer is graded even if it contains a report word", async () => {
-      const num = bank.find((q) => q.id === "pd-001")!; // 10,000 bitcoins
+      const num = bank.find((q) => q.id === "pd-901")!; // 10,000 olives
       openRound(num);
       vi.mocked(claimWin).mockResolvedValue({ kind: "won", rewardPep: 20, paid: true });
       const out = await processAnswer(replyInput("bad guess maybe 10000", CURRENT), deps());

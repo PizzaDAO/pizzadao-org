@@ -22,7 +22,7 @@ const QMSG = "830000000000000000";
 const MSG = "830000000000000005";
 const USER = "300000000000000000";
 
-const bank = getBank().questions.filter((q) => q.status === "approved");
+const bank = (await getBank()).questions.filter((q) => q.status === "approved");
 const shortText = bank.find((q) => q.type === "short_answer" && q.match.kind === "text")!;
 const shortNum = bank.find((q) => q.type === "short_answer" && q.match.kind === "number")!;
 const tf = bank.find((q) => q.type === "true_false")!;

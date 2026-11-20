@@ -2,45 +2,39 @@
 
 // app/admin/trivia/SuggestionActions.tsx
 //
-// One-click actions on a community suggestion: copy its JSON snippet (a draft entry in the data/trivia/questions.json
-// schema, to paste into a PR), mark it added, or dismiss it. Labels come from the server page (already translated).
+// One-click actions on a community suggestion: "Add to bank" (creates its draft as a flagged bank row, then marks the
+// suggestion added) or dismiss it. Labels come from the server page (already translated).
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 export interface SuggestionActionLabels {
-  copy: string;
-  copied: string;
-  copyFailed: string;
-  added: string;
+  addToBank: string;
+  /** Contains "{id}". */
+  addedToBank: string;
   dismiss: string;
   failed: string;
 }
 
-export function SuggestionActions({ suggestionId, snippet, labels }: { suggestionId: number; snippet: string | null; labels: SuggestionActionLabels }) {
+export function SuggestionActions({ suggestionId, canAdd, labels }: { suggestionId: number; canAdd: boolean; labels: SuggestionActionLabels }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
-  const [note, setNote] = useState<"" | "copied" | "copyFailed" | "failed">("");
+  const [note, setNote] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
 
-  async function copy() {
-    if (!snippet) return;
-    try {
-      await navigator.clipboard.writeText(snippet);
-      setNote("copied");
-    } catch {
-      setNote("copyFailed");
-    }
-  }
-
-  async function close(action: "suggestion-added" | "suggestion-dismiss") {
+  async function act(action: "suggestion-add" | "suggestion-dismiss") {
     setBusy(true);
-    setNote("");
+    setNote(null);
     try {
       const res = await fetch("/api/admin/trivia", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, suggestionId }) });
-      if (!res.ok) throw new Error(String(res.status));
+      const body = (await res.json().catch(() => ({}))) as { questionId?: string; error?: string; errors?: string[] };
+      if (!res.ok) {
+        setNote({ kind: "error", text: [body.error ?? labels.failed, ...(body.errors ?? [])].join(" · ") });
+        return;
+      }
+      if (action === "suggestion-add" && body.questionId) setNote({ kind: "ok", text: labels.addedToBank.replace("{id}", body.questionId) });
       router.refresh();
     } catch {
-      setNote("failed");
+      setNote({ kind: "error", text: labels.failed });
     } finally {
       setBusy(false);
     }
@@ -50,18 +44,15 @@ export function SuggestionActions({ suggestionId, snippet, labels }: { suggestio
   const style = { borderColor: "hsl(var(--rule-warm) / 0.65)" };
   return (
     <span className="inline-flex flex-wrap items-center gap-2">
-      <button type="button" onClick={copy} disabled={!snippet} className={btn} style={style}>
-        {labels.copy}
+      <button type="button" onClick={() => act("suggestion-add")} disabled={busy || !canAdd} className={btn} style={style}>
+        {labels.addToBank}
       </button>
-      <button type="button" onClick={() => close("suggestion-added")} disabled={busy} className={btn} style={style}>
-        {labels.added}
-      </button>
-      <button type="button" onClick={() => close("suggestion-dismiss")} disabled={busy} className={btn} style={style}>
+      <button type="button" onClick={() => act("suggestion-dismiss")} disabled={busy} className={btn} style={style}>
         {labels.dismiss}
       </button>
       {note && (
-        <span role={note === "copied" ? "status" : "alert"} className={note === "copied" ? "text-sm" : "text-tomato text-sm"}>
-          {note === "copied" ? labels.copied : note === "copyFailed" ? labels.copyFailed : labels.failed}
+        <span role={note.kind === "ok" ? "status" : "alert"} className={note.kind === "ok" ? "text-sm" : "text-tomato text-sm"}>
+          {note.text}
         </span>
       )}
     </span>

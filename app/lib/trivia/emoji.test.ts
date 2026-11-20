@@ -6,8 +6,8 @@ import { CHOICE_EMOJI, CHOICE_FALLBACK, FLAG_REACTION, TF_REACTIONS, reactionAtt
 import { getBank } from "./bank";
 import type { TriviaQuestion } from "./schema";
 
-const bank = getBank().questions;
-const mc = bank.find((q) => q.id === "jc-006")!; // $400, 4 choices
+const bank = (await getBank()).questions;
+const mc = bank.find((q) => q.id === "jc-906")!; // $120, 4 choices
 const tf = bank.find((q) => q.type === "true_false" && q.status === "approved")!;
 const short = bank.find((q) => q.type === "short_answer" && q.status === "approved")!;
 const ALL = new Set(CHOICE_EMOJI.map((e) => e.id));

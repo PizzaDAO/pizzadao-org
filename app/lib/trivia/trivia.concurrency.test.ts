@@ -126,7 +126,7 @@ describe.skipIf(!isLocal)('Discord trivia under concurrency (real Postgres)', ()
     await L.prisma.$executeRawUnsafe(
       `CREATE UNIQUE INDEX IF NOT EXISTS "TriviaAttempt_web_once_per_round" ON "TriviaAttempt"("roundId", "discordId") WHERE "messageId" IS NULL`,
     )
-    tf = L.bank.servable({ pool: 'discord' }).find((q: any) => q.type === 'true_false')
+    tf = (await L.bank.servable({ pool: 'discord' })).find((q: any) => q.type === 'true_false')
     expect(tf).toBeTruthy()
   }, 60_000)
 
@@ -208,7 +208,7 @@ describe.skipIf(!isLocal)('Discord trivia under concurrency (real Postgres)', ()
 
   it('only discord-pool, approved, non-fun questions are ever opened', async () => {
     const channelId = chanId()
-    const ids = new Set(L.bank.servable({ pool: 'discord' }).map((q: any) => q.id))
+    const ids = new Set((await L.bank.servable({ pool: 'discord' })).map((q: any) => q.id))
     const seen = new Set<string>()
     for (let i = 0; i < 25; i++) {
       const r: any = await L.rounds.openDiscordRound({ channelId, rewardPep: 20 }, fakePosts().deps)
@@ -300,7 +300,7 @@ describe.skipIf(!isLocal)('Discord trivia under concurrency (real Postgres)', ()
 
     it('a recorder retry after a 5xx is a duplicate (never throttled, never recounted); the real 2 s throttle ignores a second fast answer', async () => {
       const channelId = chanId()
-      const short = L.bank.servable({ pool: 'discord' }).find((q: any) => q.type === 'short_answer' && q.match.kind === 'text')
+      const short = (await L.bank.servable({ pool: 'discord' })).find((q: any) => q.type === 'short_answer' && q.match.kind === 'text')
       const r: any = await L.rounds.openDiscordRound({ channelId, rewardPep: 20, question: short }, fakePosts().deps)
       expect(r.ok).toBe(true)
       const u = await seedUser(0)
@@ -417,8 +417,8 @@ describe.skipIf(!isLocal)('Discord trivia under concurrency (real Postgres)', ()
       removed.length = 0
     })
 
-    beforeAll(() => {
-      mcq = L.bank.servable({ pool: 'discord' }).find((q: any) => q.type === 'multiple_choice')
+    beforeAll(async () => {
+      mcq = (await L.bank.servable({ pool: 'discord' })).find((q: any) => q.type === 'multiple_choice')
       expect(mcq).toBeTruthy()
     })
 
@@ -576,10 +576,10 @@ describe.skipIf(!isLocal)('Discord trivia under concurrency (real Postgres)', ()
         L.settings.clearSettingsCache({ all: true })
       })
       const reportsFor = (qid: string) => L.prisma.triviaReport.findMany({ where: { questionId: qid } })
-      const shortPool = () => L.bank.servable({ pool: 'discord' }).filter((q: any) => q.type === 'short_answer')
+      const shortPool = async () => (await L.bank.servable({ pool: 'discord' })).filter((q: any) => q.type === 'short_answer')
 
       it('one report per member per question, even with 20 at once', async () => {
-        const qid = shortPool()[0].id
+        const qid = (await shortPool())[0].id
         const u = await seedUser(0)
         const results = await Promise.all(Array.from({ length: N }, () => L.reports.recordReport({ questionId: qid, discordId: u, text: 'x' })))
         expect(results.filter((r: any) => r.status === 'recorded')).toHaveLength(1)
@@ -590,7 +590,7 @@ describe.skipIf(!isLocal)('Discord trivia under concurrency (real Postgres)', ()
       it('3 different members within 7 days auto-pull the question (production only), logged and silent; the picker then skips it', async () => {
         process.env.VERCEL_ENV = 'production'
         const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-        const dpool = L.bank.servable({ pool: 'discord' })
+        const dpool = (await L.bank.servable({ pool: 'discord' }))
         const qid = dpool[dpool.length - 1].id
         const users = await Promise.all([seedUser(0), seedUser(0), seedUser(0)])
         const a = await L.reports.recordReport({ questionId: qid, discordId: users[0], text: 'bad' })
@@ -618,7 +618,7 @@ describe.skipIf(!isLocal)('Discord trivia under concurrency (real Postgres)', ()
 
       it('the auto-pull does nothing off production (previews share the database), and later reports do not pull twice', async () => {
         delete process.env.VERCEL_ENV
-        const qid = shortPool()[1].id
+        const qid = (await shortPool())[1].id
         const users = await Promise.all([seedUser(0), seedUser(0), seedUser(0)])
         for (const u of users) expect((await L.reports.recordReport({ questionId: qid, discordId: u, text: 'bad' })).status).toBe('recorded')
         expect(await L.reports.getDisabledIds()).not.toContain(qid)
@@ -632,7 +632,7 @@ describe.skipIf(!isLocal)('Discord trivia under concurrency (real Postgres)', ()
 
       it('reports older than 7 days do not count toward the pull', async () => {
         process.env.VERCEL_ENV = 'production'
-        const qid = shortPool()[2].id
+        const qid = (await shortPool())[2].id
         const old = new Date(Date.now() - 8 * 86_400_000)
         for (let i = 0; i < 3; i++) await L.prisma.triviaReport.create({ data: { questionId: qid, discordId: await seedUser(0), text: 'old', createdAt: old } })
         expect(await L.reports.getDisabledIds()).not.toContain(qid)
@@ -640,7 +640,7 @@ describe.skipIf(!isLocal)('Discord trivia under concurrency (real Postgres)', ()
       }, 60_000)
 
       it('concurrent disables of different questions lose none (guarded read-modify-write)', async () => {
-        const ids = shortPool().slice(0, 4).map((q: any) => q.id)
+        const ids = (await shortPool()).slice(0, 4).map((q: any) => q.id)
         await Promise.all(ids.map((id: string) => L.reports.setQuestionDisabled(id, true, 'tester')))
         const row = await L.prisma.appSetting.findUnique({ where: { key: KEY } })
         expect([...row.value].sort()).toEqual([...ids].sort())
@@ -649,7 +649,7 @@ describe.skipIf(!isLocal)('Discord trivia under concurrency (real Postgres)', ()
       }, 60_000)
 
       it('the web practice pool and daily honour the disabled list', async () => {
-        const web = L.bank.servable({ pool: 'web' })
+        const web = (await L.bank.servable({ pool: 'web' }))
         const target = web[0].id
         expect((await L.web.practicePool()).some((q: any) => q.id === target) || true).toBe(true)
         await L.reports.setQuestionDisabled(target, true, 'tester')
@@ -731,12 +731,13 @@ describe.skipIf(!isLocal)('Discord trivia under concurrency (real Postgres)', ()
           const repo = await import('../sheets/member-repository')
           vi.mocked(repo.fetchMemberIdByDiscordId).mockImplementation(async () => 'm1')
         })
-        const dpool = () => L.bank.servable({ pool: 'discord' })
+        // Newest ids first, so these questions are not the ones the earlier report tests used (shortPool, from the front).
+        const dpool = async () => [...(await L.bank.servable({ pool: 'discord' }))].reverse()
         const openCount = (qid: string) => L.prisma.triviaReport.count({ where: { questionId: qid, status: 'open' } })
 
         it('ineligible reports (non-members, young accounts) are stored as such and never count toward a pull, on the web path too', async () => {
           prodWarn()
-          const qid = dpool()[3].id
+          const qid = (await dpool())[3].id
           // three signed-in web users who are not onboarded members: no eligible flag passed, so it is computed here
           for (let i = 0; i < 3; i++) {
             const r = await rec({ questionId: qid, discordId: await seedUser(0), text: 'bad' })
@@ -758,7 +759,7 @@ describe.skipIf(!isLocal)('Discord trivia under concurrency (real Postgres)', ()
 
         it('handled reports never count: a dismiss or a restore is not undone by the old reports', async () => {
           prodWarn()
-          const qid = dpool()[4].id
+          const qid = (await dpool())[4].id
           const a = await eligibleUser()
           const b = await eligibleUser()
           await rec({ questionId: qid, discordId: a, text: 'bad' })
@@ -782,7 +783,7 @@ describe.skipIf(!isLocal)('Discord trivia under concurrency (real Postgres)', ()
         }, 120_000)
 
         it('one report per member per question per 7-day window; after a dismiss (or 7 days) the member can report again', async () => {
-          const qid = dpool()[5].id
+          const qid = (await dpool())[5].id
           const u = await eligibleUser()
           expect((await rec({ questionId: qid, discordId: u, text: 'first' })).status).toBe('recorded')
           expect(await rec({ questionId: qid, discordId: u, text: 'again' })).toEqual({ status: 'duplicate' })
@@ -795,7 +796,7 @@ describe.skipIf(!isLocal)('Discord trivia under concurrency (real Postgres)', ()
           expect((await rec({ questionId: qid, discordId: v, text: 'fresh' })).status).toBe('recorded')
           // 20 at once from one member: one row (an ineligible one counts as a report too)
           const w = await seedUser(0)
-          const qid2 = dpool()[6].id
+          const qid2 = (await dpool())[6].id
           const rs = await Promise.all(Array.from({ length: N }, () => rec({ questionId: qid2, discordId: w, text: 'x' })))
           expect(rs.filter((r: any) => r.status === 'recorded')).toHaveLength(1)
         }, 90_000)
@@ -816,7 +817,7 @@ describe.skipIf(!isLocal)('Discord trivia under concurrency (real Postgres)', ()
           // practice no longer serves it, and tomorrow's pick never is it
           expect((await L.web.practicePool()).some((q: any) => q.id === target)).toBe(false)
           const { dailyQuestionFor, addDays, dayKeyUtc } = await import('./daily')
-          const tomorrow = dailyQuestionFor(addDays(dayKeyUtc(), 1), L.bank.servable({ pool: 'web', disabledIds: [target] }))
+          const tomorrow = dailyQuestionFor(addDays(dayKeyUtc(), 1), (await L.bank.servable({ pool: 'web', disabledIds: [target] })))
           expect(tomorrow?.id).not.toBe(target)
           await L.reports.setQuestionDisabled(target, false, 'admin')
           L.settings.clearSettingsCache()
@@ -829,7 +830,7 @@ describe.skipIf(!isLocal)('Discord trivia under concurrency (real Postgres)', ()
 
   describe('wrong-attempt marks (real attempt counts)', () => {
     it('a short answer: a cross for the 1st and 2nd wrong try, cross + lock on the 3rd, nothing for a 4th; true/false stays silent', async () => {
-      const short = L.bank.servable({ pool: 'discord' }).find((q: any) => q.type === 'short_answer' && q.match.kind === 'text')
+      const short = (await L.bank.servable({ pool: 'discord' })).find((q: any) => q.type === 'short_answer' && q.match.kind === 'text')
       const channelId = chanId()
       const r: any = await L.rounds.openDiscordRound({ channelId, rewardPep: 20, question: short }, fakePosts().deps)
       const u = await seedUser(0)

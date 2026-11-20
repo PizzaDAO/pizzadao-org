@@ -1,14 +1,15 @@
 // Practice: GET up to 10 random questions (public view only); POST {questionId, answer} to check one.
 //
-// Practice draws from the *web* pool only, minus today's daily question, (questions reserved for Discord rounds are never served here), so the
-// reveal after an attempt cannot be used to farm Discord answers. GET never carries answer/aliases/rejects.
+// Practice draws from EXPOSED web questions only (their answers are public already), minus today's daily question:
+// questions reserved for Discord rounds and unexposed web questions (future dailies) are never served or checked here,
+// so the reveal after an attempt cannot be used to farm answers that pay. GET never carries answer/aliases/rejects.
 // Checks are server-side and rate limited (30/min per IP, and per member when signed in).
 import { NextRequest } from "next/server";
 import { getSession } from "@/app/lib/session";
 import { rejectUnsafeWrite } from "@/app/lib/admin-guard";
 import { checkKeyedRateLimit, enforceRateLimit, rateLimitResponse } from "@/app/lib/rate-limit";
 import { getQuestion, publicView, reveal } from "@/app/lib/trivia/bank";
-import { practicePool } from "@/app/lib/trivia/web";
+import { practicePoolOrNull } from "@/app/lib/trivia/web";
 import { categoryCounts, pickPractice } from "@/app/lib/trivia/daily";
 import { match } from "@/app/lib/trivia/match";
 import { CATEGORIES, type TriviaCategory } from "@/app/lib/trivia/schema";
@@ -21,7 +22,8 @@ export async function GET(request: NextRequest) {
   const limited = await enforceRateLimit(request, "trivia-read");
   if (limited) return withNoStore(limited);
 
-  const pool = await practicePool();
+  // Fails closed: when today's daily cannot be read, nothing is served (it is unknown which question to hide).
+  const pool = (await practicePoolOrNull()) ?? [];
   const raw = request.nextUrl.searchParams.get("category");
   const category = raw && (CATEGORIES as readonly string[]).includes(raw) ? (raw as TriviaCategory) : null;
   if (raw && raw !== "all" && !category) return reply({ error: "Unknown category" }, 400);
@@ -52,8 +54,11 @@ export async function POST(request: NextRequest) {
 
   // Only a question that is currently served on the web can be checked: not a Discord one, not a held-back one.
   // Today's daily is not served by practice either: its answer must not be learnable before a recorded attempt.
-  const q = getQuestion(questionId);
-  if (!q || !(await practicePool()).some((s) => s.id === q.id)) return reply({ error: "Unknown question" }, 404);
+  // Fails closed: if today's daily cannot be read, nothing is checked (no reveal can give today's answer away).
+  const pool = await practicePoolOrNull();
+  if (!pool) return reply({ error: "Practice is unavailable right now. Please try again later." }, 503);
+  const q = await getQuestion(questionId);
+  if (!q || !pool.some((s) => s.id === q.id)) return reply({ error: "Unknown question" }, 404);
 
   const { verdict } = match(q, answer);
   if (verdict === "ignore") return reply({ verdict: "ignore" });

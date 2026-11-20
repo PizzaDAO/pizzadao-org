@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     return reply({ error: `Tell us what is wrong (${REPORT_MIN} to ${REPORT_MAX} characters)` }, 400);
   }
   // Only a question the web actually serves can be reported (that is all anyone has seen).
-  if (!servable({ pool: "web" }).some((q) => q.id === questionId)) return reply({ error: "Unknown question" }, 404);
+  if (!(await servable({ pool: "web" })).some((q) => q.id === questionId)) return reply({ error: "Unknown question" }, 404);
 
   try {
     if (session?.discordId) {

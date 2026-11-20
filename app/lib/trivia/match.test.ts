@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
-import raw from "@/data/trivia/questions.json";
-import { BankSchema, type TriviaQuestion } from "./schema";
+// The matcher, against the MADE-UP fixture bank (the real bank is never committed). Each fixture question mirrors the
+// matcher settings of a real one (number with tolerance, choice with near-miss rejects, fuzzy text, exact text...).
+import raw from "./__fixtures__/questions.fixture.json";
+import { QuestionSchema, type TriviaQuestion } from "./schema";
 import { editDistance, fuzzyThreshold, match, parseNumbers, parseBoolean, parseChoiceLetter } from "./match";
 
-const bank = BankSchema.parse(raw);
+const bank = { questions: raw.questions.map((q) => QuestionSchema.parse(q)) };
 const byId = (id: string): TriviaQuestion => {
   const q = bank.questions.find((x) => x.id === id);
   if (!q) throw new Error(`no question ${id}`);
@@ -12,7 +14,7 @@ const byId = (id: string): TriviaQuestion => {
 const verdict = (id: string, input: string) => match(byId(id), input).verdict;
 const approved = bank.questions.filter((q) => q.status === "approved");
 
-describe("bank-driven: every approved question", () => {
+describe("bank-driven: every approved fixture question", () => {
   it.each(approved.map((q) => [q.id, q] as const))("%s: its answer and every alias match", (_id, q) => {
     const accepted = [q.answer, ...q.aliases];
     if (q.match.kind === "boolean") accepted.push(q.answer === "true" ? "yes" : "no");
@@ -41,8 +43,8 @@ describe("bank-driven: every approved question", () => {
 
 describe("boolean", () => {
   it("Volt's case: Trie and True both match true", () => {
-    expect(verdict("pd-007", "Trie")).toBe("correct");
-    expect(verdict("pd-007", "True")).toBe("correct");
+    expect(verdict("pd-902", "Trie")).toBe("correct");
+    expect(verdict("pd-902", "True")).toBe("correct");
   });
   it.each(["true", "TRUE", "t", "yes", "y", "yep", "yeah", "correct", "right", "✅", "\u{1F44D}", "ture", "trie", "it's true", "I think true", "**true**", "true!", "answer: true"])(
     "accepts %s as true",
@@ -52,11 +54,11 @@ describe("boolean", () => {
     expect(parseBoolean(s)).toBe(false),
   );
   it.each(["maybe", "lol", "hello there", "tr", "trash", "idk"])("%s is not an answer (ignore)", (s) => {
-    expect(verdict("pd-007", s)).toBe("ignore");
+    expect(verdict("pd-902", s)).toBe("ignore");
   });
   it("a wrong boolean is wrong, not ignored", () => {
-    expect(verdict("pd-012", "true")).toBe("wrong"); // pd-012 is false
-    expect(verdict("pd-012", "flase")).toBe("correct");
+    expect(verdict("pd-903", "true")).toBe("wrong"); // pd-903 is false
+    expect(verdict("pd-903", "flase")).toBe("correct");
   });
 });
 
@@ -66,71 +68,71 @@ describe("numbers", () => {
   });
   it("10.000 reads as ten thousand (and as 10: both readings are offered)", () => {
     expect(parseNumbers("10.000")[0]).toContain(10000);
-    expect(verdict("pd-001", "10.000")).toBe("correct");
+    expect(verdict("pd-901", "10.000")).toBe("correct");
   });
   it("0.99 is not 99", () => {
-    expect(verdict("pd-011", "0.99")).toBe("correct");
-    expect(verdict("pd-011", ".99")).toBe("correct");
-    expect(verdict("pd-011", "99")).toBe("wrong");
+    expect(verdict("pd-904", "0.99")).toBe("correct");
+    expect(verdict("pd-904", ".99")).toBe("correct");
+    expect(verdict("pd-904", "99")).toBe("wrong");
     expect(parseNumbers("0.99")[0]).toEqual([0.99]);
   });
-  it("3.125 is a decimal for the subsidy question", () => {
-    expect(verdict("pr-004", "3.125")).toBe("correct");
-    expect(verdict("pr-004", "6.25")).toBe("wrong");
+  it("3.125 is a decimal (the flour question)", () => {
+    expect(verdict("pr-904", "3.125")).toBe("correct");
+    expect(verdict("pr-904", "6.25")).toBe("wrong");
   });
   it("never fuzzy on digits", () => {
-    expect(verdict("pd-001", "9,800")).toBe("wrong");
-    expect(verdict("pd-001", "10001")).toBe("wrong");
-    expect(verdict("pd-009", "57044")).toBe("wrong");
+    expect(verdict("pd-901", "9,800")).toBe("wrong");
+    expect(verdict("pd-901", "10001")).toBe("wrong");
+    expect(verdict("pd-909", "48122")).toBe("wrong");
   });
   it("suffixes, words and exponents", () => {
-    expect(verdict("pd-001", "10k")).toBe("correct");
-    expect(verdict("pd-001", "ten thousand")).toBe("correct");
-    expect(verdict("pd-001", "10,000 BTC")).toBe("correct");
-    expect(verdict("pr-009", "1e8")).toBe("correct");
-    expect(verdict("pr-009", "10^8")).toBe("correct");
-    expect(verdict("pr-009", "one hundred million")).toBe("correct");
-    expect(verdict("pr-009", "100 million")).toBe("correct");
-    expect(verdict("eb-004", "nine")).toBe("correct");
-    expect(verdict("pr-001", "$50")).toBe("correct");
+    expect(verdict("pd-901", "10k")).toBe("correct");
+    expect(verdict("pd-901", "ten thousand")).toBe("correct");
+    expect(verdict("pd-901", "10,000 olives")).toBe("correct");
+    expect(verdict("pr-909", "1e8")).toBe("correct");
+    expect(verdict("pr-909", "10^8")).toBe("correct");
+    expect(verdict("pr-909", "one hundred million")).toBe("correct");
+    expect(verdict("pr-909", "100 million")).toBe("correct");
+    expect(verdict("eb-904", "nine")).toBe("correct");
+    expect(verdict("pr-901", "$50")).toBe("correct");
   });
-  it("184 billion passes eb-020 (tolerance), 21 million fails", () => {
-    expect(verdict("eb-020", "184 billion")).toBe("correct");
-    expect(verdict("eb-020", "184,467,440,737")).toBe("correct");
-    expect(verdict("eb-020", "92 billion")).toBe("wrong");
-    expect(verdict("eb-020", "21 million")).toBe("wrong");
+  it("273 billion passes eb-920 (tolerance), 27 million fails", () => {
+    expect(verdict("eb-920", "273 billion")).toBe("correct");
+    expect(verdict("eb-920", "273,400,000,000")).toBe("correct");
+    expect(verdict("eb-920", "136 billion")).toBe("wrong");
+    expect(verdict("eb-920", "27 million")).toBe("wrong");
   });
   it("no number, or several, is not an attempt", () => {
-    expect(verdict("pd-001", "no idea")).toBe("ignore");
-    expect(verdict("pd-001", "10000 or 20000")).toBe("ignore");
-    expect(verdict("pd-001", "lol")).toBe("ignore");
+    expect(verdict("pd-901", "no idea")).toBe("ignore");
+    expect(verdict("pd-901", "10000 or 20000")).toBe("ignore");
+    expect(verdict("pd-901", "lol")).toBe("ignore");
   });
   it("percent and dates", () => {
-    expect(verdict("pz-006", "51%")).toBe("correct");
-    expect(verdict("pz-006", "49")).toBe("wrong");
-    expect(verdict("pd-003", "2010")).toBe("correct");
-    expect(verdict("pd-003", "2011")).toBe("wrong");
+    expect(verdict("pz-906", "51%")).toBe("correct");
+    expect(verdict("pz-906", "49")).toBe("wrong");
+    expect(verdict("pd-910", "1987")).toBe("correct");
+    expect(verdict("pd-910", "1988")).toBe("wrong");
   });
 });
 
 describe("text", () => {
   it("rejects beat fuzzy and aliases", () => {
-    expect(verdict("pd-004", "domino's")).toBe("wrong");
-    expect(verdict("pd-004", "dominos")).toBe("wrong");
-    expect(verdict("pd-004", "Papa John's")).toBe("correct");
-    expect(verdict("pd-004", "papa johns")).toBe("correct");
+    expect(verdict("pd-905", "crust corner's")).toBe("wrong");
+    expect(verdict("pd-905", "crust corners")).toBe("wrong");
+    expect(verdict("pd-905", "Slice Shack's")).toBe("correct");
+    expect(verdict("pd-905", "slice shacks")).toBe("correct");
   });
   it("negation blocks containment", () => {
-    expect(verdict("eb-013", "not hal finney")).toBe("wrong");
+    expect(verdict("eb-913", "not marla crust")).toBe("wrong");
   });
-  it("plain pineapple does not count for fun-002, pineapple jalapeno does", () => {
-    expect(verdict("fun-002", "pineapple")).toBe("wrong");
-    expect(verdict("fun-002", "Pineapple Jalapeño")).toBe("correct");
-    expect(verdict("fun-002", "pineapple and jalapenos")).toBe("correct");
-    expect(verdict("fun-002", "pineappel jalapeno")).toBe("correct"); // typo, fuzzy
+  it("plain mango does not count for fun-902, mango jalapeno does", () => {
+    expect(verdict("fun-902", "mango")).toBe("wrong");
+    expect(verdict("fun-902", "Mango Jalapeño")).toBe("correct");
+    expect(verdict("fun-902", "mango and jalapenos")).toBe("correct");
+    expect(verdict("fun-902", "mango jalapneo")).toBe("correct"); // typo, fuzzy
   });
   it("a wrong text guess is wrong", () => {
-    expect(verdict("fun-002", "pepperoni")).toBe("wrong");
+    expect(verdict("fun-902", "pepperoni")).toBe("wrong");
   });
   it("fuzzy thresholds scale with length", () => {
     expect(fuzzyThreshold(4)).toBe(0);
@@ -141,7 +143,7 @@ describe("text", () => {
     expect(editDistance("kitten", "sitting")).toBe(3);
   });
   it("diacritics and markdown are ignored", () => {
-    expect(verdict("fun-002", "||PINEAPPLE jalapeño||")).toBe("correct");
+    expect(verdict("fun-902", "||MANGO jalapeño||")).toBe("correct");
   });
 });
 
@@ -156,17 +158,17 @@ describe("multiple choice", () => {
     expect(parseChoiceLetter("bob")).toBeNull();
   });
   it("chit-chat is not an attempt", () => {
-    expect(verdict("pd-004", "lol no idea")).toBe("ignore");
-    expect(verdict("pd-004", "e")).toBe("ignore");
+    expect(verdict("pd-905", "lol no idea")).toBe("ignore");
+    expect(verdict("pd-905", "e")).toBe("ignore");
   });
   it("naming another choice is wrong", () => {
-    expect(verdict("pd-004", "Pizza Hut")).toBe("wrong");
-    expect(verdict("pd-004", "papa johns pizza")).toBe("correct");
+    expect(verdict("pd-905", "Oven Owls")).toBe("wrong");
+    expect(verdict("pd-905", "slice shacks pizza")).toBe("correct");
   });
 });
 
 describe("pre-filter", () => {
-  const q = () => byId("pd-001");
+  const q = () => byId("pd-901");
   it("ignores long chat and answer dumps", () => {
     expect(match(q(), "x".repeat(81)).verdict).toBe("ignore");
     expect(match(q(), "10000 is it and many other words follow here ok").verdict).toBe("ignore");
@@ -204,55 +206,55 @@ describe("fuzz", () => {
   });
   it("survives hostile numeric strings", () => {
     for (const s of ["1e999999", "9".repeat(70), "1,,,,2", "....", ",,,", "1.2.3.4.5", "10^999", "- - -", "0x10"]) {
-      expect(() => match(byId("pd-001"), s)).not.toThrow();
+      expect(() => match(byId("pd-901"), s)).not.toThrow();
     }
   });
 });
 
 describe("lists of guesses never pass (review probes)", () => {
   it.each([
-    ["pz-016", "base ethereum polygon bitcoin"],
-    ["pz-016", "Base, Polygon"],
-    ["pz-010", "ethereum bitcoin solana base"],
-    ["jc-006", "$41 $400 $40,000"],
-    ["jc-006", "400 or 41"],
-    ["eb-027", "10 30 70 99"],
-    ["eb-027", "under 70%"],
-    ["pd-015", "windows mac linux"],
-    ["pd-015", "mac or windows"],
-    ["eb-009", "nyt ft the times"],
-    ["eb-009", "times of india"],
-    ["eb-024", "hal finney jed mccaleb gavin"],
-    ["eb-033", "satoshin@gmx.de"],
-    ["eb-033", "satoshin@gmx.com.evil"],
+    ["pz-916", "oven grill smoker fryer"],
+    ["pz-916", "Oven, Smoker"],
+    ["pz-910", "basil oregano thyme parsley"],
+    ["jc-906", "$12 $120 $12,000"],
+    ["jc-906", "120 or 12"],
+    ["eb-927", "5 25 60 95"],
+    ["eb-927", "under 60%"],
+    ["pd-915", "gas brick electric"],
+    ["pd-915", "brick or gas"],
+    ["eb-909", "nyg dg the gazette"],
+    ["eb-909", "gazette of india"],
+    ["eb-924", "marla crust rita calzone tony"],
+    ["eb-933", "chef@fixture.de"],
+    ["eb-933", "chef@fixture.test.evil"],
   ])("%s: %s is not correct", (id, input) => {
     expect(verdict(id, input)).toBe("wrong");
   });
 
   it.each([
-    ["jc-006", "it's $400"],
-    ["jc-006", "I think $400"],
-    ["pz-010", "the answer is ethereum"],
-    ["pz-010", "ethereum!"],
-    ["pz-016", "Base mainnet"],
-    ["eb-027", "over 70"],
-    ["pd-015", "it's mac os x"],
-    ["pd-015", "the mac"],
-    ["eb-009", "the times of london"],
-    ["eb-009", "The Times!"],
-    ["eb-024", "mccaleb jed"],
-    ["eb-024", "it was jed mccaleb"],
-    ["pd-004", "I think papa johns"],
-    ["eb-033", "satoshin@gmx.com"],
-    ["fun-002", "i think pineapple and jalapeno"],
+    ["jc-906", "it's $120"],
+    ["jc-906", "I think $120"],
+    ["pz-910", "the answer is basil"],
+    ["pz-910", "basil!"],
+    ["pz-916", "Oven door"],
+    ["eb-927", "over 60"],
+    ["pd-915", "it's brick oven deluxe"],
+    ["pd-915", "the brick"],
+    ["eb-909", "the gazette of fixture"],
+    ["eb-909", "The Gazette!"],
+    ["eb-924", "calzone rita"],
+    ["eb-924", "it was rita calzone"],
+    ["pd-905", "I think slice shacks"],
+    ["eb-933", "chef@fixture.test"],
+    ["fun-902", "i think mango and jalapeno"],
   ])("%s: %s still passes", (id, input) => {
     expect(verdict(id, input)).toBe("correct");
   });
 
   it("the answer is true / articles / typos still work", () => {
-    expect(verdict("pd-007", "the answer is true")).toBe("correct");
-    expect(verdict("pd-004", "papa jons")).toBe("correct"); // one typo
-    expect(verdict("eb-009", "a times")).toBe("correct");
+    expect(verdict("pd-902", "the answer is true")).toBe("correct");
+    expect(verdict("pd-905", "slice shaks")).toBe("correct"); // one typo
+    expect(verdict("eb-909", "a gazette")).toBe("correct");
   });
 });
 
@@ -279,16 +281,16 @@ describe("strict booleans (Discord rounds)", () => {
 });
 
 describe("text answers: chat sentences are ignored, short misses are wrong attempts", () => {
-  const q = { answer: "Laszlo Hanyecz", aliases: ["Laszlo"], rejects: [], match: { kind: "text" as const, fuzzy: true }, choices: undefined };
+  const q = { answer: "Marla Crust", aliases: ["Marla"], rejects: [], match: { kind: "text" as const, fuzzy: true }, choices: undefined };
   it("a long sentence that matches nothing is not an attempt", () => {
     expect(match(q, "hey everyone how is the call going today friends").verdict).toBe("ignore");
     expect(match(q, "does anyone know when the next call starts tonight").verdict).toBe("ignore");
   });
   it("a short wrong guess is still an attempt", () => {
-    expect(match(q, "Hal Finney").verdict).toBe("wrong");
-    expect(match(q, "satoshi").verdict).toBe("wrong");
+    expect(match(q, "Rita Calzone").verdict).toBe("wrong");
+    expect(match(q, "tony").verdict).toBe("wrong");
   });
   it("a correct answer inside a longer sentence still counts", () => {
-    expect(match(q, "i think it was laszlo hanyecz").verdict).toBe("correct");
+    expect(match(q, "i think it was marla crust").verdict).toBe("correct");
   });
 });

@@ -19,8 +19,8 @@ const USER = "300000000000000000";
 const NEW_USER = String(BigInt(NOW.getTime() - 2 * 86_400_000 - 1420070400000) << BigInt(22));
 const KEY = reactionAttemptKey(QMSG, USER);
 
-const bank = getBank().questions;
-const mc = bank.find((q) => q.id === "jc-006")!;
+const bank = (await getBank()).questions;
+const mc = bank.find((q) => q.id === "jc-906")!;
 const tf = bank.find((q) => q.type === "true_false" && q.status === "approved")!;
 const short = bank.find((q) => q.type === "short_answer" && q.status === "approved")!;
 const rightIdx = mc.choices!.indexOf(mc.answer);

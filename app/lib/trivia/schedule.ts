@@ -8,6 +8,7 @@
 // already fired (a round was opened at or after it), so a missed 5-minute tick is caught up by the next one.
 import { SLOT_CATCH_UP_MINUTES, WINDOWS_UTC, DIFFICULTY_WEIGHTS } from "./config";
 import { dayStartMs, hash32 } from "./daily";
+import { preferUnexposed } from "./exposed";
 import type { TriviaQuestion } from "./schema";
 
 const MIN_MS = 60_000;
@@ -71,19 +72,23 @@ export interface PickOptions {
   /** Question ids used in recent Discord rounds, newest first. */
   recentIds: readonly string[];
   rng?: () => number;
+  /** Exposed question ids (see exposed.ts): only picked when no unexposed candidate is left. */
+  exposedIds?: ReadonlySet<string>;
 }
 
 /**
  * Random question from the (already filtered: discord pool, approved, not disabled) pool: avoids the last
  * floor(pool x 0.8) ids, weighted 40% easy, 45% medium, 15% hard. fun-* / just-for-fun questions are never
- * picked here, whatever the pool says (they are web only; the schema enforces it too).
+ * picked here, whatever the pool says (they are web only; the schema enforces it too). Among the candidates (not
+ * recent), unexposed questions are preferred: an exposed one is picked only when no unexposed candidate is left.
  */
-export function pickQuestion(pool: readonly TriviaQuestion[], { recentIds, rng = Math.random }: PickOptions): TriviaQuestion | null {
+export function pickQuestion(pool: readonly TriviaQuestion[], { recentIds, rng = Math.random, exposedIds }: PickOptions): TriviaQuestion | null {
   const paid = pool.filter((q) => !q.id.startsWith("fun-") && q.category !== "just-for-fun");
   if (paid.length === 0) return null;
   const avoid = new Set(recentIds.slice(0, Math.floor(paid.length * 0.8)));
   let candidates = paid.filter((q) => !avoid.has(q.id));
   if (candidates.length === 0) candidates = [...paid]; // tiny pool: repeats beat silence
+  if (exposedIds) candidates = preferUnexposed(candidates, exposedIds, "the Discord round");
   const present = (Object.keys(DIFFICULTY_WEIGHTS) as (keyof typeof DIFFICULTY_WEIGHTS)[]).filter((d) => candidates.some((q) => q.difficulty === d));
   const total = present.reduce((sum, d) => sum + DIFFICULTY_WEIGHTS[d], 0);
   let roll = rng() * total;

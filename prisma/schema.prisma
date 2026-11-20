@@ -3411,7 +3411,29 @@ model MemberRsvCheck {
   checkedAt DateTime
 }
 
-// Trivia (plans/trivia.md). Questions live in data/trivia/questions.json; these tables hold runtime state only.
+// Trivia (plans/trivia.md). The question bank is TriviaQuestion (edited at /admin/trivia, never in git: the repo is
+// public); the other tables hold runtime state.
+
+// One bank question. `data` is the full question object (app/lib/trivia/schema.ts QuestionSchema, validated on every
+// write and read); status / pool / category are copies of its fields, for filtering. `exposed` = its text and answer
+// are in public git history (the bank used to be data/trivia/questions.json): the picker avoids it for the daily and
+// Discord rounds while unexposed questions are left, and editing the question or answer clears it.
+model TriviaQuestion {
+  id        String   @id
+  status    String   @db.VarChar(16)
+  pool      String?  @db.VarChar(16)
+  category  String   @db.VarChar(32)
+  data      Json
+  exposed   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+
+  @@index([status])
+  @@index([pool])
+  @@index([category])
+}
+
 enum TriviaRoundStatus {
   OPEN
   WON

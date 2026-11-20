@@ -4,7 +4,7 @@
  * the web/Discord pool split, rate limits and report validation. The database is an in-memory fake; the rate
  * limiter is the real one (in-memory fallback, since no Upstash env is set in tests).
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 const session = vi.hoisted(() => ({ value: null as null | { discordId: string } }));
@@ -87,7 +87,9 @@ vi.mock("@/app/lib/db", () => ({
 import { GET as dailyGET, POST as dailyPOST } from "./daily/route";
 import { GET as practiceGET, POST as practicePOST } from "./practice/route";
 import { POST as reportPOST } from "./report/route";
-import { getBank, servable } from "@/app/lib/trivia/bank";
+import { getBank, invalidateBank, servable } from "@/app/lib/trivia/bank";
+import { fakeBank } from "@/app/lib/trivia/__fixtures__/fake-bank-store";
+import type { TriviaQuestion } from "@/app/lib/trivia/schema";
 import { dailyQuestionFor, dayKeyUtc } from "@/app/lib/trivia/daily";
 
 let ipCounter = 0;
@@ -113,22 +115,30 @@ function keysDeep(v: unknown, out = new Set<string>()): Set<string> {
 }
 
 /** A clearly wrong but well-formed answer for any kind of question. */
-function wrongFor(q: ReturnType<typeof getBank>["questions"][number]): string {
+function wrongFor(q: TriviaQuestion): string {
   if (q.match.kind === "boolean") return q.answer === "true" ? "false" : "true";
   if (q.match.kind === "number") return String(Number(q.answer) + 7);
   if (q.match.kind === "choice") return q.choices!.find((c) => c !== q.answer)!;
   return "zzzz nothing";
 }
 
-const webPool = () => servable({ pool: "web" });
+// The (fixture) pools, read once: no test here changes the bank except the empty-bank ones, which restore it.
+const WEB = await servable({ pool: "web" });
+const DISCORD = await servable({ pool: "discord" });
+const webPool = () => WEB;
 /** The body a client sends for today's daily. */
 const dailyBody = (answer: string, over: Record<string, unknown> = {}) => {
-  const q = dailyQuestionFor(dayKeyUtc(), servable({ pool: "web" }))!;
+  const q = dailyQuestionFor(dayKeyUtc(), WEB)!;
   return { answer, dayKey: dayKeyUtc(), questionId: q.id, ...over };
 };
-const discordPool = () => servable({ pool: "discord" });
+const discordPool = () => DISCORD;
 
 beforeEach(() => {
+  // Every fixture question exposed (as after the import of the old public bank): practice serves exposed questions only,
+  // and with all of them exposed the daily is the plain hash pick (and serving it as the daily changes nothing).
+  fakeBank.reset();
+  fakeBank.setExposed([...fakeBank.rows.keys()]);
+  invalidateBank();
   session.value = null;
   db.rounds.length = 0;
   db.attempts = [];
@@ -162,7 +172,7 @@ describe("practice", () => {
   });
 
   it("never serves today's daily question: not in GET, and POST gives 404 (no answer lookup before a recorded attempt)", async () => {
-    const daily = dailyQuestionFor(dayKeyUtc(), servable({ pool: "web" }))!;
+    const daily = dailyQuestionFor(dayKeyUtc(), WEB)!;
     for (let i = 0; i < 40; i++) {
       const body = await (await practiceGET(req("/api/trivia/practice"))).json();
       expect(body.questions.some((q: { id: string }) => q.id === daily.id)).toBe(false);
@@ -172,12 +182,15 @@ describe("practice", () => {
     expect(JSON.stringify(await res.json())).not.toContain(daily.explanation.slice(0, 20));
   });
 
-  it("practice keeps working with the tables down and still hides the computed daily", async () => {
+  it("fails closed with the tables down: today's daily is unknown, so nothing is served or checked", async () => {
     db.down = true;
-    const daily = dailyQuestionFor(dayKeyUtc(), servable({ pool: "web" }))!;
-    const body = await (await practiceGET(req("/api/trivia/practice"))).json();
-    expect(body.questions.length).toBe(10);
-    expect(body.questions.some((q: { id: string }) => q.id === daily.id)).toBe(false);
+    const res = await practiceGET(req("/api/trivia/practice"));
+    expect(res.status).toBe(200);
+    expect((await res.json()).questions).toEqual([]);
+    const q = WEB.find((x) => x.id !== dailyQuestionFor(dayKeyUtc(), WEB)!.id)!;
+    const post = await practicePOST(req("/api/trivia/practice", { method: "POST", body: { questionId: q.id, answer: q.answer } }));
+    expect(post.status).toBe(503);
+    expect(JSON.stringify(await post.json())).not.toContain("reveal");
   });
 
   it("never serves a Discord-pool question, even across many draws", async () => {
@@ -210,7 +223,7 @@ describe("practice", () => {
   });
 
   it("POST: refuses a Discord-pool, held-back or unknown question (404), and bad bodies (400)", async () => {
-    for (const id of [discordPool()[0].id, "pz-008", "eb-035", "bt-000", "nope-999"]) {
+    for (const id of [discordPool()[0].id, "pz-908", "eb-935", "bt-900", "nope-999"]) {
       const res = await practicePOST(req("/api/trivia/practice", { method: "POST", body: { questionId: id, answer: "x" } }));
       expect(res.status, id).toBe(404);
     }
@@ -396,7 +409,7 @@ describe("daily", () => {
   });
 
   it("a question pulled mid-day: the round is re-pointed at the replacement and the old answers are voided", async () => {
-    const pulled = servable({ pool: "discord" })[0]; // not in the web pool, like a disabled question
+    const pulled = DISCORD[0]; // not in the web pool, like a disabled question
     db.rounds.push({ id: 1, dayKey: dayKeyUtc(), questionId: pulled.id, surface: "WEB_DAILY" });
     db.attempts.push({ roundId: 1, discordId: "777", messageId: null, correct: true, answerText: "x" });
     const body = await (await dailyGET(req("/api/trivia/daily"))).json();
@@ -435,7 +448,7 @@ describe("report", () => {
     expect((await post({ questionId: q.id, text: "y".repeat(501) })).status).toBe(400);
     expect((await post({ questionId: "nope-1", text: "something is off" })).status).toBe(404);
     expect((await post({ questionId: discordPool()[0].id, text: "something is off" })).status).toBe(404);
-    expect((await post({ questionId: "pz-008", text: "something is off" })).status).toBe(404);
+    expect((await post({ questionId: "pz-908", text: "something is off" })).status).toBe(404);
     expect(db.reports).toHaveLength(0);
   });
 
@@ -448,10 +461,92 @@ describe("report", () => {
   });
 });
 
+describe("practice is not an oracle for future dailies", () => {
+  it("an unexposed web question is never served or checked by practice (its answer is not public)", async () => {
+    const fresh = WEB.filter((q) => q.id !== dailyQuestionFor(dayKeyUtc(), WEB)!.id).slice(0, 3);
+    fakeBank.setExposed(fresh.map((q) => q.id), false);
+    invalidateBank();
+    const body = await (await practiceGET(req("/api/trivia/practice"))).json();
+    for (const q of fresh) expect(body.questions.some((x: { id: string }) => x.id === q.id)).toBe(false);
+    for (const q of fresh) {
+      const res = await practicePOST(req("/api/trivia/practice", { method: "POST", body: { questionId: q.id, answer: q.answer } }));
+      expect(res.status).toBe(404);
+      expect(JSON.stringify(await res.json())).not.toContain("reveal");
+    }
+  });
+
+  it("with nothing exposed, practice has nothing to serve", async () => {
+    fakeBank.setExposed([...fakeBank.rows.keys()], false);
+    invalidateBank();
+    const body = await (await practiceGET(req("/api/trivia/practice"))).json();
+    expect(body.questions).toEqual([]);
+  });
+});
+
+describe("an empty or unreachable bank", () => {
+  afterEach(() => {
+    fakeBank.reset();
+    invalidateBank();
+  });
+
+  it("the daily is a 503 (nothing stored), practice is empty, a report is a 404: nothing crashes", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    fakeBank.set([]);
+    invalidateBank();
+    expect((await dailyGET(req("/api/trivia/daily"))).status).toBe(503);
+    session.value = { discordId: "100000000000000001" };
+    expect((await dailyPOST(req("/api/trivia/daily", { method: "POST", body: { answer: "x", dayKey: dayKeyUtc(), questionId: "pd-901" } }))).status).toBe(503);
+    expect(db.rounds).toEqual([]);
+    expect(reward.calls).toBe(0);
+    const practice = await (await practiceGET(req("/api/trivia/practice"))).json();
+    expect(practice.questions).toEqual([]);
+    expect((await practicePOST(req("/api/trivia/practice", { method: "POST", body: { questionId: "pd-901", answer: "10000" } }))).status).toBe(503); // no daily: practice is closed
+    expect((await reportPOST(req("/api/trivia/report", { method: "POST", body: { questionId: "pd-901", text: "something is off" } }))).status).toBe(404);
+    warn.mockRestore();
+  });
+
+  it("an outage is the same, logged", async () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    fakeBank.fail = new Error("connection refused");
+    invalidateBank();
+    expect((await dailyGET(req("/api/trivia/daily"))).status).toBe(503);
+    expect((await (await practiceGET(req("/api/trivia/practice"))).json()).questions).toEqual([]);
+    expect(err.mock.calls.some((c) => String(c[0]).includes("question bank unavailable"))).toBe(true);
+    err.mockRestore();
+  });
+});
+
+describe("no public response carries an answer, whatever the question", () => {
+  it("daily GET (signed out and in, before an attempt) and practice GET, for every web question as the daily", async () => {
+    // Make each web question the only one in turn, so every question is served as the daily once.
+    try {
+      for (const q of WEB) {
+        fakeBank.reset();
+        for (const id of [...fakeBank.rows.keys()]) if (id !== q.id) fakeBank.rows.delete(id);
+        invalidateBank();
+        db.rounds.length = 0;
+        for (const signedIn of [false, true]) {
+          session.value = signedIn ? { discordId: "100000000000000002" } : null;
+          const body = await (await dailyGET(req("/api/trivia/daily"))).json();
+          expect(body.question.id).toBe(q.id);
+          for (const f of FORBIDDEN_KEYS) expect(keysDeep(body).has(f), `${q.id} leaked ${f}`).toBe(false);
+          // (a multiple-choice answer is one of its choices, which are part of the question)
+          if (q.type !== "multiple_choice" && q.answer.length > 3) expect(JSON.stringify(body).toLowerCase()).not.toContain(`"${q.answer.toLowerCase()}"`);
+        }
+      }
+    } finally {
+      fakeBank.reset();
+      invalidateBank();
+    }
+    const practice = await (await practiceGET(req("/api/trivia/practice"))).json();
+    for (const f of FORBIDDEN_KEYS) expect(keysDeep(practice).has(f), `practice leaked ${f}`).toBe(false);
+  });
+});
+
 describe("bank pool sanity for the routes", () => {
-  it("has questions in both pools", () => {
-    expect(getBank().questions.length).toBeGreaterThan(80);
-    expect(webPool().length).toBeGreaterThan(50);
-    expect(discordPool().length).toBeGreaterThan(20);
+  it("has questions in both pools", async () => {
+    expect((await getBank()).questions.length).toBeGreaterThan(20);
+    expect(webPool().length).toBeGreaterThan(11);
+    expect(discordPool().length).toBeGreaterThan(5);
   });
 });

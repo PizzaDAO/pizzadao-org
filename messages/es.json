@@ -2995,14 +2995,12 @@
     "suggestInvalid_generic": "Revisa el formulario e intenta de nuevo.",
     "adminSuggestionsOverline": "Comunidad",
     "adminSuggestionsTitle": "Preguntas sugeridas",
-    "adminSuggestionsHelp": "Las más nuevas al final. Copia el fragmento JSON en data/trivia/questions.json en un PR (es un borrador: marcado, con una explicación provisional) y luego marca la sugerencia como añadida.",
+    "adminSuggestionsHelp": "Las más antiguas primero. \"Añadir al banco\" crea una pregunta borrador a partir de la sugerencia (marcada, así que aún no se sirve, con una explicación provisional) y marca la sugerencia como añadida: luego revisa su fuente, complétala y apruébala en el editor del banco de arriba.",
     "adminSuggestionsEmpty": "No hay sugerencias abiertas.",
     "adminAnswer": "Respuesta",
     "adminSuggestionUnreadable": "No se pudo leer esta sugerencia.",
-    "adminCopySnippet": "Copiar fragmento JSON",
-    "adminCopied": "Copiado.",
-    "adminCopyFailed": "No se pudo copiar.",
-    "adminMarkAdded": "Marcar como añadida",
+    "adminAddToBank": "Añadir al banco",
+    "adminAddedToBank": "Añadida al banco como {id}.",
     "adminDismiss": "Descartar",
     "adminSaveFailed": "No se pudo guardar. Intenta de nuevo."
   }

@@ -40,7 +40,7 @@ export async function discordLeaderboard(): Promise<{ available: boolean; month:
  */
 export async function reportLatestQuestion(discordId: string, reason: string | undefined): Promise<ReportLatestResult> {
   const round = await latestAskedRound();
-  const q = round ? getQuestion(round.questionId) : undefined;
+  const q = round ? await getQuestion(round.questionId) : undefined;
   if (!round || !q) return { status: "none" };
   const now = new Date();
   if (!accountOldEnough(discordId, now) || !(await fetchMemberIdByDiscordId(discordId))) return { status: "not_member" };

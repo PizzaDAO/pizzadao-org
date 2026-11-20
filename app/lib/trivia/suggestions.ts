@@ -2,12 +2,15 @@
 //
 // Community question suggestions (plans/trivia.md section 10, phase 3), the database half. A suggestion is a TriviaReport
 // row with kind = "suggestion": questionId is "" and payload holds the validated fields (suggestion-core.ts). Statuses:
-// open (in the admin queue), added (an admin put it in the bank), dismissed. Suggestions never touch the question bank,
-// the pulled-questions setting or the report counts: every report query filters kind = "report".
+// open (in the admin queue), added (an admin put it in the bank with "Add to bank": a flagged draft row), dismissed.
+// Only addSuggestionToBank writes to the question bank; suggestions never touch the pulled-questions setting or the
+// report counts: every report query filters kind = "report".
 import { prisma } from "@/app/lib/db";
 import { Prisma } from "@prisma/client";
-import { getBank } from "./bank";
-import { snippetJson, SUGGESTIONS_PER_DAY, validateSuggestion, type SuggestionInput, type SuggestionPayload } from "./suggestion-core";
+import { bankIds, getBank } from "./bank";
+import { createQuestion } from "./bank-admin";
+import { listBankRows } from "./bank-store";
+import { buildQuestionSnippet, snippetJson, SUGGESTIONS_PER_DAY, validateSuggestion, type SuggestionInput, type SuggestionPayload } from "./suggestion-core";
 
 export type SuggestionStatus = "open" | "added" | "dismissed";
 
@@ -57,14 +60,14 @@ export interface SuggestionRow {
   createdAt: Date;
   /** Null when the payload cannot be read (should not happen: it is written validated). */
   suggestion: SuggestionPayload | null;
-  /** The ready-to-paste JSON entry, with the next free id; null when the payload is unreadable. */
+  /** The draft "Add to bank" would create (pretty JSON, with the next free id); null when the payload is unreadable. */
   snippet: string | null;
 }
 
-/** Open suggestions, oldest first (first come, first reviewed), each with its JSON snippet. */
+/** Open suggestions, oldest first (first come, first reviewed), each with a preview of its draft. */
 export async function openSuggestions(limit = 100): Promise<SuggestionRow[]> {
   const rows = await prisma.triviaReport.findMany({ where: { kind: "suggestion", status: "open" }, orderBy: { id: "asc" }, take: limit, select: { id: true, createdAt: true, payload: true } });
-  const ids = getBank().questions.map((q) => q.id);
+  const ids = bankIds(await getBank());
   const out: SuggestionRow[] = [];
   for (const r of rows) {
     const p = r.payload as Partial<SuggestionPayload> | null;
@@ -73,8 +76,8 @@ export async function openSuggestions(limit = 100): Promise<SuggestionRow[]> {
       out.push({ id: r.id, createdAt: r.createdAt, suggestion: null, snippet: null });
       continue;
     }
-    // Several open suggestions in one category all want "the next free id": number them past the earlier ones, so
-    // pasting two snippets in a row never makes a duplicate id.
+    // Several open suggestions in one category all want "the next free id": number the previews past the earlier ones
+    // (the real id is picked again from the database when a draft is added).
     let snippet: string | null = null;
     try {
       snippet = snippetJson(v.value, ids, r.id);
@@ -90,4 +93,44 @@ export async function openSuggestions(limit = 100): Promise<SuggestionRow[]> {
 /** Close an open suggestion (added to the bank, or dismissed). Returns false when it was not open (or not a suggestion). */
 export async function closeSuggestion(id: number, status: Exclude<SuggestionStatus, "open">): Promise<boolean> {
   return (await prisma.triviaReport.updateMany({ where: { id, kind: "suggestion", status: "open" }, data: { status } })).count > 0;
+}
+
+export type AddToBankResult =
+  | { status: "added"; questionId: string; existed: boolean }
+  | { status: "not_open" }
+  | { status: "unreadable" }
+  | { status: "failed"; error: string; errors?: string[] };
+
+/**
+ * "Add to bank": create the suggestion's draft as a bank row (status flagged, so it is not served until an admin edits
+ * and approves it), then mark the suggestion added. The id is the next free one in its category, picked from the
+ * database at that moment (a race for the same id retries with the next one). Idempotent: if a draft from this
+ * suggestion already exists (an earlier click whose close failed), the suggestion is just closed.
+ */
+export async function addSuggestionToBank(suggestionId: number, actor: string): Promise<AddToBankResult> {
+  const row = await prisma.triviaReport.findFirst({ where: { id: suggestionId, kind: "suggestion", status: "open" }, select: { id: true, payload: true } });
+  if (!row) return { status: "not_open" };
+  const p = row.payload as Partial<SuggestionPayload> | null;
+  const v = p ? validateSuggestion({ question: p.question, answer: p.answer, aliases: p.aliases, source: p.source, category: p.category }) : null;
+  if (!v?.ok) return { status: "unreadable" };
+  const marker = `Community suggestion #${suggestionId}.`;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const rows = await listBankRows();
+    const prior = rows.find((r) => {
+      const notes = (r.data as { notes?: unknown } | null)?.notes;
+      return typeof notes === "string" && notes.startsWith(marker);
+    });
+    if (prior) {
+      await closeSuggestion(suggestionId, "added");
+      return { status: "added", questionId: prior.id, existed: true };
+    }
+    const draft = buildQuestionSnippet(v.value, rows.map((r) => r.id), suggestionId);
+    const created = await createQuestion(draft, actor);
+    if (created.ok) {
+      await closeSuggestion(suggestionId, "added");
+      return { status: "added", questionId: created.row.id, existed: false };
+    }
+    if (created.status !== 409) return { status: "failed", error: created.error, errors: created.errors };
+  }
+  return { status: "failed", error: "Could not find a free id: try again" };
 }

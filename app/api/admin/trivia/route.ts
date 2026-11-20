@@ -3,7 +3,7 @@ import { json, rejectUnsafeWrite } from "@/app/lib/admin-guard";
 import { internalError } from "@/app/lib/errors/error-response";
 import { getQuestion } from "@/app/lib/trivia/bank";
 import { closeReports, setQuestionDisabled } from "@/app/lib/trivia/reports";
-import { closeSuggestion } from "@/app/lib/trivia/suggestions";
+import { addSuggestionToBank, closeSuggestion } from "@/app/lib/trivia/suggestions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,8 +13,11 @@ export const dynamic = "force-dynamic";
  *   { action: "disable", questionId }   pull the question from every pool (trivia.disabledQuestionIds) and close its reports
  *   { action: "enable", questionId }    bring it back
  *   { action: "dismiss", questionId }   close its open reports without pulling it
+ *   { action: "suggestion-add", suggestionId }   "Add to bank": create the suggestion's draft as a flagged bank row
+ *     (not served until approved in the bank editor), then mark the suggestion added
  *   { action: "suggestion-added" | "suggestion-dismiss", suggestionId }   close an open community suggestion
- *     (added to the bank by PR, or dismissed). Neither touches the bank or any setting.
+ *     (marked added, or dismissed). Neither touches the bank or any setting.
+ * Bank edits (create, edit, status, pool) are /api/admin/trivia/questions.
  * The setting is audited like any other (the admin's id is the actor).
  */
 export async function POST(request: Request) {
@@ -28,6 +31,19 @@ export async function POST(request: Request) {
   } catch {
     return json({ error: "Invalid JSON" }, 400);
   }
+  if (body.action === "suggestion-add") {
+    const id = typeof body.suggestionId === "number" && Number.isInteger(body.suggestionId) && body.suggestionId > 0 ? body.suggestionId : 0;
+    if (!id) return json({ error: "Unknown suggestion" }, 400);
+    try {
+      const out = await addSuggestionToBank(id, auth.session.discordId);
+      if (out.status === "added") return json({ ok: true, questionId: out.questionId, existed: out.existed });
+      if (out.status === "not_open") return json({ error: "That suggestion is not open" }, 404);
+      if (out.status === "unreadable") return json({ error: "That suggestion cannot be read" }, 400);
+      return json({ error: out.error, errors: out.errors }, 400);
+    } catch (err) {
+      return internalError(err, "admin/trivia", "Could not add the suggestion to the bank");
+    }
+  }
   if (body.action === "suggestion-added" || body.action === "suggestion-dismiss") {
     const id = typeof body.suggestionId === "number" && Number.isInteger(body.suggestionId) && body.suggestionId > 0 ? body.suggestionId : 0;
     if (!id) return json({ error: "Unknown suggestion" }, 400);
@@ -39,7 +55,7 @@ export async function POST(request: Request) {
     }
   }
   const questionId = typeof body.questionId === "string" ? body.questionId : "";
-  if (!getQuestion(questionId)) return json({ error: "Unknown question" }, 404);
+  if (!(await getQuestion(questionId))) return json({ error: "Unknown question" }, 404);
   try {
     switch (body.action) {
       case "disable": {

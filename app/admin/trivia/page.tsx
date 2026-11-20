@@ -1,7 +1,8 @@
 // app/admin/trivia/page.tsx
 //
-// Trivia admin, READ ONLY in phase 1 (plans/trivia.md §4.2, §12): bank stats and what is held back, recent rounds and
-// the "report a problem" queue. No writes: disabling a question is a bank edit (PR) until phase 2 adds the setting.
+// Trivia admin (plans/trivia.md §4.2, §12): bank stats, the question bank editor (the bank is in the database, never in
+// the public repo), reported questions (disable = trivia.disabledQuestionIds), community suggestions ("Add to bank"),
+// recent rounds. Every write goes through /api/admin/trivia(/questions), which checks the admin again.
 // Gate: ADMIN_ROLE_IDS (isAdminDiscordId, fails closed). A visitor with no session gets a real 307 to log in from proxy.ts
 // before anything renders. A signed-in non-admin gets notFound(): the site's not-found page, but with a 200 status (the root
 // layout's Suspense has already sent the status by the time the page runs), and no admin data is rendered or sent.
@@ -12,11 +13,16 @@ import { prisma } from "@/app/lib/db";
 import { getSession } from "@/app/lib/session";
 import { isAdminDiscordId } from "@/app/lib/auth-guards";
 import { loginHrefFrom } from "@/app/lib/login-return";
-import { bankStats, getQuestion } from "@/app/lib/trivia/bank";
+import { bankStats, getBank } from "@/app/lib/trivia/bank";
+import { listAdminQuestions, type AdminQuestionRow } from "@/app/lib/trivia/bank-admin";
+import { nextQuestionId } from "@/app/lib/trivia/suggestion-core";
+import { CATEGORIES } from "@/app/lib/trivia/schema";
 import { getDisabledIds, openReportGroups } from "@/app/lib/trivia/reports";
 import { openSuggestions } from "@/app/lib/trivia/suggestions";
 import { ReportActions } from "./ReportActions";
 import { SuggestionActions } from "./SuggestionActions";
+import { BankEditor, type LiveIds } from "./BankEditor";
+import { dayKeyUtc } from "@/app/lib/trivia/daily";
 import { EditorialMasthead, EditorialPage, SectionHeading, paperCard } from "@/app/ui/shared/Editorial";
 
 export const runtime = "nodejs";
@@ -39,6 +45,28 @@ function Counts({ data }: { data: Record<string, number> }) {
         ))}
     </ul>
   );
+}
+
+async function loadBankRows(): Promise<AdminQuestionRow[] | null> {
+  try {
+    return await listAdminQuestions();
+  } catch (e) {
+    console.error("[trivia] admin bank rows unavailable:", (e as Error).message);
+    return null;
+  }
+}
+
+/** Today's web daily and the open Discord round's question, so the editor can warn before changing them. */
+async function loadLive(): Promise<LiveIds> {
+  try {
+    const [daily, open] = await Promise.all([
+      prisma.triviaRound.findUnique({ where: { dayKey: dayKeyUtc() }, select: { questionId: true } }),
+      prisma.triviaRound.findFirst({ where: { surface: "DISCORD", status: "OPEN" }, orderBy: { id: "desc" }, select: { questionId: true } }),
+    ]);
+    return { daily: daily?.questionId ?? null, discord: open?.questionId ?? null };
+  } catch {
+    return { daily: null, discord: null };
+  }
 }
 
 async function loadRuntime() {
@@ -64,20 +92,28 @@ export default async function AdminTriviaPage() {
   if (!(await isAdminDiscordId(session.discordId))) notFound();
 
   const t = await getTranslations("trivia");
-  const stats = bankStats();
-  const data = await loadRuntime();
+  const [stats, bank, rows, data, live] = await Promise.all([bankStats(), getBank(), loadBankRows(), loadRuntime(), loadLive()]);
+  const byId = new Map(bank.questions.map((q) => [q.id, q]));
+  const allIds = (rows ?? []).map((r) => r.id);
+  const nextIds = Object.fromEntries(CATEGORIES.map((c) => [c, nextQuestionId(c, allIds)]));
 
   return (
     <EditorialPage>
-      <EditorialMasthead overline="Admin" title={t("adminTitle")} dek="The bank is data/trivia/questions.json: change it with a PR. Reported questions can be disabled here (they are pulled from Discord and the web at once)." />
+      <EditorialMasthead overline="Admin" title={t("adminTitle")} dek="The question bank lives in the database (never in the public repo): edit it below. Reported questions can be disabled here (they are pulled from Discord and the web at once)." />
 
       <div className="grid gap-6">
         <section className={`${paperCard} p-6`}>
           <SectionHeading overline="Bank" title="Questions" count={stats.total} />
           <div className="grid gap-3 text-sm">
             <p className="m-0">
-              Served on the web: <strong>{stats.servableWeb}</strong> · Reserved for Discord (never on the web): <strong>{stats.servableDiscord}</strong>
+              Served on the web: <strong>{stats.servableWeb}</strong> · Reserved for Discord (never on the web): <strong>{stats.servableDiscord}</strong> · Approved and exposed (want rewording):{" "}
+              <strong>{stats.exposedApproved}</strong>
             </p>
+            {!stats.available && <p className="m-0 text-tomato">The question bank could not be read: Discord rounds and the web daily are skipped until it can.</p>}
+            {stats.available && stats.total === 0 && (
+              <p className="m-0 text-tomato">The question bank is empty: import it (scripts/trivia/import-bank.ts) or add questions below. Discord rounds and the web daily are skipped until then.</p>
+            )}
+            {stats.invalid.length > 0 && <p className="m-0 text-tomato">Rows that fail the schema (not served): {stats.invalid.map((i) => i.id).join(", ")}</p>}
             <div>
               <p className="overline m-0 text-foreground/70">Status</p>
               <Counts data={stats.byStatus} />
@@ -105,6 +141,17 @@ export default async function AdminTriviaPage() {
           </div>
         </section>
 
+        <section className={`${paperCard} p-6`}>
+          <SectionHeading overline="Bank" title="Question editor" count={rows?.length ?? 0} />
+          {rows ? (
+            <BankEditor initialRows={rows} nextIds={nextIds} live={live} />
+          ) : (
+            <p className="m-0 text-sm" role="status">
+              The question bank table could not be read (the migration may not be applied to this database yet).
+            </p>
+          )}
+        </section>
+
         {!data.available && (
           <p className={`${paperCard} m-0 p-4 text-sm`} role="status">
             The Trivia tables could not be read (the migration may not be applied to this database yet). Rounds and reports are unavailable.
@@ -121,7 +168,7 @@ export default async function AdminTriviaPage() {
           ) : (
             <ul className="m-0 grid list-none gap-4 p-0">
               {data.groups.map((g) => {
-                const q = getQuestion(g.questionId);
+                const q = byId.get(g.questionId);
                 const disabled = data.disabledIds.includes(g.questionId);
                 return (
                   <li key={g.questionId} className="grid gap-2 border-b border-[hsl(var(--rule-warm)/0.3)] pb-4 text-sm">
@@ -176,12 +223,10 @@ export default async function AdminTriviaPage() {
                   {s.snippet && <pre className="m-0 max-h-48 overflow-auto rounded-xl bg-[hsl(var(--butter)/0.2)] p-3 text-xs">{s.snippet}</pre>}
                   <SuggestionActions
                     suggestionId={s.id}
-                    snippet={s.snippet}
+                    canAdd={!!s.snippet}
                     labels={{
-                      copy: t("adminCopySnippet"),
-                      copied: t("adminCopied"),
-                      copyFailed: t("adminCopyFailed"),
-                      added: t("adminMarkAdded"),
+                      addToBank: t("adminAddToBank"),
+                      addedToBank: t("adminAddedToBank", { id: "{id}" }),
                       dismiss: t("adminDismiss"),
                       failed: t("adminSaveFailed"),
                     }}
