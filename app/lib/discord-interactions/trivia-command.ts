@@ -160,7 +160,7 @@ export function triviaSuggestModal() {
       row(IN_ANSWER, 'Answer', { style: 1, max_length: 120, required: true, placeholder: 'True / False, a number or a short answer' }),
       row(IN_ALIASES, 'Other accepted answers (optional)', { style: 1, max_length: 400, required: false, placeholder: 'Separate with commas' }),
       row(IN_SOURCE, 'Source link (http or https)', { style: 1, max_length: 300, required: true, placeholder: 'https://...' }),
-      row(IN_CATEGORY, 'Category (optional)', { style: 1, max_length: 40, required: false, placeholder: 'pizza-day, jercos, early-bitcoin, satoshi, protocol, myth-busting, pizzadao' }),
+      row(IN_CATEGORY, 'Category (optional)', { style: 1, max_length: 40, required: false, placeholder: 'pizza-day, jercos, early-bitcoin, satoshi, protocol, myth-busting, pizzadao, just-for-fun' }),
     ],
   }
 }

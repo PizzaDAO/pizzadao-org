@@ -132,7 +132,7 @@ export async function recordReport(input: RecordReportInput): Promise<ReportOutc
     // Serialise this member's reports on this question: two flags at once must not both insert.
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(${REPORT_LOCK_NAMESPACE}::int, hashtext(${`${input.questionId}:${input.discordId}`}))`;
     const existing = await tx.triviaReport.findFirst({
-      where: { questionId: input.questionId, discordId: input.discordId, status: { not: "handled" }, createdAt: { gte: new Date(now.getTime() - REPORT_WINDOW_DAYS * DAY_MS) } },
+      where: { kind: "report", questionId: input.questionId, discordId: input.discordId, status: { not: "handled" }, createdAt: { gte: new Date(now.getTime() - REPORT_WINDOW_DAYS * DAY_MS) } },
       select: { id: true },
     });
     if (existing) return false;
@@ -226,5 +226,5 @@ export async function openReportGroups(limit = 200): Promise<ReportGroup[]> {
 
 /** Mark every open report of a question handled (after the admin acted on it). */
 export async function closeReports(questionId: string): Promise<number> {
-  return (await prisma.triviaReport.updateMany({ where: { questionId, status: "open" }, data: { status: "handled" } })).count;
+  return (await prisma.triviaReport.updateMany({ where: { kind: "report", questionId, status: "open" }, data: { status: "handled" } })).count;
 }
