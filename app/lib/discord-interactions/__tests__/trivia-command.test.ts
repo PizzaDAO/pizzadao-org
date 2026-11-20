@@ -20,7 +20,7 @@ const run = (sub: string, subOptions?: Opt[]) => ({
 })
 
 function make(trivia?: Partial<NonNullable<HandlerDeps['trivia']>> | null, admin = false) {
-  const t = { enabled: vi.fn(async () => true), rateLimit: vi.fn(async () => null as Date | null), defer: vi.fn() as ReturnType<typeof vi.fn>, ...trivia } as { enabled: ReturnType<typeof vi.fn>; rateLimit: ReturnType<typeof vi.fn>; defer: ReturnType<typeof vi.fn> }
+  const t = { enabled: vi.fn(async () => true), rateLimit: vi.fn(async () => null as Date | null), defer: vi.fn() as ReturnType<typeof vi.fn>, suggest: vi.fn(async () => ({ status: 'recorded' })) as ReturnType<typeof vi.fn>, ...trivia } as { enabled: ReturnType<typeof vi.fn>; rateLimit: ReturnType<typeof vi.fn>; defer: ReturnType<typeof vi.fn>; suggest: ReturnType<typeof vi.fn> }
   const deps = { guildId: GUILD, isAdmin: vi.fn(async () => admin), ...(trivia === null ? {} : { trivia: t }) } as unknown as HandlerDeps
   return { deps, t }
 }
@@ -30,7 +30,7 @@ describe('registration', () => {
   const cmd = (PEP_COMMANDS as readonly { name: string; description: string; options?: readonly Opt2[]; dm_permission?: boolean }[]).find((c) => c.name === 'trivia')!
 
   it('has leaderboard / start / skip, guild only', () => {
-    expect(cmd.options?.map((o) => o.name)).toEqual(['leaderboard', 'start', 'skip', 'report'])
+    expect(cmd.options?.map((o) => o.name)).toEqual(['leaderboard', 'start', 'skip', 'report', 'suggest'])
     expect(cmd.dm_permission).toBe(false)
     expect(cmd.options?.find((o) => o.name === 'leaderboard')?.options?.[0]).toMatchObject({ name: 'public', type: 5, required: false })
   })

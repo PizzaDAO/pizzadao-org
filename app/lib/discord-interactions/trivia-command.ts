@@ -1,4 +1,7 @@
 /**
+ * /trivia suggest opens a modal (type 9) instead of deferring; its submit is handled in handle.ts with the helpers at
+ * the bottom of this file (modal, parsing, reply text).
+ *
  * /trivia leaderboard | start | skip: the deferred half. The interaction handler answers within Discord's 3 s window
  * with a deferred reply (type 5; ephemeral unless the leaderboard was asked for publicly); this runs afterwards
  * (route: after()) and edits the reply in via the interaction webhook. start and skip are admin only (checked by
@@ -13,12 +16,14 @@ import { esc } from './text'
 
 const API = 'https://discord.com/api/v10'
 
-export const TRIVIA_SUBCOMMANDS = ['leaderboard', 'start', 'skip', 'report'] as const
+export const TRIVIA_SUBCOMMANDS = ['leaderboard', 'start', 'skip', 'report', 'suggest'] as const
 export type TriviaSub = (typeof TRIVIA_SUBCOMMANDS)[number]
+/** The subcommands that defer and edit the reply (everything except /trivia suggest, which opens a modal). */
+export type TriviaDeferredSub = Exclude<TriviaSub, 'suggest'>
 export const TRIVIA_ADMIN_SUBCOMMANDS: readonly TriviaSub[] = ['start', 'skip']
 
 export interface TriviaJob {
-  sub: TriviaSub
+  sub: TriviaDeferredSub
   discordId: string
   /** leaderboard: show it to the channel instead of only to the member. */
   public?: boolean
@@ -127,5 +132,66 @@ export async function runTriviaCommand(job: TriviaJob, deps: TriviaCommandDeps):
     } catch {
       // the token may have expired; nothing more to do
     }
+  }
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// /trivia suggest: the modal, its parsing and the replies (plans/trivia.md section 10, phase 3)
+// ---------------------------------------------------------------------------------------------------------------
+
+export const TRIVIA_SUGGEST_MODAL_ID = 'trivia:suggest'
+const IN_QUESTION = 'question'
+const IN_ANSWER = 'answer'
+const IN_ALIASES = 'aliases'
+const IN_SOURCE = 'source'
+const IN_CATEGORY = 'category'
+
+/** The Discord modal (response type 9 data): question, answer, optional aliases, source link, optional category. */
+export function triviaSuggestModal() {
+  const row = (custom_id: string, label: string, extra: Record<string, unknown>) => ({
+    type: 1,
+    components: [{ type: 4, custom_id, label, ...extra }],
+  })
+  return {
+    custom_id: TRIVIA_SUGGEST_MODAL_ID,
+    title: 'Suggest a trivia question',
+    components: [
+      row(IN_QUESTION, 'Question', { style: 2, min_length: 8, max_length: 300, required: true, placeholder: 'One fact, worded so it has one right answer' }),
+      row(IN_ANSWER, 'Answer', { style: 1, max_length: 120, required: true, placeholder: 'True / False, a number or a short answer' }),
+      row(IN_ALIASES, 'Other accepted answers (optional)', { style: 1, max_length: 400, required: false, placeholder: 'Separate with commas' }),
+      row(IN_SOURCE, 'Source link (http or https)', { style: 1, max_length: 300, required: true, placeholder: 'https://...' }),
+      row(IN_CATEGORY, 'Category (optional)', { style: 1, max_length: 40, required: false, placeholder: 'pizza-day, jercos, early-bitcoin, satoshi, protocol, myth-busting, pizzadao, just-for-fun' }),
+    ],
+  }
+}
+
+/** The text-input values of a submitted modal, by field. Missing inputs are empty strings. */
+export function readTriviaSuggestModal(components: Array<{ components?: Array<{ custom_id?: string; value?: string }> }> | undefined) {
+  const flat = (components ?? []).flatMap((r) => r.components ?? [])
+  const get = (id: string) => flat.find((c) => c.custom_id === id)?.value ?? ''
+  return { question: get(IN_QUESTION), answer: get(IN_ANSWER), aliases: get(IN_ALIASES), source: get(IN_SOURCE), category: get(IN_CATEGORY) }
+}
+
+export type SuggestResult = { status: 'recorded' } | { status: 'limit' } | { status: 'invalid'; field: string } | { status: 'error' }
+
+/** What to tell the member after the modal: [tone, headline, body]. */
+export function triviaSuggestReply(r: SuggestResult, perDay: number): ['success' | 'error' | 'cooldown', string, string | undefined] {
+  switch (r.status) {
+    case 'recorded':
+      return ['success', 'Thanks, your question was sent to the team.', "They'll check the source before anything is asked. Suggestions are never shown until approved."]
+    case 'limit':
+      return ['cooldown', `You can suggest ${perDay} questions a day.`, 'Try again tomorrow.']
+    case 'invalid': {
+      const why: Record<string, string> = {
+        question: 'The question must be 8 to 300 characters.',
+        answer: 'The answer must be 1 to 120 characters.',
+        aliases: 'Up to 8 other answers, each up to 80 characters.',
+        source: 'The source must be a full http or https link.',
+        category: 'Category must be one of: pizza-day, jercos, early-bitcoin, satoshi, protocol, myth-busting, pizzadao, just-for-fun (or leave it empty).',
+      }
+      return ['error', "That didn't work.", why[r.field] ?? 'Please check the form and try again.']
+    }
+    case 'error':
+      return ['error', 'Something went wrong. Please try again.', undefined]
   }
 }

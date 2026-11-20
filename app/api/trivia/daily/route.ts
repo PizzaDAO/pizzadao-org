@@ -18,10 +18,16 @@ import { publicView, reveal } from "@/app/lib/trivia/bank";
 import { match } from "@/app/lib/trivia/match";
 import { nextDayStartMs } from "@/app/lib/trivia/daily";
 import { MAX_ANSWER_INPUT, readAnswer, reply, withNoStore } from "@/app/lib/trivia/api";
-import { findDailyAttempt, getDailyRound, percentCorrect, recordDailyAttempt, streakFor } from "@/app/lib/trivia/web";
+import { findDailyAttempt, getDailyRound, percentCorrect, recordDailyAttempt, streakStatsFor } from "@/app/lib/trivia/web";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/** Current and best streak, as the daily's response fields. */
+async function streakFields(discordId: string, dayKey: string) {
+  const s = await streakStatsFor(discordId, dayKey);
+  return { streak: s.current, bestStreak: s.best };
+}
 
 export async function GET(request: NextRequest) {
   const limited = await enforceRateLimit(request, "trivia-read");
@@ -39,12 +45,15 @@ export async function GET(request: NextRequest) {
   };
   if (!session?.discordId) return reply({ ...base, attempt: null });
 
-  const streak = await streakFor(session.discordId, round.dayKey);
+  const stats = await streakStatsFor(session.discordId, round.dayKey);
+  const streak = stats.current;
+  const bestStreak = stats.best;
   const mine = round.roundId ? await findDailyAttempt(round.roundId, session.discordId) : null;
-  if (!mine) return reply({ ...base, streak, attempt: null });
+  if (!mine) return reply({ ...base, streak, bestStreak, attempt: null });
   return reply({
     ...base,
     streak,
+    bestStreak,
     attempt: {
       correct: mine.correct,
       reveal: reveal(round.question),
@@ -91,7 +100,7 @@ export async function POST(request: NextRequest) {
       recorded: true,
       reveal: reveal(q),
       percentCorrect: await percentCorrect(round.roundId),
-      streak: await streakFor(discordId, round.dayKey),
+      ...(await streakFields(discordId, round.dayKey)),
     });
   };
   const prior = await already();
@@ -120,6 +129,6 @@ export async function POST(request: NextRequest) {
     recorded: true,
     reveal: reveal(q),
     percentCorrect: round.roundId ? await percentCorrect(round.roundId) : null,
-    streak: await streakFor(discordId, round.dayKey),
+    ...(await streakFields(discordId, round.dayKey)),
   });
 }

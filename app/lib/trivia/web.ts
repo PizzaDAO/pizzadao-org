@@ -7,7 +7,7 @@
 // renders and practice still works. Nothing here posts to Discord or pays PEP (phase 2).
 import { prisma } from "@/app/lib/db";
 import { getQuestion, servable } from "./bank";
-import { addDays, computeStreak, dailyQuestionFor, dayKeyUtc, nextDayStartMs } from "./daily";
+import { addDays, computeBestStreak, computeStreak, dailyQuestionFor, dayKeyUtc, nextDayStartMs } from "./daily";
 import { getDisabledIds } from "./reports";
 import type { TriviaQuestion } from "./schema";
 
@@ -117,20 +117,40 @@ export async function percentCorrect(roundId: number, minPlayers = 5): Promise<n
   }
 }
 
-/** Current daily streak of one member (days with a recorded web attempt). 0 when unavailable. */
-export async function streakFor(discordId: string, today: string): Promise<number> {
+export interface StreakStats {
+  /** Consecutive days ending today (or yesterday while today is not played): the number the leaderboard ranks. */
+  current: number;
+  /** Longest run in the last STREAK_HISTORY_DAYS days. Never below `current`. */
+  best: number;
+  /** The member has already played today's daily (so `current` includes today). */
+  playedToday: boolean;
+}
+
+/** How far back the best streak looks. */
+export const STREAK_HISTORY_DAYS = 400;
+
+/**
+ * Current and best daily streak of one member (days with a recorded web attempt). The current streak is computed with
+ * computeStreak, exactly as the leaderboard does, so the number here is the number on the board (the board only stops
+ * counting past its own 120-day window). All zeros when unavailable.
+ */
+export async function streakStatsFor(discordId: string, today: string): Promise<StreakStats> {
   try {
     const rows = await prisma.triviaAttempt.findMany({
-      where: { discordId, messageId: null, round: { surface: "WEB_DAILY", dayKey: { gte: addDays(today, -400) } } },
+      where: { discordId, messageId: null, round: { surface: "WEB_DAILY", dayKey: { gte: addDays(today, -STREAK_HISTORY_DAYS) } } },
       select: { round: { select: { dayKey: true } } },
       orderBy: { id: "asc" },
       take: 500,
     });
-    return computeStreak(
-      rows.map((r) => r.round.dayKey).filter((k): k is string => !!k),
-      today,
-    );
+    const days = rows.map((r) => r.round.dayKey).filter((k): k is string => !!k);
+    const current = computeStreak(days, today);
+    return { current, best: Math.max(current, computeBestStreak(days)), playedToday: days.includes(today) };
   } catch {
-    return 0;
+    return { current: 0, best: 0, playedToday: false };
   }
+}
+
+/** Current daily streak of one member (days with a recorded web attempt). 0 when unavailable. */
+export async function streakFor(discordId: string, today: string): Promise<number> {
+  return (await streakStatsFor(discordId, today)).current;
 }

@@ -3,6 +3,7 @@ import { json, rejectUnsafeWrite } from "@/app/lib/admin-guard";
 import { internalError } from "@/app/lib/errors/error-response";
 import { getQuestion } from "@/app/lib/trivia/bank";
 import { closeReports, setQuestionDisabled } from "@/app/lib/trivia/reports";
+import { closeSuggestion } from "@/app/lib/trivia/suggestions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,6 +13,8 @@ export const dynamic = "force-dynamic";
  *   { action: "disable", questionId }   pull the question from every pool (trivia.disabledQuestionIds) and close its reports
  *   { action: "enable", questionId }    bring it back
  *   { action: "dismiss", questionId }   close its open reports without pulling it
+ *   { action: "suggestion-added" | "suggestion-dismiss", suggestionId }   close an open community suggestion
+ *     (added to the bank by PR, or dismissed). Neither touches the bank or any setting.
  * The setting is audited like any other (the admin's id is the actor).
  */
 export async function POST(request: Request) {
@@ -19,11 +22,21 @@ export async function POST(request: Request) {
   if (!auth.ok) return auth.response;
   const unsafe = rejectUnsafeWrite(request);
   if (unsafe) return unsafe;
-  let body: { action?: unknown; questionId?: unknown };
+  let body: { action?: unknown; questionId?: unknown; suggestionId?: unknown };
   try {
     body = (await request.json()) as typeof body;
   } catch {
     return json({ error: "Invalid JSON" }, 400);
+  }
+  if (body.action === "suggestion-added" || body.action === "suggestion-dismiss") {
+    const id = typeof body.suggestionId === "number" && Number.isInteger(body.suggestionId) && body.suggestionId > 0 ? body.suggestionId : 0;
+    if (!id) return json({ error: "Unknown suggestion" }, 400);
+    try {
+      const closed = await closeSuggestion(id, body.action === "suggestion-added" ? "added" : "dismissed");
+      return closed ? json({ ok: true }) : json({ error: "That suggestion is not open" }, 404);
+    } catch (err) {
+      return internalError(err, "admin/trivia", "Could not update the suggestion");
+    }
   }
   const questionId = typeof body.questionId === "string" ? body.questionId : "";
   if (!getQuestion(questionId)) return json({ error: "Unknown question" }, 404);

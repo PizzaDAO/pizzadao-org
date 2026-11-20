@@ -63,6 +63,23 @@ export function computeStreak(playedDayKeys: Iterable<string>, today: string): n
   return streak;
 }
 
+/**
+ * The longest run of consecutive UTC days in `playedDayKeys` (the best streak). Same rule as computeStreak (a day counts
+ * once played), so best is never below the current streak.
+ */
+export function computeBestStreak(playedDayKeys: Iterable<string>): number {
+  const days = [...new Set(playedDayKeys)].sort();
+  let best = 0;
+  let run = 0;
+  let prev: string | null = null;
+  for (const d of days) {
+    run = prev !== null && addDays(prev, 1) === d ? run + 1 : 1;
+    best = Math.max(best, run);
+    prev = d;
+  }
+  return best;
+}
+
 export interface PracticeOptions {
   category?: TriviaCategory | null;
   count?: number;

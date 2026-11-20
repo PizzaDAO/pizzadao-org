@@ -7,7 +7,8 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { loginHrefFrom } from "@/app/lib/login-return";
-import { paperCard, pillOutline } from "@/app/ui/shared/Editorial";
+import { paperCard, pillInk, pillOutline } from "@/app/ui/shared/Editorial";
+import { shareValues } from "@/app/lib/trivia/share";
 import { AnswerForm, postJson, QuestionHeader, RevealPanel, type PublicQuestionDto, type RevealDto } from "./shared";
 
 interface DailyResponse {
@@ -16,6 +17,7 @@ interface DailyResponse {
   signedIn: boolean;
   question: PublicQuestionDto;
   streak?: number | null;
+  bestStreak?: number | null;
   attempt: { correct: boolean; reveal: RevealDto; percentCorrect: number | null } | null;
 }
 interface AnswerResponse {
@@ -26,6 +28,7 @@ interface AnswerResponse {
   reveal?: RevealDto;
   percentCorrect?: number | null;
   streak?: number | null;
+  bestStreak?: number | null;
 }
 
 function useCountdown(resetsAt: string | undefined): { h: number; m: number } | null {
@@ -48,6 +51,7 @@ export default function DailyCard() {
   const [result, setResult] = useState<AnswerResponse | null>(null);
   const [nudge, setNudge] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [shared, setShared] = useState<"idle" | "copied" | "failed">("idle");
   const left = useCountdown(data?.resetsAt);
 
   useEffect(() => {
@@ -94,6 +98,20 @@ export default function DailyCard() {
   // A verdict with no answer text: logged out (sign in to see it) or not recorded (tables unavailable).
   const verdictOnly = result && result.verdict !== "ignore" && !result.reveal ? { verdict: result.verdict, signIn: !!result.signInToReveal } : null;
   const streak = answered?.streak ?? data?.streak ?? null;
+  const bestStreak = Math.max(answered?.bestStreak ?? data?.bestStreak ?? 0, streak ?? 0);
+  // Today's result, for the share text (the share text never contains the question or the answer).
+  const todayCorrect = shown ? shown.verdict === "correct" : verdictOnly ? verdictOnly.verdict === "correct" : null;
+
+  async function share() {
+    if (!data || todayCorrect === null) return;
+    const text = t("shareText", shareValues({ dayKey: data.dayKey, correct: todayCorrect, streak: data.signedIn ? streak : null, url: `${window.location.origin}/trivia` }));
+    try {
+      await navigator.clipboard.writeText(text);
+      setShared("copied");
+    } catch {
+      setShared("failed");
+    }
+  }
 
   return (
     <section className={`${paperCard} p-6 sm:p-8`} aria-labelledby="trivia-daily-title">
@@ -106,9 +124,23 @@ export default function DailyCard() {
         </div>
         <div className="text-right text-sm text-foreground/70">
           {left && <p className="m-0">{t("resetsIn", { time: left.h > 0 ? t("timeHM", { h: left.h, m: left.m }) : t("timeM", { m: left.m }) })}</p>}
-          {data?.signedIn && streak !== null && streak !== undefined && <p className="m-0 font-semibold text-foreground">{t("streak", { days: streak })}</p>}
         </div>
       </div>
+
+      {state === "ready" && data?.signedIn && streak !== null && (
+        <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-1 rounded-[var(--radius)] bg-[hsl(var(--butter)/0.3)] px-4 py-3" role="group" aria-label={t("streakLabel")}>
+          <p className="m-0 text-foreground">
+            <span aria-hidden>🔥 </span>
+            <span className="text-sm text-foreground/75">{t("streakCurrent")} </span>
+            <strong className="font-display text-xl tabular-nums">{t("streakDays", { days: streak })}</strong>
+          </p>
+          <p className="m-0 text-foreground">
+            <span className="text-sm text-foreground/75">{t("streakBest")} </span>
+            <strong className="font-display text-xl tabular-nums">{t("streakDays", { days: bestStreak })}</strong>
+          </p>
+          {!shown && <p className="m-0 w-full text-sm text-foreground/75">{streak ? t("streakKeep") : t("streakStart")}</p>}
+        </div>
+      )}
 
       <div className="mt-5">
         {state === "loading" && <p className="m-0 text-foreground/70">{t("loading")}</p>}
@@ -145,6 +177,23 @@ export default function DailyCard() {
                   <p className="m-0">{t("comeBack")}</p>
                 </div>
               </>
+            )}
+            {todayCorrect !== null && (
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <button type="button" onClick={share} className={pillInk}>
+                  {t("shareButton")}
+                </button>
+                {shared === "copied" && (
+                  <span role="status" className="text-sm text-foreground/75">
+                    {t("shareCopied")}
+                  </span>
+                )}
+                {shared === "failed" && (
+                  <span role="alert" className="text-sm text-tomato-readable">
+                    {t("shareFailed")}
+                  </span>
+                )}
+              </div>
             )}
             {!data.signedIn && (
               <p className="mb-0 mt-5 flex flex-wrap items-center gap-3 text-sm text-foreground/75">
