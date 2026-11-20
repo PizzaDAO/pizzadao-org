@@ -681,6 +681,8 @@
       "sendPep": "Enviar PEP",
       "editProfile": "Editar perfil",
       "editPfp": "Edita tu foto de perfil",
+      "downloadPfp": "Descargar foto de perfil",
+      "downloadPfpHint": "Para usarla en Discord: Ajustes de usuario → Perfiles → Cambiar avatar.",
       "manageWallets": "Gestionar wallets",
       "viewPublicProfile": "Ver perfil público",
       "shareProfile": "Compartir perfil",

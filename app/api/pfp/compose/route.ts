@@ -4,6 +4,7 @@
 // POST   { base: {kind, url?}, layers: [{assetId, x, y, scale, rotation}] } -> composes + saves.
 //        The server re-checks every layer against the member's unlocks; the GET list is display only.
 // DELETE -> reset to the original PFP (drops the composed image).
+import { after } from 'next/server'
 import { invalidateProfileSummary } from '@/app/lib/profile-summary-cache'
 import { del } from '@vercel/blob'
 import { prisma } from '@/app/lib/db'
@@ -124,6 +125,9 @@ export const POST = memberPfpRoute(async (req, { memberId, discordId }) => {
     original: parseBase(body.original),
     layers: body.layers ?? [],
   })
+  // Saved: DM the download link after the response (own setting, throttled; a failure is swallowed).
+  const saved = () => import('@/app/lib/pfp-dm').then((m) => m.maybeSendPfpSavedDm(discordId, memberId)).catch(() => {})
+  try { after(saved) } catch { void saved() }
   return { ok: true, composedUrl: res.composedUrl, layers: res.layers }
 }, { rateLimit: 'pfp-compose' })
 

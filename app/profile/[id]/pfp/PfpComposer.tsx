@@ -261,18 +261,6 @@ export function PfpComposer({ memberId }: { memberId: string }) {
     catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
 
-  async function download() {
-    if (!savedUrl) return;
-    try {
-      const blob = await (await fetch(savedUrl)).blob();
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = `pizzadao-pfp-${memberId}.webp`;
-      a.click();
-      URL.revokeObjectURL(a.href);
-    } catch { setError("Could not download the picture."); }
-  }
-
   const ordered = [...layers].sort((a, b) => order(byId.get(a.assetId)?.kind) - order(byId.get(b.assetId)?.kind));
   const sel = layers.find((l) => l.assetId === selected && movable(byId.get(l.assetId)?.kind));
 
@@ -333,10 +321,10 @@ export function PfpComposer({ memberId }: { memberId: string }) {
           <button type="button" disabled={busy || !baseSrc} onClick={save} className="rounded border px-4 py-2 font-semibold disabled:opacity-50">
             {busy ? "Working..." : "Save"}
           </button>
-          <button type="button" disabled={!savedUrl} onClick={download} className="rounded border px-4 py-2 disabled:opacity-50">Download</button>
+          {savedUrl && <a href={`/api/pfp/${encodeURIComponent(memberId)}/download`} download="pizzadao-pfp.png" className="rounded border px-4 py-2 no-underline">Download</a>}
           {state.current && <button type="button" disabled={busy} onClick={reset} className="px-2 py-2 text-sm underline">Reset</button>}
         </div>
-        {savedUrl && <p className="m-0 text-sm text-foreground/70">Saved. It shows across PizzaDAO. Download to use it on Discord, X or Telegram.</p>}
+        {savedUrl && <p className="m-0 text-sm text-foreground/70">Saved. It shows across PizzaDAO. To use it on Discord: User Settings → Profiles → Change Avatar.</p>}
         {error && <p role="alert" className="m-0 rounded border border-tomato p-2 text-sm">{error}</p>}
       </div>
 

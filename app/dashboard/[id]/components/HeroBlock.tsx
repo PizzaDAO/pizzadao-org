@@ -18,6 +18,7 @@ import { ThemeToggle } from "../../../ui/ThemeToggle";
 import { ShareProfileButton } from "../../../ui/vouches/ShareProfileButton";
 import type { ProfileCompletion } from "../lib/profile-completion";
 import { ProfileCompletionMeter } from "./ProfileCompletionMeter";
+import { PfpDownload } from "./PfpDownload";
 
 export type HeroBlockProps = {
     name: string;
@@ -247,6 +248,7 @@ export function HeroBlock({
                 >
                     {t("editPfp")}
                 </Link>
+                <PfpDownload memberId={idValue} />
                 <Link
                     href="/me/wallets"
                     className="ui inline-flex items-center gap-1.5 text-[13px] uppercase tracking-[0.08em] text-foreground/70 transition-colors hover:text-tomato-readable"
