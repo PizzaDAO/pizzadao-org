@@ -73,7 +73,7 @@ const clean = (v: Partial<PostFilter> | null | undefined): PostFilter => ({
 })
 
 /**
- * The current filter (settings cached ~30s). With no saved row the setting's empty default applies.
+ * The current filter (settings cached ~60s). With no saved row the setting's empty default applies.
  * Throws if the settings cannot be read or the saved value is invalid; callers then skip posting.
  */
 export async function loadPostFilter(now: number = Date.now()): Promise<PostFilter> {

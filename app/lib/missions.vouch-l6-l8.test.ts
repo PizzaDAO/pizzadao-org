@@ -15,6 +15,7 @@ vi.mock('./discord', () => ({ getMembersWithRoles: vi.fn().mockResolvedValue([])
 vi.mock('./mission-verify/events', () => ({ emitMissionEvent: vi.fn(async () => null) }))
 
 import { computeCurrentLevel, getCurrentLevel, settleLevels } from './missions'
+import { clearMissionCaches } from './mission-cache'
 import { MISSION_VERIFIER_CONFIG, LEVEL_6_REWARD, LEVEL_8_REWARD } from './mission-verify/mission-config'
 import { getVerifier, vouchReceived } from './mission-verify/verifiers'
 import { acceptsManualSubmission } from './mission-verify/policy'
@@ -40,13 +41,14 @@ let approved: number[]
 let ledger: Array<{ metadata?: unknown; description?: string }>
 
 beforeEach(() => {
+  clearMissionCaches() // the Mission rows are cached per instance
   vi.clearAllMocks()
   approved = []
   ledger = []
   mockFn(prisma.$transaction).mockImplementation(async (fn: (tx: unknown) => unknown) => fn(prisma))
   mockFn(prisma.$queryRaw).mockResolvedValue([])
   mockFn(prisma.economy.update).mockResolvedValue({})
-  mockFn(prisma.mission.findMany).mockImplementation(async ({ where }: { where: { level?: number | object } }) =>
+  mockFn(prisma.mission.findMany).mockImplementation(async ({ where = {} }: { where?: { level?: number | object } } = {}) =>
     typeof where.level !== 'number' ? MISSIONS : MISSIONS.filter((m) => m.level === where.level),
   )
   mockFn(prisma.missionCompletion.findMany).mockImplementation(async () => approved.map((missionId) => ({ missionId })))

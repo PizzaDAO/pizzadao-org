@@ -555,6 +555,7 @@ export async function getAttendanceForMember(
   const records = await prisma.callAttendance.findMany({
     where: { discordId },
     orderBy: { callDate: "desc" },
+    select: { crewId: true, crewLabel: true, callDate: true },
   });
 
   // Aggregate per-crew breakdown
@@ -615,10 +616,8 @@ export async function rebuildAttendanceSummaries(
   if (discordIds && discordIds.length > 0) {
     ids = discordIds;
   } else {
-    const rows = await prisma.callAttendance.findMany({
-      select: { discordId: true },
-      distinct: ["discordId"],
-    });
+    // groupBy de-duplicates in the database (Prisma's `distinct` reads every row and de-duplicates here).
+    const rows = await prisma.callAttendance.groupBy({ by: ["discordId"] });
     ids = rows.map((r) => r.discordId);
   }
 

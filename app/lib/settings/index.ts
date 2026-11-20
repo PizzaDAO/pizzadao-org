@@ -1,19 +1,28 @@
 /**
  * Cached, fail-safe read path for admin settings (plans/app-settings.md 4.3).
  *
- *   const s = await loadSettings()      // one query for all rows, cached ~30s per instance
+ *   const s = await loadSettings()      // one query for all rows, cached ~60s per instance
  *   s.get('missions.maxAttempts')       // typed
  *   await getSetting('disavow.minLevel')
  *
  * Never throws for a bad row or an unreachable database (except keys whose failure mode is
  * 'throw'): a missing row gives the code default; an unreadable or invalid value gives the
  * key's onReadFailure value (see registry.ts). A failed read is cached only briefly.
+ *
+ * When the cached snapshot expires, a fingerprint of the table (db-fingerprint.ts, 32 bytes) is
+ * checked first: unchanged rows are not read again, so the minute-by-minute refresh is nearly free.
  */
 import { prisma } from '@/app/lib/db'
+import { tableFingerprint } from '@/app/lib/db-fingerprint'
 import { clearKnownOverrides, forgetOverride, rememberOverride } from './known'
 import { SETTINGS, SETTING_KEYS, isSettingKey, type SettingKey, type SettingValue } from './registry'
 
-export const SETTINGS_CACHE_MS = 30_000
+/**
+ * How long one bulk read of AppSetting is reused in this instance (every key shares it). Saving a
+ * setting clears it here at once; other instances pick the change up within this window. Kept at a
+ * minute because settings are read on almost every request and each read returns every row.
+ */
+export const SETTINGS_CACHE_MS = 60_000
 const FAILURE_CACHE_MS = 5_000
 
 export interface Settings {
@@ -28,7 +37,8 @@ export interface Settings {
 
 const lastKnownGood = new Map<SettingKey, unknown>()
 const warned = new Set<string>()
-let cached: { at: number; ttl: number; settings: Settings } | null = null
+/** `fp`: the table's fingerprint taken before the read (null: unknown, so the next refresh re-reads). */
+let cached: { at: number; ttl: number; settings: Settings; fp: string | null } | null = null
 let inflight: Promise<Settings> | null = null
 
 /** Test hook / after saving: forget the cached snapshot (and optionally the last-known-good values). */
@@ -110,18 +120,32 @@ async function readAll(): Promise<{ settings: Settings; ttl: number }> {
   return { settings: snapshot(values, false, invalid, overrides), ttl: SETTINGS_CACHE_MS }
 }
 
-/** All settings (cached ~30s). Never rejects. */
+/**
+ * Reuse the expired snapshot when the table's fingerprint is unchanged, else read every row. The
+ * fingerprint is taken before the read, so a change landing during the read is caught next time.
+ */
+async function refresh(prev: typeof cached): Promise<{ settings: Settings; ttl: number; fp: string | null }> {
+  const fp = await tableFingerprint('AppSetting')
+  if (fp && prev?.fp === fp && !prev.settings.readFailed) return { settings: prev.settings, ttl: SETTINGS_CACHE_MS, fp }
+  const { settings, ttl } = await readAll()
+  return { settings, ttl, fp: settings.readFailed ? null : fp }
+}
+
+/** All settings (cached ~60s). Never rejects. */
 export async function loadSettings(now: number = Date.now()): Promise<Settings> {
   if (cached && now - cached.at < cached.ttl) return cached.settings
   if (!inflight) {
-    inflight = readAll()
-      .then(({ settings, ttl }) => {
-        cached = { at: now, ttl, settings }
+    const prev = cached
+    const p: Promise<Settings> = refresh(prev)
+      .then(({ settings, ttl, fp }) => {
+        // A read that started before a save (clearSettingsCache) must not cache the old rows.
+        if (inflight === p) cached = { at: now, ttl, settings, fp }
         return settings
       })
       .finally(() => {
-        inflight = null
+        if (inflight === p) inflight = null
       })
+    inflight = p
   }
   return inflight
 }

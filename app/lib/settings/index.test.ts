@@ -32,7 +32,7 @@ describe('settings read path', () => {
     expect(await getSetting('calls.transcriptMinLevel')).toBe(9)
   })
 
-  it('caches for ~30s with a single query, then re-reads', async () => {
+  it('caches for ~60s with a single query, then re-reads', async () => {
     findMany.mockResolvedValue([])
     const t0 = 1_000_000
     await loadSettings(t0)
@@ -48,6 +48,61 @@ describe('settings read path', () => {
     clearSettingsCache()
     findMany.mockResolvedValueOnce([] as never)
     expect(await getSetting('missions.maxAttempts')).toBe(3)
+  })
+
+  it('a read already in flight when the cache is cleared does not cache its (older) rows', async () => {
+    let release!: (rows: unknown) => void
+    findMany.mockReturnValueOnce(new Promise((r) => (release = r)) as never)
+    const old = loadSettings()
+    clearSettingsCache() // a save lands while the read is in flight
+    release([{ key: 'missions.maxAttempts', value: 5 }])
+    expect((await old).get('missions.maxAttempts')).toBe(5)
+    findMany.mockResolvedValueOnce([] as never)
+    expect(await getSetting('missions.maxAttempts')).toBe(3)
+    expect(findMany).toHaveBeenCalledTimes(2)
+  })
+
+  describe('fingerprint check on expiry', () => {
+    const fp = vi.mocked(prisma.$queryRawUnsafe)
+    beforeEach(() => fp.mockReset())
+    afterEach(() => fp.mockReset())
+
+    it('an unchanged fingerprint reuses the snapshot without reading the rows', async () => {
+      fp.mockResolvedValue([{ fp: 'aaa' }] as never)
+      findMany.mockResolvedValue([{ key: 'missions.maxAttempts', value: 5 }] as never)
+      const t0 = 2_000_000
+      expect((await loadSettings(t0)).get('missions.maxAttempts')).toBe(5)
+      expect((await loadSettings(t0 + SETTINGS_CACHE_MS + 1)).get('missions.maxAttempts')).toBe(5)
+      expect((await loadSettings(t0 + 2 * SETTINGS_CACHE_MS + 2)).get('missions.maxAttempts')).toBe(5)
+      expect(findMany).toHaveBeenCalledTimes(1)
+      expect(fp).toHaveBeenCalledTimes(3)
+    })
+
+    it('a changed fingerprint reads the rows again', async () => {
+      fp.mockResolvedValueOnce([{ fp: 'aaa' }] as never).mockResolvedValueOnce([{ fp: 'bbb' }] as never)
+      findMany.mockResolvedValueOnce([{ key: 'missions.maxAttempts', value: 5 }] as never).mockResolvedValueOnce([] as never)
+      const t0 = 3_000_000
+      await loadSettings(t0)
+      expect((await loadSettings(t0 + SETTINGS_CACHE_MS + 1)).get('missions.maxAttempts')).toBe(3)
+      expect(findMany).toHaveBeenCalledTimes(2)
+    })
+
+    it('an unreadable fingerprint falls back to the full read', async () => {
+      fp.mockRejectedValue(new Error('no raw'))
+      findMany.mockResolvedValue([] as never)
+      const t0 = 4_000_000
+      await loadSettings(t0)
+      await loadSettings(t0 + SETTINGS_CACHE_MS + 1)
+      expect(findMany).toHaveBeenCalledTimes(2)
+    })
+
+    it('a failed read is never reused on a matching fingerprint', async () => {
+      fp.mockResolvedValue([{ fp: 'aaa' }] as never)
+      findMany.mockRejectedValueOnce(new Error('db down')).mockResolvedValue([] as never)
+      const t0 = 6_000_000
+      expect((await loadSettings(t0)).readFailed).toBe(true)
+      expect((await loadSettings(t0 + 6000)).readFailed).toBe(false)
+    })
   })
 
   it('dedupes concurrent loads into one query', async () => {

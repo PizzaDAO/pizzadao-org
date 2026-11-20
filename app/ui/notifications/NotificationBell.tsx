@@ -185,12 +185,22 @@ export function NotificationBell({ pollInterval = 30000 }: NotificationBellProps
     fetchNotifications();
   }, [fetchNotifications, enabled]);
 
-  // Polling
+  // Polling, only while the tab is visible (a background tab would otherwise query every 30s for
+  // hours); coming back to the tab fetches at once.
   useEffect(() => {
     if (!enabled || pollInterval <= 0) return;
 
-    const interval = setInterval(fetchNotifications, pollInterval);
-    return () => clearInterval(interval);
+    const interval = setInterval(() => {
+      if (document.visibilityState !== "hidden") fetchNotifications();
+    }, pollInterval);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") fetchNotifications();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [fetchNotifications, pollInterval, enabled]);
 
   // Close dropdown on outside click

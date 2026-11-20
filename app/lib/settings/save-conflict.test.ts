@@ -5,6 +5,7 @@ vi.mock('@/app/lib/db')
 
 import { prisma } from '@/app/lib/db'
 import { saveSetting, SettingError } from './store'
+import { clearSettingsCache, getSetting } from './index'
 
 const m = (f: unknown) => f as ReturnType<typeof vi.fn>
 const tx = {
@@ -44,5 +45,22 @@ describe('saveSetting with expectedUpdatedAt = null ("only if there is no row ye
     await saveSetting('missions.maxAttempts', 4, 'x')
     expect(tx.appSetting.upsert).toHaveBeenCalled()
     expect(tx.appSetting.create).not.toHaveBeenCalled()
+  })
+})
+
+describe('saving clears the cached settings in this instance', () => {
+  it('the next read after a save goes to the database again', async () => {
+    const findMany = m(prisma.appSetting.findMany)
+    findMany.mockResolvedValue([{ key: 'missions.maxAttempts', value: 5 }])
+    clearSettingsCache({ all: true })
+    expect(await getSetting('missions.maxAttempts')).toBe(5)
+    expect(await getSetting('missions.maxAttempts')).toBe(5)
+    expect(findMany).toHaveBeenCalledTimes(1) // cached
+
+    tx.appSetting.upsert.mockResolvedValue({ updatedAt: new Date() })
+    findMany.mockResolvedValue([{ key: 'missions.maxAttempts', value: 4 }])
+    await saveSetting('missions.maxAttempts', 4, 'x')
+    expect(await getSetting('missions.maxAttempts')).toBe(4)
+    expect(findMany).toHaveBeenCalledTimes(2)
   })
 })

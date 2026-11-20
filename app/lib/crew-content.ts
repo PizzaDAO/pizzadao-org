@@ -23,9 +23,34 @@ export type DbCrewTask = {
   position: number
 }
 
+const TASK_SELECT = {
+  id: true,
+  crewId: true,
+  label: true,
+  url: true,
+  stage: true,
+  priority: true,
+  goal: true,
+  due: true,
+  dueRaw: true,
+  leadName: true,
+  leadMemberId: true,
+  notes: true,
+  position: true,
+} as const
+
 /** Every task of a crew that was not removed on the website, in order. */
 export async function loadCrewTasks(crewId: string): Promise<DbCrewTask[]> {
-  return prisma.crewTask.findMany({ where: { crewId, archived: false }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] })
+  return prisma.crewTask.findMany({ where: { crewId, archived: false }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }], select: TASK_SELECT })
+}
+
+/** Just what the crew list's task ranking needs (it runs for every crew on each crew-list refresh). */
+export async function loadCrewTaskSummaries(crewId: string): Promise<Array<Pick<DbCrewTask, 'label' | 'url' | 'priority' | 'stage' | 'due'>>> {
+  return prisma.crewTask.findMany({
+    where: { crewId, archived: false },
+    orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+    select: { label: true, url: true, priority: true, stage: true, due: true },
+  })
 }
 
 /** A task as the crew page shows it (the same fields the sheet parser returns). */
@@ -70,7 +95,7 @@ export async function crewContentFromDb(crewId: string): Promise<{
 export async function myTasksFromDb(crewId: string, memberId: string): Promise<{ active: Array<{ label: string; url?: string }>; doneCount: number }> {
   const id = String(memberId).trim()
   if (!id) return { active: [], doneCount: 0 }
-  const rows = await prisma.crewTask.findMany({ where: { crewId, archived: false, leadMemberId: id }, orderBy: { position: 'asc' } })
+  const rows = await prisma.crewTask.findMany({ where: { crewId, archived: false, leadMemberId: id }, orderBy: { position: 'asc' }, select: { label: true, url: true, stage: true } })
   const active: Array<{ label: string; url?: string }> = []
   let doneCount = 0
   for (const t of rows) {
