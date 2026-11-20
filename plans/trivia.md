@@ -588,13 +588,26 @@ schedule is predictable, so anyone could look up the answer to a paid Discord ro
 - **Loader (`bank.ts`):** in-process cache, 60 s TTL, invalidated by admin writes in the same instance. A row that fails the
   schema is never served. Unreachable database: the last good copy is served; with none, the bank is empty. An empty bank
   means no Discord round opens (`no_question`, logged) and the web daily answers 503: nothing is posted or paid.
-- **Exposed questions:** `exposed = true` = the text and answer are in public git history (everything imported from the old
-  file, `--exposed`). The web daily and the Discord picker prefer unexposed questions among the ones not used recently and
-  fall back to exposed ones (logged) only when none is left; practice may use exposed ones. Editing the question text or
-  the answer in `/admin/trivia` clears the flag. Plan: reword the exposed questions over time.
+- **Exposed questions:** `exposed = true` = the answer is public: in git history (everything imported from the old file,
+  `--exposed`), or revealed since. A Discord round that closes (expired or won) and a question served as the web daily are
+  marked exposed automatically (`updatedBy = system:revealed`). The web daily and the Discord picker prefer unexposed
+  questions among the ones not used recently and fall back to exposed ones (logged) only when none is left.
+- **Practice serves exposed web questions only** (minus today's daily): it reveals the answer after any attempt, so an
+  unexposed question there would be an oracle for a future daily. With nothing exposed, practice is empty.
+- **Clearing exposed:** question ids are public and history maps id -> answer, so rewording the text keeps the flag. Only
+  an answer that is genuinely new (not the old answer, not an old alias, not accepted by the old matcher) clears it, or
+  the admin unticks it by hand.
+- **Today's daily and a partial bank:** if the stored daily question is missing from the bank (unavailable, mid-import, a
+  row failing the schema) the daily answers 503 and nothing is re-pointed or deleted (previews share the production
+  database). Only a question that exists and is genuinely not servable (retired, expired, moved pool) is re-pointed.
 - **Import:** `npx tsx scripts/trivia/import-bank.ts <file.json> [--apply] [--exposed] [--force] [--as-of <date>]`: dry run by
-  default; every entry is schema- and lint-checked (nothing is written if one fails); a row updated after the import
-  (`--as-of`, default the file's mtime) is kept unless `--force`.
+  default; every entry is schema- and lint-checked (nothing is written if one fails); all writes in one transaction. A row
+  last written by anything but the import (an admin edit, a reveal) is skipped as "edited in admin", and a row updated
+  after `--as-of` (default the file's mtime) as "newer"; `--force` overwrites both. Output is ids, field paths and counts,
+  never text or answers.
 - **Editor:** `/admin/trivia` lists and filters the bank (status, pool, category, exposed), creates and edits questions (form
   or raw JSON), approves / flags / retires, moves pools. API: `/api/admin/trivia/questions` (admin only, same-origin JSON).
+  Every update is guarded by the updatedAt of the row it read (409 if it changed). The open Discord round's answer,
+  aliases, rejects and matcher cannot change (409); the editor asks before changing today's web daily (a status or pool
+  change re-points it and deletes today's attempts) or the open round's question.
 - **Tests** run on a made-up fixture bank behind an in-memory store (`vitest.setup.ts` mocks `bank-store.ts`).

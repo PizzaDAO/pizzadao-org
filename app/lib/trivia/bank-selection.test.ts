@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const db = vi.hoisted(() => ({
   rounds: [] as { id: number; dayKey: string | null; questionId: string; surface: string; status?: string }[],
   recentDaily: [] as { questionId: string }[],
+  dueDiscord: [] as { id: number; questionId: string; channelId: string | null; messageId: string | null; rewardPep: number; openedAt: Date; closesAt: Date }[],
   transactions: 0,
   writes: 0,
 }));
@@ -14,7 +15,7 @@ vi.mock("@/app/lib/db", () => ({
   prisma: {
     triviaRound: {
       findUnique: vi.fn(async ({ where }: { where: { dayKey: string } }) => db.rounds.find((r) => r.dayKey === where.dayKey) ?? null),
-      findMany: vi.fn(async ({ where }: { where: { surface: string } }) => (where.surface === "WEB_DAILY" ? db.recentDaily : [])),
+      findMany: vi.fn(async ({ where }: { where: { surface: string } }) => (where.surface === "WEB_DAILY" ? db.recentDaily : db.dueDiscord)),
       findFirst: vi.fn(async () => null),
       create: vi.fn(async ({ data }: { data: { dayKey: string | null; questionId: string; surface: string } }) => {
         db.writes++;
@@ -62,7 +63,8 @@ import { getBank, invalidateBank, servable } from "./bank";
 import { dailyQuestionFor, dayKeyUtc } from "./daily";
 import { pickDailyQuestion, preferUnexposed } from "./exposed";
 import { pickQuestion, slotsForDay } from "./schedule";
-import { openDiscordRound } from "./rounds";
+import { announceWin, expireRounds, openDiscordRound } from "./rounds";
+import { prisma } from "@/app/lib/db";
 import { getDailyRound, practicePool } from "./web";
 import { runTriviaCron } from "./cron";
 import type { TriviaQuestion } from "./schema";
@@ -76,6 +78,7 @@ beforeEach(() => {
   invalidateBank();
   db.rounds = [];
   db.recentDaily = [];
+  db.dueDiscord = [];
   db.transactions = 0;
   db.writes = 0;
   warn = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -216,5 +219,100 @@ describe("empty or unreachable bank: everything no-ops", () => {
     expect(db.writes).toBe(0);
     expect(db.rounds[0].questionId).toBe("pd-901");
     expect((await getBank()).available).toBe(false);
+  });
+});
+
+describe("today's stored daily vs a partial bank (previews share the production database)", () => {
+  const stored = (questionId: string) => db.rounds.push({ id: 1, dayKey: TODAY, questionId, surface: "WEB_DAILY" });
+
+  it("the stored question missing from the bank (mid-import): 503, nothing re-pointed or deleted", async () => {
+    stored("pd-901");
+    fakeBank.rows.delete("pd-901");
+    invalidateBank();
+    expect(await getDailyRound(NOW)).toBeNull();
+    expect(db.writes).toBe(0);
+    expect(db.rounds[0].questionId).toBe("pd-901");
+    expect(warn.mock.calls.some((c: unknown[]) => String(c[0]).includes("not in the bank"))).toBe(true);
+  });
+
+  it("the stored question's row fails the schema: same, nothing deleted", async () => {
+    stored("pd-901");
+    const r = fakeBank.rows.get("pd-901")!;
+    r.data = { ...(r.data as object), answer: "" };
+    invalidateBank();
+    expect(await getDailyRound(NOW)).toBeNull();
+    expect(db.writes).toBe(0);
+  });
+
+  it("the stored question exists and was retired: re-pointed, its attempts voided (unchanged behaviour)", async () => {
+    stored("pd-901");
+    const r = fakeBank.rows.get("pd-901")!;
+    const { pool: _pool, ...rest } = r.data as TriviaQuestion;
+    void _pool;
+    fakeBank.rows.set("pd-901", { ...r, status: "rejected", pool: null, data: { ...rest, status: "rejected" } });
+    invalidateBank();
+    const round = await getDailyRound(NOW);
+    expect(round!.question.id).not.toBe("pd-901");
+    expect(round!.roundId).toBe(1);
+    expect(vi.mocked(prisma.triviaAttempt.deleteMany)).toHaveBeenCalled();
+  });
+
+  it("a pulled (disabled) stored question keeps being served all day", async () => {
+    const reports = await import("./reports");
+    vi.mocked(reports.getDisabledIds).mockResolvedValue(["pd-901"]);
+    try {
+      stored("pd-901");
+      expect((await getDailyRound(NOW))!.question.id).toBe("pd-901");
+      expect(db.writes).toBe(0);
+    } finally {
+      vi.mocked(reports.getDisabledIds).mockResolvedValue([]);
+    }
+  });
+
+  it("losing the create race serves the question the other request stored, not our own pick", async () => {
+    (prisma.triviaRound.create as unknown as ReturnType<typeof vi.fn>).mockImplementationOnce(async () => {
+      db.rounds.push({ id: 9, dayKey: TODAY, questionId: "eb-913", surface: "WEB_DAILY" });
+      throw Object.assign(new Error("unique"), { code: "P2002" });
+    });
+    const round = await getDailyRound(NOW);
+    expect(round).toMatchObject({ roundId: 9, question: { id: "eb-913" } });
+  });
+});
+
+describe("a revealed answer marks the question exposed", () => {
+  it("a question served as the web daily", async () => {
+    const round = await getDailyRound(NOW);
+    const row = fakeBank.rows.get(round!.question.id)!;
+    expect(row).toMatchObject({ exposed: true, updatedBy: "system:revealed" });
+    expect((await getBank()).exposedIds.has(round!.question.id)).toBe(true); // the cache was dropped
+  });
+
+  it("a Discord round that expires, or is won", async () => {
+    db.dueDiscord = [{ id: 3, questionId: "pd-909", channelId: "1", messageId: "2", rewardPep: 20, openedAt: new Date(NOW.getTime() - 600_000), closesAt: new Date(NOW.getTime() - 1000) }];
+    const { deps } = fakePost();
+    expect(await expireRounds(NOW, deps)).toBe(1);
+    expect(fakeBank.rows.get("pd-909")).toMatchObject({ exposed: true, updatedBy: "system:revealed" });
+    await announceWin({ id: 4, channelId: "1", questionId: "eb-924" }, { discordId: "5", messageId: "6", rewardPep: 20, paid: true }, deps);
+    expect(fakeBank.rows.get("eb-924")!.exposed).toBe(true);
+  });
+
+  it("a failure to mark never breaks the round", async () => {
+    db.dueDiscord = [{ id: 3, questionId: "pd-909", channelId: "1", messageId: "2", rewardPep: 20, openedAt: new Date(NOW.getTime() - 600_000), closesAt: new Date(NOW.getTime() - 1000) }];
+    await getBank(); // cached
+    fakeBank.fail = new Error("write failed");
+    const { deps, posted } = fakePost();
+    expect(await expireRounds(NOW, deps)).toBe(1);
+    expect(posted.length).toBe(1); // the reveal still went out (from the cached bank)
+  });
+});
+
+describe("practice serves exposed questions only", () => {
+  it("nothing exposed: nothing to practise; exposed ones (minus today's daily) only", async () => {
+    expect(await practicePool(NOW)).toEqual([]);
+    fakeBank.setExposed(["pd-901", "pd-903", "eb-904", "pd-909"]); // pd-909 is a Discord question: never on the web
+    invalidateBank();
+    const pool = await practicePool(NOW);
+    const daily = (await getDailyRound(NOW))!.question.id;
+    expect(pool.map((q) => q.id).sort()).toEqual(["eb-904", "pd-901", "pd-903"].filter((id) => id !== daily).sort());
   });
 });

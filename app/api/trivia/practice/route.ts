@@ -1,7 +1,8 @@
 // Practice: GET up to 10 random questions (public view only); POST {questionId, answer} to check one.
 //
-// Practice draws from the *web* pool only, minus today's daily question, (questions reserved for Discord rounds are never served here), so the
-// reveal after an attempt cannot be used to farm Discord answers. GET never carries answer/aliases/rejects.
+// Practice draws from EXPOSED web questions only (their answers are public already), minus today's daily question:
+// questions reserved for Discord rounds and unexposed web questions (future dailies) are never served or checked here,
+// so the reveal after an attempt cannot be used to farm answers that pay. GET never carries answer/aliases/rejects.
 // Checks are server-side and rate limited (30/min per IP, and per member when signed in).
 import { NextRequest } from "next/server";
 import { getSession } from "@/app/lib/session";

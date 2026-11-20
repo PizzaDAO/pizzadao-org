@@ -11,7 +11,7 @@ import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
 import { triviaSettings } from "./channel";
 import { accountOldEnough, REQUIRE_MEMBER } from "./config";
 import { triviaLive } from "./enabled";
-import { filterServable, getBank } from "./bank";
+import { filterServable, getBank, markRevealed } from "./bank";
 import { addDays, computeBestStreak, computeStreak, dayKeyUtc, nextDayStartMs } from "./daily";
 import { pickDailyQuestion } from "./exposed";
 import { getDisabledIds } from "./reports";
@@ -24,14 +24,6 @@ export interface DailyRound {
   roundId: number | null;
 }
 
-/**
- * Today's web daily: the stored round if there is one, else computed (and stored, best effort). Null if the web pool is empty.
- *
- * If the stored question is no longer servable (retired, expired, or no longer a web question; NOT merely pulled: see below) the round is re-pointed at the
- * replacement and the answers already given to the pulled question are voided (deleted): they were graded against a
- * question that is no longer served, so keeping them would make the reveal, "% got it right" and streak disagree with
- * the question on screen. Those members can answer the replacement and win the day back.
- */
 /** Question ids of the web dailies before `dayKey`, newest first; cached per day (past days do not change). */
 let recentDailyCache: { dayKey: string; ids: string[] } | null = null;
 async function recentDailyIds(dayKey: string): Promise<string[]> {
@@ -56,32 +48,57 @@ async function recentDailyIds(dayKey: string): Promise<string[]> {
  * unexposed questions (exposed.ts pickDailyQuestion; the recent dailies are only read while exposed ones are left).
  * `stillServable` ignores pulls: see getDailyRound.
  */
-async function dailyContext(now: Date): Promise<{ dayKey: string; pool: TriviaQuestion[]; computed: TriviaQuestion | null; stillServable: TriviaQuestion[] }> {
+async function dailyContext(
+  now: Date,
+): Promise<{ dayKey: string; pool: TriviaQuestion[]; computed: TriviaQuestion | null; stillServable: TriviaQuestion[]; known: Set<string>; exposedIds: ReadonlySet<string> }> {
   const dayKey = dayKeyUtc(now);
   const bank = await getBank();
   const pool = filterServable(bank.questions, { now, pool: "web", disabledIds: await getDisabledIds() });
   const anyExposed = pool.some((q) => bank.exposedIds.has(q.id));
   const computed = pickDailyQuestion(dayKey, pool, { exposedIds: bank.exposedIds, recentIds: anyExposed ? await recentDailyIds(dayKey) : [] });
-  return { dayKey, pool, computed, stillServable: filterServable(bank.questions, { now, pool: "web" }) };
+  return { dayKey, pool, computed, stillServable: filterServable(bank.questions, { now, pool: "web" }), known: new Set(bank.questions.map((q) => q.id)), exposedIds: bank.exposedIds };
 }
 
+/**
+ * Today's web daily: the stored round if there is one, else computed (and stored, best effort). Null if the web pool is empty.
+ *
+ * If the stored question is in the bank but no longer servable (retired, expired, or no longer a web question; NOT
+ * merely pulled: see below) the round is re-pointed at the replacement and the answers already given to it are voided
+ * (deleted): they were graded against a question that is no longer served, so keeping them would make the reveal,
+ * "% got it right" and streak disagree with the question on screen. Those members can answer the replacement.
+ *
+ * If the stored question is MISSING from the bank (an unreachable database, a half-done import, a row that fails the
+ * schema) nothing is changed or deleted: the day answers 503 until the question is back. Previews share the production
+ * database, so a partial bank anywhere must never wipe a day's answers.
+ *
+ * The question served as the daily is marked exposed (bank.ts markRevealed): everyone sees its answer after answering.
+ */
 export async function getDailyRound(now: Date = new Date()): Promise<DailyRound | null> {
   // Today's stored question stays valid even if it has been PULLED (disabled) since: a pull stops it being picked from
   // tomorrow, but never changes the question on screen mid-day or deletes anyone's answer and streak credit. Only a
   // question that is no longer servable at all (retired, expired, moved out of the web pool) is re-pointed.
   // An empty or unreachable bank computes nothing and changes nothing: no round is stored or re-pointed (bank.ts logs it).
-  const { dayKey, computed, stillServable } = await dailyContext(now);
+  const { dayKey, computed, stillServable, known } = await dailyContext(now);
 
   try {
     const existing = await prisma.triviaRound.findUnique({ where: { dayKey } });
     if (existing) {
       const stored = stillServable.find((q) => q.id === existing.questionId);
-      if (stored && stillServable.some((q) => q.id === stored.id)) return { dayKey, question: stored, roundId: existing.id };
+      if (stored) {
+        await markRevealed([stored.id]);
+        return { dayKey, question: stored, roundId: existing.id };
+      }
+      if (!known.has(existing.questionId)) {
+        console.warn(`[trivia] today's daily question ${existing.questionId} is not in the bank (unavailable, mid-import or invalid): serving nothing, changing nothing`);
+        return null;
+      }
+      // The stored question exists and is genuinely not servable any more: re-point (see above).
       if (!computed) return null;
       await prisma.$transaction([
         prisma.triviaAttempt.deleteMany({ where: { roundId: existing.id } }),
         prisma.triviaRound.update({ where: { id: existing.id }, data: { questionId: computed.id } }),
       ]);
+      await markRevealed([computed.id]);
       return { dayKey, question: computed, roundId: existing.id };
     }
     if (!computed) return null;
@@ -89,11 +106,14 @@ export async function getDailyRound(now: Date = new Date()): Promise<DailyRound 
       const created = await prisma.triviaRound.create({
         data: { surface: "WEB_DAILY", questionId: computed.id, status: "OPEN", dayKey, closesAt: new Date(nextDayStartMs(dayKey)) },
       });
+      await markRevealed([computed.id]);
       return { dayKey, question: computed, roundId: created.id };
     } catch {
-      // Lost a race with another request creating the same day.
+      // Lost a race with another request creating the same day: serve what that request stored, never our own pick.
       const again = await prisma.triviaRound.findUnique({ where: { dayKey } });
-      return { dayKey, question: computed, roundId: again?.id ?? null };
+      if (!again) return { dayKey, question: computed, roundId: null };
+      const theirs = stillServable.find((q) => q.id === again.questionId);
+      return theirs ? { dayKey, question: theirs, roundId: again.id } : null;
     }
   } catch (e) {
     console.error("[trivia] daily round unavailable:", (e as Error).message);
@@ -102,14 +122,15 @@ export async function getDailyRound(now: Date = new Date()): Promise<DailyRound 
 }
 
 /**
- * The questions practice may serve: the web pool minus today's daily, so a practice reveal can never give away the
- * daily answer before a member's recorded attempt.
+ * The questions practice may serve: EXPOSED web questions only (their answers are public already), minus today's
+ * daily. Practice reveals the answer after any attempt, so an unexposed question there would be an oracle for a future
+ * daily (which can pay $PEP). With no exposed web question, practice has nothing to serve.
  */
 export async function practicePool(now: Date = new Date()): Promise<TriviaQuestion[]> {
-  const { pool, computed } = await dailyContext(now);
+  const { pool, computed, exposedIds } = await dailyContext(now);
   const daily = await getDailyRound(now);
   const hidden = new Set([daily?.question.id, computed?.id].filter((x): x is string => !!x));
-  return pool.filter((q) => !hidden.has(q.id));
+  return pool.filter((q) => exposedIds.has(q.id) && !hidden.has(q.id));
 }
 
 export interface StoredAttempt {

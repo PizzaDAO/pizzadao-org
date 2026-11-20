@@ -4,20 +4,22 @@
  *   DATABASE_URL=... npx tsx scripts/trivia/import-bank.ts <questions.json>
  *       dry run (default): validates every entry and prints what it would create / update / keep. Writes nothing.
  *   ... --apply
- *       upserts. Refuses to write anything if any entry is invalid (QuestionSchema + matcher lint) or an id repeats.
+ *       upserts, all in one transaction. Refuses to write anything if any entry is invalid (QuestionSchema + matcher
+ *       lint) or an id repeats; a row that changed meanwhile rolls the whole import back.
  *   ... --exposed
  *       marks every imported row exposed=true (its text and answer are in public git history: the original bank).
  *   ... --force
- *       also overwrites rows changed after the import (by default a row whose updatedAt is newer is kept).
+ *       also overwrites rows edited outside the import (updatedBy is not script:import-bank: an admin edit, a reveal)
+ *       and rows changed after --as-of. Without it both are skipped and listed.
  *   ... --as-of <ISO date>
  *       when the import's content was written (default: the file's modification time). Rows updated after it are
  *       "newer than the import".
  *
- * The file is a bank file ({ "questions": [...] }) or a bare array of questions. Output is ids and counts only.
+ * The file is a bank file ({ "questions": [...] }) or a bare array of questions. Output is ids, field paths and counts only (never text, answers, aliases or rejects).
  * Exit code: 0 ok, 1 invalid entries / write conflicts, 2 bad arguments.
  */
 import { readFileSync, statSync } from "node:fs";
-import { formatImportReport, importEntries, runImport } from "../../app/lib/trivia/bank-import";
+import { describeError, formatImportReport, importEntries, runImport } from "../../app/lib/trivia/bank-import";
 
 function usage(msg?: string): never {
   if (msg) console.error(msg);
@@ -41,14 +43,15 @@ async function main() {
   try {
     raw = JSON.parse(readFileSync(file, "utf8"));
   } catch (e) {
-    usage(`cannot read ${file}: ${(e as Error).message}`);
+    // Not the message: JSON.parse quotes a slice of the file, which may be an answer.
+    usage(`cannot read ${file}: ${(e as Error).name}${(e as { code?: string }).code ? ` ${(e as { code?: string }).code}` : ""}`);
   }
   const entries = importEntries(raw);
   if (!entries) usage(`${file} is neither { "questions": [...] } nor an array`);
   const asOf = asOfArg ? new Date(asOfArg) : statSync(file).mtime;
   if (Number.isNaN(asOf.getTime())) usage(`bad --as-of ${asOfArg}`);
 
-  const opts = { apply: flags.has("--apply"), force: flags.has("--force"), exposed: flags.has("--exposed"), asOf, actor: "script:import-bank" };
+  const opts = { apply: flags.has("--apply"), force: flags.has("--force"), exposed: flags.has("--exposed"), asOf };
   const report = await runImport(entries, opts);
   console.log(formatImportReport(report, opts));
   const { prisma } = await import("../../app/lib/db");
@@ -57,6 +60,6 @@ async function main() {
 }
 
 main().catch((e) => {
-  console.error(e);
+  console.error(`import failed: ${describeError(e)}`);
   process.exit(1);
 });

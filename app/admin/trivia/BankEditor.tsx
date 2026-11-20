@@ -7,8 +7,12 @@
 // usual fields, raw JSON for everything), approve / flag / retire, move pools. The server validates every save
 // (QuestionSchema + matcher lint) and shows why a save was refused.
 //
-// Exposed questions: their text and answer are in public git history, so the daily and the Discord rounds avoid them.
-// Rewording the question or changing the answer clears the flag.
+// Exposed questions: their answer is public (in git history, or revealed by a closed round or a served daily), so the
+// daily and the Discord rounds avoid them and practice serves them. The id is public too, so rewording the question
+// keeps the flag; only a genuinely new answer clears it (or clearing it by hand).
+//
+// Live questions: changing today's web daily's status or pool re-points the daily and deletes today's attempts, and
+// the open Discord round's answer cannot change until it closes (the server refuses): both ask before saving.
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -130,7 +134,28 @@ function Select({ value, onChange, options, empty }: { value: string; onChange: 
 
 type Editing = { mode: "create" } | { mode: "edit"; row: AdminQuestionRow };
 
-function Editor({ editing, template, onDone, onCancel }: { editing: Editing; template: Partial<TriviaQuestion>; onDone: (row: AdminQuestionRow) => void; onCancel: () => void }) {
+/** The question ids live right now: today's web daily and the open Discord round's question. */
+export interface LiveIds {
+  daily: string | null;
+  discord: string | null;
+}
+
+const gradingKey = (q: Partial<TriviaQuestion> | Record<string, unknown>) => {
+  const x = q as Partial<TriviaQuestion>;
+  return JSON.stringify([x.answer, x.aliases ?? [], x.rejects ?? [], x.match, x.choices ?? null, x.type]);
+};
+
+/** The confirmation to show before a change to a live question, or null when it is not live. */
+function liveWarning(id: string, live: LiveIds, change: { grading: boolean; servedChange: boolean }): string | null {
+  const lines: string[] = [];
+  if (id === live.daily && change.servedChange) lines.push("This is today's web daily: flagging, retiring or moving it re-points the daily and DELETES today's attempts (members answer the replacement).");
+  else if (id === live.daily && change.grading) lines.push("This is today's web daily: changing its answer changes how the rest of today's answers are graded.");
+  if (id === live.discord && change.grading) lines.push("This question is in the open Discord round: answer changes are refused until the round closes.");
+  else if (id === live.discord && change.servedChange) lines.push("This question is in the open Discord round (the round itself carries on).");
+  return lines.length ? `${lines.join("\n\n")}\n\nContinue?` : null;
+}
+
+function Editor({ editing, template, live, onDone, onCancel }: { editing: Editing; template: Partial<TriviaQuestion>; live: LiveIds; onDone: (row: AdminQuestionRow) => void; onCancel: () => void }) {
   const start = editing.mode === "edit" ? ((editing.row.question ?? editing.row.data) as Partial<TriviaQuestion>) : template;
   const [form, setForm] = useState<FormState>(() => toForm(start));
   const [tab, setTab] = useState<"form" | "json">(editing.mode === "edit" && !editing.row.question ? "json" : "form");
@@ -167,6 +192,15 @@ function Editor({ editing, template, onDone, onCancel }: { editing: Editing; tem
         return;
       }
     } else question = fromForm(form);
+    if (editing.mode === "edit" && question && typeof question === "object") {
+      const before = (editing.row.question ?? editing.row.data ?? {}) as Partial<TriviaQuestion>;
+      const after = question as Partial<TriviaQuestion>;
+      const warning = liveWarning(editing.row.id, live, {
+        grading: gradingKey(before) !== gradingKey(after),
+        servedChange: before.status !== after.status || (before.pool ?? null) !== (after.pool ?? null),
+      });
+      if (warning && !window.confirm(warning)) return;
+    }
     setBusy(true);
     try {
       const body =
@@ -199,7 +233,7 @@ function Editor({ editing, template, onDone, onCancel }: { editing: Editing; tem
         </button>
       </div>
       {editing.mode === "edit" && editing.row.exposed && (
-        <p className="m-0 text-sm text-tomato">Exposed: this question and its answer are in public git history. Reword the question (or change the answer) to clear it.</p>
+        <p className="m-0 text-sm text-tomato">Exposed: its answer is public (git history, or revealed by a round). Rewording the text keeps it exposed (the id is public); change the answer to a new one, or untick below, to clear it.</p>
       )}
       {tab === "json" ? (
         <Field label="Question object" hint="The full entry, exactly as stored. Validated on save.">
@@ -298,7 +332,7 @@ function Editor({ editing, template, onDone, onCancel }: { editing: Editing; tem
       )}
       {editing.mode === "edit" && (
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={exposed} onChange={(e) => setExposed(e.target.checked)} /> Exposed (in public git history). Cleared automatically when the question or answer changes.
+          <input type="checkbox" checked={exposed} onChange={(e) => setExposed(e.target.checked)} /> Exposed (answer public). Cleared automatically only when the answer changes to a genuinely new one.
         </label>
       )}
       {errors.length > 0 && (
@@ -328,11 +362,13 @@ function Badge({ children, tone = "plain" }: { children: React.ReactNode; tone?:
   );
 }
 
-function RowActions({ row, onSaved, onEdit }: { row: AdminQuestionRow; onSaved: (row: AdminQuestionRow) => void; onEdit: () => void }) {
+function RowActions({ row, live, onSaved, onEdit }: { row: AdminQuestionRow; live: LiveIds; onSaved: (row: AdminQuestionRow) => void; onEdit: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   async function status(next: string, pool?: string) {
+    const warning = liveWarning(row.id, live, { grading: false, servedChange: true });
+    if (warning && !window.confirm(warning)) return;
     let rejectedReason: string | undefined;
     if (next === "rejected") {
       const reason = window.prompt(`Retire ${row.id}: why (who and when)?`);
@@ -396,7 +432,7 @@ function RowActions({ row, onSaved, onEdit }: { row: AdminQuestionRow; onSaved: 
   );
 }
 
-export function BankEditor({ initialRows, nextIds }: { initialRows: AdminQuestionRow[]; nextIds: Record<string, string> }) {
+export function BankEditor({ initialRows, nextIds, live }: { initialRows: AdminQuestionRow[]; nextIds: Record<string, string>; live: LiveIds }) {
   const router = useRouter();
   const [rows, setRows] = useState(initialRows);
   const [status, setStatus] = useState("");
@@ -435,7 +471,7 @@ export function BankEditor({ initialRows, nextIds }: { initialRows: AdminQuestio
     <div className="grid gap-4">
       {exposedApproved > 0 && (
         <p className="m-0 text-sm" role="status">
-          <strong className="text-tomato">{exposedApproved}</strong> approved question{exposedApproved === 1 ? " is" : "s are"} exposed (in public git history) and want rewording. The daily and Discord rounds use unexposed questions first.
+          <strong className="text-tomato">{exposedApproved}</strong> approved question{exposedApproved === 1 ? " is" : "s are"} exposed (answer public) and want a new answer. The daily and Discord rounds use unexposed questions first; practice serves only exposed ones.
         </p>
       )}
       <div className="grid gap-2 sm:grid-cols-5">
@@ -461,7 +497,7 @@ export function BankEditor({ initialRows, nextIds }: { initialRows: AdminQuestio
         </span>
       </div>
       {editing?.mode === "create" && (
-        <Editor key={`create-${newCategory}`} editing={editing} template={{ id: nextIds[newCategory] ?? "", category: newCategory as TriviaQuestion["category"], status: "flagged" }} onDone={saved} onCancel={() => setEditing(null)} />
+        <Editor key={`create-${newCategory}`} editing={editing} template={{ id: nextIds[newCategory] ?? "", category: newCategory as TriviaQuestion["category"], status: "flagged" }} live={live} onDone={saved} onCancel={() => setEditing(null)} />
       )}
       <ul className="m-0 grid list-none gap-3 p-0">
         {shown.map((r) => (
@@ -473,7 +509,9 @@ export function BankEditor({ initialRows, nextIds }: { initialRows: AdminQuestio
               <Badge>{r.category}</Badge>
               {r.question && <Badge>{r.question.type}</Badge>}
               {r.question && <Badge>{r.question.difficulty}</Badge>}
-              {r.exposed && <Badge tone="warn">exposed: needs rewording</Badge>}
+              {r.exposed && <Badge tone="warn">exposed: needs a new answer</Badge>}
+              {r.id === live.daily && <Badge tone="warn">today&apos;s web daily</Badge>}
+              {r.id === live.discord && <Badge tone="warn">open Discord round</Badge>}
               {r.error && <Badge tone="warn">invalid: not served</Badge>}
               <span className="text-xs text-foreground/60">
                 {r.updatedAt.slice(0, 16).replace("T", " ")} UTC{r.updatedBy ? ` · ${r.updatedBy}` : ""}
@@ -481,9 +519,9 @@ export function BankEditor({ initialRows, nextIds }: { initialRows: AdminQuestio
             </p>
             {r.question ? <p className="m-0">{r.question.question}</p> : <p className="m-0 text-tomato">{r.error}</p>}
             {editing?.mode === "edit" && editing.row.id === r.id ? (
-              <Editor key={`edit-${r.id}-${r.updatedAt}`} editing={editing} template={{}} onDone={saved} onCancel={() => setEditing(null)} />
+              <Editor key={`edit-${r.id}-${r.updatedAt}`} editing={editing} template={{}} live={live} onDone={saved} onCancel={() => setEditing(null)} />
             ) : (
-              <RowActions row={r} onSaved={saved} onEdit={() => setEditing({ mode: "edit", row: r })} />
+              <RowActions row={r} live={live} onSaved={saved} onEdit={() => setEditing({ mode: "edit", row: r })} />
             )}
           </li>
         ))}

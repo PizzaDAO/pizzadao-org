@@ -11,7 +11,7 @@
 //
 // Answer secrecy: everything a client sees before an attempt goes through publicView(); the answer, aliases, rejects,
 // explanation and sources only leave the server through reveal(), after an attempt.
-import { listBankRows, type BankRow } from "./bank-store";
+import { listBankRows, markRowsExposed, type BankRow } from "./bank-store";
 import { QuestionSchema, type PublicQuestion, type QuestionReveal, type TriviaPool, type TriviaQuestion } from "./schema";
 
 export const BANK_TTL_MS = 60_000;
@@ -94,6 +94,25 @@ export function invalidateBank(): void {
   generation++;
   cache = null;
   inflight = null;
+}
+
+export const REVEALED_ACTOR = "system:revealed";
+
+/**
+ * A question's answer has gone public (a Discord round closed, a question was served as the web daily): mark it
+ * exposed, so the daily and the Discord picker do not use it again while fresh ones are left (and practice may).
+ * Already exposed rows are untouched. Never throws: a failure is logged and the caller carries on.
+ */
+export async function markRevealed(ids: Iterable<string>): Promise<void> {
+  const list = [...new Set(ids)];
+  if (list.length === 0) return;
+  try {
+    const bank = await getBank();
+    if (list.every((id) => bank.exposedIds.has(id))) return; // nothing to do (cheap: no write)
+    if ((await markRowsExposed(list, REVEALED_ACTOR)) > 0) invalidateBank();
+  } catch (e) {
+    console.error(`[trivia] could not mark ${list.join(", ")} exposed: ${(e as Error).message?.slice(0, 120)}`);
+  }
 }
 
 /** Every id in use, valid rows and broken ones (a new id must not collide with either). */

@@ -3,7 +3,14 @@
 // invalidation. The bank is the made-up fixture behind the in-memory store (vitest.setup.ts).
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/app/lib/db");
+const live = vi.hoisted(() => ({ openDiscordQuestion: null as string | null }));
+vi.mock("@/app/lib/db", () => ({
+  prisma: {
+    triviaRound: {
+      findFirst: async ({ where }: { where: { questionId: string } }) => (live.openDiscordQuestion === where.questionId ? { id: 1 } : null),
+    },
+  },
+}));
 vi.mock("@/app/lib/auth-guards", () => ({ requireAdmin: vi.fn() }));
 
 import { GET, POST } from "./route";
@@ -35,6 +42,7 @@ const fresh = (over: Partial<TriviaQuestion> = {}): TriviaQuestion => ({
 });
 
 beforeEach(() => {
+  live.openDiscordQuestion = null;
   fakeBank.reset();
   invalidateBank();
   vi.mocked(requireAdmin).mockReset();
@@ -116,17 +124,49 @@ describe("create", () => {
 describe("update", () => {
   const current = async (id: string) => ({ ...((await getQuestion(id)) as TriviaQuestion) });
 
-  it("rewording the question clears exposed; editing anything else keeps it", async () => {
+  it("rewording the question text keeps exposed (the id is public); only a genuinely new answer clears it", async () => {
     fakeBank.setExposed(["pd-905", "pd-901"]);
     invalidateBank();
     const q = await current("pd-905");
-    const kept = await post({ action: "update", id: "pd-905", question: { ...q, explanation: "A better explanation." } });
-    expect((await kept.json()).row.exposed).toBe(true);
-    const reworded = await post({ action: "update", id: "pd-905", question: { ...q, question: "Which Fixture Town shop first sold a deep dish?" } });
-    expect((await reworded.json()).row).toMatchObject({ exposed: false, updatedBy: ADMIN });
+    const reworded = await post({ action: "update", id: "pd-905", question: { ...q, question: "Which Fixture Town shop first sold a deep dish?", explanation: "Better." } });
+    expect((await reworded.json()).row).toMatchObject({ exposed: true, updatedBy: ADMIN });
     const n = await current("pd-901");
-    const newAnswer = await post({ action: "update", id: "pd-901", question: { ...n, answer: "12000", aliases: ["12,000"] } });
+    // an old alias, or a form the old matcher accepts, as the new answer: still the answer in public history
+    const alias = await post({ action: "update", id: "pd-901", question: { ...n, answer: "10000", aliases: ["10,000", "10k"] } });
+    expect((await alias.json()).row.exposed).toBe(true);
+    const same = await current("pd-901");
+    const fromAlias = await post({ action: "update", id: "pd-901", question: { ...same, answer: "10000.0", aliases: ["10,000"] } });
+    expect((await fromAlias.json()).row.exposed).toBe(true);
+    const fresh2 = await current("pd-901");
+    const newAnswer = await post({ action: "update", id: "pd-901", question: { ...fresh2, question: "How many basil leaves were on the record Fixture Town pizza?", answer: "12000", aliases: ["12,000"] } });
     expect((await newAnswer.json()).row.exposed).toBe(false);
+  });
+
+  it("the guard defaults to the row just read: a write landing in between is never overwritten (update and status)", async () => {
+    const q = await current("pd-906");
+    const bump = () => {
+      const r = fakeBank.rows.get("pd-906")!;
+      fakeBank.rows.set("pd-906", { ...r, updatedAt: new Date(r.updatedAt.getTime() + 1000), updatedBy: "system:revealed" });
+    };
+    fakeBank.afterRead = bump;
+    expect((await post({ action: "update", id: "pd-906", question: { ...q, explanation: "Mine." } })).status).toBe(409);
+    expect((await post({ action: "status", id: "pd-906", status: "flagged" })).status).toBe(409);
+    expect(fakeBank.rows.get("pd-906")!).toMatchObject({ status: "approved", updatedBy: "system:revealed" });
+    fakeBank.afterRead = null;
+    expect((await post({ action: "update", id: "pd-906", question: { ...q, explanation: "Mine." } })).status).toBe(200);
+  });
+
+  it("the open Discord round's question: its answer cannot change (409); other fields can", async () => {
+    live.openDiscordQuestion = "pd-909";
+    const q = await current("pd-909");
+    for (const over of [{ answer: "48122" }, { aliases: ["48,121", "oven door 48121"] }, { rejects: ["48122"] }, { match: { kind: "number" as const, tolerance: 5 } }]) {
+      const res = await post({ action: "update", id: "pd-909", question: { ...q, ...over } });
+      expect(res.status).toBe(409);
+      expect((await res.json()).error).toMatch(/open Discord round/);
+    }
+    expect((await post({ action: "update", id: "pd-909", question: { ...q, explanation: "Clearer." } })).status).toBe(200);
+    live.openDiscordQuestion = null;
+    expect((await post({ action: "update", id: "pd-909", question: { ...(await current("pd-909")), answer: "48122", aliases: [] } })).status).toBe(200);
   });
 
   it("the exposed flag can be set explicitly", async () => {

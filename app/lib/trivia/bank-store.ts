@@ -46,18 +46,67 @@ export async function insertBankRow(q: TriviaQuestion, meta: { exposed: boolean;
 }
 
 export interface UpdateGuard {
-  /** Optimistic concurrency (the editor): only when the row's updatedAt is exactly this. */
-  expectUpdatedAt?: Date;
-  /** The import: only when the row was not changed after this instant. */
-  notNewerThan?: Date;
+  /**
+   * Optimistic concurrency, always required: the write only happens when the row's updatedAt is exactly this (the
+   * updatedAt of the row the caller read). A row changed in between is never overwritten.
+   */
+  expectUpdatedAt: Date;
 }
 
-/** Replace a question (same id). Returns null when the row is missing or the guard fails. */
+/** Replace a question (same id). Returns null when the row is missing or changed since it was read. */
 export async function updateBankRow(q: TriviaQuestion, meta: { exposed: boolean; actor: string } & UpdateGuard): Promise<BankRow | null> {
-  const where: Prisma.TriviaQuestionWhereInput = { id: q.id };
-  if (meta.expectUpdatedAt) where.updatedAt = meta.expectUpdatedAt;
-  else if (meta.notNewerThan) where.updatedAt = { lte: meta.notNewerThan };
-  const res = await prisma.triviaQuestion.updateMany({ where, data: { ...columns(q), exposed: meta.exposed, updatedBy: meta.actor } });
+  const res = await prisma.triviaQuestion.updateMany({
+    where: { id: q.id, updatedAt: meta.expectUpdatedAt },
+    data: { ...columns(q), exposed: meta.exposed, updatedBy: meta.actor },
+  });
   if (res.count !== 1) return null;
   return getBankRow(q.id);
+}
+
+export type ImportOp = { kind: "create"; q: TriviaQuestion; exposed: boolean } | { kind: "update"; q: TriviaQuestion; exposed: boolean; expectUpdatedAt: Date };
+
+class ImportConflict extends Error {
+  constructor(readonly id: string) {
+    super(`conflict on ${id}`);
+  }
+}
+
+/**
+ * Apply an import in ONE transaction: every write or none. A create whose id appeared meanwhile, or an update of a row
+ * changed since it was read, rolls the whole import back and is reported as the conflict.
+ */
+export async function applyImportOps(ops: ImportOp[], actor: string): Promise<{ ok: true } | { ok: false; conflict: string }> {
+  try {
+    await prisma.$transaction(
+      async (tx) => {
+        for (const op of ops) {
+          if (op.kind === "create") {
+            const res = await tx.triviaQuestion.createMany({ data: [{ id: op.q.id, ...columns(op.q), exposed: op.exposed, updatedBy: actor }], skipDuplicates: true });
+            if (res.count !== 1) throw new ImportConflict(op.q.id);
+          } else {
+            const res = await tx.triviaQuestion.updateMany({
+              where: { id: op.q.id, updatedAt: op.expectUpdatedAt },
+              data: { ...columns(op.q), exposed: op.exposed, updatedBy: actor },
+            });
+            if (res.count !== 1) throw new ImportConflict(op.q.id);
+          }
+        }
+      },
+      { maxWait: 15_000, timeout: 120_000 },
+    );
+    return { ok: true };
+  } catch (e) {
+    if (e instanceof ImportConflict) return { ok: false, conflict: e.id };
+    throw e;
+  }
+}
+
+/**
+ * Mark questions exposed because their answer has been revealed publicly (a Discord round closed, a web daily was
+ * served). Only rows not already exposed change. Returns how many changed.
+ */
+export async function markRowsExposed(ids: string[], actor: string): Promise<number> {
+  if (ids.length === 0) return 0;
+  const res = await prisma.triviaQuestion.updateMany({ where: { id: { in: ids }, exposed: false }, data: { exposed: true, updatedBy: actor } });
+  return res.count;
 }

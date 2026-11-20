@@ -134,6 +134,11 @@ const dailyBody = (answer: string, over: Record<string, unknown> = {}) => {
 const discordPool = () => DISCORD;
 
 beforeEach(() => {
+  // Every fixture question exposed (as after the import of the old public bank): practice serves exposed questions only,
+  // and with all of them exposed the daily is the plain hash pick (and serving it as the daily changes nothing).
+  fakeBank.reset();
+  fakeBank.setExposed([...fakeBank.rows.keys()]);
+  invalidateBank();
   session.value = null;
   db.rounds.length = 0;
   db.attempts = [];
@@ -450,6 +455,28 @@ describe("report", () => {
     const codes: number[] = [];
     for (let i = 0; i < 6; i++) codes.push((await post({ questionId: q.id, text: "something is off" }, ip)).status);
     expect(codes).toEqual([200, 200, 200, 200, 200, 429]);
+  });
+});
+
+describe("practice is not an oracle for future dailies", () => {
+  it("an unexposed web question is never served or checked by practice (its answer is not public)", async () => {
+    const fresh = WEB.filter((q) => q.id !== dailyQuestionFor(dayKeyUtc(), WEB)!.id).slice(0, 3);
+    fakeBank.setExposed(fresh.map((q) => q.id), false);
+    invalidateBank();
+    const body = await (await practiceGET(req("/api/trivia/practice"))).json();
+    for (const q of fresh) expect(body.questions.some((x: { id: string }) => x.id === q.id)).toBe(false);
+    for (const q of fresh) {
+      const res = await practicePOST(req("/api/trivia/practice", { method: "POST", body: { questionId: q.id, answer: q.answer } }));
+      expect(res.status).toBe(404);
+      expect(JSON.stringify(await res.json())).not.toContain("reveal");
+    }
+  });
+
+  it("with nothing exposed, practice has nothing to serve", async () => {
+    fakeBank.setExposed([...fakeBank.rows.keys()], false);
+    invalidateBank();
+    const body = await (await practiceGET(req("/api/trivia/practice"))).json();
+    expect(body.questions).toEqual([]);
   });
 });
 

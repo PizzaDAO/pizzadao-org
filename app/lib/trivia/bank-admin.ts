@@ -4,11 +4,17 @@
 // validated with QuestionSchema plus the matcher lint (bank-lint.ts), records the actor in updatedBy, and drops this
 // instance's bank cache so the change is served at once (other instances within BANK_TTL_MS).
 //
-// Exposed questions (see exposed.ts): editing the question text or the answer clears `exposed`, since the reworded
-// question is no longer the one in public history. The editor can also set the flag explicitly.
+// Exposed questions (see exposed.ts): the id is public and history maps id -> answer, so rewording the question text
+// does NOT clear `exposed`. Only a new answer clears it: one that is not the old answer, not an old alias, and not
+// something the old matcher would accept. The editor can also set the flag explicitly.
+//
+// Every update is guarded by the updatedAt of the row it read (or the one the editor loaded): a row changed in between
+// is never overwritten (409). The answer of the question in the open Discord round cannot change mid-round (409).
+import { prisma } from "@/app/lib/db";
 import { bankFromRows, bankIds, invalidateBank } from "./bank";
 import { checkQuestion } from "./bank-lint";
 import { getBankRow, insertBankRow, listBankRows, updateBankRow, type BankRow } from "./bank-store";
+import { match, normalizeText } from "./match";
 import { POOLS, QuestionSchema, STATUSES, type TriviaPool, type TriviaQuestion } from "./schema";
 
 export type BankWriteResult = { ok: true; row: AdminQuestionRow } | { ok: false; status: 400 | 404 | 409; error: string; errors?: string[] };
@@ -89,7 +95,7 @@ export async function createQuestion(value: unknown, actor: string): Promise<Ban
 export interface UpdateOptions {
   /** The updatedAt the editor loaded: refused (409) when the row changed since. */
   expectUpdatedAt?: string;
-  /** Set the exposed flag explicitly. Absent: kept, or cleared when the question text or answer changed. */
+  /** Set the exposed flag explicitly. Absent: kept, or cleared when the answer changed to a genuinely new one. */
   exposed?: boolean;
 }
 
@@ -104,9 +110,12 @@ export async function updateQuestion(id: string, value: unknown, actor: string, 
   const q = check.question;
   if (q.id !== id) return invalid([`id: the id cannot change (${id})`]);
   const old = QuestionSchema.safeParse(existing.data);
-  const reworded = !old.success || old.data.question !== q.question || old.data.answer !== q.answer;
-  const exposed = opts.exposed ?? (reworded ? false : existing.exposed);
-  const row = await updateBankRow(q, { exposed, actor, expectUpdatedAt: expected });
+  if (old.success && gradingChanged(old.data, q) && (await isOpenDiscordQuestion(id))) {
+    return { ok: false, status: 409, error: "This question is in the open Discord round: its answer, aliases, rejects and matcher cannot change until the round closes" };
+  }
+  const exposed = opts.exposed ?? (old.success && newAnswer(old.data, q.answer) ? false : existing.exposed);
+  // Default guard: the row just read. A write in between (another admin, the import, a reveal) is never overwritten.
+  const row = await updateBankRow(q, { exposed, actor, expectUpdatedAt: expected ?? existing.updatedAt });
   invalidateBank();
   if (!row) return { ok: false, status: 409, error: "The question changed since you opened it: reload and try again" };
   return { ok: true, row: toAdminRow(row) };
@@ -135,5 +144,24 @@ export async function setQuestionStatus(id: string, change: StatusChange, actor:
   if (next.status === "rejected") {
     if (change.rejectedReason?.trim()) next.rejectedReason = change.rejectedReason.trim();
   } else delete next.rejectedReason;
-  return updateQuestion(id, next, actor, { expectUpdatedAt: change.expectUpdatedAt });
+  return updateQuestion(id, next, actor, { expectUpdatedAt: change.expectUpdatedAt ?? existing.updatedAt.toISOString() });
+}
+
+/** Whether a changed answer is genuinely new: not the old answer, not an old alias, not accepted by the old matcher. */
+export function newAnswer(old: TriviaQuestion, answer: string): boolean {
+  const n = normalizeText(answer);
+  if ([old.answer, ...old.aliases].some((a) => normalizeText(a) === n)) return false;
+  return match(old, answer).verdict !== "correct";
+}
+
+/** Whether an edit changes how answers are graded. */
+function gradingChanged(a: TriviaQuestion, b: TriviaQuestion): boolean {
+  const g = (q: TriviaQuestion) => JSON.stringify([q.answer, q.aliases, q.rejects, q.match, q.choices ?? null, q.type]);
+  return g(a) !== g(b);
+}
+
+/** Whether `id` is the question of an OPEN Discord round right now. */
+async function isOpenDiscordQuestion(id: string): Promise<boolean> {
+  const open = await prisma.triviaRound.findFirst({ where: { surface: "DISCORD", status: "OPEN", questionId: id }, select: { id: true } });
+  return !!open;
 }

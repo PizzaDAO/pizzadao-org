@@ -21,7 +21,8 @@ import { getDisabledIds, openReportGroups } from "@/app/lib/trivia/reports";
 import { openSuggestions } from "@/app/lib/trivia/suggestions";
 import { ReportActions } from "./ReportActions";
 import { SuggestionActions } from "./SuggestionActions";
-import { BankEditor } from "./BankEditor";
+import { BankEditor, type LiveIds } from "./BankEditor";
+import { dayKeyUtc } from "@/app/lib/trivia/daily";
 import { EditorialMasthead, EditorialPage, SectionHeading, paperCard } from "@/app/ui/shared/Editorial";
 
 export const runtime = "nodejs";
@@ -55,6 +56,19 @@ async function loadBankRows(): Promise<AdminQuestionRow[] | null> {
   }
 }
 
+/** Today's web daily and the open Discord round's question, so the editor can warn before changing them. */
+async function loadLive(): Promise<LiveIds> {
+  try {
+    const [daily, open] = await Promise.all([
+      prisma.triviaRound.findUnique({ where: { dayKey: dayKeyUtc() }, select: { questionId: true } }),
+      prisma.triviaRound.findFirst({ where: { surface: "DISCORD", status: "OPEN" }, orderBy: { id: "desc" }, select: { questionId: true } }),
+    ]);
+    return { daily: daily?.questionId ?? null, discord: open?.questionId ?? null };
+  } catch {
+    return { daily: null, discord: null };
+  }
+}
+
 async function loadRuntime() {
   try {
     const [rounds, reports, openReports, groups, disabledIds, suggestions] = await Promise.all([
@@ -78,7 +92,7 @@ export default async function AdminTriviaPage() {
   if (!(await isAdminDiscordId(session.discordId))) notFound();
 
   const t = await getTranslations("trivia");
-  const [stats, bank, rows, data] = await Promise.all([bankStats(), getBank(), loadBankRows(), loadRuntime()]);
+  const [stats, bank, rows, data, live] = await Promise.all([bankStats(), getBank(), loadBankRows(), loadRuntime(), loadLive()]);
   const byId = new Map(bank.questions.map((q) => [q.id, q]));
   const allIds = (rows ?? []).map((r) => r.id);
   const nextIds = Object.fromEntries(CATEGORIES.map((c) => [c, nextQuestionId(c, allIds)]));
@@ -130,7 +144,7 @@ export default async function AdminTriviaPage() {
         <section className={`${paperCard} p-6`}>
           <SectionHeading overline="Bank" title="Question editor" count={rows?.length ?? 0} />
           {rows ? (
-            <BankEditor initialRows={rows} nextIds={nextIds} />
+            <BankEditor initialRows={rows} nextIds={nextIds} live={live} />
           ) : (
             <p className="m-0 text-sm" role="status">
               The question bank table could not be read (the migration may not be applied to this database yet).

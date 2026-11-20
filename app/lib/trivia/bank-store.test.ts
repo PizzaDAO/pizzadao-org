@@ -6,10 +6,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.unmock("@/app/lib/trivia/bank-store");
 const db = vi.hoisted(() => ({
   triviaQuestion: { findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn(), updateMany: vi.fn() },
+  $transaction: vi.fn(),
 }));
 vi.mock("@/app/lib/db", () => ({ prisma: db }));
 
-import { insertBankRow, listBankRows, updateBankRow } from "./bank-store";
+import { applyImportOps, insertBankRow, listBankRows, markRowsExposed, updateBankRow } from "./bank-store";
 import fixture from "./__fixtures__/questions.fixture.json";
 import { QuestionSchema } from "./schema";
 
@@ -18,6 +19,7 @@ const draft = QuestionSchema.parse(fixture.questions.find((x) => x.id === "pz-90
 
 beforeEach(() => {
   for (const f of Object.values(db.triviaQuestion)) f.mockReset();
+  db.$transaction.mockReset();
 });
 
 describe("bank-store", () => {
@@ -42,18 +44,35 @@ describe("bank-store", () => {
     await expect(insertBankRow(q, { exposed: false, actor: "a" })).rejects.toThrow("down");
   });
 
-  it("update guards: exact updatedAt for the editor, not-newer-than for the import, null when no row matched", async () => {
+  it("every update is guarded by the exact updatedAt; null when no row matched", async () => {
     const at = new Date("2026-01-01T00:00:00Z");
     db.triviaQuestion.updateMany.mockResolvedValue({ count: 1 });
     db.triviaQuestion.findUnique.mockResolvedValue({ id: q.id });
     await updateBankRow(q, { exposed: false, actor: "a", expectUpdatedAt: at });
     expect(db.triviaQuestion.updateMany.mock.calls[0][0].where).toEqual({ id: "pd-901", updatedAt: at });
-    await updateBankRow(q, { exposed: false, actor: "a", notNewerThan: at });
-    expect(db.triviaQuestion.updateMany.mock.calls[1][0].where).toEqual({ id: "pd-901", updatedAt: { lte: at } });
-    await updateBankRow(q, { exposed: false, actor: "a" });
-    expect(db.triviaQuestion.updateMany.mock.calls[2][0].where).toEqual({ id: "pd-901" });
-    expect(db.triviaQuestion.updateMany.mock.calls[2][0].data).toMatchObject({ status: "approved", pool: "web", category: "pizza-day", exposed: false, updatedBy: "a" });
+    expect(db.triviaQuestion.updateMany.mock.calls[0][0].data).toMatchObject({ status: "approved", pool: "web", category: "pizza-day", exposed: false, updatedBy: "a" });
     db.triviaQuestion.updateMany.mockResolvedValue({ count: 0 });
     expect(await updateBankRow(q, { exposed: false, actor: "a", expectUpdatedAt: at })).toBeNull();
+  });
+
+  it("an import runs in one transaction and a conflict rolls it back", async () => {
+    const at = new Date("2026-01-01T00:00:00Z");
+    const tx = { triviaQuestion: { createMany: vi.fn(async (a: unknown) => (void a, { count: 1 })), updateMany: vi.fn(async (a: { where: unknown }) => (void a, { count: 1 })) } };
+    db.$transaction.mockImplementation(async (fn: (t: typeof tx) => unknown) => fn(tx));
+    expect(await applyImportOps([{ kind: "create", q, exposed: true }, { kind: "update", q: draft, exposed: false, expectUpdatedAt: at }], "script:import-bank")).toEqual({ ok: true });
+    expect(db.$transaction).toHaveBeenCalledTimes(1);
+    expect(tx.triviaQuestion.createMany.mock.calls[0][0]).toMatchObject({ skipDuplicates: true, data: [{ id: "pd-901", exposed: true, updatedBy: "script:import-bank" }] });
+    expect(tx.triviaQuestion.updateMany.mock.calls[0][0].where).toEqual({ id: "pz-908", updatedAt: at });
+    tx.triviaQuestion.updateMany.mockResolvedValueOnce({ count: 0 });
+    expect(await applyImportOps([{ kind: "update", q: draft, exposed: false, expectUpdatedAt: at }], "x")).toEqual({ ok: false, conflict: "pz-908" });
+    db.$transaction.mockRejectedValueOnce(new Error("down"));
+    await expect(applyImportOps([{ kind: "create", q, exposed: true }], "x")).rejects.toThrow("down");
+  });
+
+  it("markRowsExposed only flips rows that are not exposed yet", async () => {
+    db.triviaQuestion.updateMany.mockResolvedValue({ count: 1 });
+    expect(await markRowsExposed(["pd-901"], "system:revealed")).toBe(1);
+    expect(db.triviaQuestion.updateMany.mock.calls[0][0]).toEqual({ where: { id: { in: ["pd-901"] }, exposed: false }, data: { exposed: true, updatedBy: "system:revealed" } });
+    expect(await markRowsExposed([], "x")).toBe(0);
   });
 });
