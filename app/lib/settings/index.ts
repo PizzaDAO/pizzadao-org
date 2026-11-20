@@ -82,15 +82,19 @@ function snapshot(
   }
 }
 
+/** The database could not be read: no values, so every get() resolves through its failure mode. */
+function failedRead(e: unknown): { settings: Settings; ttl: number } {
+  warnOnce('db', `could not read AppSetting (${e instanceof Error ? e.message : String(e)}); using each setting's failure mode`)
+  return { settings: snapshot(new Map(), true, []), ttl: FAILURE_CACHE_MS }
+}
+
 async function readAll(): Promise<{ settings: Settings; ttl: number }> {
   let rows: Array<{ key: string; value: unknown }>
   try {
     const r = await prisma.appSetting.findMany({ select: { key: true, value: true } })
     rows = Array.isArray(r) ? r : []
   } catch (e) {
-    warnOnce('db', `could not read AppSetting (${e instanceof Error ? e.message : String(e)}); using each setting's failure mode`)
-    // No values: every get() resolves through its failure mode.
-    return { settings: snapshot(new Map(), true, []), ttl: FAILURE_CACHE_MS }
+    return failedRead(e)
   }
 
   const stored = new Map<string, unknown>(rows.map((r) => [r.key, r.value]))
@@ -125,7 +129,13 @@ async function readAll(): Promise<{ settings: Settings; ttl: number }> {
  * fingerprint is taken before the read, so a change landing during the read is caught next time.
  */
 async function refresh(prev: typeof cached): Promise<{ settings: Settings; ttl: number; fp: string | null }> {
-  const fp = await tableFingerprint('AppSetting')
+  let fp: string | null
+  try {
+    fp = await tableFingerprint('AppSetting')
+  } catch (e) {
+    // The database is unreachable: fail now (cached briefly) rather than wait for a second query.
+    return { ...failedRead(e), fp: null }
+  }
   if (fp && prev?.fp === fp && !prev.settings.readFailed) return { settings: prev.settings, ttl: SETTINGS_CACHE_MS, fp }
   const { settings, ttl } = await readAll()
   return { settings, ttl, fp: settings.readFailed ? null : fp }

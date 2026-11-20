@@ -8,15 +8,16 @@ import { prisma } from '@/app/lib/db'
 /** Only these tables (the name goes into the SQL, so it is never caller text). */
 export type FingerprintTable = 'AppSetting' | 'Mission'
 
-/** The fingerprint, or null when it could not be read (callers then do the full read). */
+/**
+ * The fingerprint, or null when there is none to compare (a client without raw queries, such as a
+ * test double, or an odd result): callers then do the full read. Rejects when the query fails
+ * (database unreachable), so a caller can take its failure path without a second slow query.
+ */
 export async function tableFingerprint(table: FingerprintTable): Promise<string | null> {
-  try {
-    const rows = (await prisma.$queryRawUnsafe(
-      `SELECT md5(coalesce(string_agg(t::text, ',' ORDER BY t::text), '')) AS fp FROM "${table}" t`,
-    )) as Array<{ fp?: unknown }> | undefined
-    const fp = rows?.[0]?.fp
-    return typeof fp === 'string' && fp ? fp : null
-  } catch {
-    return null
-  }
+  if (typeof prisma.$queryRawUnsafe !== 'function') return null
+  const rows = (await prisma.$queryRawUnsafe(
+    `SELECT md5(coalesce(string_agg(t::text, ',' ORDER BY t::text), '')) AS fp FROM "${table}" t`,
+  )) as Array<{ fp?: unknown }> | undefined
+  const fp = rows?.[0]?.fp
+  return typeof fp === 'string' && fp ? fp : null
 }

@@ -87,13 +87,29 @@ describe('settings read path', () => {
       expect(findMany).toHaveBeenCalledTimes(2)
     })
 
-    it('an unreadable fingerprint falls back to the full read', async () => {
-      fp.mockRejectedValue(new Error('no raw'))
+    it('no fingerprint to compare (e.g. an odd result) falls back to the full read', async () => {
+      fp.mockResolvedValue([] as never)
       findMany.mockResolvedValue([] as never)
       const t0 = 4_000_000
       await loadSettings(t0)
       await loadSettings(t0 + SETTINGS_CACHE_MS + 1)
       expect(findMany).toHaveBeenCalledTimes(2)
+    })
+
+    it('a failing fingerprint query is a read failure at once (no second query), cached briefly', async () => {
+      findMany.mockResolvedValueOnce([{ key: 'calls.transcriptMinLevel', value: 8 }] as never)
+      const t0 = 4_500_000
+      expect((await loadSettings(t0)).get('calls.transcriptMinLevel')).toBe(8)
+      fp.mockRejectedValue(new Error('db down'))
+      const s = await loadSettings(t0 + SETTINGS_CACHE_MS + 1)
+      expect(s.readFailed).toBe(true)
+      expect(s.get('calls.transcriptMinLevel')).toBe(8) // last known good
+      expect(s.get('missions.humanReleaseMinLevel')).toBe(1) // strictest
+      expect(findMany).toHaveBeenCalledTimes(1)
+      fp.mockResolvedValue([{ fp: 'aaa' }] as never)
+      findMany.mockResolvedValue([] as never)
+      expect((await loadSettings(t0 + SETTINGS_CACHE_MS + 1000)).readFailed).toBe(true) // still the cached failure
+      expect((await loadSettings(t0 + SETTINGS_CACHE_MS + 7000)).readFailed).toBe(false)
     })
 
     it('a failed read is never reused on a matching fingerprint', async () => {
