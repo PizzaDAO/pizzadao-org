@@ -100,6 +100,8 @@ export interface HandlerDeps {
   guildId: string | undefined
   /** PizzaDAO member name for a Discord id (null if none). Optional; used for the embed author line. */
   memberName?: (discordId: string) => Promise<string | null>
+  /** The member's website PFP (composed / static / dough ball / default; site-relative or https), null if no member. Optional; used for the embed author icon. */
+  memberPfp?: (discordId: string) => Promise<string | null>
   /** Currency label, e.g. the guild's <:pepperoni:...> emoji. */
   currency?: string
   getWallet: (discordId: string) => Promise<number>
@@ -330,20 +332,34 @@ const opt = (i: Interaction, name: string) => i.data?.options?.find((o) => o.nam
 
 const MEMBER_NAME_BUDGET_MS = 300
 
-/** Member-name lookup with a hard time budget; null on timeout, error, or no name. */
-async function lookupMemberName(fn: (id: string) => Promise<string | null>, id: string): Promise<string | null> {
+/** Run a lookup under a hard time budget; null on timeout or error. */
+async function withBudget<T>(fn: (id: string) => Promise<T>, id: string): Promise<T | null> {
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
-    const name = await Promise.race([
+    return await Promise.race([
       fn(id),
       new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), MEMBER_NAME_BUDGET_MS) }),
     ])
-    return typeof name === 'string' && name.trim() ? name.trim() : null
   } catch {
     return null
   } finally {
     if (timer) clearTimeout(timer)
   }
+}
+
+/** Member-name lookup with a hard time budget; null on timeout, error, or no name. */
+async function lookupMemberName(fn: (id: string) => Promise<string | null>, id: string): Promise<string | null> {
+  const name = await withBudget(fn, id)
+  return typeof name === 'string' && name.trim() ? name.trim() : null
+}
+
+/** PFP lookup with the same budget; an absolute https URL, or null (keep the default icon). */
+async function lookupMemberPfp(fn: (id: string) => Promise<string | null>, id: string): Promise<string | null> {
+  const raw = await withBudget(fn, id)
+  if (typeof raw !== 'string') return null
+  const v = raw.trim()
+  const abs = v.startsWith('/') && !v.startsWith('//') ? `${SITE_URL}${v}` : v
+  return abs.startsWith('https://') ? abs : null
 }
 
 export async function handleInteraction(i: Interaction, deps: HandlerDeps): Promise<InteractionResponse> {
@@ -352,9 +368,14 @@ export async function handleInteraction(i: Interaction, deps: HandlerDeps): Prom
   const author = authorFor(invoker)
   // DM follow-up / reminder buttons build their own replies, so they skip the name lookup.
   const dmButton = (i.type === InteractionType.MESSAGE_COMPONENT || i.type === InteractionType.MODAL_SUBMIT) && (isFollowUpInteraction(i) || isReminderInteraction(i))
-  if (author && deps.memberName && invoker?.user?.id && i.type !== InteractionType.AUTOCOMPLETE && !dmButton) {
-    const name = await lookupMemberName(deps.memberName, invoker.user.id)
+  if (author && (deps.memberName || deps.memberPfp) && invoker?.user?.id && i.type !== InteractionType.AUTOCOMPLETE && !dmButton) {
+    const id = invoker.user.id
+    const [name, pfp] = await Promise.all([
+      deps.memberName ? lookupMemberName(deps.memberName, id) : null,
+      deps.memberPfp ? lookupMemberPfp(deps.memberPfp, id) : null,
+    ])
     if (name) author.name = sliceUnits(name, 256)
+    if (pfp) author.icon_url = pfp
   }
   const out = new Out(author)
   const known: number[] = [
