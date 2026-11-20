@@ -7,7 +7,7 @@
 import { NextResponse } from 'next/server'
 import sharp from 'sharp'
 import { prisma } from '@/app/lib/db'
-import { fetchImageBytes } from '@/app/lib/pfp-assets/compose'
+import { fetchImageBytes, MAX_PIXELS } from '@/app/lib/pfp-assets/compose'
 import { isAllowedFetchUrl } from '@/app/lib/pfp-assets/hosts'
 import { enforceRateLimit } from '@/app/lib/rate-limit'
 
@@ -27,7 +27,7 @@ async function savedUrl(memberId: string): Promise<string | null> {
 const notFound = () => NextResponse.json({ error: 'No saved PFP' }, { status: 404, headers: HEADERS })
 
 export async function HEAD(req: Request, { params }: { params: Promise<{ memberId: string }> }) {
-  const limited = await enforceRateLimit(req, 'pfp-download')
+  const limited = await enforceRateLimit(req, 'pfp-download-check')
   if (limited) return limited
   const url = await savedUrl((await params).memberId).catch(() => null)
   return new NextResponse(null, { status: url && isAllowedFetchUrl(url) ? 200 : 404, headers: HEADERS })
@@ -42,7 +42,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ memberId
     if (!url || !isAllowedFetchUrl(url)) return notFound()
     const bytes = await fetchImageBytes(url)
     // The composed image is already square; this only re-encodes it as a PNG (Discord-friendly).
-    const png = await sharp(bytes).rotate().resize(SIZE, SIZE, { fit: 'cover' }).png().toBuffer()
+    const png = await sharp(bytes, { limitInputPixels: MAX_PIXELS }).rotate().resize(SIZE, SIZE, { fit: 'cover' }).png().toBuffer()
     return new NextResponse(new Uint8Array(png), {
       status: 200,
       headers: {

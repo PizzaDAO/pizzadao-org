@@ -10,15 +10,14 @@ import { toggleEnabled } from '@/app/lib/settings/toggles'
 import { checkKeyedRateLimit } from '@/app/lib/rate-limit'
 import { deliverDm, reminderSendAllowed } from '@/app/lib/reminders/deliver'
 import { fetchMemberIdByDiscordId } from '@/app/lib/sheets/member-repository'
-import { loadEditAccess } from '@/app/lib/pfp-assets/access'
 import { getSetting } from '@/app/lib/settings'
 
 const pfpLink = (memberId: string) => `${appBaseUrl()}/profile/${encodeURIComponent(memberId)}/pfp`
 
 export const unlockedDmText = (link: string, level: number) =>
   `You reached level ${level} 🍕 You can now make your PizzaDAO PFP: ${link}`
-export const readyDmText = (link: string) =>
-  `Your PizzaDAO PFP is ready: ${link} Download it to use on Discord.`
+export const savedDmText = (downloadLink: string, pfpPage: string) =>
+  `Your PizzaDAO PFP is saved 🍕 Download it to use on Discord: ${downloadLink} (or open your editor: ${pfpPage})`
 
 /** The durable once-only marker is an in-app notification row (also what the member sees in the bell). */
 const UNLOCK_KIND = 'pfp_unlocked_dm'
@@ -58,20 +57,20 @@ export async function maybeSendPfpUnlockedDm(discordId: string, paidLevel: numbe
   }
 }
 
-/** Call after a portrait or dress-up succeeded (inside `after()`). Throttled to one per member per 10 minutes. */
-export async function maybeSendPfpReadyDm(discordId: string): Promise<void> {
+/**
+ * Call after a PFP was saved (inside `after()`; saving already needs the PFP level). Throttled to one
+ * per member per 10 minutes so repeated saves do not spam.
+ */
+export async function maybeSendPfpSavedDm(discordId: string, memberId: string): Promise<void> {
   try {
     if (!reminderSendAllowed()) return
     if (!(await toggleEnabled('pfp.readyDmEnabled'))) return
-    // Before the PFP level there is no editor to send them to (the onboarding portrait is generated earlier).
-    if (!(await loadEditAccess(discordId)).allowed) return
-    const memberId = await fetchMemberIdByDiscordId(discordId).catch(() => null)
-    if (!memberId) return
     const rl = await checkKeyedRateLimit('pfp-ready-dm', discordId, undefined, { failClosed: true })
     if (!rl.success) return
-    const out = await deliverDm({ discordId, text: readyDmText(pfpLink(memberId)) })
-    if (out.kind !== 'sent') console.warn('[pfp-dm] ready DM not delivered:', out.kind)
+    const download = `${appBaseUrl()}/api/pfp/${encodeURIComponent(memberId)}/download`
+    const out = await deliverDm({ discordId, text: savedDmText(download, pfpLink(memberId)) })
+    if (out.kind !== 'sent') console.warn('[pfp-dm] saved DM not delivered:', out.kind)
   } catch (e) {
-    console.error('[pfp-dm] ready DM failed:', e instanceof Error ? e.message : e)
+    console.error('[pfp-dm] saved DM failed:', e instanceof Error ? e.message : e)
   }
 }

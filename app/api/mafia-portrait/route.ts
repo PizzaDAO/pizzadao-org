@@ -11,7 +11,7 @@
 // anonymous visitor has picked none). Both paths sit under the same global cap.
 //
 // The finale never blocks on this route: any non-200 just keeps the topping seal.
-import { after, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { toggleEnabled } from "@/app/lib/settings/toggles";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
@@ -239,10 +239,6 @@ export async function POST(req: Request) {
   }
 
   recordActivationLater("portrait_generated", { discordId, actor, code: "ok" });
-  if (discordId) {
-    const ready = () => import("@/app/lib/pfp-dm").then((m) => m.maybeSendPfpReadyDm(discordId)).catch(() => {});
-    try { after(ready); } catch { void ready(); }
-  }
   return NextResponse.json({
     url: drawn.url,
     cached: false,

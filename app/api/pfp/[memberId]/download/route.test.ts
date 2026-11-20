@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import sharp from 'sharp'
 
 vi.mock('@/app/lib/db', () => ({ prisma: { memberPfp: { findUnique: vi.fn() } } }))
-vi.mock('@/app/lib/pfp-assets/compose', () => ({ fetchImageBytes: vi.fn() }))
+vi.mock('@/app/lib/pfp-assets/compose', () => ({ fetchImageBytes: vi.fn(), MAX_PIXELS: 4096 * 4096 }))
 vi.mock('@/app/lib/rate-limit', () => ({ enforceRateLimit: vi.fn(async () => null) }))
 
 import { prisma } from '@/app/lib/db'
@@ -74,5 +74,6 @@ describe('HEAD /api/pfp/[memberId]/download', () => {
     m(prisma.memberPfp.findUnique).mockResolvedValue(null)
     expect((await HEAD(req('HEAD'), ctx('42'))).status).toBe(404)
     expect(fetchImageBytes).not.toHaveBeenCalled()
+    expect(m(enforceRateLimit).mock.calls.every((c) => c[1] === 'pfp-download-check')).toBe(true)
   })
 })

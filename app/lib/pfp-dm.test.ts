@@ -7,7 +7,6 @@ vi.mock('@/app/lib/settings', () => ({ getSetting: vi.fn() }))
 vi.mock('@/app/lib/rate-limit', () => ({ checkKeyedRateLimit: vi.fn() }))
 vi.mock('@/app/lib/reminders/deliver', () => ({ deliverDm: vi.fn(), reminderSendAllowed: vi.fn() }))
 vi.mock('@/app/lib/sheets/member-repository', () => ({ fetchMemberIdByDiscordId: vi.fn() }))
-vi.mock('@/app/lib/pfp-assets/access', () => ({ loadEditAccess: vi.fn() }))
 
 import { prisma } from '@/app/lib/db'
 import { toggleEnabled } from '@/app/lib/settings/toggles'
@@ -15,8 +14,7 @@ import { getSetting } from '@/app/lib/settings'
 import { checkKeyedRateLimit } from '@/app/lib/rate-limit'
 import { deliverDm, reminderSendAllowed } from '@/app/lib/reminders/deliver'
 import { fetchMemberIdByDiscordId } from '@/app/lib/sheets/member-repository'
-import { loadEditAccess } from '@/app/lib/pfp-assets/access'
-import { maybeSendPfpReadyDm, maybeSendPfpUnlockedDm } from './pfp-dm'
+import { maybeSendPfpSavedDm, maybeSendPfpUnlockedDm } from './pfp-dm'
 
 const m = (f: unknown) => f as ReturnType<typeof vi.fn>
 const toggles: Record<string, boolean> = {}
@@ -31,7 +29,6 @@ beforeEach(() => {
   m(prisma.notification.findFirst).mockResolvedValue(null)
   m(fetchMemberIdByDiscordId).mockResolvedValue('42')
   m(deliverDm).mockResolvedValue({ kind: 'sent' })
-  m(loadEditAccess).mockResolvedValue({ allowed: true, completed: 2, minLevel: 2, bypass: false })
   m(checkKeyedRateLimit).mockResolvedValue({ success: true, limit: 1, remaining: 0, reset: Date.now() + 1000 })
 })
 
@@ -76,34 +73,30 @@ describe('maybeSendPfpUnlockedDm', () => {
   })
 })
 
-describe('maybeSendPfpReadyDm', () => {
-  it('DMs a link to the PFP page', async () => {
-    await maybeSendPfpReadyDm('d1')
-    expect(m(deliverDm).mock.calls[0][0].text).toContain('/profile/42/pfp')
+describe('maybeSendPfpSavedDm', () => {
+  it('DMs the download link and the PFP page link', async () => {
+    await maybeSendPfpSavedDm('d1', '42')
+    const text = m(deliverDm).mock.calls[0][0].text as string
+    expect(text).toContain('/api/pfp/42/download')
+    expect(text).toContain('/profile/42/pfp')
     expect(checkKeyedRateLimit).toHaveBeenCalledWith('pfp-ready-dm', 'd1', undefined, { failClosed: true })
   })
 
   it('is throttled: no DM when the 10-minute window is used', async () => {
     m(checkKeyedRateLimit).mockResolvedValue({ success: false, limit: 1, remaining: 0, reset: Date.now() + 1000 })
-    await maybeSendPfpReadyDm('d1')
+    await maybeSendPfpSavedDm('d1', '42')
     expect(deliverDm).not.toHaveBeenCalled()
   })
 
   it('sends nothing with the toggle off', async () => {
     toggles['pfp.readyDmEnabled'] = false
-    await maybeSendPfpReadyDm('d1')
+    await maybeSendPfpSavedDm('d1', '42')
     expect(deliverDm).not.toHaveBeenCalled()
     expect(checkKeyedRateLimit).not.toHaveBeenCalled()
   })
 
-  it('skips members who cannot use the PFP editor yet', async () => {
-    m(loadEditAccess).mockResolvedValue({ allowed: false, completed: 1, minLevel: 2, bypass: false })
-    await maybeSendPfpReadyDm('d1')
-    expect(deliverDm).not.toHaveBeenCalled()
-  })
-
   it('never throws when sending fails', async () => {
     m(deliverDm).mockRejectedValue(new Error('discord down'))
-    await expect(maybeSendPfpReadyDm('d1')).resolves.toBeUndefined()
+    await expect(maybeSendPfpSavedDm('d1', '42')).resolves.toBeUndefined()
   })
 })
