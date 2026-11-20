@@ -11,6 +11,7 @@
  * - Keys never contain secrets. Editorial/private values live only in DB rows, never here.
  */
 import { z } from 'zod'
+import { isInternalPath } from '@/app/lib/manuals-freshness'
 import { explorersTextValid } from '@/app/lib/proposals/explorers'
 import { validCrewHints } from '@/app/lib/call-tasks/routing'
 import { CONTENT_SETTINGS } from './content-settings'
@@ -2138,8 +2139,8 @@ export const SETTINGS = {
     help: 'Page path members below the PFP level are pointed to under "What\'s left", e.g. /review/<set-slug> (only members who can use the art review get the link). Empty hides the line.',
     maxLength: 200,
     placeholder: '/review/<set-slug>',
-    check: (v) => v === '' || (v.startsWith('/') && !v.startsWith('//')),
-    checkMessage: 'Use a path on this site, starting with a single /',
+    check: (v) => v === '' || isInternalPath(v),
+    checkMessage: 'Use a path on this site, such as /review/<set-slug>',
   }),
   'pfp.restylePerUnlock': intSetting({
     key: 'pfp.restylePerUnlock',

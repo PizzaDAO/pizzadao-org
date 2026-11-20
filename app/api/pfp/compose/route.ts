@@ -20,7 +20,7 @@ import { allowedBaseKinds, assertBaseKindAllowed, assertCanEdit, loadEditAccess 
 import { fetchMemberByDiscordId } from '@/app/lib/sheets/member-repository'
 import { toggleEnabled } from '@/app/lib/settings/toggles'
 import { getSetting } from '@/app/lib/settings'
-import { imageReviewRole } from '@/app/lib/image-review/access'
+import { imageReviewAccess } from '@/app/lib/image-review/access'
 import { loadRemainingMissions } from '@/app/lib/pfp-assets/remaining'
 import { evaluateAllowance, loadRestyleSettings, loadUsage, usageByOutfit } from '@/app/lib/pfp-assets/restyle'
 
@@ -35,12 +35,13 @@ function parseBase(v: unknown): { kind: import('@/app/lib/pfp-assets/compose').B
 }
 
 async function lockedExtras(discordId: string, completed: number, minLevel: number) {
-  const [remaining, link, reviewRole] = await Promise.all([
+  const [remaining, link, reviewAccess] = await Promise.all([
     loadRemainingMissions(discordId, completed, minLevel).catch(() => []),
     getSetting('pfp.lockedReviewLink').catch(() => ''),
-    imageReviewRole(discordId).catch(() => null),
+    imageReviewAccess(discordId).catch(() => null),
   ])
-  return { remaining, review: link ? { href: link, canVote: !!reviewRole } : null }
+  // The review has its own minimum level: the page says which one to reach.
+  return { remaining, review: link ? { href: link, canVote: !!reviewAccess?.role, minLevel: reviewAccess?.minLevel ?? 2 } : null }
 }
 
 export const GET = memberPfpRoute(async (_req, { memberId, discordId }) => {
@@ -63,9 +64,9 @@ export const GET = memberPfpRoute(async (_req, { memberId, discordId }) => {
   const gate = usage ? evaluateAllowance(restyleSettings, { ...usage, forOutfit: 0 }) : null
   const unlocked = unlockedAssetIds(assets, ctx)
   // Locked page only: the member's own unfinished missions and the dough-ball review link.
-  const locked = access.allowed ? null : await lockedExtras(discordId, access.completed, access.minLevel)
+  const lockedP = access.allowed ? null : lockedExtras(discordId, access.completed, access.minLevel)
   // Only the names the locked hints need (not the admin pickers' full lists).
-  const lookups = await hintLookups(assets.filter((a) => !unlocked.has(a.id)))
+  const [lookups, locked] = await Promise.all([hintLookups(assets.filter((a) => !unlocked.has(a.id))), lockedP])
   return {
     level: ctx.level,
     allowedBaseKinds: baseKinds,

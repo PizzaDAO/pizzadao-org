@@ -30,3 +30,13 @@ describe('textSetting options', () => {
     expect(SETTINGS['guide.hostDeadlines'].onReadFailure).toEqual({ value: '' })
   })
 })
+
+describe('pfp.lockedReviewLink', () => {
+  it('accepts empty or an internal path only', () => {
+    const { schema } = SETTINGS['pfp.lockedReviewLink']
+    for (const ok of ['', '/review/abc']) expect(schema.safeParse(ok).success).toBe(true)
+    for (const bad of ['/\\evil.com', '/\t/evil.com', '//evil.com', '/a/../b', 'https://x.y', 'review/abc']) {
+      expect(schema.safeParse(bad).success, bad).toBe(false)
+    }
+  })
+})

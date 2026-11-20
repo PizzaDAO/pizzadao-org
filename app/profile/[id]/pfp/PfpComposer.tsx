@@ -16,8 +16,8 @@ interface State {
   memberName?: string;
   access: { allowed: boolean; minLevel: number; completed: number };
   // Locked state only: the missions still to finish, and the dough-ball review link (null = hidden).
-  remaining?: { id: number; title: string; level: number; href?: string }[];
-  review?: { href: string; canVote: boolean } | null;
+  remaining?: { id: number; title: string; level: number; href?: string; pending?: boolean; rejected?: boolean }[];
+  review?: { href: string; canVote: boolean; minLevel: number } | null;
   bases: { static: string | null; discord: string | null; mafia: string | null };
   current: { baseKind: BaseKind; baseUrl: string; composedUrl: string; layers: Layer[]; original: OriginalBase | null } | null;
   assets: Asset[];
@@ -134,9 +134,11 @@ export function PfpComposer({ memberId }: { memberId: string }) {
             <ul className="m-0 grid list-none gap-1 p-0">
               {remaining.slice(0, LEFT_SHOWN).map((m) => (
                 <li key={m.id} className="flex items-baseline gap-2">
-                  <span aria-label="Not done yet" role="img">☐</span>
+                  <span aria-label={m.pending ? "Awaiting review" : m.rejected ? "Needs another try" : "Not done yet"} role="img">{m.pending ? "⏳" : m.rejected ? "↻" : "☐"}</span>
                   <a href={m.href ?? "/missions"} className="underline">{m.title}</a>
-                  <span className="text-sm text-foreground/60">Level {m.level}</span>
+                  <span className="text-sm text-foreground/60">
+                    Level {m.level}{m.pending ? " · awaiting review" : m.rejected ? " · needs another try" : ""}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -153,7 +155,7 @@ export function PfpComposer({ memberId }: { memberId: string }) {
             {state.review.canVote ? (
               <>While you work on it, <a href={state.review.href} className="underline">help pick the dough-ball look for new members</a>.</>
             ) : (
-              `Once you reach level ${minLevel} you can vote on the dough-ball looks too.`
+              `Once you reach level ${state.review.minLevel} you can vote on the dough-ball looks too.`
             )}
           </p>
         )}

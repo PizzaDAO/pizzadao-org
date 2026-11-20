@@ -58,21 +58,23 @@ describe("PfpComposer", () => {
   });
 
   it("lists what is left with links, capped, and the review line by access", async () => {
-    const remaining = Array.from({ length: 12 }, (_, i) => ({ id: i + 1, title: `Mission ${i + 1}`, level: 2, ...(i === 0 ? { href: "/handbook/x" } : {}) }));
-    mockState({ access: { allowed: false, minLevel: 2, completed: 1 }, remaining, review: { href: "/review/abc", canVote: true } });
+    const remaining = Array.from({ length: 12 }, (_, i) => ({ id: i + 1, title: `Mission ${i + 1}`, level: 2, ...(i === 0 ? { href: "/handbook/x" } : {}), ...(i === 1 ? { pending: true } : {}), ...(i === 2 ? { rejected: true } : {}) }));
+    mockState({ access: { allowed: false, minLevel: 2, completed: 1 }, remaining, review: { href: "/review/abc", canVote: true, minLevel: 2 } });
     render(<PfpComposer memberId="42" />);
     const box = await screen.findByTestId("pfp-whats-left");
     expect(screen.getByText("Mission 1").getAttribute("href")).toBe("/handbook/x");
     expect(screen.getByText("Mission 2").getAttribute("href")).toBe("/missions");
     expect(screen.queryByText("Mission 11")).toBeNull();
     expect(box.textContent).toContain("and 2 more");
+    expect(box.textContent).toContain("awaiting review");
+    expect(box.textContent).toContain("needs another try");
     expect(screen.getByText("help pick the dough-ball look for new members").getAttribute("href")).toBe("/review/abc");
   });
 
   it("says to reach level 2 when the review is not open to the member, and hides the line when unset", async () => {
-    mockState({ access: { allowed: false, minLevel: 2, completed: 0 }, remaining: [], review: { href: "/review/abc", canVote: false } });
+    mockState({ access: { allowed: false, minLevel: 2, completed: 0 }, remaining: [], review: { href: "/review/abc", canVote: false, minLevel: 3 } });
     const { unmount } = render(<PfpComposer memberId="42" />);
-    await screen.findByText("Once you reach level 2 you can vote on the dough-ball looks too.");
+    await screen.findByText("Once you reach level 3 you can vote on the dough-ball looks too.");
     expect(screen.queryByTestId("pfp-whats-left")).toBeNull();
     unmount();
     mockState({ access: { allowed: false, minLevel: 2, completed: 0 }, review: null });

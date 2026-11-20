@@ -17,7 +17,7 @@ vi.mock('@/app/lib/pfp-assets/access', () => ({
   loadEditAccess: vi.fn(async () => ({ allowed: true, completed: 2, minLevel: 2, bypass: false })),
 }))
 vi.mock('@/app/lib/pfp-assets/remaining', () => ({ loadRemainingMissions: vi.fn(async () => [{ id: 5, title: 'Do a thing', level: 2 }]) }))
-vi.mock('@/app/lib/image-review/access', () => ({ imageReviewRole: vi.fn(async () => null) }))
+vi.mock('@/app/lib/image-review/access', () => ({ imageReviewAccess: vi.fn(async () => ({ role: null, completed: 1, minLevel: 3 })) }))
 vi.mock('@/app/lib/settings', async (orig) => ({ ...(await orig<typeof import('@/app/lib/settings')>()), getSetting: vi.fn(async () => '/review/abc') }))
 vi.mock('@/app/lib/pfp-assets/catalog', () => ({
   listAssets: vi.fn(async () => []),
@@ -78,7 +78,7 @@ describe('/api/pfp/compose locked extras', () => {
     m(loadEditAccess).mockResolvedValueOnce({ allowed: false, completed: 1, minLevel: 2, bypass: false })
     const locked = await (await GET(new Request('https://app.test/api/pfp/compose'))).json()
     expect(locked.remaining).toEqual([{ id: 5, title: 'Do a thing', level: 2 }])
-    expect(locked.review).toEqual({ href: '/review/abc', canVote: false })
+    expect(locked.review).toEqual({ href: '/review/abc', canVote: false, minLevel: 3 })
     expect(loadRemainingMissions).toHaveBeenCalledWith('400000000000000001', 1, 2)
   })
 })
