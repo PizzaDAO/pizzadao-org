@@ -352,6 +352,7 @@ describe('settings registry', () => {
       ['trivia.enabled', false],
       ['trivia.dryRun', false],
       ['trivia.rewardPep', 20],
+      ['trivia.webDailyRewardPep', 0],
       ['trivia.channelId', ''],
       ['trivia.roundsPerDay', 3],
       ['trivia.disabledQuestionIds', []],

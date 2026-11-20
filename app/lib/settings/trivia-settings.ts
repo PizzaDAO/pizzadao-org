@@ -46,6 +46,18 @@ const rewardPep: SettingDef<number> = {
   confirm: (from, to) => (to > from ? `Each win will pay ${to} $PEP.` : null),
 }
 
+const webDailyRewardPep: SettingDef<number> = {
+  key: 'trivia.webDailyRewardPep',
+  area: 'trivia',
+  label: 'Web daily reward ($PEP)',
+  help: 'What a signed-in member earns for answering the web daily (pizzadao.org/trivia) correctly on their one attempt. 0 turns it off. At most 25, once per member per day, only for onboarded members on Discord accounts at least 7 days old. Does not count toward the Discord 3-wins-a-day cap. Paid only while trivia is enabled and not in dry run.',
+  schema: z.number().int().min(0).max(25),
+  default: 0,
+  onReadFailure: { value: 0 },
+  input: { type: 'int', min: 0, max: 25, unit: '$PEP' },
+  confirm: (from, to) => (to > from ? `A correct web daily answer will pay ${to} $PEP.` : null),
+}
+
 const channelId: SettingDef<string> = {
   key: 'trivia.channelId',
   area: 'trivia',
@@ -84,6 +96,7 @@ export const TRIVIA_SETTINGS = {
   'trivia.enabled': enabled,
   'trivia.dryRun': dryRun,
   'trivia.rewardPep': rewardPep,
+  'trivia.webDailyRewardPep': webDailyRewardPep,
   'trivia.channelId': channelId,
   'trivia.roundsPerDay': roundsPerDay,
   'trivia.disabledQuestionIds': disabledQuestionIds,

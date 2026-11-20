@@ -18,7 +18,7 @@ import { publicView, reveal } from "@/app/lib/trivia/bank";
 import { match } from "@/app/lib/trivia/match";
 import { nextDayStartMs } from "@/app/lib/trivia/daily";
 import { MAX_ANSWER_INPUT, readAnswer, reply, withNoStore } from "@/app/lib/trivia/api";
-import { findDailyAttempt, getDailyRound, percentCorrect, recordDailyAttempt, streakStatsFor } from "@/app/lib/trivia/web";
+import { dailyRewardOffer, findDailyAttempt, getDailyRound, payDailyReward, percentCorrect, recordDailyAttempt, streakStatsFor } from "@/app/lib/trivia/web";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
     resetsAt: new Date(nextDayStartMs(round.dayKey)).toISOString(),
     signedIn: !!session?.discordId,
     question: publicView(round.question),
+    rewardPep: await dailyRewardOffer(),
   };
   if (!session?.discordId) return reply({ ...base, attempt: null });
 
@@ -123,6 +124,8 @@ export async function POST(request: NextRequest) {
   // Not recorded (the tables are unavailable): the member gets the verdict but not the answer, which would
   // otherwise be free to retry for. The answer text only ever goes with a recorded attempt.
   if (!recorded) return reply({ verdict, alreadyAnswered: false, recorded: false });
+  // A correct, recorded attempt may earn the optional reward; payDailyReward never throws and never blocks the answer.
+  const reward = verdict === "correct" && round.roundId ? await payDailyReward({ roundId: round.roundId, dayKey: round.dayKey, discordId }) : null;
   return reply({
     verdict,
     alreadyAnswered: false,
@@ -130,5 +133,6 @@ export async function POST(request: NextRequest) {
     reveal: reveal(q),
     percentCorrect: round.roundId ? await percentCorrect(round.roundId) : null,
     ...(await streakFields(discordId, round.dayKey)),
+    ...(reward ? { reward } : {}),
   });
 }

@@ -16,6 +16,8 @@ interface DailyResponse {
   resetsAt: string;
   signedIn: boolean;
   question: PublicQuestionDto;
+  /** $PEP a correct answer pays today; 0 or absent when the reward is off. */
+  rewardPep?: number;
   streak?: number | null;
   bestStreak?: number | null;
   attempt: { correct: boolean; reveal: RevealDto; percentCorrect: number | null } | null;
@@ -29,6 +31,7 @@ interface AnswerResponse {
   percentCorrect?: number | null;
   streak?: number | null;
   bestStreak?: number | null;
+  reward?: { pep: number; status: "paid" | "ineligible" | "off" | "already"; reason?: "not_member" | "too_young" };
 }
 
 function useCountdown(resetsAt: string | undefined): { h: number; m: number } | null {
@@ -95,6 +98,16 @@ export default function DailyCard() {
     : prior
       ? { verdict: (prior.correct ? "correct" : "wrong") as "correct" | "wrong", reveal: prior.reveal, pct: prior.percentCorrect, recorded: true, already: true }
       : null;
+  // The reward line after a correct answer given just now (nothing at all when the reward is off).
+  const reward = answered?.verdict === "correct" ? answered.reward : undefined;
+  const rewardText =
+    reward?.status === "paid"
+      ? t("rewardPaid", { pep: reward.pep })
+      : reward?.status === "already"
+        ? t("rewardAlready")
+        : reward?.status === "ineligible"
+          ? t(reward.reason === "too_young" ? "rewardTooYoung" : "rewardNotMember")
+          : null;
   // A verdict with no answer text: logged out (sign in to see it) or not recorded (tables unavailable).
   const verdictOnly = result && result.verdict !== "ignore" && !result.reveal ? { verdict: result.verdict, signIn: !!result.signInToReveal } : null;
   const streak = answered?.streak ?? data?.streak ?? null;
@@ -153,6 +166,9 @@ export default function DailyCard() {
         {state === "ready" && data && (
           <>
             <QuestionHeader q={data.question} />
+            {!shown && !verdictOnly && !!data.rewardPep && data.signedIn && (
+              <p className="mb-2 mt-3 text-sm text-foreground/75">{t("rewardOffer", { pep: data.rewardPep })}</p>
+            )}
             {!shown && !verdictOnly && <AnswerForm question={data.question} busy={busy} onSubmit={submit} />}
             {nudge && (
               <p role="alert" className="mb-0 mt-3 text-sm text-tomato-readable">
@@ -172,6 +188,11 @@ export default function DailyCard() {
                 <RevealPanel verdict={shown.verdict} reveal={shown.reveal} questionId={data.question.id} />
                 <div className="mt-3 space-y-1 text-sm text-foreground/75">
                   {shown.already && <p className="m-0">{t("alreadyAnswered")}</p>}
+                  {rewardText && (
+                    <p className="m-0 font-semibold text-foreground" role="status">
+                      {rewardText}
+                    </p>
+                  )}
                   {shown.pct !== null && <p className="m-0">{t("percentCorrect", { pct: shown.pct })}</p>}
                   {!shown.recorded && <p className="m-0">{t("notRecorded")}</p>}
                   <p className="m-0">{t("comeBack")}</p>

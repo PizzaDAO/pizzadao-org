@@ -4,8 +4,13 @@
 //
 // Every function here tolerates the Trivia tables being absent (the migration is applied to production by hand before
 // the merge, and previews share that database): a failed query is logged and reported as "no data", so the page still
-// renders and practice still works. Nothing here posts to Discord or pays PEP (phase 2).
+// renders and practice still works. Nothing here posts to Discord; the only PEP paid is the optional web daily reward (payDailyReward).
 import { prisma } from "@/app/lib/db";
+import { creditInTx, getOrCreateEconomy } from "@/app/lib/economy";
+import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
+import { triviaSettings } from "./channel";
+import { accountOldEnough, REQUIRE_MEMBER } from "./config";
+import { triviaLive } from "./enabled";
 import { getQuestion, servable } from "./bank";
 import { addDays, computeBestStreak, computeStreak, dailyQuestionFor, dayKeyUtc, nextDayStartMs } from "./daily";
 import { getDisabledIds } from "./reports";
@@ -153,4 +158,74 @@ export async function streakStatsFor(discordId: string, today: string): Promise<
 /** Current daily streak of one member (days with a recorded web attempt). 0 when unavailable. */
 export async function streakFor(discordId: string, today: string): Promise<number> {
   return (await streakStatsFor(discordId, today)).current;
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Web daily reward (trivia.webDailyRewardPep, default 0 = off)
+// ---------------------------------------------------------------------------------------------------------------
+
+/** Advisory-lock namespace for one member's web daily payout (first key of the two-key lock; see rounds.ts, reports.ts, suggestions.ts for the others). */
+export const DAILY_REWARD_LOCK_NAMESPACE = 742019347;
+
+export interface DailyReward {
+  /** $PEP paid (status "paid") or on offer. 0 when off. */
+  pep: number;
+  status: "paid" | "ineligible" | "off" | "already";
+  /** Why an ineligible member was not paid. */
+  reason?: "not_member" | "too_young";
+}
+
+/** What a correct daily answer would pay right now, for the "Correct answer pays N" line. 0 when off, in dry run, or not live. */
+export async function dailyRewardOffer(env: Record<string, string | undefined> = process.env): Promise<number> {
+  try {
+    const s = await triviaSettings(env);
+    if (s.webDailyRewardPep <= 0 || s.dryRun || !(await triviaLive(env))) return 0;
+    return s.webDailyRewardPep;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Pay the web daily reward for a member's recorded, correct attempt. Same eligibility as a Discord win (onboarded member,
+ * Discord account at least 7 days old). Exactly once per member per day, enforced in the database: the attempt row (unique
+ * per round and member) is claimed with a conditional UPDATE (rewardedPep IS NULL) under an advisory lock, and the wallet
+ * credit and TRIVIA_DAILY_REWARD ledger row are written in that same transaction. It never counts toward the Discord
+ * 3-wins-a-day cap (that counts WON Discord rounds). Never throws: any failure is logged and reported as "off".
+ */
+export async function payDailyReward(
+  input: { roundId: number; dayKey: string; discordId: string },
+  now: Date = new Date(),
+  env: Record<string, string | undefined> = process.env,
+): Promise<DailyReward> {
+  try {
+    const s = await triviaSettings(env);
+    if (s.webDailyRewardPep <= 0 || !(await triviaLive(env))) return { pep: 0, status: "off" };
+    const pep = s.webDailyRewardPep;
+    if (s.dryRun) {
+      console.info(`[trivia] dry run: would pay ${pep} $PEP for the web daily ${input.dayKey} to ${input.discordId}`);
+      return { pep: 0, status: "off" };
+    }
+    if (!accountOldEnough(input.discordId, now)) return { pep, status: "ineligible", reason: "too_young" };
+    if (REQUIRE_MEMBER && !(await fetchMemberIdByDiscordId(input.discordId))) return { pep, status: "ineligible", reason: "not_member" };
+
+    await getOrCreateEconomy(input.discordId); // the wallet row must exist before the transaction
+    const paid = await prisma.$transaction(
+      async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(${DAILY_REWARD_LOCK_NAMESPACE}::int, hashtext(${`${input.dayKey}:${input.discordId}`}))`;
+        const claimed = await tx.triviaAttempt.updateMany({
+          where: { roundId: input.roundId, discordId: input.discordId, messageId: null, correct: true, rewardedPep: null },
+          data: { rewardedPep: pep },
+        });
+        if (claimed.count !== 1) return false;
+        await creditInTx(tx, input.discordId, pep, "TRIVIA_DAILY_REWARD", "Trivia web daily", { roundId: input.roundId, dayKey: input.dayKey });
+        return true;
+      },
+      { maxWait: 15_000, timeout: 30_000 },
+    );
+    return { pep, status: paid ? "paid" : "already" };
+  } catch (e) {
+    console.error("[trivia] web daily reward failed:", (e as Error).message);
+    return { pep: 0, status: "off" };
+  }
 }

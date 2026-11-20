@@ -212,6 +212,7 @@ enum TransactionType {
   ADMIN_GRANT // Discord /add-money by an admin (+)
   ADMIN_REMOVE // Discord /remove-money by an admin (-)
   TRIVIA_REWARD // Discord trivia win (plans/trivia.md); written from phase 2, added now so the enum stays in sync
+  TRIVIA_DAILY_REWARD // Web daily trivia answer paid once per member per day (trivia.webDailyRewardPep)
 }
 
 model Transaction {
@@ -3453,6 +3454,7 @@ model TriviaAttempt {
   messageId  String?     @unique // Discord: idempotency for recorder retries
   correct    Boolean
   answerText String?     @db.VarChar(120) // truncated; kept 30 days, then nulled by the scrub cron
+  rewardedPep Int? // Web daily only: $PEP paid for this attempt (set once, atomically, with the ledger row)
   createdAt  DateTime    @default(now())
   round      TriviaRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
 
