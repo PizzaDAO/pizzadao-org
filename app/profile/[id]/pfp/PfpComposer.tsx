@@ -15,6 +15,9 @@ interface State {
   allowedBaseKinds: BaseKind[];
   memberName?: string;
   access: { allowed: boolean; minLevel: number; completed: number };
+  // Locked state only: the missions still to finish, and the dough-ball review link (null = hidden).
+  remaining?: { id: number; title: string; level: number; href?: string; pending?: boolean; rejected?: boolean }[];
+  review?: { href: string; canVote: boolean; minLevel: number } | null;
   bases: { static: string | null; discord: string | null; mafia: string | null };
   current: { baseKind: BaseKind; baseUrl: string; composedUrl: string; layers: Layer[]; original: OriginalBase | null } | null;
   assets: Asset[];
@@ -31,6 +34,7 @@ const KINDS: { kind: Kind; label: string }[] = [
   { kind: "badge", label: "Badges" },
 ];
 const LIMIT: Record<Kind, number> = { background: 1, outfit: 1, frame: 1, accessory: 3, badge: 1 };
+const LEFT_SHOWN = 10;
 const FULL: Omit<Layer, "assetId"> = { x: 0.5, y: 0.5, scale: 1, rotation: 0 };
 
 async function api(url: string, init?: RequestInit) {
@@ -108,6 +112,7 @@ export function PfpComposer({ memberId }: { memberId: string }) {
 
   if (state.access && !state.access.allowed) {
     const { minLevel, completed } = state.access;
+    const remaining = state.remaining ?? [];
     return (
       <section className="grid gap-3 rounded-[24px] border p-6 text-center" data-testid="pfp-locked">
         {state.current?.composedUrl && (
@@ -119,13 +124,41 @@ export function PfpComposer({ memberId }: { memberId: string }) {
           </div>
         )}
         <h2 className="m-0 text-2xl font-bold">Reach level {minLevel} to make your PFP</h2>
-        <p className="m-0 text-foreground/70">
-          You have completed level {completed} so far. Finish the level {Math.min(minLevel, completed + 1)} missions to keep going.
-        </p>
+        <p className="m-0 text-foreground/70">You have completed level {completed} so far.</p>
         <div className="mx-auto h-2 w-full max-w-xs overflow-hidden rounded bg-foreground/10" role="progressbar" aria-valuemin={0} aria-valuemax={minLevel} aria-valuenow={Math.min(completed, minLevel)}>
           <div className="h-full bg-foreground" style={{ width: `${Math.min(100, (completed / Math.max(1, minLevel)) * 100)}%` }} />
         </div>
+        {remaining.length > 0 ? (
+          <div className="mx-auto grid w-full max-w-md gap-2 text-left" data-testid="pfp-whats-left">
+            <h3 className="m-0 text-lg font-bold">What&apos;s left</h3>
+            <ul className="m-0 grid list-none gap-1 p-0">
+              {remaining.slice(0, LEFT_SHOWN).map((m) => (
+                <li key={m.id} className="flex items-baseline gap-2">
+                  <span aria-label={m.pending ? "Awaiting review" : m.rejected ? "Needs another try" : "Not done yet"} role="img">{m.pending ? "⏳" : m.rejected ? "↻" : "☐"}</span>
+                  <a href={m.href ?? "/missions"} className="underline">{m.title}</a>
+                  <span className="text-sm text-foreground/60">
+                    Level {m.level}{m.pending ? " · awaiting review" : m.rejected ? " · needs another try" : ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {remaining.length > LEFT_SHOWN && (
+              <a href="/missions" className="text-sm underline">and {remaining.length - LEFT_SHOWN} more</a>
+            )}
+          </div>
+        ) : (
+          <p className="m-0 text-foreground/70">Finish the level {Math.min(minLevel, completed + 1)} missions to keep going.</p>
+        )}
         <a href="/missions" className="mx-auto rounded border px-4 py-2 font-semibold underline">Go to missions</a>
+        {state.review && (
+          <p className="m-0 text-sm text-foreground/70" data-testid="pfp-locked-review">
+            {state.review.canVote ? (
+              <>While you work on it, <a href={state.review.href} className="underline">help pick the dough-ball look for new members</a>.</>
+            ) : (
+              `Once you reach level ${state.review.minLevel} you can vote on the dough-ball looks too.`
+            )}
+          </p>
+        )}
       </section>
     );
   }

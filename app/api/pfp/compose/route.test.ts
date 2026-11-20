@@ -16,6 +16,9 @@ vi.mock('@/app/lib/pfp-assets/access', () => ({
   allowedBaseKinds: vi.fn(async () => ['mafia', 'restyle']),
   loadEditAccess: vi.fn(async () => ({ allowed: true, completed: 2, minLevel: 2, bypass: false })),
 }))
+vi.mock('@/app/lib/pfp-assets/remaining', () => ({ loadRemainingMissions: vi.fn(async () => [{ id: 5, title: 'Do a thing', level: 2 }]) }))
+vi.mock('@/app/lib/image-review/access', () => ({ imageReviewAccess: vi.fn(async () => ({ role: null, completed: 1, minLevel: 3 })) }))
+vi.mock('@/app/lib/settings', async (orig) => ({ ...(await orig<typeof import('@/app/lib/settings')>()), getSetting: vi.fn(async () => '/review/abc') }))
 vi.mock('@/app/lib/pfp-assets/catalog', () => ({
   listAssets: vi.fn(async () => []),
   hintLookups: vi.fn(async () => ({})),
@@ -27,8 +30,9 @@ vi.mock('@/app/lib/pfp-assets/context', () => ({
 import { getSession } from '@/app/lib/session'
 import { fetchMemberIdByDiscordId } from '@/app/lib/sheets/member-repository'
 import { composeMemberPfp } from '@/app/lib/pfp-assets/compose'
-import { assertBaseKindAllowed, assertCanEdit } from '@/app/lib/pfp-assets/access'
+import { assertBaseKindAllowed, assertCanEdit, loadEditAccess } from '@/app/lib/pfp-assets/access'
 import { ForbiddenError } from '@/app/lib/errors/api-errors'
+import { loadRemainingMissions } from '@/app/lib/pfp-assets/remaining'
 import { prisma } from '@/app/lib/db'
 import { del } from '@vercel/blob'
 import { GET, POST, DELETE } from './route'
@@ -64,6 +68,18 @@ describe('/api/pfp/compose rules', () => {
     expect(body.allowedBaseKinds).toEqual(['mafia', 'restyle'])
     expect(body.access).toMatchObject({ allowed: true, minLevel: 2 })
     expect(body.memberName).toBe('Tony')
+  })
+})
+
+describe('/api/pfp/compose locked extras', () => {
+  it('returns the session member\'s remaining missions and the review link only when locked', async () => {
+    const body = await (await GET(new Request('https://app.test/api/pfp/compose'))).json()
+    expect(body.remaining).toBeUndefined()
+    m(loadEditAccess).mockResolvedValueOnce({ allowed: false, completed: 1, minLevel: 2, bypass: false })
+    const locked = await (await GET(new Request('https://app.test/api/pfp/compose'))).json()
+    expect(locked.remaining).toEqual([{ id: 5, title: 'Do a thing', level: 2 }])
+    expect(locked.review).toEqual({ href: '/review/abc', canVote: false, minLevel: 3 })
+    expect(loadRemainingMissions).toHaveBeenCalledWith('400000000000000001', 1, 2)
   })
 })
 
