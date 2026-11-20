@@ -467,6 +467,32 @@ describe('sweep change markers', () => {
     expect(s.load).toHaveBeenCalledTimes(2)
   })
 
+  it('re-checks when channel privacy flips with an unchanged marker', async () => {
+    const s = setup(() => 'm1')
+    let priv = true
+    const { deps } = s.mk()
+    deps.channelIsPrivate = async () => priv
+    await syncDueCallReviewCards(5, deps)
+    await syncDueCallReviewCards(5, deps)
+    expect(s.load).toHaveBeenCalledTimes(1)
+    priv = false
+    await syncDueCallReviewCards(5, deps)
+    expect(s.load).toHaveBeenCalledTimes(2)
+  })
+
+  it('re-checks when the interactive toggle flips with an unchanged marker', async () => {
+    const s = setup(() => 'm1')
+    let on = true
+    const { deps } = s.mk()
+    deps.interactive = async () => on
+    await syncDueCallReviewCards(5, deps)
+    await syncDueCallReviewCards(5, deps)
+    expect(s.load).toHaveBeenCalledTimes(1)
+    on = false
+    await syncDueCallReviewCards(5, deps)
+    expect(s.load).toHaveBeenCalledTimes(2)
+  })
+
   it('does a full re-check after the interval', async () => {
     const s = setup(() => 'm1')
     const { deps } = s.mk()
