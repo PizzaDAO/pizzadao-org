@@ -20,6 +20,9 @@ import { ValidationError } from '@/app/lib/errors/api-errors'
 import { allowedBaseKinds, assertBaseKindAllowed, assertCanEdit, loadEditAccess } from '@/app/lib/pfp-assets/access'
 import { fetchMemberByDiscordId } from '@/app/lib/sheets/member-repository'
 import { toggleEnabled } from '@/app/lib/settings/toggles'
+import { getSetting } from '@/app/lib/settings'
+import { imageReviewAccess } from '@/app/lib/image-review/access'
+import { loadRemainingMissions } from '@/app/lib/pfp-assets/remaining'
 import { evaluateAllowance, loadRestyleSettings, loadUsage, usageByOutfit } from '@/app/lib/pfp-assets/restyle'
 
 export const runtime = 'nodejs'
@@ -30,6 +33,16 @@ function parseBase(v: unknown): { kind: import('@/app/lib/pfp-assets/compose').B
   const o = v as { kind?: unknown; url?: unknown } | null | undefined
   if (!o || !isBaseKind(o.kind)) return undefined
   return { kind: o.kind, url: typeof o.url === 'string' ? o.url : undefined }
+}
+
+async function lockedExtras(discordId: string, completed: number, minLevel: number) {
+  const [remaining, link, reviewAccess] = await Promise.all([
+    loadRemainingMissions(discordId, completed, minLevel).catch(() => []),
+    getSetting('pfp.lockedReviewLink').catch(() => ''),
+    imageReviewAccess(discordId).catch(() => null),
+  ])
+  // The review has its own minimum level: the page says which one to reach.
+  return { remaining, review: link ? { href: link, canVote: !!reviewAccess?.role, minLevel: reviewAccess?.minLevel ?? 2 } : null }
 }
 
 export const GET = memberPfpRoute(async (_req, { memberId, discordId }) => {
@@ -51,14 +64,17 @@ export const GET = memberPfpRoute(async (_req, { memberId, discordId }) => {
   // Daily and monthly gates only (null outfit): the per-outfit count is in `usedByOutfit`.
   const gate = usage ? evaluateAllowance(restyleSettings, { ...usage, forOutfit: 0 }) : null
   const unlocked = unlockedAssetIds(assets, ctx)
+  // Locked page only: the member's own unfinished missions and the dough-ball review link.
+  const lockedP = access.allowed ? null : lockedExtras(discordId, access.completed, access.minLevel)
   // Only the names the locked hints need (not the admin pickers' full lists).
-  const lookups = await hintLookups(assets.filter((a) => !unlocked.has(a.id)))
+  const [lookups, locked] = await Promise.all([hintLookups(assets.filter((a) => !unlocked.has(a.id))), lockedP])
   return {
     level: ctx.level,
     allowedBaseKinds: baseKinds,
     // The member's own mafia name, for drawing their portrait from the editor.
     memberName: who?.name ?? '',
     access: { allowed: access.allowed, minLevel: access.minLevel, completed: access.bypass ? ctx.level : access.completed },
+    ...(locked ?? {}),
     outfitOverlay,
     restyle: {
       enabled: restyleSettings.enabled,
