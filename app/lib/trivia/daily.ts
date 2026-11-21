@@ -1,6 +1,6 @@
 // app/lib/trivia/daily.ts
 //
-// Pure helpers for the web daily and practice (no I/O). plans/trivia.md §8.
+// Pure helpers for the web daily and practice (no I/O). plans/done/trivia.md §8.
 //
 // The daily is the same question for everyone for a UTC day. It is picked deterministically from the *web* pool:
 // the pool is put in a fixed pseudo-random order (by a hash of each id) and the day number walks through it, so

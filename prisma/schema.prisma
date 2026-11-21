@@ -211,7 +211,7 @@ enum TransactionType {
   GAME_WIN // Casino game payout incl. stake returned on a push (+)
   ADMIN_GRANT // Discord /add-money by an admin (+)
   ADMIN_REMOVE // Discord /remove-money by an admin (-)
-  TRIVIA_REWARD // Discord trivia win (plans/trivia.md); written from phase 2, added now so the enum stays in sync
+  TRIVIA_REWARD // Discord trivia win (plans/done/trivia.md); written from phase 2, added now so the enum stays in sync
   TRIVIA_DAILY_REWARD // Web daily trivia answer paid once per member per day (trivia.webDailyRewardPep)
 }
 
@@ -3426,7 +3426,7 @@ model MemberRsvCheck {
   checkedAt DateTime
 }
 
-// Trivia (plans/trivia.md). The question bank is TriviaQuestion (edited at /admin/trivia, never in git: the repo is
+// Trivia (plans/done/trivia.md). The question bank is TriviaQuestion (edited at /admin/trivia, never in git: the repo is
 // public); the other tables hold runtime state.
 
 // One bank question. `data` is the full question object (app/lib/trivia/schema.ts QuestionSchema, validated on every

@@ -1,6 +1,6 @@
 // app/lib/trivia/leaderboard.ts
 //
-// Leaderboard aggregates (plans/trivia.md §9): SQL over TriviaRound (Discord wins) and TriviaAttempt (daily streaks).
+// Leaderboard aggregates (plans/done/trivia.md §9): SQL over TriviaRound (Discord wins) and TriviaAttempt (daily streaks).
 // There is no denormalised score table until it's needed. Shared by /api/trivia/leaderboard and (phase 2) /trivia leaderboard.
 // Phase 1 has no Discord rounds yet, so the wins boards are empty until phase 2 ships; streaks fill from the web daily.
 //

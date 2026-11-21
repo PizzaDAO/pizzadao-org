@@ -1,6 +1,6 @@
 // app/lib/trivia/emoji.ts
 //
-// Pure helpers for reaction answers (plans/trivia.md section 17): which emoji label the choices of a round, and
+// Pure helpers for reaction answers (plans/done/trivia.md section 17): which emoji label the choices of a round, and
 // which choice (or true/false) a reaction means. No I/O: the guild's emoji list is passed in.
 import { CHOICE_EMOJI, CHOICE_FALLBACK, FLAG_REACTION, TF_REACTIONS } from "./config";
 import type { TriviaQuestion } from "./schema";

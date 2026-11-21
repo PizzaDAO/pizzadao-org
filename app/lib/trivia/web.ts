@@ -1,6 +1,6 @@
 // app/lib/trivia/web.ts
 //
-// DB access for the web daily. plans/trivia.md §4.1, §8.
+// DB access for the web daily. plans/done/trivia.md §4.1, §8.
 //
 // Every function here tolerates the Trivia tables being absent (the migration is applied to production by hand before
 // the merge, and previews share that database): a failed query is logged and reported as "no data", so the page still

@@ -1,6 +1,6 @@
 // app/lib/trivia/channel.ts
 //
-// Which channel trivia runs in. Snax's decision (plans/trivia.md section 13): the existing #work channel, no new
+// Which channel trivia runs in. Snax's decision (plans/done/trivia.md section 13): the existing #work channel, no new
 // channel; he plans to rename it. So the channel is an ID, never a name:
 //   1. the saved `trivia.channelId` setting;
 //   2. else the mission review channel, resolved the way the mission cards resolve it (saved id, else

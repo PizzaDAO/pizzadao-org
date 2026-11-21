@@ -1,6 +1,6 @@
 // app/lib/trivia/match.ts
 //
-// Pure answer matcher (plans/trivia.md §5). No I/O, never throws.
+// Pure answer matcher (plans/done/trivia.md §5). No I/O, never throws.
 //
 //   match(question, raw) -> { verdict: 'correct' | 'wrong' | 'ignore' }
 //

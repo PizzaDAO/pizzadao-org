@@ -1,6 +1,6 @@
 // app/admin/trivia/page.tsx
 //
-// Trivia admin (plans/trivia.md §4.2, §12): bank stats, the question bank editor (the bank is in the database, never in
+// Trivia admin (plans/done/trivia.md §4.2, §12): bank stats, the question bank editor (the bank is in the database, never in
 // the public repo), reported questions (disable = trivia.disabledQuestionIds), community suggestions ("Add to bank"),
 // recent rounds. Every write goes through /api/admin/trivia(/questions), which checks the admin again.
 // Gate: ADMIN_ROLE_IDS (isAdminDiscordId, fails closed). A visitor with no session gets a real 307 to log in from proxy.ts

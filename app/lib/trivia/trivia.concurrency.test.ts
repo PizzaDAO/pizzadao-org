@@ -1,6 +1,6 @@
 // @vitest-environment node
 //
-// Real-Postgres suite for the Discord trivia loop (plans/trivia.md section 11), in the pattern of
+// Real-Postgres suite for the Discord trivia loop (plans/done/trivia.md section 11), in the pattern of
 // pep-economy.concurrency.test.ts. Skipped unless PEP_IT_DATABASE_URL points at a LOCAL Postgres whose schema was
 // created with `prisma db push`:
 //

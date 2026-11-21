@@ -1,6 +1,6 @@
 // app/lib/trivia/share.ts
 //
-// The text a member copies after answering the web daily (plans/trivia.md phase 3, "OG share"). It must never reveal the
+// The text a member copies after answering the web daily (plans/done/trivia.md phase 3, "OG share"). It must never reveal the
 // answer or the question: only the day, a result emoji line and the streak, plus the link.
 
 export const SHARE_CORRECT_EMOJI = "🍕✅";

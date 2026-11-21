@@ -1,6 +1,6 @@
 // app/lib/trivia/reports.ts
 //
-// "This question is bad" reports (plans/trivia.md section 18): the flag reaction, replies to a question post and
+// "This question is bad" reports (plans/done/trivia.md section 18): the flag reaction, replies to a question post and
 // /trivia report all end up here as a TriviaReport row. Reports are never answer attempts. A question reported by
 // REPORT_PULL_MEMBERS different members within REPORT_WINDOW_DAYS is pulled automatically (added to the
 // trivia.disabledQuestionIds setting) and nothing is said publicly. The same setting is the admin's one-click disable.

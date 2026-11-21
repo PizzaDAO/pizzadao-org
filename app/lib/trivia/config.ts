@@ -1,6 +1,6 @@
 // app/lib/trivia/config.ts
 //
-// The fixed launch rules of the Discord loop (plans/trivia.md section 6 and 13). These are decisions, not
+// The fixed launch rules of the Discord loop (plans/done/trivia.md section 6 and 13). These are decisions, not
 // settings: the settings group (app/lib/settings/trivia-settings.ts) only carries the switches and the
 // few knobs Snax may turn (enabled, dryRun, rewardPep, channelId, roundsPerDay).
 import type { TriviaQuestion } from "./schema";
@@ -21,7 +21,7 @@ export const SLOT_CATCH_UP_MINUTES = 90;
 export const STALE_REVEAL_MINUTES = 30;
 /** How many recent Discord rounds the question picker looks back at, at most. */
 export const RECENT_ROUNDS_LOOKBACK = 400;
-/** Difficulty weights for picking a question (plans/trivia.md section 6). */
+/** Difficulty weights for picking a question (plans/done/trivia.md section 6). */
 export const DIFFICULTY_WEIGHTS = { easy: 40, medium: 45, hard: 15 } as const;
 
 /** Attempts one member gets per round: true/false and multiple choice one (otherwise free money), short answers three. */
@@ -53,7 +53,7 @@ export function snowflakeAfter(a: string, b: string): boolean {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// Reaction answers (plans/trivia.md section 17)
+// Reaction answers (plans/done/trivia.md section 17)
 // ---------------------------------------------------------------------------------------------------------------
 
 /**

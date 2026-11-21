@@ -1,5 +1,5 @@
 /**
- * Discord trivia, phase 2 (plans/trivia.md section 6). Every switch is off by default. Kept in its own
+ * Discord trivia, phase 2 (plans/done/trivia.md section 6). Every switch is off by default. Kept in its own
  * file so the registry only carries one spread line. Imports only types from ./registry.
  *
  * The fixed parts of the loop (10-minute rounds, 3 wins per member per day, onboarded members only,

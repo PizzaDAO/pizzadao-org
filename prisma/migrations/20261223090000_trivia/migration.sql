@@ -1,4 +1,4 @@
--- Trivia (plans/trivia.md, phase 1). Purely additive: one enum value, two enums, three new tables.
+-- Trivia (plans/done/trivia.md, phase 1). Purely additive: one enum value, two enums, three new tables.
 -- Nothing reads or writes these tables from the Discord side yet (phase 2); the web daily writes TriviaRound/TriviaAttempt,
 -- and "report a problem" writes TriviaReport.
 

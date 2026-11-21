@@ -1,5 +1,5 @@
 /**
- * Forward typed trivia answers to the app (plans/trivia.md section 7). The recorder is a thin forwarder: it only
+ * Forward typed trivia answers to the app (plans/done/trivia.md section 7). The recorder is a thin forwarder: it only
  * drops what can never be an answer (other channels, bots and webhooks, empty or long messages); the app owns the
  * question bank, the matching, the caps and the payout.
  *

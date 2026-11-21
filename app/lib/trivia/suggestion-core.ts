@@ -1,6 +1,6 @@
 // app/lib/trivia/suggestion-core.ts
 //
-// Community question suggestions (plans/trivia.md section 10, phase 3), the pure half: validation of what a member typed
+// Community question suggestions (plans/done/trivia.md section 10, phase 3), the pure half: validation of what a member typed
 // (Discord modal or web form) and the draft bank entry "Add to bank" creates (suggestions.ts addSuggestionToBank). No
 // database, no network: suggestions.ts stores them as TriviaReport rows with kind = "suggestion".
 import { CATEGORIES, QuestionSchema, type TriviaCategory, type TriviaQuestion } from "./schema";
@@ -115,7 +115,7 @@ export const DEFAULT_SUGGESTION_CATEGORY: TriviaCategory = "pizzadao";
 
 /**
  * A draft entry in the exact bank schema (QuestionSchema). It is `status: "flagged"` (not served: a reviewer
- * checks the sources and flips it to approved with a pool, as plans/trivia.md section 10 says) and the fields a member
+ * checks the sources and flips it to approved with a pool, as plans/done/trivia.md section 10 says) and the fields a member
  * cannot know (difficulty, explanation) are placeholders to edit. The type and matcher are inferred from the answer.
  * Always parses with QuestionSchema (suggestion tests enforce it).
  */

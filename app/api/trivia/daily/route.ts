@@ -1,6 +1,6 @@
 // GET today's web daily question (public view only); POST an answer.
 //
-// Answer secrecy (plans/trivia.md §8): GET never carries the answer, aliases or rejects. They come back (answer,
+// Answer secrecy (plans/done/trivia.md §8): GET never carries the answer, aliases or rejects. They come back (answer,
 // explanation, sources) only in the response to an attempt, or in GET once the signed-in member has already attempted.
 // The daily is drawn from the web pool only, so nothing here can leak a Discord question.
 //
