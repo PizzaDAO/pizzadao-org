@@ -1735,7 +1735,12 @@
       "dmClosed": "Nous n'avons pas pu vous envoyer de MP sur Discord. Autorisez les messages privés des membres du serveur, puis réessayez.",
       "tryAgain": "Réessayer",
       "proposals": "M'envoyer un MP quand une proposition s'ouvre ou va bientôt se clôturer",
-      "proposalsHint": "Si vous avez déjà retiré votre bulletin, vous ne recevrez pas le rappel de clôture. Chaque MP a un bouton pour arrêter."
+      "proposalsHint": "Si vous avez déjà retiré votre bulletin, vous ne recevrez pas le rappel de clôture. Chaque MP a un bouton pour arrêter.",
+      "nearby": "Me prévenir des soirées pizza près de ma ville",
+      "nearbyHint": "Événements du Global Pizza Party et de séries approuvées près de la ville de ton profil. Personne ne t'inscrit à ta place. Quelques-uns par semaine au maximum ; chaque DM a un bouton pour tout arrêter.",
+      "nearbyRadiusLegend": "Jusqu'où",
+      "nearbyRadiusDefault": "Standard",
+      "nearbyRadiusOption": "À moins de {km} km"
     }
   },
   "reengage": {

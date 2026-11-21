@@ -22,6 +22,14 @@ describe('rm: Stop button on reminder DMs', () => {
     expect(res.data?.flags).toBe(64)
     expect((await handleInteraction(dm('rm:stop:proposals:u9'), deps(r))).data?.content).toMatch(/unknown/i)
   })
+  it('rm:stop:nearby turns nearby invites off for the invoking user only', async () => {
+    const r = rm()
+    const res = await handleInteraction(dm('rm:stop:nearby'), deps(r))
+    expect(r.stop).toHaveBeenCalledWith('u1', 'nearby')
+    expect(res.data?.content).toMatch(/not get invites to nearby events/i)
+    expect(res.data?.flags).toBe(64)
+    expect((await handleInteraction(dm('rm:stop:nearby:u9'), deps(r))).data?.content).toMatch(/unknown/i)
+  })
   it('the actor is member.user.id when present, never anything from the custom id', async () => {
     const r = rm()
     await handleInteraction(dm('rm:stop:calls', { user: undefined, member: { user: { id: 'u2' } } } as Partial<Interaction>), deps(r))

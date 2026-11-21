@@ -9,7 +9,7 @@ import type { PrefLite } from './schedule'
 export const MAX_ATTEMPTS = 3
 
 /** The kinds of send row. Calls are the default everywhere; proposals pass their kind explicitly. */
-export type SendKind = 'CALL' | 'PROPOSAL_OPENED' | 'PROPOSAL_CLOSING'
+export type SendKind = 'CALL' | 'PROPOSAL_OPENED' | 'PROPOSAL_CLOSING' | 'NEARBY_EVENT'
 
 export interface ReminderStore {
   /** Everyone who opted in to call reminders. */

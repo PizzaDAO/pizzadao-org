@@ -142,6 +142,8 @@ export const TOGGLES = {
   'reminders.callsEnabled': { env: 'REMINDERS_CALLS_ENABLED', legacy: ON_WORDS },
   // Off unless turned on: opt-in proposal reminders by Discord DM (B2). Also needs proposals.enabled.
   'reminders.proposalsEnabled': { env: 'REMINDERS_PROPOSALS_ENABLED', legacy: ON_WORDS },
+  // Off unless turned on: opt-OUT nearby pizza-party invites by DM + in-app (plans/pineapple-84122.md).
+  'reminders.nearbyEventsEnabled': { env: 'REMINDERS_NEARBY_EVENTS_ENABLED', legacy: ON_WORDS },
   // Off unless turned on: the nightly crew roster auto-add from call attendance (counts only while off).
   'crews.rosterAutoAddEnabled': { env: 'CREWS_ROSTER_AUTOADD_ENABLED', legacy: ON_WORDS },
   // Off unless turned on: digest of website crew task changes in the crew's Discord channel.

@@ -17,15 +17,21 @@ import { clearSettledProposalReminders, prismaProposalStore } from './proposal-s
 import { runProposalReminders, type ProposalRunResult } from './proposals'
 import { loadDmReach, recordDmClosed, recordDmOk } from './reach'
 import { runCallRemindersNow, type RunResult } from './run'
+import { runNearbyInvitesNow } from '@/app/lib/nearby-events/now'
+import type { NearbyRunResult } from '@/app/lib/nearby-events/run'
 import { prismaStore } from './store'
 
 /** Proposals ran every 5 minutes before the cron went to every minute; they still only run on those minutes. */
 export const PROPOSALS_EVERY_MINUTES = 5
 
+/** Nearby-event invites look for new work every 30 minutes (the feed is small, but the members table is not). */
+export const NEARBY_EVERY_MINUTES = 30
+
 export type Skipped = { skipped: string }
 export interface RemindersRunResult {
   calls: RunResult | Skipped
   proposals: ProposalRunResult | Skipped
+  nearby: NearbyRunResult | Skipped
 }
 
 export async function runProposalRemindersNow(
@@ -86,5 +92,12 @@ export async function runRemindersNow(
   // Privacy sweep: no per-member proposal reminder row outlives its proposal being open. Runs even with the
   // switches off, so rows from an earlier run are still removed. Best effort.
   if (proposalsSlot && reminderSendAllowed(env)) await clearSettledProposalReminders().catch(() => 0)
-  return { calls, proposals }
+  // Nearby-event invites: after calls and proposals, only when they left room, on their own 30-minute slot.
+  // A failure here never affects the call or proposal results.
+  let nearby: NearbyRunResult | Skipped
+  const nearbySlot = !!opts.dryRun || now.getUTCMinutes() % NEARBY_EVERY_MINUTES === 0
+  if (!nearbySlot) nearby = { skipped: 'cadence' }
+  else if ('stoppedEarly' in calls && calls.stoppedEarly) nearby = { skipped: 'calls_first' }
+  else nearby = await runNearbyInvitesNow(now, env, { dryRun: opts.dryRun }).catch(() => ({ skipped: 'error' }))
+  return { calls, proposals, nearby }
 }

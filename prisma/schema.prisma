@@ -283,6 +283,7 @@ enum NotificationType {
   DISAVOW_VOTE_NEEDED // A disavow nomination needs a DPR vote (no names)
   DISAVOW_ROUND_CLOSED // A disavow round you opened has closed (no names)
   DISAVOW_LISTED_SUBJECT // You were listed (no names or content)
+  NEARBY_EVENT // A curated pizza party near your city
 }
 
 // ---------------------------------------------------------------------------
@@ -3003,6 +3004,7 @@ enum ReminderKind {
   CALL_MOVED
   PROPOSAL_OPENED
   PROPOSAL_CLOSING
+  NEARBY_EVENT
 }
 
 model ReminderPref {
@@ -3013,6 +3015,9 @@ model ReminderPref {
   proposalOpened  Boolean         @default(false)
   proposalClosing Boolean         @default(false)
   channel         ReminderChannel @default(AUTO)
+  // Nearby pizza-party invites are OPT-OUT: on unless the member turns them off (no row = on).
+  nearbyEvents    Boolean         @default(true)
+  nearbyRadiusKm  Int? // null = the reminders.nearbyDefaultRadiusKm setting
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 

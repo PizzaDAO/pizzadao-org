@@ -11,6 +11,7 @@ vi.mock('@/app/lib/settings/toggles', () => ({ toggleEnabled: (k: string) => tog
 vi.mock('@/app/lib/settings', () => ({ loadSettings: () => loadSettings() }))
 vi.mock('@/app/lib/proposals/constants', () => ({ proposalsEnabled: vi.fn(async () => true) }))
 vi.mock('@/app/lib/proposals/pilot', () => ({ loadPilotState: vi.fn(async () => ({ running: false, unknown: false, ids: [] })) }))
+vi.mock('@/app/lib/nearby-events/now', () => ({ runNearbyInvitesNow: vi.fn(async () => ({ skipped: 'disabled' })) }))
 vi.mock('./run', () => ({ runCallRemindersNow: () => runCalls() }))
 vi.mock('./proposal-store', () => ({
   prismaProposalStore: { listProposalPrefs: () => listProposalPrefs() },

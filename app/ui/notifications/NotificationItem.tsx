@@ -231,7 +231,9 @@ export function NotificationItem({ notification, onMarkRead, onNavigate }: Notif
       onMarkRead(notification.id);
     }
     if (notification.linkUrl) {
-      onNavigate(notification.linkUrl);
+      // Nearby-event invites link to the event page on another site.
+      if (/^https:\/\//i.test(notification.linkUrl)) window.open(notification.linkUrl, "_blank", "noopener,noreferrer");
+      else onNavigate(notification.linkUrl);
     }
   };
 

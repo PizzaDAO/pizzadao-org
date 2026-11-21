@@ -101,7 +101,7 @@ import { syncCallReviewCard } from "@/app/lib/calls/review-cards";
 import { taskProposalHandlerDeps, taskProposalRunDeps } from "@/app/lib/discord-interactions/task-proposal-review-defaults";
 import { runTaskProposalReview } from "@/app/lib/discord-interactions/task-proposal-review";
 import { defaultProposalCardDeps, syncTaskProposalCard } from "@/app/lib/call-tasks/cards";
-import { stopCallReminders, stopProposalReminders } from "@/app/lib/reminders/prefs";
+import { stopCallReminders, stopNearbyInvites, stopProposalReminders } from "@/app/lib/reminders/prefs";
 import { liveCommandEnabled, mayRunLive, runLiveCommand, type LiveJob } from "@/app/lib/calls/live-announce-command";
 import { SITE_URL } from "@/app/lib/site-url";
 
@@ -392,7 +392,7 @@ const followups: FollowUpInteractionDeps = {
 };
 
 const reminders: ReminderInteractionDeps = {
-  stop: (discordId, kind) => (kind === 'proposals' ? stopProposalReminders(discordId) : stopCallReminders(discordId)),
+  stop: (discordId, kind) => (kind === 'proposals' ? stopProposalReminders(discordId) : kind === 'nearby' ? stopNearbyInvites(discordId) : stopCallReminders(discordId)),
   settingsUrl: async (discordId) => {
     const memberId = await fetchMemberIdByDiscordId(discordId);
     return memberId ? `${SITE_URL}/profile/${encodeURIComponent(memberId)}/edit` : null;
