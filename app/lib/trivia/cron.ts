@@ -1,6 +1,6 @@
 // app/lib/trivia/cron.ts
 //
-// The 5-minute tick of the Discord loop (plans/trivia.md section 6): expire rounds past their time (reveal the
+// The 5-minute tick of the Discord loop (plans/done/trivia.md section 6): expire rounds past their time (reveal the
 // answer), then open the next scheduled round if one is due and none is open.
 //
 // A no-op (nothing read, posted or paid) unless this is the production deployment AND trivia.enabled is on:

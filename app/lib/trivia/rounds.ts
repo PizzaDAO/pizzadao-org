@@ -1,6 +1,6 @@
 // app/lib/trivia/rounds.ts
 //
-// Discord rounds: open, claim, expire, cancel (plans/trivia.md sections 6 and 7). All DB state lives in
+// Discord rounds: open, claim, expire, cancel (plans/done/trivia.md sections 6 and 7). All DB state lives in
 // TriviaRound / TriviaAttempt; the only things that leave the process are the injected `post` calls and the
 // TRIVIA_REWARD ledger credit (creditInTx, inside the claim transaction).
 //

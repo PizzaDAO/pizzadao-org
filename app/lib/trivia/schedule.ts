@@ -1,6 +1,6 @@
 // app/lib/trivia/schedule.ts
 //
-// Pure scheduling and question picking for the Discord loop (plans/trivia.md section 6). No I/O.
+// Pure scheduling and question picking for the Discord loop (plans/done/trivia.md section 6). No I/O.
 //
 // Slots: for each UTC day the schedule has `roundsPerDay` instants, each at a random minute inside one of the
 // evening windows. "Random" is seeded by the date, so every cron tick on the same day computes the same slots

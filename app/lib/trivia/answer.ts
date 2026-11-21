@@ -1,6 +1,6 @@
 // app/lib/trivia/answer.ts
 //
-// One typed answer from the recorder (plans/trivia.md sections 5 to 7): find the channel's open round, judge the text
+// One typed answer from the recorder (plans/done/trivia.md sections 5 to 7): find the channel's open round, judge the text
 // with the pure matcher, and run the atomic claim. The recorder is a thin forwarder; everything that decides lives
 // here (bank, settings, caps). Answers reach this in Discord order (the recorder's per-channel serial queue).
 import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
@@ -200,7 +200,7 @@ export interface ReactionInput {
 }
 
 /**
- * A reaction on the question post, as a choice (plans/trivia.md section 17). The same rules as a typed answer: the
+ * A reaction on the question post, as a choice (plans/done/trivia.md section 17). The same rules as a typed answer: the
  * open round, eligibility, the attempt cap (1 for true/false and multiple choice), the dedupe key and claimWin. The
  * dedupe key is `reaction:<question message>:<member>`, so a member's FIRST reaction is their only reaction attempt
  * (their later ones are duplicates). A pick on the current question is removed immediately, in parallel with the work and whatever the outcome, so

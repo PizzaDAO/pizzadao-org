@@ -6,7 +6,7 @@
  * with a deferred reply (type 5; ephemeral unless the leaderboard was asked for publicly); this runs afterwards
  * (route: after()) and edits the reply in via the interaction webhook. start and skip are admin only (checked by
  * the handler before anything is deferred). Dependencies are injected so tests never reach Discord or the database.
- * See plans/trivia.md sections 6 and 9.
+ * See plans/done/trivia.md sections 6 and 9.
  *
  * The questions and answers never appear in a reply: start only says a round began (the question is posted in the
  * trivia channel by the bot), skip only says a round was cancelled.
@@ -136,7 +136,7 @@ export async function runTriviaCommand(job: TriviaJob, deps: TriviaCommandDeps):
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// /trivia suggest: the modal, its parsing and the replies (plans/trivia.md section 10, phase 3)
+// /trivia suggest: the modal, its parsing and the replies (plans/done/trivia.md section 10, phase 3)
 // ---------------------------------------------------------------------------------------------------------------
 
 export const TRIVIA_SUGGEST_MODAL_ID = 'trivia:suggest'

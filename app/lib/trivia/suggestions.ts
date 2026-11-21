@@ -1,6 +1,6 @@
 // app/lib/trivia/suggestions.ts
 //
-// Community question suggestions (plans/trivia.md section 10, phase 3), the database half. A suggestion is a TriviaReport
+// Community question suggestions (plans/done/trivia.md section 10, phase 3), the database half. A suggestion is a TriviaReport
 // row with kind = "suggestion": questionId is "" and payload holds the validated fields (suggestion-core.ts). Statuses:
 // open (in the admin queue), added (an admin put it in the bank with "Add to bank": a flagged draft row), dismissed.
 // Only addSuggestionToBank writes to the question bank; suggestions never touch the pulled-questions setting or the

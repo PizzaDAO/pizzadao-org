@@ -1,6 +1,6 @@
 // app/lib/trivia/post.ts
 //
-// Discord message builders for the loop (plans/trivia.md section 6). Pure. Every message sets
+// Discord message builders for the loop (plans/done/trivia.md section 6). Pure. Every message sets
 // allowed_mentions explicitly: question and reveal posts ping nobody, the winner post pings only the winner.
 import { reveal } from "./bank";
 import { FLAG_REACTION, ROUND_MINUTES, TF_REACTIONS } from "./config";

@@ -1,6 +1,6 @@
 // app/lib/trivia/reactions.ts
 //
-// The Discord side of reaction answers (plans/trivia.md section 17): resolving the choice emoji, pre-adding the bot's
+// The Discord side of reaction answers (plans/done/trivia.md section 17): resolving the choice emoji, pre-adding the bot's
 // reactions to a question post, removing a member's reaction after their attempt (so the counts never show what others
 // picked), and checking which channel permissions the bot has. Nothing here changes permissions; it only reads them.
 import { computeChannelPermissions, type GuildRole, type PermissionOverwrite } from "@/app/lib/announce/bot-check";

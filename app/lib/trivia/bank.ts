@@ -1,7 +1,7 @@
 // app/lib/trivia/bank.ts
 //
 // Loads the question bank from the database (TriviaQuestion, via bank-store.ts), validates every row with QuestionSchema,
-// and decides what may be served. plans/trivia.md §4.2. Only `approved` questions are ever served; `flagged`,
+// and decides what may be served. plans/done/trivia.md §4.2. Only `approved` questions are ever served; `flagged`,
 // `needs_snax` and `rejected` ones stay in the bank as a record (so they are not re-added) but are filtered out here.
 //
 // Cache: one in-process copy, refreshed at most every BANK_TTL_MS (60 s). An admin write in this instance calls

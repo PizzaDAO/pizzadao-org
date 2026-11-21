@@ -51,7 +51,7 @@ export interface RecorderConfig {
   /** Live Discord message counting for the profile "Discord activity" block (members.discordActivityCount / ...FlushSeconds). */
   discordActivity: { enabled: boolean; flushSeconds: number }
   /**
-   * Discord trivia answer forwarding (plans/trivia.md section 7): on only in production with trivia.enabled on,
+   * Discord trivia answer forwarding (plans/done/trivia.md section 7): on only in production with trivia.enabled on,
    * and only for the trivia channel (an id: it survives a rename). Everything else is decided by the app.
    */
   trivia: { enabled: boolean; channelIds: string[] }

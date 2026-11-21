@@ -1,6 +1,6 @@
 // app/lib/trivia/schema.ts
 //
-// zod schema + types for the trivia question bank. plans/trivia.md §3.1 and §4.2.
+// zod schema + types for the trivia question bank. plans/done/trivia.md §3.1 and §4.2.
 //
 // The bank lives in the database (TriviaQuestion, one row per question, the object below in its `data` column), never
 // in git: the repo is public. Every write (admin editor, import script) and every read (bank.ts) validates with

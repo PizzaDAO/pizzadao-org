@@ -38,7 +38,7 @@ export async function proxy(req: NextRequest) {
     const moved = await hostRedirect(req);
     if (moved) return moved;
     const path = req.nextUrl.pathname;
-    // /admin/trivia (read-only, plans/trivia.md): a visitor with no valid session is redirected to log in before any
+    // /admin/trivia (read-only, plans/done/trivia.md): a visitor with no valid session is redirected to log in before any
     // page renders (a redirect() inside the page would arrive as a 200 stream). The page itself checks the admin role
     // and answers notFound() to everyone else.
     if (path === "/admin/trivia") {
