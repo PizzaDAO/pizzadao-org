@@ -3665,3 +3665,20 @@ model MemeReport {
   @@id([memeId, reporterId])
   @@index([reporterId, createdAt])
 }
+
+// One row per crew call started from the crew page; the row is the claim (primary key = the occurrence key:
+// <eventId>:<scheduled start> or adhoc:<crew>:active, replaced once its cooldown passes), so a double press never starts twice.
+// Deleted when the Discord write fails so the start can be retried. See app/lib/crew-call-start.ts.
+model CrewCallStart {
+  occurrenceKey String   @id
+  crewId        String
+  eventId       String?
+  adHoc         Boolean  @default(false)
+  channelId     String?
+  startedBy     String // Discord id
+  postMessageId String?
+  error         String?  @db.VarChar(300)
+  createdAt     DateTime @default(now())
+
+  @@index([crewId, createdAt])
+}

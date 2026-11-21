@@ -18,7 +18,7 @@ export const ROUTE_NAMESPACES: Record<string, readonly string[]> = {
   "": ["onboarding"],
   admin: ["adminCalls", "crewCallUpdates"],
   calls: ["callsPage", "memberCard", "memberSince", "discordActivity"],
-  crew: ["crewPage", "crewCallUpdates", "crewDrafts", "crewBounties", "crewGettingStarted"],
+  crew: ["crewPage", "crewCallUpdates", "crewCallStart", "crewDrafts", "crewBounties", "crewGettingStarted"],
   crews: ["crewsPage"],
   dashboard: [
     "language",

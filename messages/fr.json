@@ -3073,5 +3073,27 @@
     "cardTitle": "Dossier de mèmes",
     "cardEmpty": "Pas encore de mèmes. Soyez le premier à en partager un.",
     "cardWaiting": "{count, plural, one {# mème en attente de modération} other {# mèmes en attente de modération}}"
+  },
+  "crewCallStart": {
+    "start": "Démarrer l'appel du crew",
+    "starting": "Démarrage...",
+    "live": "En direct",
+    "recording": "Enregistrement",
+    "joinVoice": "Rejoindre le vocal",
+    "openLive": "Ouvrir la vue en direct",
+    "joinHint": "Rejoignez le salon vocal. Metalhead commence à enregistrer dès que vous y êtes.",
+    "previewNote": "Aperçu : rien n'a été démarré.",
+    "busyNamed": "{crew} est en direct dans le salon d'appel.",
+    "errors": {
+      "generic": "Impossible de démarrer l'appel. Réessayez dans une minute.",
+      "rateLimited": "Trop d'essais. Attendez quelques minutes.",
+      "already_live": "Cet appel est déjà en direct.",
+      "channel_busy": "Un autre crew est en direct dans le salon d'appel.",
+      "cooldown": "Ce crew a démarré un appel à l'instant.",
+      "not_scheduled": "Aucun appel n'est prévu pour le moment.",
+      "not_scheduledNext": "Aucun appel n'est prévu pour le moment. Prochain appel : {when}.",
+      "not_recordable": "Ce salon d'appel n'est pas configuré pour l'enregistrement.",
+      "discord_failed": "Discord a refusé de démarrer l'appel. Demandez à un admin de vérifier les permissions du bot."
+    }
   }
 }

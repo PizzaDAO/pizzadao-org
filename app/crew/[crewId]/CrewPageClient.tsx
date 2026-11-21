@@ -19,6 +19,7 @@ import { CrewGettingStarted } from './CrewGettingStarted'
 import { CrewBounties } from './CrewBounties'
 import { CrewDrafts } from './CrewDrafts'
 import { CrewCallUpdates } from './CrewCallUpdates'
+import { CrewCallStart } from './CrewCallStart'
 import { isClosedTask, tasksForGoal } from './goal-tasks'
 import { crewHasFeature } from '@/app/lib/crew-features'
 
@@ -963,6 +964,7 @@ export default function CrewPageClient({ params, featuresLink = false }: { param
             {crew.callLength && (
               <span style={badge()}>⏱ {crew.callLength}</span>
             )}
+            <CrewCallStart crewId={crew.id} />
             {crew.discordUrl ? (
               <a href={crew.discordUrl} target="_blank" rel="noopener noreferrer" style={{ ...badge(), textDecoration: 'none' }}>
                 💬 {t('joinDiscord')}
