@@ -199,7 +199,7 @@ export async function getGuildChannels(opts: DiscordOpts = {}): Promise<GuildCha
   const json = JSON.stringify(channels)
   if (channelPersisted?.guildId !== guildId || channelPersisted.json !== json) {
     channelPersisted = { guildId, json }
-    writeGuildSnapshotLater(guildId, 'channels', channels)
+    await writeGuildSnapshotLater(guildId, 'channels', channels)
   }
   return channels
 }
@@ -236,7 +236,7 @@ export async function getGuildRoles(opts: DiscordOpts = {}): Promise<GuildRole[]
   const json = JSON.stringify(roles)
   if (rolePersisted?.guildId !== guildId || rolePersisted.json !== json) {
     rolePersisted = { guildId, json }
-    writeGuildSnapshotLater(guildId, 'roles', roles)
+    await writeGuildSnapshotLater(guildId, 'roles', roles)
   }
   return roles
 }

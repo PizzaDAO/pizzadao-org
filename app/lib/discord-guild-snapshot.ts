@@ -5,6 +5,8 @@
  * (so about once per cold instance, plus real changes).
  * Everything is best effort and never throws (the table may not exist yet, the database may be down).
  */
+import { after } from 'next/server'
+
 export type SnapshotKind = 'channels' | 'roles'
 
 const READ_TIMEOUT_MS = 1500
@@ -23,16 +25,19 @@ export async function readGuildSnapshot<T>(guildId: string, kind: SnapshotKind):
   }
 }
 
-/** Schedule the write after the response when inside a request (next/server `after`), else fire and forget. */
-export function writeGuildSnapshotLater(guildId: string, kind: SnapshotKind, payload: unknown[]): void {
-  void (async () => {
-    try {
-      const { after } = await import('next/server')
-      after(() => writeGuildSnapshot(guildId, kind, payload))
-    } catch {
-      void writeGuildSnapshot(guildId, kind, payload)
-    }
-  })()
+/**
+ * Save the snapshot without holding up the response: `after()` (called synchronously, so it is still
+ * inside the request scope) runs it once the response is sent. When `after()` is unavailable (outside
+ * a request, or inside a cached function) the write is returned as a promise the caller awaits, since
+ * a detached write is frozen when a serverless function finishes. This happens about once per cold
+ * instance, so the extra wait is rare.
+ */
+export function writeGuildSnapshotLater(guildId: string, kind: SnapshotKind, payload: unknown[]): Promise<void> | void {
+  try {
+    after(() => writeGuildSnapshot(guildId, kind, payload))
+  } catch {
+    return writeGuildSnapshot(guildId, kind, payload)
+  }
 }
 
 export async function writeGuildSnapshot(guildId: string, kind: SnapshotKind, payload: unknown[]): Promise<void> {
