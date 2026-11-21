@@ -13,6 +13,10 @@
  *     cache so a Discord outage doesn't make every request in that window
  *     wait out the REST timeout again — they get the stale list (or null)
  *     immediately instead.
+ *   - Both lists also keep a durable last-good copy in the database
+ *     (discord-guild-snapshot.ts): written only when the list changed, read only
+ *     when Discord fails and nothing is in memory (a cold start), so names do not
+ *     blank on a timeout. The stale copy never makes a request wait longer.
  *   - getGuildMemberName: one member's display name, cached per id.
  *   - getChannelMessage / getChannel: one REST call each. "unknown" means the
  *     call itself failed (network, 5xx, rate limit, no token), as opposed to a
@@ -21,6 +25,7 @@
  * Everything takes an optional fetchImpl so tests never reach Discord.
  */
 import { cleanGuildName } from './discord-names'
+import { readGuildSnapshot, writeGuildSnapshot } from './discord-guild-snapshot'
 
 const API = 'https://discord.com/api/v10'
 const TTL_MS = 60 * 60 * 1000
@@ -48,19 +53,24 @@ type GuildChannel = {
 }
 let channelCache: { guildId: string; channels: GuildChannel[]; at: number } | null = null
 let channelFailCache: { guildId: string; at: number } | null = null
+/** JSON of the list last written to / read from the database snapshot (skips rewriting an unchanged list). */
+let channelPersisted: { guildId: string; json: string } | null = null
 
 export function clearGuildChannelsCache() {
   channelCache = null
   channelFailCache = null
+  channelPersisted = null
 }
 
 type GuildRole = { id: string; name: string; permissions?: string }
 let roleCache: { guildId: string; roles: GuildRole[]; at: number } | null = null
 let roleFailCache: { guildId: string; at: number } | null = null
+let rolePersisted: { guildId: string; json: string } | null = null
 
 export function clearGuildRolesCache() {
   roleCache = null
   roleFailCache = null
+  rolePersisted = null
 }
 
 // One guild member's display name (nick, else global name, else username),
@@ -142,7 +152,16 @@ export async function getGuildChannels(opts: DiscordOpts = {}): Promise<GuildCha
   if (!guildId) return null
   const now = opts.now ?? Date.now()
   if (channelCache && channelCache.guildId === guildId && now - channelCache.at < TTL_MS) return channelCache.channels
-  const stale = () => (channelCache?.guildId === guildId ? channelCache.channels : null)
+  // Stale-but-good: the in-memory copy, else (cold start) the durable snapshot, kept in memory as
+  // already-expired so the database is read at most once per failure window.
+  const stale = async () => {
+    if (channelCache?.guildId === guildId) return channelCache.channels
+    const saved = await readGuildSnapshot<GuildChannel>(guildId, 'channels')
+    if (!saved) return null
+    channelCache = { guildId, channels: saved, at: now - TTL_MS }
+    channelPersisted = { guildId, json: JSON.stringify(saved) }
+    return saved
+  }
   if (channelFailCache && channelFailCache.guildId === guildId && now - channelFailCache.at < FAIL_TTL_MS) {
     // A refresh failed recently — don't hit Discord (and wait out the REST
     // timeout) again until the short negative-cache window elapses.
@@ -162,6 +181,11 @@ export async function getGuildChannels(opts: DiscordOpts = {}): Promise<GuildCha
   }))
   channelCache = { guildId, channels, at: now }
   channelFailCache = null
+  const json = JSON.stringify(channels)
+  if (channelPersisted?.guildId !== guildId || channelPersisted.json !== json) {
+    channelPersisted = { guildId, json }
+    void writeGuildSnapshot(guildId, 'channels', channels)
+  }
   return channels
 }
 
@@ -171,7 +195,14 @@ export async function getGuildRoles(opts: DiscordOpts = {}): Promise<GuildRole[]
   if (!guildId) return null
   const now = opts.now ?? Date.now()
   if (roleCache && roleCache.guildId === guildId && now - roleCache.at < TTL_MS) return roleCache.roles
-  const stale = () => (roleCache?.guildId === guildId ? roleCache.roles : null)
+  const stale = async () => {
+    if (roleCache?.guildId === guildId) return roleCache.roles
+    const saved = await readGuildSnapshot<GuildRole>(guildId, 'roles')
+    if (!saved) return null
+    roleCache = { guildId, roles: saved, at: now - TTL_MS }
+    rolePersisted = { guildId, json: JSON.stringify(saved) }
+    return saved
+  }
   if (roleFailCache && roleFailCache.guildId === guildId && now - roleFailCache.at < FAIL_TTL_MS) {
     return stale()
   }
@@ -187,6 +218,11 @@ export async function getGuildRoles(opts: DiscordOpts = {}): Promise<GuildRole[]
   }))
   roleCache = { guildId, roles, at: now }
   roleFailCache = null
+  const json = JSON.stringify(roles)
+  if (rolePersisted?.guildId !== guildId || rolePersisted.json !== json) {
+    rolePersisted = { guildId, json }
+    void writeGuildSnapshot(guildId, 'roles', roles)
+  }
   return roles
 }
 

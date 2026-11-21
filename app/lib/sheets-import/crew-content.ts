@@ -382,7 +382,8 @@ export function crewTasksEditor(crewId: string): EditorSpec {
       { key: 'goal', label: 'Goal', kind: 'text', maxLength: 200 },
       { key: 'notes', label: 'Notes', kind: 'text', maxLength: 1000 },
     ],
-    maxRows: 500,
+    // No product limit on crew tasks; a safety bound only.
+    maxRows: 5000,
     validate: (row) => {
       if (!isHttpUrlOrEmpty(row.url)) return 'link must be a full http(s) address'
       if (text(row.due) && !ISO.test(text(row.due))) return 'due must be YYYY-MM-DD'

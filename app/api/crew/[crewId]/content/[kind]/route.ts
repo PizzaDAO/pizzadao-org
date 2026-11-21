@@ -9,6 +9,7 @@ import { CREW_EDITORS, type CrewEditorKind } from '@/app/lib/sheets-import/crew-
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60 // a save of many changed tasks runs as one transaction
 
 type Params = { params: Promise<{ crewId: string; kind: string }> }
 

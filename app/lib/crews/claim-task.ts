@@ -127,6 +127,7 @@ export async function claimCrewTask(input: ClaimInput): Promise<ClaimResult> {
   let taskRowCells: Array<{ userEnteredValue?: { stringValue?: string | null; numberValue?: number | null } | null; formattedValue?: string | null }> = []
   let leadColIdx = -1
   let leadIdColIdx = -1
+  let stageColIdx = -1
   let tasksHeaderRowIdx = -1
 
   for (const grid of sheetData.data) {
@@ -152,6 +153,7 @@ export async function claimCrewTask(input: ClaimInput): Promise<ClaimResult> {
                 cells[ci]?.formattedValue || '').toLowerCase().trim()
               if (colVal === 'lead') leadColIdx = ci
               if (colVal === 'lead id') leadIdColIdx = ci
+              if (colVal === 'stage') stageColIdx = ci
             }
             break
           }
@@ -200,6 +202,13 @@ export async function claimCrewTask(input: ClaimInput): Promise<ClaimResult> {
 
   if (leadIdColIdx === -1) {
     return fail(500, 'Lead ID column not found in sheet')
+  }
+
+  // A task already closed (done, skip, ...) cannot be claimed; giving one up stays allowed.
+  if (action === 'claim' && input.requireOpen && stageColIdx !== -1) {
+    const stageCell = taskRowCells[stageColIdx]
+    const stage = String(stageCell?.userEnteredValue?.stringValue ?? stageCell?.formattedValue ?? '')
+    if (isClosedStage(stage)) return fail(409, 'That task is closed')
   }
 
   // Ownership: read the current Lead ID of the task row.
@@ -312,7 +321,9 @@ async function claimInDb(
     task = (await prisma.crewTask.findFirst({ where: { id: byId.taskId, crewId: crew.id, archived: false }, select: { id: true, label: true, leadMemberId: true, stage: true } })) ?? undefined
   } else {
     const tasks = await prisma.crewTask.findMany({ where: { crewId: crew.id, archived: false }, select: { id: true, label: true, leadMemberId: true, stage: true } })
-    task = tasks.find((t) => t.label.trim() === taskName)
+    // Labels are not unique: when an open and a closed task share one, a claim means the open one.
+    const same = tasks.filter((t) => t.label.trim() === taskName)
+    task = (action === 'claim' && byId?.requireOpen ? same.find((t) => !isClosedStage(t.stage ?? '')) : undefined) ?? same[0]
   }
   if (!task) return fail(404, 'Task not found')
   if (byId?.requireOpen && action === 'claim' && isClosedStage(task.stage ?? '')) return fail(409, 'That task is closed')

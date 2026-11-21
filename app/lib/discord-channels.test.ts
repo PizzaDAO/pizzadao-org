@@ -1,4 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
+
+const snap = vi.hoisted(() => ({ read: vi.fn(async (..._a: unknown[]) => null as unknown), write: vi.fn(async (..._a: unknown[]) => {}) }))
+vi.mock("./discord-guild-snapshot", () => ({ readGuildSnapshot: snap.read, writeGuildSnapshot: snap.write }))
 import {
   getChannel,
   fetchChannel,
@@ -96,5 +99,47 @@ describe("getChannel / fetchChannel", () => {
   it("fetchChannel reports Retry-After on a 429", async () => {
     const fetchImpl = vi.fn(async () => new Response("{}", { status: 429, headers: { "retry-after": "7" } }))
     expect(await fetchChannel(ID, { ...OPTS, fetchImpl })).toEqual({ ok: false, status: 429, retryAfterMs: 7000 })
+  })
+})
+
+describe("durable last-good snapshot", () => {
+  beforeEach(() => {
+    clearGuildChannelsCache()
+    clearGuildRolesCache()
+    snap.read.mockReset()
+    snap.write.mockReset()
+  })
+
+  it("writes the list once when it changes, not on every refresh of an unchanged list", async () => {
+    const fetchImpl = vi.fn(async () => res(200, [{ id: "1", name: "general", type: 0 }]))
+    await getGuildChannels({ ...OPTS, now: 0, fetchImpl })
+    await getGuildChannels({ ...OPTS, now: TTL_MS_PLUS_ONE, fetchImpl })
+    expect(snap.write).toHaveBeenCalledTimes(1)
+    expect(snap.write).toHaveBeenCalledWith("999", "channels", [{ id: "1", name: "general", type: 0, parent_id: null }])
+    expect(snap.read).not.toHaveBeenCalled() // a healthy path never reads the database
+  })
+
+  it("serves the saved channels on a cold start when Discord fails, reading the database once", async () => {
+    const saved = [{ id: "1", name: "general", type: 0, parent_id: null }]
+    snap.read.mockResolvedValue(saved)
+    const fetchImpl = vi.fn(async () => res(500, { message: "down" }))
+    expect(await getGuildChannels({ ...OPTS, now: 0, fetchImpl })).toEqual(saved)
+    expect(await getGuildChannels({ ...OPTS, now: 10_000, fetchImpl })).toEqual(saved)
+    expect(snap.read).toHaveBeenCalledTimes(1)
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+  })
+
+  it("returns null when Discord fails and nothing was saved", async () => {
+    snap.read.mockResolvedValue(null)
+    const fetchImpl = vi.fn(async () => res(500, {}))
+    expect(await getGuildChannels({ ...OPTS, now: 0, fetchImpl })).toBeNull()
+  })
+
+  it("does the same for roles", async () => {
+    const saved = [{ id: "5", name: "Capo" }]
+    snap.read.mockResolvedValue(saved)
+    const fetchImpl = vi.fn(async () => res(500, {}))
+    expect(await getGuildRoles({ ...OPTS, now: 0, fetchImpl })).toEqual(saved)
+    expect(snap.read).toHaveBeenCalledWith("999", "roles")
   })
 })

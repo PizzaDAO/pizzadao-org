@@ -194,3 +194,12 @@ describe('crew task editor', () => {
     expect(rows).toHaveLength(2) // same label twice is fine: rows are matched by id
   })
 })
+
+describe('task editor row limit', () => {
+  it('accepts far more than the old 500 tasks (no active-task limit)', () => {
+    const spec = crewTasksEditor('ops')
+    const rows = Array.from({ length: 1200 }, (_, i) => ({ task: `Task ${i}` }))
+    expect(cleanRows(spec, rows)).toHaveLength(1200)
+    expect(spec.maxRows).toBeGreaterThanOrEqual(5000)
+  })
+})
