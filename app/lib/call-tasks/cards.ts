@@ -141,7 +141,7 @@ export function renderProposalCard(v: ProposalCardView, opts: { appUrl: string }
   const body: string[] = []
 
   if (state === 'hidden') {
-    const embed = makeEmbed('cooldown', `${kind}: review on the website`, 'This proposal is reviewed on the website only.', { footer: { text: `Task proposal · ${v.id}` } })
+    const embed = makeEmbed('cooldown', `${kind}: review on the website`, 'This action item is reviewed on the website only.', { footer: { text: `Action item · ${v.id}` } })
     return { content: '', embeds: [embed], components: [{ type: 1, components: [{ type: 2, style: 5, label: 'Open on website', url: link }] }], allowed_mentions: { parse: [] } }
   }
 
@@ -176,7 +176,7 @@ export function renderProposalCard(v: ProposalCardView, opts: { appUrl: string }
   }
 
   const embed = makeEmbed(tone, headline, body.join('\n').trim())
-  embed.footer = { text: `Task proposal · ${v.id}` }
+  embed.footer = { text: `Action item · ${v.id}` }
   const buttons: unknown[] = []
   if (state === 'open' && v.interactive) buttons.push({ type: 2, style: 3, label: 'Apply', custom_id: proposalApplyId(v.id) })
   if ((state === 'open' || state === 'needs-website' || state === 'changed') && v.interactive) buttons.push({ type: 2, style: 2, label: 'Dismiss', custom_id: proposalDismissId(v.id) })

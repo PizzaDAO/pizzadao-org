@@ -82,10 +82,10 @@ export async function handleTaskProposalButton(i: Interaction, userId: string, d
   const action = m[1] as ProposalReviewAction
   const id = m[2]
 
-  if (!(await deps.enabled())) return refuse('Task proposal cards are turned off.', 'Decide on it on the website.')
-  if (!(await deps.roleFor(i.member?.roles ?? []))) return refuse("You can't decide on task proposals here.", 'Pizza Capos and Dread Pizza Roberts can. Crew leads can on the website.')
+  if (!(await deps.enabled())) return refuse('Action item cards are turned off.', 'Decide on it on the website.')
+  if (!(await deps.roleFor(i.member?.roles ?? []))) return refuse("You can't decide on action items here.", 'Pizza Capos and Dread Pizza Roberts can. Crew leads can on the website.')
   const t = await deps.target(id)
-  if (!t) return refuse('That proposal no longer exists.')
+  if (!t) return refuse('That action item no longer exists.')
   if (t.status !== 'PENDING') {
     deps.refresh?.(id)
     return refuse('Already decided.', site(t.url))
@@ -135,15 +135,15 @@ export function applyRefusal(r: ApplyOutcome): [string, string] {
     case 'missing-task':
       return ['The task no longer exists.', '']
     case 'expired':
-      return ['This proposal is too old to apply.', '']
+      return ['This action item is too old to apply.', '']
     case 'disabled':
-      return ['Task proposals are switched off for this crew.', '']
+      return ['Action items are switched off for this crew.', '']
     case 'not-db-crew':
       return ["This crew's tasks are still edited in its Google Sheet.", '']
     case 'forbidden':
       return ["You can't decide on this.", '']
     case 'not-found':
-      return ['That proposal no longer exists.', '']
+      return ['That action item no longer exists.', '']
     case 'bad-edits':
     case 'bad-crew':
       return ['This needs the website.', 'Nothing was changed.']
@@ -161,7 +161,7 @@ export async function runTaskProposalReview(job: ProposalReviewJob, deps: Propos
       const r = await deps.dismiss(job.proposalId, job.userId)
       await deps.syncCard(job.proposalId).catch(() => undefined)
       if (r === 'dismissed') await reply(makeEmbed('success', 'Dismissed.', 'Nothing was changed on the task.'))
-      else await reply(makeEmbed('error', r === 'not-pending' ? 'Already decided.' : r === 'forbidden' ? "You can't decide on this." : 'That proposal no longer exists.', link.trim()))
+      else await reply(makeEmbed('error', r === 'not-pending' ? 'Already decided.' : r === 'forbidden' ? "You can't decide on this." : 'That action item no longer exists.', link.trim()))
       return r
     }
 
