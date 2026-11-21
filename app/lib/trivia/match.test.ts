@@ -63,6 +63,20 @@ describe("boolean", () => {
 });
 
 describe("numbers", () => {
+  it.each([
+    ["0.00649", [[0.00649]]],
+    ["0.0001", [[0.0001]]],
+    [".5", [[0.5]]],
+    ["0.1", [[0.1]]],
+    ["1.0065", [[1.0065]]],
+    ["it is 0.00649 exactly", [[0.00649]]],
+    ["1,000", [[1000]]],
+    ["10,000.5", [[10000.5]]],
+    ["2,048", [[2048]]],
+    ["between 0.0123 and 5,000", [[0.0123], [5000]]],
+  ])("parseNumbers(%j) reads %j", (input, expected) => {
+    expect(parseNumbers(input)).toEqual(expected);
+  });
   it("9,900 / 9900 / 9 900 / 9.9k all read as 9900", () => {
     for (const s of ["9,900", "9900", "9 900", "9.9k"]) expect(parseNumbers(s).flat()).toContain(9900);
   });

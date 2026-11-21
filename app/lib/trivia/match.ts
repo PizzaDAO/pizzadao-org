@@ -228,8 +228,10 @@ export function parseNumbers(cleaned: string): number[][] {
   const text = normalizeNumberText(cleaned);
   const found: number[][] = [];
 
+  // A thousands group needs a non-zero leading part and must not be followed by more digits, so 0.00649 and
+  // 1.0065 stay single decimals instead of splitting into 0.006 + 49.
   // Digits first (with optional scale suffix), then word-numbers in what is left.
-  const DIGITS = /(\d+\^\d+|\d+(?:\.\d+)?e\d+|\d{1,3}(?:[ ,._]\d{3})+(?:[.,]\d+)?|\d*[.,]\d+|\d+)(?:\s*(thousand|million|billion|mil|k|m|b)\b)?/g;
+  const DIGITS = /(\d+\^\d+|\d+(?:\.\d+)?e\d+|[1-9]\d{0,2}(?:[ ,._]\d{3})+(?:[.,]\d+)?(?!\d)|\d*[.,]\d+|\d+)(?:\s*(thousand|million|billion|mil|k|m|b)\b)?/g;
   let rest = text;
   let m: RegExpExecArray | null;
   const spans: [number, number][] = [];
