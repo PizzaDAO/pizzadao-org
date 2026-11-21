@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
 const snap = vi.hoisted(() => ({ read: vi.fn(async (..._a: unknown[]) => null as unknown), write: vi.fn(async (..._a: unknown[]) => {}) }))
-vi.mock("./discord-guild-snapshot", () => ({ readGuildSnapshot: snap.read, writeGuildSnapshot: snap.write }))
+vi.mock("./discord-guild-snapshot", () => ({ readGuildSnapshot: snap.read, writeGuildSnapshotLater: snap.write }))
 import {
   getChannel,
   fetchChannel,
@@ -141,5 +141,23 @@ describe("durable last-good snapshot", () => {
     const fetchImpl = vi.fn(async () => res(500, {}))
     expect(await getGuildRoles({ ...OPTS, now: 0, fetchImpl })).toEqual(saved)
     expect(snap.read).toHaveBeenCalledWith("999", "roles")
+  })
+
+  it("tries a missing snapshot once per failure window, sharing concurrent reads", async () => {
+    snap.read.mockResolvedValue(null)
+    const fetchImpl = vi.fn(async () => res(500, {}))
+    await Promise.all([getGuildChannels({ ...OPTS, now: 0, fetchImpl }), getGuildChannels({ ...OPTS, now: 1, fetchImpl })])
+    await getGuildChannels({ ...OPTS, now: 20_000, fetchImpl })
+    expect(snap.read).toHaveBeenCalledTimes(1)
+    await getGuildChannels({ ...OPTS, now: 70_000, fetchImpl })
+    expect(snap.read).toHaveBeenCalledTimes(2)
+  })
+
+  it("treats a throwing snapshot read as missing, once per window", async () => {
+    snap.read.mockRejectedValue(new Error("db down"))
+    const fetchImpl = vi.fn(async () => res(500, {}))
+    expect(await getGuildRoles({ ...OPTS, now: 0, fetchImpl })).toBeNull()
+    expect(await getGuildRoles({ ...OPTS, now: 5_000, fetchImpl })).toBeNull()
+    expect(snap.read).toHaveBeenCalledTimes(1)
   })
 })

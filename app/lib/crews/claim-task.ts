@@ -129,6 +129,7 @@ export async function claimCrewTask(input: ClaimInput): Promise<ClaimResult> {
   let leadIdColIdx = -1
   let stageColIdx = -1
   let tasksHeaderRowIdx = -1
+  let closedMatch: { r: number; cells: typeof taskRowCells } | null = null
 
   for (const grid of sheetData.data) {
     const rows = grid.rowData || []
@@ -185,11 +186,24 @@ export async function claimCrewTask(input: ClaimInput): Promise<ClaimResult> {
         cells[taskColIdx]?.formattedValue || ''
 
       if (cellVal.trim() === taskName.trim()) {
+        // A closed duplicate above an open one must not block the claim: keep looking, remember it.
+        if (action === 'claim' && input.requireOpen && stageColIdx !== -1) {
+          const sc = cells[stageColIdx]
+          if (isClosedStage(String(sc?.userEnteredValue?.stringValue ?? sc?.formattedValue ?? ''))) {
+            closedMatch ??= { r, cells }
+            continue
+          }
+        }
         taskRowIdx = r
         taskRowCells = cells
         break
       }
     }
+  }
+
+  if (taskRowIdx === -1 && closedMatch) {
+    taskRowIdx = closedMatch.r
+    taskRowCells = closedMatch.cells
   }
 
   if (taskRowIdx === -1) {
@@ -323,7 +337,15 @@ async function claimInDb(
     const tasks = await prisma.crewTask.findMany({ where: { crewId: crew.id, archived: false }, select: { id: true, label: true, leadMemberId: true, stage: true } })
     // Labels are not unique: when an open and a closed task share one, a claim means the open one.
     const same = tasks.filter((t) => t.label.trim() === taskName)
-    task = (action === 'claim' && byId?.requireOpen ? same.find((t) => !isClosedStage(t.stage ?? '')) : undefined) ?? same[0]
+    const mine = String(memberId)
+    if (action === 'giveup') {
+      // Giving up means the duplicate this member leads.
+      task = same.find((t) => (t.leadMemberId ?? '').trim() === mine) ?? same[0]
+    } else {
+      const free = (t: (typeof same)[number]) => !(t.leadMemberId ?? '').trim() || (t.leadMemberId ?? '').trim() === mine
+      const open = (t: (typeof same)[number]) => !(byId?.requireOpen && isClosedStage(t.stage ?? ''))
+      task = same.find((t) => open(t) && free(t)) ?? same.find(open) ?? same[0]
+    }
   }
   if (!task) return fail(404, 'Task not found')
   if (byId?.requireOpen && action === 'claim' && isClosedStage(task.stage ?? '')) return fail(409, 'That task is closed')
