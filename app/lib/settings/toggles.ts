@@ -88,6 +88,8 @@ export const TOGGLES = {
   'calls.taskProposalsNudgeEnabled': { env: 'CALL_TASK_PROPOSALS_NUDGE_ENABLED', legacy: ON_WORDS },
   // Off unless turned on: the bot posts each proposed task update to the private capo review channel for Apply / Dismiss.
   'calls.taskProposalCardsEnabled': { env: 'CALL_TASK_PROPOSAL_CARDS_ENABLED', legacy: ON_WORDS },
+  // Off unless turned on: action items from a call go straight onto the crew's task list (no review step).
+  'calls.taskProposalsAutoApply': { env: 'CALL_TASK_PROPOSALS_AUTO_APPLY', legacy: ON_WORDS },
   'calls.importedRecapPostEnabled': { env: 'CALL_IMPORT_RECAP_ENABLED', legacy: ON_WORDS },
   'calls.importedFollowupsEnabled': { env: 'CALL_IMPORT_FOLLOWUPS_ENABLED', legacy: ON_WORDS },
   'calls.importedAgendaContext': { env: 'CALL_IMPORT_AGENDA_ENABLED', legacy: ON_WORDS },

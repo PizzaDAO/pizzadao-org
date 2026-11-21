@@ -1840,6 +1840,13 @@ export const SETTINGS = {
     help: 'Post each proposed crew task update to the private capo review channel (the same channel as the call review cards) with Apply and Dismiss buttons, and keep the card up to date when it is decided here or on the website. Only proposals made after this is switched on are posted. Cards never show the transcript quote, and nothing is posted unless the channel is hidden from everyone but capos. Buttons work for Pizza Capos (with capo call review on) and Dread Pizza Roberts. The CALL_TASK_PROPOSAL_CARDS_ENABLED env var set to off always wins.',
     confirmOn: 'The bot will post proposed crew task updates, with Apply and Dismiss buttons, to the capo review channel.',
   }),
+  'calls.taskProposalsAutoApply': boolSetting({
+    key: 'calls.taskProposalsAutoApply',
+    area: 'calls',
+    label: 'Add action items from calls straight to the crew\'s tasks',
+    help: 'Action items from a call are added to (or update, or close) the crew\'s tasks right away, with the stage and lead from the call, instead of waiting for a crew lead to apply them. An unclear lead is left empty. Anything that cannot be applied safely (the task was edited since the call, or is gone) still waits for review, and only those get a card in the capo review channel. A held call is not touched until it is released. When the review channel is set and private, Metalhead posts one short summary per call there. Only calls whose action items are made after this is switched on are added. Leads can still edit or archive any task, and undo a retire. The CALL_TASK_PROPOSALS_AUTO_APPLY env var set to off always wins; on preview deploys only the env var counts.',
+    confirmOn: 'Action items from calls of the listed crews will be added to the crew\'s tasks without review.',
+  }),
   'calls.taskProposalsDefaultCrew': textSetting({
     key: 'calls.taskProposalsDefaultCrew',
     area: 'calls',

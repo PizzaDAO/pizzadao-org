@@ -1907,6 +1907,17 @@ model CrewTaskProposal {
   @@index([recordingId])
 }
 
+// Action items applied straight from a call (calls.taskProposalsAutoApply, app/lib/call-tasks/auto-apply.ts): one row
+// per call. Kept apart from CallRecording so the bookkeeping never bumps the call's updatedAt.
+model CallTaskAutoApply {
+  recordingId      String    @id
+  appliedAt        DateTime? // the auto-apply pass finished (not set while the call is held)
+  summaryClaimedAt DateTime? // the one summary in the capo review channel was claimed (posted at most once)
+  summaryMessageId String?
+  summaryError     String? // last Discord failure, max 300, no URLs
+  updatedAt        DateTime  @updatedAt
+}
+
 // The bot's approval card for a proposal in the private capo review channel (app/lib/call-tasks/cards.ts).
 // Mirrors CallReviewCard; kept apart so card bookkeeping never bumps CrewTaskProposal.updatedAt.
 model CrewTaskProposalCard {

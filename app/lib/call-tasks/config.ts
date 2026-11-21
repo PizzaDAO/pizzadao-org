@@ -17,6 +17,8 @@ export interface TaskProposalConfig {
   /** '' = the summary model. */
   model: string
   nudge: boolean
+  /** Action items are applied as soon as they are made (calls.taskProposalsAutoApply; only while proposals are on). */
+  autoApply: boolean
 }
 
 export function taskProposalConfigFrom(settings: Settings, env: Record<string, string | undefined> = process.env): TaskProposalConfig {
@@ -28,6 +30,7 @@ export function taskProposalConfigFrom(settings: Settings, env: Record<string, s
     maxDays: settings.get('calls.taskProposalMaxDays'),
     model: settings.get('calls.taskProposalsModel').trim(),
     nudge: !settings.readFailed && resolveToggle('calls.taskProposalsNudgeEnabled', settings, env),
+    autoApply: !settings.readFailed && crews.length > 0 && resolveToggle('calls.taskProposalsEnabled', settings, env) && resolveToggle('calls.taskProposalsAutoApply', settings, env),
   }
 }
 
@@ -36,7 +39,7 @@ export async function loadTaskProposalConfig(env: Record<string, string | undefi
   try {
     return taskProposalConfigFrom(await loadSettings(), env)
   } catch {
-    return { enabled: false, crews: [], maxPerCall: 15, maxDays: 14, model: '', nudge: false }
+    return { enabled: false, crews: [], maxPerCall: 15, maxDays: 14, model: '', nudge: false, autoApply: false }
   }
 }
 

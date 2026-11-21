@@ -3,7 +3,8 @@
  * Runs once per summarized call of an allowlisted crew (ingest hook + the followups cron sweep) and
  * on demand from the call page. Idempotent: rows are keyed by sourceKey, so a re-run only adds
  * proposals it has not seen and never touches a decided row. Proposals only: nothing here changes a
- * task, and the optional crew-channel nudge carries a count and a link, never the proposals.
+ * task (with calls.taskProposalsAutoApply on, auto-apply.ts applies the new ones right after), and the
+ * optional crew-channel nudge carries a count and a link, never the proposals.
  */
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/app/lib/db'
@@ -215,6 +216,9 @@ export async function proposeTasksForRecording(
     )
     const created = await storeProposals(id, crewId, drafts, rec.startedAt)
     await prisma.callRecording.update({ where: { id }, data: { taskProposalsAt: now, taskProposalsError: null } })
+    // Action items straight onto the crew's tasks (off unless calls.taskProposalsAutoApply), before the nudge so it counts only what is left.
+    // Lazy: auto-apply.ts imports this module (through apply.ts).
+    if (created > 0 && cfg.autoApply) await (await import('./auto-apply')).autoApplyForRecording(id).catch((e) => console.warn('[call-tasks] auto-apply failed:', e instanceof Error ? e.message : e))
     if (created > 0 && cfg.nudge) await nudgeCrew(id).catch((e) => console.warn('[call-tasks] nudge failed:', e instanceof Error ? e.message : e))
     return { result: 'ok', created }
   } catch (e) {

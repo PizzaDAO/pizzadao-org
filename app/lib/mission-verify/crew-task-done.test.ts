@@ -64,6 +64,19 @@ describe('crew_task_done verifier: yes/no matrix', () => {
   it('lead assigned at or after the Done event (claimed after Done): no', async () => {
     expect(await run([{ crewId: 'ops', closedBy: 'lead-ops', ledWhenClosed: false }])).toMatchObject({ status: 'fail' })
   })
+  it('closed by the system (an action item applied from a call): no, and no member lookup for it', async () => {
+    const canCloseCrewTasks = vi.fn(canClose)
+    expect(await run([{ crewId: 'ops', closedBy: 'system:call-action-items' }], { canCloseCrewTasks })).toMatchObject({ status: 'fail' })
+    expect(canCloseCrewTasks).not.toHaveBeenCalled()
+  })
+  it('the latest Done event wins: re-closed by the system after a lead, it does not count', async () => {
+    db.crewTask.findMany.mockResolvedValue([{ id: 't1', crewId: 'ops', label: 'T', stage: 'Done' }])
+    db.crewTaskEvent.findMany.mockResolvedValue([
+      { id: 9, taskId: 't1', action: 'update', actor: 'system:call-action-items', data: { changes: { stage: 'Done' } } },
+      { id: 5, taskId: 't1', action: 'update', actor: 'lead-ops', data: { changes: { stage: 'Done' } } },
+    ])
+    expect((await doneCrewTasksLedBy('m1'))[0].closedBy).toBe('system:call-action-items')
+  })
   it('no recorded closer: no', async () => {
     expect(await run([{ crewId: 'ops', closedBy: null }])).toMatchObject({ status: 'fail' })
   })
