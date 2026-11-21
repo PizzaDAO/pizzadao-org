@@ -55,18 +55,28 @@ export async function loadNametagFields(): Promise<NametagFields> {
 }
 
 /** A disavowed member is skipped (fails closed when the check errors). */
-async function isHidden(discordId: string): Promise<boolean> {
+async function isHidden(discordId: string): Promise<boolean | 'error'> {
   if (!discordId) return false
   if (!(await disavowEnabled().catch(() => false))) return false
-  return isDisavowSubject(discordId).catch(() => true)
+  return isDisavowSubject(discordId).catch(() => 'error' as const)
 }
 
-async function composeOne(memberId: string, fields: NametagFields, pfp: string, crews: Crew[]): Promise<NametagMember | null> {
-  const member = await safe(fetchMemberById(memberId), null)
-  if (!member) return null
+/** `cache: false` marks a transient failure (lookup error): the answer is not remembered. */
+type Composed = { card: NametagMember | null; cache: boolean }
+
+async function composeOne(memberId: string, fields: NametagFields, pfp: string, crews: Crew[]): Promise<Composed> {
+  let member: unknown
+  try {
+    member = await fetchMemberById(memberId)
+  } catch {
+    return { card: null, cache: false }
+  }
+  if (!member) return { card: null, cache: true }
   const m = member as unknown as Record<string, unknown>
   const discordId = text(m['discordId'])
-  if (await isHidden(discordId)) return null
+  const hidden = await isHidden(discordId)
+  if (hidden === 'error') return { card: null, cache: false }
+  if (hidden) return { card: null, cache: true }
 
   const card: NametagMember = {
     memberId,
@@ -102,7 +112,7 @@ async function composeOne(memberId: string, fields: NametagFields, pfp: string, 
       card.levelTitle = mission.completedTitle ?? ''
     }
   }
-  return card
+  return { card, cache: true }
 }
 
 const CONCURRENCY = 6
@@ -136,12 +146,12 @@ export async function composeNametagCards(memberIds: string[], fields: NametagFi
   const worker = async () => {
     while (next < todo.length) {
       const id = todo[next++]
-      const card = await safe(composeOne(id, fields, pfps[id], crews), null)
+      const { card, cache } = await safe(composeOne(id, fields, pfps[id], crews), { card: null, cache: false } as Composed)
       if (CACHE.size >= CACHE_MAX) {
         const oldest = [...CACHE.entries()].sort((a, b) => a[1].time - b[1].time)[0]?.[0]
         if (oldest) CACHE.delete(oldest)
       }
-      CACHE.set(id, { time: Date.now(), fieldsKey, card })
+      if (cache) CACHE.set(id, { time: Date.now(), fieldsKey, card })
       if (card) out.set(id, card)
     }
   }

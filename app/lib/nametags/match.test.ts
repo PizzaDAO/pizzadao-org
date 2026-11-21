@@ -35,6 +35,17 @@ describe('matchIdentifiers', () => {
     await matchIdentifiers({ emailHashes: [H], wallets: [] }, { matchWallets: true }, db)
     expect(sql[0]).toContain('"emailVerifiedAt" is not null')
   })
+  it('SQL trimming strips the same whitespace as JS trim (tab, NBSP, BOM, unicode spaces)', async () => {
+    const { db, sql } = fakeDb({})
+    await matchIdentifiers({ emailHashes: [H], wallets: [] }, { matchWallets: true }, db)
+    const m = sql[0].match(/regexp_replace\("email", '([^']+)'/)
+    expect(m).not.toBeNull()
+    // Postgres ARE and JS regex share this syntax for the class: apply the SQL pattern in JS.
+    const re = new RegExp(m![1].replace(/\\u([0-9a-f]{4})/gi, '\\u$1'), 'g')
+    for (const raw of ['\tGuest@Example.com \n', '\u00a0guest@example.com\u00a0', '\ufeffguest@example.com', '\u2003guest@example.com\u3000', ' guest@example.com ']) {
+      expect(raw.replace(re, '')).toBe(raw.trim())
+    }
+  })
   it('wallets are ignored (no query) unless the setting allows', async () => {
     const w = '0x' + 'AB'.repeat(20)
     const off = fakeDb({ wallets: [{ memberId: '3', wallet: w.toLowerCase() }] })

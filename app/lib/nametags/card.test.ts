@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const members: Record<string, Record<string, unknown>> = {}
-vi.mock('@/app/lib/sheets/member-repository', () => ({ fetchMemberById: async (id: string) => members[id] ?? null }))
+const fetchMember = vi.fn(async (id: string) => members[id] ?? null)
+vi.mock('@/app/lib/sheets/member-repository', () => ({ fetchMemberById: (id: string) => fetchMember(id) }))
 const progress = vi.fn()
 vi.mock('@/app/lib/missions', () => ({ getUserProgressSummary: (...a: unknown[]) => progress(...a) }))
 vi.mock('@/app/lib/crew-mappings', () => ({
@@ -40,6 +41,8 @@ beforeEach(() => {
     Wallet: '0xabc',
     Telegram: '@secret',
   }
+  fetchMember.mockClear()
+  fetchMember.mockImplementation(async (id: string) => members[id] ?? null)
   progress.mockReset().mockResolvedValue({ completed: 3, completedTitle: 'Sous Chef', currentLevel: 4 })
   pfps.mockReset().mockResolvedValue({ '1': 'https://img.example/p.png', '2': '/pfp/default.png' })
   disavowOn.mockReset().mockResolvedValue(false)
@@ -83,5 +86,23 @@ describe('composeNametagCards', () => {
     const card = (await composeNametagCards(['1'], all)).get('1')!
     expect(card.levelCompleted).toBeUndefined()
     expect(card.name).toBe('Pat Pie')
+  })
+  it('does not cache a transient lookup error, but caches a real card and a confirmed not-found', async () => {
+    fetchMember.mockRejectedValueOnce(new Error('sheet down'))
+    expect((await composeNametagCards(['1'], all)).size).toBe(0)
+    // next request retries (the failure was not remembered) and succeeds
+    expect((await composeNametagCards(['1'], all)).get('1')?.name).toBe('Pat Pie')
+    const calls = fetchMember.mock.calls.length
+    await composeNametagCards(['1', '404'], all)
+    await composeNametagCards(['1', '404'], all)
+    // '1' served from cache; '404' fetched once more only the first time (then remembered as not found)
+    expect(fetchMember.mock.calls.length).toBe(calls + 1)
+  })
+  it('does not cache when the disavow check errors', async () => {
+    disavowOn.mockResolvedValue(true)
+    disavowed.mockRejectedValueOnce(new Error('db'))
+    expect((await composeNametagCards(['1'], all)).size).toBe(0)
+    disavowed.mockResolvedValue(false)
+    expect((await composeNametagCards(['1'], all)).size).toBe(1)
   })
 })

@@ -2,7 +2,7 @@
  * Identifier -> member for event name tags. Only identifiers a member proved match: the hash of a VERIFIED
  * profile email, the hash of the email they proved on rsv.pizza (account link), and (when the setting
  * allows) a linked EVM wallet. Unverified emails never match. Hashes are sha256 of the lower-cased,
- * trimmed address, hex (same contract as the events-attended lookup).
+ * trimmed address, hex (trimming strips the same whitespace as JS String.trim, in SQL too; same contract as the events-attended lookup).
  */
 import { prisma } from '@/app/lib/db'
 
@@ -35,10 +35,10 @@ export async function matchIdentifiers(
       }),
       // The hash is computed in SQL over verified rows only, so an unverified address can never match.
       db.$queryRaw<{ memberId: string; hash: string }[]>`
-        select "memberId", encode(sha256(convert_to(lower(btrim("email")), 'UTF8')), 'hex') as hash
+        select "memberId", encode(sha256(convert_to(lower(regexp_replace("email", '^[\\s\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]+|[\\s\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]+$', '', 'g')), 'UTF8')), 'hex') as hash
         from "MemberProfileExtras"
         where "emailVerifiedAt" is not null and "email" is not null
-          and encode(sha256(convert_to(lower(btrim("email")), 'UTF8')), 'hex') = any(${hashes}::text[])`,
+          and encode(sha256(convert_to(lower(regexp_replace("email", '^[\\s\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]+|[\\s\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]+$', '', 'g')), 'UTF8')), 'hex') = any(${hashes}::text[])`,
     ])
     for (const r of linked) if (r.rsvLinkedEmailHash) out.push({ memberId: r.memberId, emailHash: r.rsvLinkedEmailHash.toLowerCase() })
     for (const r of verified) out.push({ memberId: r.memberId, emailHash: r.hash })
