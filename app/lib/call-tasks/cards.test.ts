@@ -7,7 +7,7 @@ vi.mock('@/app/lib/settings/toggles', async (orig) => ({ ...(await orig<typeof i
 vi.mock('@/app/lib/calls/post-filters', async (orig) => ({ ...(await orig<typeof import('@/app/lib/calls/post-filters')>()), loadPostFilter: vi.fn() }))
 vi.mock('./config', async (orig) => ({
   ...(await orig<typeof import('./config')>()),
-  loadTaskProposalConfig: vi.fn(async () => ({ enabled: true, crews: ['ops'], maxPerCall: 15, maxDays: 14, model: '', nudge: false })),
+  loadTaskProposalConfig: vi.fn(async () => ({ enabled: true, crews: ['ops'], maxPerCall: 15, maxDays: 14, model: '', nudge: false, autoApply: false })),
 }))
 vi.mock('@/app/lib/crew-mappings', async (orig) => ({
   ...(await orig<typeof import('@/app/lib/crew-mappings')>()),
@@ -21,6 +21,9 @@ import { POSTED_UNSTORED, renderHash } from '@/app/lib/calls/review-cards'
 import { getCrewMappings } from '@/app/lib/crew-mappings'
 import { loadTaskProposalConfig } from './config'
 import {
+  AUTO_APPLY_ACTOR,
+  AUTO_APPLY_GRACE_MS,
+  awaitingAutoApply,
   loadProposalCardView,
   proposalCardState,
   renderProposalCard,
@@ -161,6 +164,12 @@ describe('renderProposalCard', () => {
     expect(text(renderProposalCard(view({ status: 'STALE', error: 'The task no longer exists' }), { appUrl: APP }))).toContain('Stale: The task no longer exists')
   })
 
+  it('applied straight from the call: says Metalhead added it, never a mention of the system actor', () => {
+    const m = renderProposalCard(view({ status: 'APPLIED', decidedBy: AUTO_APPLY_ACTOR, decidedAt: NOW }), { appUrl: APP })
+    expect(text(m)).toContain('Applied by Metalhead (added from the call)')
+    expect(text(m)).not.toContain('<@')
+  })
+
   it('not interactive (capo review off): only the link', () => {
     expect(buttons(renderProposalCard(view({ interactive: false }), { appUrl: APP })).map((b) => b.label)).toEqual(['Edit on website'])
   })
@@ -242,10 +251,21 @@ describe('loadProposalCardView', () => {
     vi.mocked(prisma.crewTask.findUnique).mockResolvedValue({ label: 'x', updatedAt: NOW, archived: false } as never)
     vi.mocked(prisma.crewTaskProposal.findUnique).mockResolvedValue(prop())
     expect((await loadProposalCardView('p1'))?.applicable).toBe(true)
-    vi.mocked(loadTaskProposalConfig).mockResolvedValueOnce({ enabled: false, crews: ['ops'], maxPerCall: 15, maxDays: 14, model: '', nudge: false })
+    vi.mocked(loadTaskProposalConfig).mockResolvedValueOnce({ enabled: false, crews: ['ops'], maxPerCall: 15, maxDays: 14, model: '', nudge: false, autoApply: false })
     expect((await loadProposalCardView('p1'))?.applicable).toBe(false)
-    vi.mocked(loadTaskProposalConfig).mockResolvedValueOnce({ enabled: true, crews: ['tech'], maxPerCall: 15, maxDays: 14, model: '', nudge: false })
+    vi.mocked(loadTaskProposalConfig).mockResolvedValueOnce({ enabled: true, crews: ['tech'], maxPerCall: 15, maxDays: 14, model: '', nudge: false, autoApply: false })
     expect((await loadProposalCardView('p1'))?.applicable).toBe(false)
+  })
+
+  it('with auto-apply on, a pending one of a call whose pass has not run is awaiting it (no new card yet)', async () => {
+    vi.mocked(prisma.crewTask.findUnique).mockResolvedValue({ label: 'x', updatedAt: NOW, archived: false } as never)
+    vi.mocked(prisma.crewTaskProposal.findUnique).mockResolvedValue(prop())
+    expect((await loadProposalCardView('p1'))?.awaitingAutoApply).toBe(false)
+    vi.mocked(loadTaskProposalConfig).mockResolvedValueOnce({ enabled: true, crews: ['ops'], maxPerCall: 15, maxDays: 14, model: '', nudge: false, autoApply: true })
+    vi.mocked(prisma.callTaskAutoApply.findUnique).mockResolvedValue(null)
+    vi.mocked(prisma.appSetting.findUnique).mockResolvedValue({ value: true, updatedAt: new Date(NOW.getTime() - 86_400_000) } as never)
+    vi.mocked(prisma.appSettingChange.findMany).mockResolvedValue([])
+    expect((await loadProposalCardView('p1'))?.awaitingAutoApply).toBe(true)
   })
 
   it('the stale check: a task updated since the proposal is "changed"', async () => {
@@ -265,6 +285,51 @@ describe('loadProposalCardView', () => {
     expect((await loadProposalCardView('p1'))?.hidden).toBe(true)
     vi.mocked(prisma.callRecording.findUnique).mockResolvedValue({ id: 'rec2', updatedAt: NOW, crewId: 'ops', crewLabel: 'Ops', title: 'W', startedAt: NOW, reviewHoldAt: NOW } as never)
     expect((await loadProposalCardView('p1'))?.hidden).toBe(true)
+  })
+})
+
+describe('the auto-apply race guard', () => {
+  const ON = { autoApply: true }
+  const SINCE = new Date('2026-11-18T00:00:00Z')
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(prisma.callTaskAutoApply.findUnique).mockResolvedValue(null)
+    vi.mocked(prisma.appSetting.findUnique).mockResolvedValue({ value: true, updatedAt: SINCE } as never)
+    vi.mocked(prisma.appSettingChange.findMany).mockResolvedValue([])
+  })
+
+  it('auto-apply off: never waits (unchanged behaviour), no lookup', async () => {
+    expect(await awaitingAutoApply({ autoApply: false }, 'rec1', NOW, NOW)).toBe(false)
+    expect(prisma.callTaskAutoApply.findUnique).not.toHaveBeenCalled()
+  })
+
+  it('on: an action item made since the switch waits until its call\'s pass ran', async () => {
+    expect(await awaitingAutoApply(ON, 'rec1', NOW, NOW)).toBe(true)
+    vi.mocked(prisma.callTaskAutoApply.findUnique).mockResolvedValue({ appliedAt: NOW } as never)
+    expect(await awaitingAutoApply(ON, 'rec1', NOW, NOW)).toBe(false)
+  })
+
+  it('on: older ones (made before the switch) do not wait; by env only, the young ones wait', async () => {
+    expect(await awaitingAutoApply(ON, 'rec1', new Date('2026-11-17T00:00:00Z'), NOW)).toBe(false)
+    vi.mocked(prisma.appSetting.findUnique).mockResolvedValue(null)
+    expect(await awaitingAutoApply(ON, 'rec1', new Date(NOW.getTime() - 60_000), NOW)).toBe(true)
+    expect(await awaitingAutoApply(ON, 'rec1', new Date(NOW.getTime() - AUTO_APPLY_GRACE_MS - 1), NOW)).toBe(false)
+  })
+
+  it('fails closed: an unreadable lookup waits (retried next run)', async () => {
+    vi.mocked(prisma.callTaskAutoApply.findUnique).mockRejectedValue(new Error('db'))
+    expect(await awaitingAutoApply(ON, 'rec1', NOW, NOW)).toBe(true)
+  })
+
+  it('a waiting action item gets no card and is not remembered (the next sweep re-checks it)', async () => {
+    const { state, deps } = makeDeps(view({ awaitingAutoApply: true }))
+    expect(await syncTaskProposalCard('p', deps)).toBe('no_card_needed')
+    expect(state.posts).toHaveLength(0)
+    expect(state.saved).toHaveLength(0)
+    // After the pass, the ones left pending get their card; applied ones never do.
+    state.v = view({ awaitingAutoApply: false })
+    expect(await syncTaskProposalCard('p', deps)).toBe('posted')
+    expect(await syncTaskProposalCard('q', makeDeps(view({ status: 'APPLIED', decidedBy: AUTO_APPLY_ACTOR })).deps)).toBe('no_card_needed')
   })
 })
 

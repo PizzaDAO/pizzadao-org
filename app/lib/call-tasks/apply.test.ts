@@ -42,7 +42,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(canManageCrew).mockResolvedValue(true)
   vi.mocked(usesDb).mockResolvedValue(true)
-  vi.mocked(loadTaskProposalConfig).mockResolvedValue({ enabled: true, crews: ['ops'], maxPerCall: 15, maxDays: 14, model: '', nudge: false })
+  vi.mocked(loadTaskProposalConfig).mockResolvedValue({ enabled: true, crews: ['ops'], maxPerCall: 15, maxDays: 14, model: '', nudge: false, autoApply: false })
   vi.mocked(loadPostFilter).mockResolvedValue(EMPTY_POST_FILTER)
   vi.mocked(prisma.callRecording.findUnique).mockResolvedValue({ crewLabel: 'Ops' } as never)
   prop.updateMany.mockResolvedValue({ count: 1 })
@@ -133,11 +133,11 @@ describe('applyProposal', () => {
   it('refuses when the feature is off, the crew left the allowlist, the crew is excluded, or the proposal is too old', async () => {
     prop.findUnique.mockResolvedValue(row({ status: 'PENDING' }) as never)
     task.findFirst.mockResolvedValue(dbTask() as never)
-    vi.mocked(loadTaskProposalConfig).mockResolvedValue({ enabled: false, crews: ['ops'], maxPerCall: 15, maxDays: 14, model: '', nudge: false })
+    vi.mocked(loadTaskProposalConfig).mockResolvedValue({ enabled: false, crews: ['ops'], maxPerCall: 15, maxDays: 14, model: '', nudge: false, autoApply: false })
     expect(await applyProposal('p1', 'lead1', { confirmed: true })).toEqual({ result: 'disabled' })
-    vi.mocked(loadTaskProposalConfig).mockResolvedValue({ enabled: true, crews: ['tech'], maxPerCall: 15, maxDays: 14, model: '', nudge: false })
+    vi.mocked(loadTaskProposalConfig).mockResolvedValue({ enabled: true, crews: ['tech'], maxPerCall: 15, maxDays: 14, model: '', nudge: false, autoApply: false })
     expect(await applyProposal('p1', 'lead1', { confirmed: true })).toEqual({ result: 'disabled' })
-    vi.mocked(loadTaskProposalConfig).mockResolvedValue({ enabled: true, crews: ['ops'], maxPerCall: 15, maxDays: 14, model: '', nudge: false })
+    vi.mocked(loadTaskProposalConfig).mockResolvedValue({ enabled: true, crews: ['ops'], maxPerCall: 15, maxDays: 14, model: '', nudge: false, autoApply: false })
     vi.mocked(loadPostFilter).mockResolvedValue({ ...EMPTY_POST_FILTER, excludedCrewIds: ['ops'] })
     expect(await applyProposal('p1', 'lead1', { confirmed: true })).toEqual({ result: 'disabled' })
     vi.mocked(loadPostFilter).mockRejectedValue(new Error('down'))
@@ -305,7 +305,7 @@ describe('new tasks routed from the community call', () => {
   const routed = (over: Record<string, unknown> = {}) =>
     row({ kind: 'CREATE', taskId: null, baseUpdatedAt: null, crewId: 'tech', changes: { label: { from: null, to: 'Fix the bot' } }, ...over })
   beforeEach(() => {
-    vi.mocked(loadTaskProposalConfig).mockResolvedValue({ enabled: true, crews: ['community'], maxPerCall: 15, maxDays: 14, model: '', nudge: false })
+    vi.mocked(loadTaskProposalConfig).mockResolvedValue({ enabled: true, crews: ['community'], maxPerCall: 15, maxDays: 14, model: '', nudge: false, autoApply: false })
     vi.mocked(prisma.callRecording.findUnique).mockResolvedValue({ crewId: 'community', crewLabel: 'Community' } as never)
   })
 
@@ -320,9 +320,9 @@ describe('new tasks routed from the community call', () => {
 
   it('a routed proposal is off when the call\'s crew is not allowlisted, or the target crew is excluded', async () => {
     prop.findUnique.mockResolvedValue(routed() as never)
-    vi.mocked(loadTaskProposalConfig).mockResolvedValue({ enabled: true, crews: ['tech'], maxPerCall: 15, maxDays: 14, model: '', nudge: false })
+    vi.mocked(loadTaskProposalConfig).mockResolvedValue({ enabled: true, crews: ['tech'], maxPerCall: 15, maxDays: 14, model: '', nudge: false, autoApply: false })
     expect(await applyProposal('p1', 'admin')).toEqual({ result: 'disabled' })
-    vi.mocked(loadTaskProposalConfig).mockResolvedValue({ enabled: true, crews: ['community'], maxPerCall: 15, maxDays: 14, model: '', nudge: false })
+    vi.mocked(loadTaskProposalConfig).mockResolvedValue({ enabled: true, crews: ['community'], maxPerCall: 15, maxDays: 14, model: '', nudge: false, autoApply: false })
     vi.mocked(loadPostFilter).mockResolvedValue({ ...EMPTY_POST_FILTER, excludedCrewIds: ['tech'] })
     expect(await applyProposal('p1', 'admin')).toEqual({ result: 'disabled' })
     expect(task.create).not.toHaveBeenCalled()
@@ -364,7 +364,7 @@ describe('new tasks routed from the community call', () => {
   })
 
   it('a crew call\'s new task cannot change crew', async () => {
-    vi.mocked(loadTaskProposalConfig).mockResolvedValue({ enabled: true, crews: ['ops'], maxPerCall: 15, maxDays: 14, model: '', nudge: false })
+    vi.mocked(loadTaskProposalConfig).mockResolvedValue({ enabled: true, crews: ['ops'], maxPerCall: 15, maxDays: 14, model: '', nudge: false, autoApply: false })
     vi.mocked(prisma.callRecording.findUnique).mockResolvedValue({ crewId: 'ops', crewLabel: 'Ops' } as never)
     prop.findUnique.mockResolvedValue(routed({ crewId: 'ops' }) as never)
     expect(await applyProposal('p1', 'admin', { edits: { crewId: 'tech' } })).toEqual({ result: 'bad-edits' })

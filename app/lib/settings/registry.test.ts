@@ -219,6 +219,7 @@ describe('settings registry', () => {
       ['calls.taskProposalsModel', ''],
       ['calls.taskProposalsNudgeEnabled', false],
       ['calls.taskProposalCardsEnabled', false],
+      ['calls.taskProposalsAutoApply', false],
       ['calls.taskProposalsDefaultCrew', 'ops'],
       ['calls.taskProposalsCrewHints', ''],
       ['vouches.dailyLimit', 50],

@@ -31,6 +31,8 @@ export async function releaseHold(id: string, actorId: string, via: CallReviewVi
   if (res.count === 1) {
     await recordCallReviewEvent({ recordingId: id, actorId, action: 'release', via }, { always: true })
     queueCallReviewCardSync(id)
+    // Its action items wait while it is held: apply them now (off unless calls.taskProposalsAutoApply; the cron sweep backs this up).
+    await import('@/app/lib/call-tasks/auto-apply').then((m) => m.queueAutoApply(id)).catch(() => {})
     return 'ok'
   }
   const exists = await prisma.callRecording.findUnique({ where: { id }, select: { id: true } })

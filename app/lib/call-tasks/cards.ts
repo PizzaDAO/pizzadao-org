@@ -18,13 +18,16 @@
  * their buttons and say who decided. Buttons: discord-interactions/task-proposal-review.ts.
  *
  * Gated by calls.taskProposalCardsEnabled (default off) plus a bot token. Only proposals made after the
- * switch was last turned on are posted by the sweep. Everything is best effort and never throws into its
+ * switch was last turned on are posted by the sweep. With calls.taskProposalsAutoApply on, a call's action
+ * items get no new card until its auto-apply pass ran (auto-apply.ts): only the ones still pending after it
+ * (the task changed since the call, a failed write, a held call once released) get a card. Everything is best effort and never throws into its
  * caller. Tests inject ProposalCardDeps, so nothing reaches Discord or the database.
  */
 import { after } from 'next/server'
 import { prisma } from '@/app/lib/db'
 import { savedChannelId } from '@/app/lib/settings/channels'
 import { toggleEnabled } from '@/app/lib/settings/toggles'
+import { switchedOnAt } from '@/app/lib/settings/switched-on'
 import { getCrewMappings } from '@/app/lib/crew-mappings'
 import { NON_ROSTER_CREW_IDS, normalizeCrewId } from '@/app/lib/crew-id'
 import { fetchChannel } from '@/app/lib/discord-channels'
@@ -39,11 +42,18 @@ import { CALL_CAPO_ROLE_IDS, DREAD_PIZZA_ROBERTS_ROLE_ID } from '@/app/ui/consta
 import { proposalApplyId, proposalDismissId } from '@/app/lib/discord-interactions/task-proposal-review'
 import { SITE_URL } from '@/app/lib/site-url'
 import { createHash } from 'node:crypto'
-import { crewInAllowlist, loadTaskProposalConfig } from './config'
+import { crewInAllowlist, loadTaskProposalConfig, type TaskProposalConfig } from './config'
 import { effectiveValues, needsLeadPick, type ProposalEdits } from './apply'
 import type { ProposalChanges } from './proposals'
 
 export const TOGGLE_KEY = 'calls.taskProposalCardsEnabled'
+export const AUTO_APPLY_KEY = 'calls.taskProposalsAutoApply'
+/** Who an action item applied straight from the call was decided by (CrewTaskProposal.decidedBy, the task history actor). */
+export const AUTO_APPLY_ACTOR = 'system:call-action-items'
+/** Auto-apply on by env only (no switch-on time): action items younger than this wait for the pass before getting a card. */
+export const AUTO_APPLY_GRACE_MS = 15 * 60 * 1000
+
+export const isAutoApplied = (decidedBy: string | null | undefined) => decidedBy === AUTO_APPLY_ACTOR
 
 export function proposalCardsEnabled(env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
   return toggleEnabled(TOGGLE_KEY, env)
@@ -88,6 +98,8 @@ export interface ProposalCardView {
   decidedAt: Date | null
   error: string | null
   createdAt: Date
+  /** Auto-apply is on and has not run for this call yet: no new card (it may be applied in a moment). */
+  awaitingAutoApply?: boolean
   card: {
     channelId: string | null
     messageId: string | null
@@ -117,7 +129,7 @@ const FIELD_LABEL: Record<string, string> = { label: 'Name', stage: 'Stage', pri
 const ts = (d: Date, style = 'f') => `<t:${Math.floor(d.getTime() / 1000)}:${style}>`
 const clip = (s: string, max: number) => (s.length > max ? s.slice(0, max - 1) + '…' : s)
 const escapeMd = (s: string) => s.replace(/([*_`~|>\\[\]])/g, '\\$1').replace(/@/g, '@\u200b')
-const clean = (s: string, max: number) => clip(escapeMd(neutralizeMentions(s).replace(/\s+/g, ' ').trim()), max)
+export const clean = (s: string, max: number) => clip(escapeMd(neutralizeMentions(s).replace(/\s+/g, ' ').trim()), max)
 const shown = (s: string | null) => (s?.trim() ? clean(s, 120) : '—')
 
 /** Where a proposal is reviewed on the website: the crew page, or the admin call page for one left on a non-crew call. */
@@ -155,7 +167,7 @@ export function renderProposalCard(v: ProposalCardView, opts: { appUrl: string }
   else if (v.lead) body.push(`Lead: ${v.lead.from?.trim() ? `${shown(v.lead.from)} → ` : ''}${shown(v.lead.to)}`)
   if (v.reason.trim()) body.push(`Why: ${clean(v.reason, 400)}`)
 
-  const who = v.decidedBy ? `<@${v.decidedBy}>` : 'a crew lead'
+  const who = isAutoApplied(v.decidedBy) ? 'Metalhead (added from the call)' : v.decidedBy ? `<@${v.decidedBy}>` : 'a crew lead'
   const when = v.decidedAt ? ` · ${ts(v.decidedAt)}` : ''
   if (state === 'needs-website') {
     body.push('', v.needsInput === 'lead' ? 'Choose who leads it on the website before applying.' : 'Give it a name on the website before applying.')
@@ -217,7 +229,7 @@ const errText = (err: unknown) => (err instanceof Error ? err.message : String(e
 
 /** Does this proposal warrant a NEW card? Pending, not hidden, applicable, recent enough. (The sweep also applies the switch-on cutoff.) */
 export function needsNewProposalCard(v: ProposalCardView, now: Date, maxAgeDays: number): boolean {
-  return v.status === 'PENDING' && !v.hidden && v.applicable && v.createdAt.getTime() >= now.getTime() - maxAgeDays * 86_400_000
+  return v.status === 'PENDING' && !v.hidden && v.applicable && !v.awaitingAutoApply && v.createdAt.getTime() >= now.getTime() - maxAgeDays * 86_400_000
 }
 
 /** Remembered rows with no message (hidden by a rule, or not applicable) are re-checked by the sweep after this (a released hold, a crew switched back on). */
@@ -427,6 +439,23 @@ const botToken = () => process.env.DISCORD_BOT_TOKEN?.trim() ?? ''
 
 const asEdits = (v: unknown): ProposalEdits => (v && typeof v === 'object' && !Array.isArray(v) ? (v as ProposalEdits) : {})
 
+/**
+ * The race guard: with auto-apply on, a call's action items wait for its pass (CallTaskAutoApply.appliedAt) before
+ * any of them gets a card. Only those made after auto-apply was switched on wait (by env only: the young ones).
+ * Fails closed (no card yet, retried next run).
+ */
+export async function awaitingAutoApply(cfg: Pick<TaskProposalConfig, 'autoApply'>, recordingId: string, createdAt: Date, now: Date = new Date()): Promise<boolean> {
+  if (!cfg.autoApply) return false
+  try {
+    const row = await prisma.callTaskAutoApply.findUnique({ where: { recordingId }, select: { appliedAt: true } })
+    if (row?.appliedAt) return false
+    const since = await switchedOnAt(AUTO_APPLY_KEY)
+    return since ? createdAt.getTime() >= since.getTime() : now.getTime() - createdAt.getTime() < AUTO_APPLY_GRACE_MS
+  } catch {
+    return true
+  }
+}
+
 /** Whether a call is held, per call version and filter: the transcript is read once, not once per proposal. */
 const holdMemo = new Map<string, { key: string; held: boolean }>()
 
@@ -502,6 +531,7 @@ export async function loadProposalCardView(id: string, opts: { lean?: boolean } 
     hiddenBy = held === null ? 'error' : held ? 'rule' : null
   }
   const taskGone = row.kind !== 'CREATE' && (!task || task.archived)
+  const awaiting = row.status === 'PENDING' && !row.card?.messageId ? await awaitingAutoApply(cfg, row.recordingId, row.createdAt) : false
   return {
     id: row.id,
     recordingId: row.recordingId,
@@ -528,6 +558,7 @@ export async function loadProposalCardView(id: string, opts: { lean?: boolean } 
     decidedAt: row.decidedAt,
     error: row.error,
     createdAt: row.createdAt,
+    awaitingAutoApply: awaiting,
     card: row.card,
   }
 }
@@ -581,14 +612,8 @@ export const defaultProposalCardDeps: ProposalCardDeps = {
 
 export const defaultProposalSweepDeps: ProposalSweepDeps = {
   ...defaultProposalCardDeps,
-  async since() {
-    // When the saved switch last went from off to on (the audit log; re-saving "on" does not move it), while it
-    // is saved as on. Switched on by env only: nothing new is posted.
-    const row = await prisma.appSetting.findUnique({ where: { key: TOGGLE_KEY }, select: { value: true, updatedAt: true } })
-    if (!row || row.value !== true) return null
-    const changes = await prisma.appSettingChange.findMany({ where: { key: TOGGLE_KEY }, orderBy: { changedAt: 'desc' }, take: 20, select: { oldValue: true, newValue: true, changedAt: true } })
-    return changes.find((c) => c.newValue === true && c.oldValue !== true)?.changedAt ?? row.updatedAt
-  },
+  // When the saved switch last went from off to on, while it is saved as on. Switched on by env only: nothing new is posted.
+  since: () => switchedOnAt(TOGGLE_KEY),
   async listNew(since, limit) {
     // A card Discord may already hold (posted, not stored) is never a candidate, so it cannot starve the rest.
     const notUnstored = [{ error: null }, { NOT: { error: { startsWith: POSTED_UNSTORED } } }]
