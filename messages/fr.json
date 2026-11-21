@@ -466,6 +466,7 @@
         "cancelled": "Tu as touché un autre numéro, la connexion est annulée. Recommence si c'était une erreur.",
         "expired": "Cette connexion a expiré. Recommence.",
         "leftServer": "Ce compte Telegram est lié à un membre qui n'est plus sur le serveur Discord de PizzaDAO.",
+        "privileged": "Ton rôle nécessite une connexion Discord. Connecte-toi avec Discord.",
         "unavailable": "La connexion avec Telegram n'est pas disponible pour l'instant. Connecte-toi avec Discord.",
         "startAgain": "Recommencer"
       },

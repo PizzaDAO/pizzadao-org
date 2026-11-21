@@ -81,6 +81,14 @@ const SIGNIN_OFF = "Sign in with Telegram isn't available right now. Log in with
 const SIGNIN_NOT_LINKED = "This Telegram isn't connected to a PizzaDAO member. Log in with Discord once, then connect Telegram on your profile page.";
 const SIGNIN_EXPIRED = "This sign-in expired. Start again from the website.";
 
+/** "12 seconds ago" for the sign-in context line. */
+function agoText(startedAt: Date, now = Date.now()): string {
+    const s = Math.max(0, Math.round((now - startedAt.getTime()) / 1000));
+    if (s < 60) return `${s} second${s === 1 ? "" : "s"} ago`;
+    const m = Math.round(s / 60);
+    return `${m} minute${m === 1 ? "" : "s"} ago`;
+}
+
 /** `/start si_<code>`: a linked account claims the sign-in and gets the three numbers. */
 async function onSigninStart(botToken: string, chatId: number, fromId: string, code: string) {
     const cfg = await signinConfig();
@@ -98,7 +106,7 @@ async function onSigninStart(botToken: string, chatId: number, fromId: string, c
         await loginBotSend(botToken, chatId, SIGNIN_OFF);
         return;
     }
-    const claim = await claimSignin(code, fromId, account.discordId);
+    const claim = await claimSignin(code, fromId, account.discordId, Date.now(), cfg.claimSeconds * 1000);
     if (claim.status === "limited") {
         await loginBotSend(botToken, chatId, "Too many attempts. Try again later.");
         return;
@@ -111,7 +119,12 @@ async function onSigninStart(botToken: string, chatId: number, fromId: string, c
     await loginBotSend(
         botToken,
         chatId,
-        `Sign in to PizzaDAO${name ? ` as ${name}` : ""}? Tap the number your browser shows. Only continue if you just pressed Sign in with Telegram on the PizzaDAO website.`,
+        [
+            `Sign in to PizzaDAO${name ? ` as ${name}` : ""}?`,
+            `Started ${agoText(claim.startedAt)}${claim.browserLabel ? ` from ${claim.browserLabel}` : ""}.`,
+            "Only tap a number if YOU just clicked Sign in with Telegram on pizzadao.org in this browser. If you didn't, ignore this message.",
+            "Tap the number your browser shows:",
+        ].join("\n\n"),
         {
             reply_markup: {
                 inline_keyboard: [numberChoices(claim.matchNumber).map((n) => ({ text: String(n), callback_data: `si:${claim.ref}:${n}` }))],

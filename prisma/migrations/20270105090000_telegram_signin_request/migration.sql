@@ -7,6 +7,7 @@ CREATE TABLE "TelegramSignInRequest" (
     "browserHash" TEXT NOT NULL,
     "matchNumber" INTEGER NOT NULL,
     "returnTo" TEXT,
+    "browserLabel" TEXT,
     "tgId" TEXT,
     "discordId" TEXT,
     "ref" TEXT,

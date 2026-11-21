@@ -22,6 +22,8 @@ export interface Session {
     createdAt: number;
     /** How this session was started. Absent = Discord (OAuth or magic link). "telegram" sessions get no admin powers unless allowed. */
     authMethod?: "telegram";
+    /** Absolute end of this session (ms), when shorter than the usual 30 days (Telegram sign-ins). */
+    expiresAt?: number;
 }
 
 /**
@@ -73,6 +75,7 @@ export function verifySession(token: string | undefined): Session | null {
         if (now - createdAt > SESSION_MAX_AGE_SECONDS * 1000) return null;
         // Allow small clock skew but reject tokens "from the future".
         if (createdAt - now > 5 * 60 * 1000) return null;
+        if (decoded.expiresAt !== undefined && !(Number(decoded.expiresAt) > now)) return null;
         return decoded as Session;
     } catch {
         return null;

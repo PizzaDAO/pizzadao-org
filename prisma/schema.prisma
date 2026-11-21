@@ -2577,6 +2577,7 @@ model TelegramSignInRequest {
   browserHash String
   matchNumber Int
   returnTo    String?
+  browserLabel String? // coarse "Chrome on macOS" of the browser that started it, shown in the bot
   tgId        String?
   discordId   String?
   ref         String?   @unique // opaque reference in the bot buttons' callback_data (never the code)

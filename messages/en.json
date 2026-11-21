@@ -466,6 +466,7 @@
         "cancelled": "You tapped a different number, so the sign-in was cancelled. Start again if that was a mistake.",
         "expired": "That sign-in expired. Start again.",
         "leftServer": "This Telegram account is connected to a member who is no longer in the PizzaDAO Discord server.",
+        "privileged": "Your role needs a Discord login. Use Discord to sign in.",
         "unavailable": "Sign in with Telegram is not available right now. Log in with Discord instead.",
         "startAgain": "Start again"
       },

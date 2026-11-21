@@ -3,9 +3,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
   process.env.SESSION_SECRET ||= "test-secret";
-  return { limit: vi.fn(), consume: vi.fn(), cfg: vi.fn(), guild: vi.fn(), issue: vi.fn() };
+  return { limit: vi.fn(), keyed: vi.fn(), consume: vi.fn(), cfg: vi.fn(), guild: vi.fn(), issue: vi.fn(), adminAllowed: vi.fn(), privileged: vi.fn() };
 });
-vi.mock("@/app/lib/rate-limit", () => ({ enforceRateLimit: mocks.limit }));
+vi.mock("@/app/lib/rate-limit", () => ({
+  enforceRateLimit: mocks.limit,
+  checkKeyedRateLimit: mocks.keyed,
+  rateLimitResponse: () => new Response(null, { status: 429 }),
+}));
+vi.mock("@/app/lib/settings/toggles", () => ({ toggleEnabled: (...a: unknown[]) => mocks.adminAllowed(...a) }));
+vi.mock("@/app/lib/telegram/signin-privileged", () => ({ holdsPrivilegedRole: (...a: unknown[]) => mocks.privileged(...a) }));
 vi.mock("@/app/lib/db", () => ({ prisma: {} }));
 vi.mock("@/app/lib/telegram/signin-code", async (orig) => ({
   ...(await orig<typeof import("@/app/lib/telegram/signin-code")>()),
@@ -34,7 +40,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.spyOn(console, "info").mockImplementation(() => {});
   mocks.limit.mockResolvedValue(null);
-  mocks.cfg.mockResolvedValue({ enabled: true, allowlist: [], ttlMinutes: 5 });
+  mocks.cfg.mockResolvedValue({ enabled: true, allowlist: [], ttlMinutes: 5, claimSeconds: 120, sessionDays: 7 });
+  mocks.keyed.mockResolvedValue({ success: true, limit: 300, remaining: 299, reset: Date.now() });
+  mocks.adminAllowed.mockResolvedValue(false);
+  mocks.privileged.mockResolvedValue(false);
   mocks.guild.mockResolvedValue({ status: "member", member: { nick: "Tony", roles: [], user: { id: "d1", username: "tony" } } });
   mocks.issue.mockResolvedValue({ token: "tg-session", memberId: "42", memberName: "Tony" });
   // Run the real precheck against the approved request for d1.
@@ -47,12 +56,39 @@ beforeEach(() => {
 });
 
 describe("telegram sign-in status", () => {
-  it("is rate limited under its own bucket and does nothing else", async () => {
-    mocks.limit.mockResolvedValue(new Response(null, { status: 429 }));
-    const res = await get();
-    expect(res.status).toBe(429);
-    expect(mocks.limit).toHaveBeenCalledWith(expect.any(Request), "telegram-signin-status");
+  it("limits a browser by its own request (shared IPs do not collide), and the rest per IP", async () => {
+    mocks.keyed.mockResolvedValue({ success: false, limit: 300, remaining: 0, reset: Date.now() + 1000 });
+    expect((await get()).status).toBe(429);
+    expect(mocks.keyed).toHaveBeenCalledWith("telegram-signin-status", expect.stringMatching(/^[0-9a-f]{64}$/));
+    expect(mocks.limit).not.toHaveBeenCalled();
     expect(mocks.consume).not.toHaveBeenCalled();
+    mocks.limit.mockResolvedValue(new Response(null, { status: 429 }));
+    const noCookie = await GET(new Request("https://app.example/api/auth/telegram/status"));
+    expect(noCookie.status).toBe(429);
+    expect(mocks.limit).toHaveBeenCalledWith(expect.any(Request), "telegram-signin-status");
+  });
+
+  it("refuses members holding admin, reviewer, payment or capo roles unless an admin allowed it", async () => {
+    mocks.privileged.mockResolvedValue(true);
+    const res = await get();
+    expect(await res.json()).toEqual({ status: "error", code: "telegram_privileged" });
+    expect(mocks.issue).not.toHaveBeenCalled();
+    expect(setCookies(res).some((c) => c.startsWith("pizzadao_session="))).toBe(false);
+    mocks.adminAllowed.mockResolvedValue(true);
+    expect(((await (await get()).json()) as { status: string }).status).toBe("approved");
+  });
+
+  it("waits and retries when the saved role lists cannot be read", async () => {
+    mocks.privileged.mockRejectedValue(new Error("db down"));
+    expect(await (await get()).json()).toEqual({ status: "pending" });
+    expect(mocks.issue).not.toHaveBeenCalled();
+  });
+
+  it("gives Telegram sessions a shorter, absolute end", async () => {
+    await get();
+    const arg = mocks.issue.mock.calls[0][0] as { expiresAt: number };
+    expect(arg.expiresAt - Date.now()).toBeGreaterThan(6.9 * 86400_000);
+    expect(arg.expiresAt - Date.now()).toBeLessThan(7.1 * 86400_000);
   });
 
   it("signs in once: a telegram-marked session cookie, the cleaned landing path, and the request cookie cleared", async () => {
@@ -89,9 +125,9 @@ describe("telegram sign-in status", () => {
   });
 
   it("refuses when the switch was turned off, or the member left the tester list, mid-flight", async () => {
-    mocks.cfg.mockResolvedValue({ enabled: false, allowlist: [], ttlMinutes: 5 });
+    mocks.cfg.mockResolvedValue({ enabled: false, allowlist: [], ttlMinutes: 5, claimSeconds: 120, sessionDays: 7 });
     expect(await (await get()).json()).toEqual({ status: "error", code: "telegram_unavailable" });
-    mocks.cfg.mockResolvedValue({ enabled: true, allowlist: ["someone-else"], ttlMinutes: 5 });
+    mocks.cfg.mockResolvedValue({ enabled: true, allowlist: ["someone-else"], ttlMinutes: 5, claimSeconds: 120, sessionDays: 7 });
     expect(await (await get()).json()).toEqual({ status: "error", code: "telegram_unavailable" });
     expect(mocks.issue).not.toHaveBeenCalled();
   });

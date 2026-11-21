@@ -466,6 +466,7 @@
         "cancelled": "Tocaste otro número, así que se canceló el acceso. Empieza de nuevo si fue un error.",
         "expired": "Ese acceso caducó. Empieza de nuevo.",
         "leftServer": "Esta cuenta de Telegram está conectada a un miembro que ya no está en el servidor de Discord de PizzaDAO.",
+        "privileged": "Tu rol requiere entrar con Discord. Usa Discord para entrar.",
         "unavailable": "Entrar con Telegram no está disponible ahora. Entra con Discord.",
         "startAgain": "Empezar de nuevo"
       },

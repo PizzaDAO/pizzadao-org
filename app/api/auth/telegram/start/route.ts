@@ -48,7 +48,7 @@ export async function POST(req: Request) {
     }
 
     const body = (await req.json().catch(() => null)) as { returnTo?: unknown } | null;
-    const created = await createSigninRequest({ returnTo: body?.returnTo, ttlMinutes: cfg.ttlMinutes });
+    const created = await createSigninRequest({ returnTo: body?.returnTo, ttlMinutes: cfg.ttlMinutes, userAgent: req.headers.get("user-agent") });
     const expiresInSeconds = Math.max(1, Math.round((created.expiresAt.getTime() - Date.now()) / 1000));
     const res = NextResponse.json(
         {

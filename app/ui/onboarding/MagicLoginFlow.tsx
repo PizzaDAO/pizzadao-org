@@ -90,7 +90,7 @@ type TgState =
   | { step: "idle" }
   | { step: "starting" }
   | { step: "waiting"; url: string; matchNumber: number; until: number }
-  | { step: "ended"; reason: "cancelled" | "expired" | "leftServer" | "unavailable" };
+  | { step: "ended"; reason: "cancelled" | "expired" | "leftServer" | "privileged" | "unavailable" };
 
 /** Whether /login offers the Telegram button. ?telegram=1 shows it to testers while an allowlist is set. */
 export async function fetchTelegramSignInEnabled(search: string): Promise<boolean> {
@@ -191,7 +191,7 @@ export function MagicLoginFlow({ onBack, loginError, navigate = assignLocation }
           setTg({ step: "ended", reason: body.status });
         } else if (body.status === "error") {
           stop();
-          setTg({ step: "ended", reason: body.code === "telegram_left_server" ? "leftServer" : "unavailable" });
+          setTg({ step: "ended", reason: body.code === "telegram_left_server" ? "leftServer" : body.code === "telegram_privileged" ? "privileged" : "unavailable" });
         } else if (body.status === "none") {
           stop();
           setTg({ step: "idle" });

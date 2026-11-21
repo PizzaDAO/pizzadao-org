@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // A small in-memory stand-in for the table that understands the where-clauses the lib uses, so the
 // conditional updates (the races) are really exercised.
 type Row = Record<string, unknown> & { codeHash: string; createdAt: Date };
-const store = vi.hoisted(() => ({ rows: [] as Row[] }));
+const store = vi.hoisted(() => ({ rows: [] as Row[], accounts: {} as Record<string, string> }));
 
 function matches(row: Row, where: Record<string, unknown>): boolean {
     return Object.entries(where).every(([k, cond]) => {
@@ -21,9 +21,13 @@ function matches(row: Row, where: Record<string, unknown>): boolean {
 
 vi.mock("@/app/lib/db", () => ({
     prisma: {
+        telegramAccount: {
+            findUnique: async ({ where }: { where: { telegramId: string } }) =>
+                store.accounts[where.telegramId] ? { discordId: store.accounts[where.telegramId] } : null,
+        },
         telegramSignInRequest: {
             create: async ({ data }: { data: Record<string, unknown> }) => {
-                store.rows.push({ claimedAt: null, approvedAt: null, consumedAt: null, cancelledAt: null, tgId: null, discordId: null, ref: null, ...data, createdAt: new Date() } as unknown as Row);
+                store.rows.push({ claimedAt: null, approvedAt: null, consumedAt: null, cancelledAt: null, tgId: null, discordId: null, ref: null, ...data, createdAt: (data.createdAt as Date) ?? new Date() } as unknown as Row);
             },
             findUnique: async ({ where }: { where: Record<string, unknown> }) => store.rows.find((r) => matches(r, where)) ?? null,
             updateMany: async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
@@ -47,6 +51,7 @@ import {
     claimSignin,
     consumeSignin,
     createSigninRequest,
+    describeBrowser,
     numberChoices,
     parseSigninCookie,
     SIGNIN_MAX_CLAIMS_PER_HOUR,
@@ -68,6 +73,7 @@ async function claimed(now = T0) {
 
 beforeEach(() => {
     store.rows = [];
+    store.accounts = { [tgA]: "d1" };
 });
 
 describe("sign-in requests", () => {
@@ -111,7 +117,7 @@ describe("claiming", () => {
 
     it("the same user pressing Start again gets the same ref", async () => {
         const { made, claim } = await claimed();
-        expect(await claimSignin(made.code, tgA, "d1", T0 + 1000)).toEqual({ status: "claimed", ref: claim.ref, matchNumber: made.matchNumber });
+        expect(await claimSignin(made.code, tgA, "d1", T0 + 1000)).toMatchObject({ status: "claimed", ref: claim.ref, matchNumber: made.matchNumber });
     });
 
     it("refuses an expired, malformed or unknown code", async () => {
@@ -128,7 +134,32 @@ describe("claiming", () => {
         }
         const extra = await start(undefined, Date.now());
         expect(await claimSignin(extra.code, tgA, "d1", Date.now())).toEqual({ status: "limited" });
-        expect(store.rows.at(-1)?.tgId).toBeNull();
+        expect(store.rows.at(-1)?.cancelledAt).toBeInstanceOf(Date);
+    });
+});
+
+describe("phishing context", () => {
+    it("describes the browser coarsely and keeps only family and OS", () => {
+        expect(describeBrowser("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36")).toBe("Chrome on macOS");
+        expect(describeBrowser("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1")).toBe("Safari on iOS");
+        expect(describeBrowser("Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0")).toBe("Firefox on Windows");
+        expect(describeBrowser("curl/8.0")).toBeNull();
+        expect(describeBrowser(null)).toBeNull();
+    });
+
+    it("hands the bot when and from what the request started", async () => {
+        const made = await createSigninRequest({ now: T0, userAgent: "Mozilla/5.0 (X11; Linux x86_64) Chrome/120.0 Safari/537.36" });
+        const claim = await claimSignin(made.code, tgA, "d1", T0 + 12_000);
+        expect(claim).toMatchObject({ status: "claimed", browserLabel: "Chrome on Linux" });
+        if (claim.status === "claimed") expect(claim.startedAt.getTime()).toBe(T0);
+    });
+
+    it("refuses to claim a request that is older than the claim window, but not one inside it", async () => {
+        const made = await start();
+        expect(await claimSignin(made.code, tgA, "d1", T0 + 121_000)).toEqual({ status: "expired" });
+        expect((await claimSignin(made.code, tgA, "d1", T0 + 119_000)).status).toBe("claimed");
+        const other = await start();
+        expect((await claimSignin(other.code, "888", "d2", T0 + 200_000, 300_000)).status).toBe("claimed");
     });
 });
 
@@ -213,6 +244,19 @@ describe("consuming (the browser's poll)", () => {
         expect(store.rows[0].consumedAt).toBeNull();
         expect(await consumeSignin(made.cookieValue, T0 + 2500, async () => "telegram_left_server")).toEqual({ status: "refused", reason: "telegram_left_server" });
         expect(await consumeSignin(made.cookieValue, T0 + 3000)).toEqual({ status: "cancelled" });
+    });
+
+    it("refuses (and ends the request) when the Telegram link changed or was removed since the tap", async () => {
+        const { made, claim } = await claimed();
+        await answerSignin(claim.ref, tgA, made.matchNumber, T0 + 1000);
+        delete store.accounts[tgA];
+        expect(await consumeSignin(made.cookieValue, T0 + 2000)).toEqual({ status: "refused", reason: "telegram_not_linked" });
+        store.accounts[tgA] = "d1";
+        expect(await consumeSignin(made.cookieValue, T0 + 3000)).toEqual({ status: "cancelled" });
+        const again = await claimed();
+        await answerSignin(again.claim.ref, tgA, again.made.matchNumber, T0 + 1000);
+        store.accounts[tgA] = "someone-else";
+        expect(await consumeSignin(again.made.cookieValue, T0 + 2000)).toEqual({ status: "refused", reason: "telegram_not_linked" });
     });
 
     it("two polls racing: only one gets the session", async () => {

@@ -67,8 +67,8 @@ describe("login bot webhook: sign in with Telegram", () => {
         fetchMock.mockResolvedValue(new Response("{}"));
         vi.stubGlobal("fetch", fetchMock);
         fetchMember.mockResolvedValue({ Name: "Tony" });
-        signin.cfg.mockResolvedValue({ enabled: true, allowlist: [], ttlMinutes: 5 });
-        signin.claim.mockResolvedValue({ status: "claimed", ref: SIREF, matchNumber: 42 });
+        signin.cfg.mockResolvedValue({ enabled: true, allowlist: [], ttlMinutes: 5, claimSeconds: 120, sessionDays: 7 });
+        signin.claim.mockResolvedValue({ status: "claimed", ref: SIREF, matchNumber: 42, startedAt: new Date(Date.now() - 12_000), browserLabel: "Chrome on macOS" });
         signin.answer.mockResolvedValue("approved");
         db.telegramAccount.findUnique.mockResolvedValue({ discordId: "d1" });
     });
@@ -79,9 +79,11 @@ describe("login bot webhook: sign in with Telegram", () => {
 
     it("a linked account claims the request and gets three numbers, one of them right, and never a link", async () => {
         await POST(hook(startMsg(`/start ${SI}`)));
-        expect(signin.claim).toHaveBeenCalledWith(CODE, "777", "d1");
+        expect(signin.claim).toHaveBeenCalledWith(CODE, "777", "d1", expect.any(Number), 120_000);
         const [send] = calls();
         expect(send.body.text).toContain("Sign in to PizzaDAO as Tony");
+        expect(send.body.text).toMatch(/Started (1[1-3]) seconds ago from Chrome on macOS/);
+        expect(send.body.text).toContain("Only tap a number if YOU just clicked Sign in with Telegram on pizzadao.org in this browser");
         const buttons = send.body.reply_markup.inline_keyboard[0] as Array<{ text: string; callback_data: string }>;
         expect(buttons).toHaveLength(3);
         expect(buttons.map((b) => b.text)).toContain("42");

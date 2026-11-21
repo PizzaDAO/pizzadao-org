@@ -17,6 +17,8 @@ import { loginReturnPath } from "@/app/lib/login-return";
 
 export const SIGNIN_START_PREFIX = "si_";
 export const SIGNIN_DEFAULT_TTL_MINUTES = 5;
+/** The bot only accepts a request this soon after the browser made it. */
+export const SIGNIN_DEFAULT_CLAIM_SECONDS = 120;
 /** Sign-in requests one Telegram account may claim per hour. */
 export const SIGNIN_MAX_CLAIMS_PER_HOUR = 3;
 export const SIGNIN_COOKIE = "pd_tg_signin";
@@ -42,6 +44,16 @@ export function parseSigninCookie(value: string | undefined | null): { code: str
     return { code, secret };
 }
 
+/** A coarse "Chrome on macOS" from a User-Agent: family and OS only, never the version or the raw string. */
+export function describeBrowser(userAgent: string | null | undefined): string | null {
+    const ua = (userAgent ?? "").slice(0, 400);
+    if (!ua) return null;
+    const family = /Edg\//.test(ua) ? "Edge" : /OPR\/|Opera/.test(ua) ? "Opera" : /Firefox\//.test(ua) ? "Firefox" : /Chrome\/|CriOS/.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : null;
+    const os = /iPhone|iPad|iPod/.test(ua) ? "iOS" : /Android/.test(ua) ? "Android" : /Windows/.test(ua) ? "Windows" : /Mac OS X|Macintosh/.test(ua) ? "macOS" : /Linux|X11/.test(ua) ? "Linux" : null;
+    if (family && os) return `${family} on ${os}`;
+    return family ?? os;
+}
+
 export interface CreatedSignin {
     code: string;
     cookieValue: string;
@@ -50,7 +62,7 @@ export interface CreatedSignin {
 }
 
 /** Make a request for this browser. `returnTo` is cleaned here, and again when it is used. */
-export async function createSigninRequest(opts: { returnTo?: unknown; ttlMinutes?: number; now?: number }): Promise<CreatedSignin> {
+export async function createSigninRequest(opts: { returnTo?: unknown; ttlMinutes?: number; userAgent?: string | null; now?: number }): Promise<CreatedSignin> {
     const now = opts.now ?? Date.now();
     const ttl = Math.min(10, Math.max(2, Math.round(opts.ttlMinutes ?? SIGNIN_DEFAULT_TTL_MINUTES)));
     const code = randomBytes(32).toString("base64url");
@@ -65,6 +77,8 @@ export async function createSigninRequest(opts: { returnTo?: unknown; ttlMinutes
             browserHash: sha(secret),
             matchNumber,
             returnTo: loginReturnPath(opts.returnTo) ?? null,
+            browserLabel: describeBrowser(opts.userAgent),
+            createdAt: new Date(now),
             expiresAt,
         },
     });
@@ -72,7 +86,7 @@ export async function createSigninRequest(opts: { returnTo?: unknown; ttlMinutes
 }
 
 export type ClaimResult =
-    | { status: "claimed"; ref: string; matchNumber: number }
+    | { status: "claimed"; ref: string; matchNumber: number; startedAt: Date; browserLabel: string | null }
     | { status: "expired" }
     | { status: "limited" };
 
@@ -80,26 +94,42 @@ export type ClaimResult =
  * The first presser (a linked account, checked by the caller) claims the request. Pressing Start again as the
  * same user returns the same ref. A different user cannot take a claimed request.
  */
-export async function claimSignin(code: string, tgId: string, discordId: string, now = Date.now()): Promise<ClaimResult> {
+export async function claimSignin(
+    code: string,
+    tgId: string,
+    discordId: string,
+    now = Date.now(),
+    maxClaimAgeMs = SIGNIN_DEFAULT_CLAIM_SECONDS * 1000,
+): Promise<ClaimResult> {
     if (!isSigninCodeShape(code)) return { status: "expired" };
     const codeHash = sha(code);
     const row = await prisma.telegramSignInRequest.findUnique({
         where: { codeHash },
-        select: { tgId: true, ref: true, matchNumber: true, approvedAt: true, consumedAt: true, cancelledAt: true, expiresAt: true },
+        select: { tgId: true, ref: true, matchNumber: true, browserLabel: true, createdAt: true, approvedAt: true, consumedAt: true, cancelledAt: true, expiresAt: true },
     });
     if (!row || row.consumedAt || row.cancelledAt || row.approvedAt || row.expiresAt.getTime() <= now) return { status: "expired" };
-    if (row.tgId) return row.tgId === tgId && row.ref ? { status: "claimed", ref: row.ref, matchNumber: row.matchNumber } : { status: "expired" };
+    const startedAt = row.createdAt;
+    const info = { startedAt, browserLabel: row.browserLabel ?? null };
+    if (row.tgId) return row.tgId === tgId && row.ref ? { status: "claimed", ref: row.ref, matchNumber: row.matchNumber, ...info } : { status: "expired" };
 
-    // Phishing guard: one Telegram account can only be asked to sign in so often.
-    const recent = await prisma.telegramSignInRequest.count({ where: { tgId, createdAt: { gt: new Date(now - HOUR_MS) } } });
-    if (recent >= SIGNIN_MAX_CLAIMS_PER_HOUR) return { status: "limited" };
+    // Phishing guard: the bot only accepts a sign-in that was started moments ago.
+    if (now - startedAt.getTime() > maxClaimAgeMs) return { status: "expired" };
 
     const ref = randomBytes(16).toString("base64url");
     const res = await prisma.telegramSignInRequest.updateMany({
         where: { codeHash, tgId: null, cancelledAt: null, consumedAt: null, expiresAt: { gt: new Date(now) } },
         data: { tgId, discordId, ref, claimedAt: new Date(now) },
     });
-    return res.count === 1 ? { status: "claimed", ref, matchNumber: row.matchNumber } : { status: "expired" };
+    if (res.count !== 1) return { status: "expired" };
+
+    // Phishing guard: one Telegram account can only be asked to sign in so often. Counted by claim time,
+    // after claiming, so two racing claims cannot both slip under the cap (at worst both are refused).
+    const claimedLastHour = await prisma.telegramSignInRequest.count({ where: { tgId, claimedAt: { gt: new Date(now - HOUR_MS) } } });
+    if (claimedLastHour > SIGNIN_MAX_CLAIMS_PER_HOUR) {
+        await prisma.telegramSignInRequest.updateMany({ where: { codeHash, consumedAt: null }, data: { cancelledAt: new Date(now) } });
+        return { status: "limited" };
+    }
+    return { status: "claimed", ref, matchNumber: row.matchNumber, ...info };
 }
 
 /** The three numbers shown in the bot: the real one and two decoys, in random order. */
@@ -167,12 +197,20 @@ export async function consumeSignin(
     const codeHash = sha(parsed.code);
     const row = await prisma.telegramSignInRequest.findUnique({
         where: { codeHash },
-        select: { browserHash: true, discordId: true, returnTo: true, approvedAt: true, consumedAt: true, cancelledAt: true, expiresAt: true },
+        select: { browserHash: true, tgId: true, discordId: true, returnTo: true, approvedAt: true, consumedAt: true, cancelledAt: true, expiresAt: true },
     });
     if (!row || row.browserHash !== sha(parsed.secret) || row.consumedAt) return { status: "none" };
     if (row.cancelledAt) return { status: "cancelled" };
     if (row.expiresAt.getTime() <= now) return { status: "expired" };
     if (!row.approvedAt || !row.discordId) return { status: "pending" };
+
+    // The link must still be the one that was claimed: someone who disconnected (or relinked) Telegram
+    // between the tap and this poll is not signed in.
+    const link = await prisma.telegramAccount.findUnique({ where: { telegramId: row.tgId ?? "" }, select: { discordId: true } });
+    if (!link || link.discordId !== row.discordId) {
+        await prisma.telegramSignInRequest.updateMany({ where: { codeHash, consumedAt: null }, data: { cancelledAt: new Date(now) } });
+        return { status: "refused", reason: "telegram_not_linked" };
+    }
 
     if (precheck) {
         const verdict = await precheck(row.discordId);

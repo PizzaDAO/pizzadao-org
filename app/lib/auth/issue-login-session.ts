@@ -18,6 +18,8 @@ export async function issueLoginSession(opts: {
   username?: string;
   nick?: string;
   authMethod?: Session["authMethod"];
+  /** Absolute end of the session (ms), for sessions that should not last the full 30 days. */
+  expiresAt?: number;
 }): Promise<IssuedLoginSession> {
   const token = createSessionToken({
     discordId: opts.discordId,
@@ -25,6 +27,7 @@ export async function issueLoginSession(opts: {
     nick: opts.nick,
     createdAt: Date.now(),
     ...(opts.authMethod ? { authMethod: opts.authMethod } : {}),
+    ...(opts.expiresAt ? { expiresAt: opts.expiresAt } : {}),
   });
 
   // Look up the member row already linked to this Discord ID (direct lib call).

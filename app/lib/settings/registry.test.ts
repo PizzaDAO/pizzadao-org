@@ -319,6 +319,8 @@ describe('settings registry', () => {
       ['auth.telegramSignInAllowlist', []],
       ['auth.telegramSignInTtlMinutes', 5],
       ['auth.telegramSignInAdminAllowed', false],
+      ['auth.telegramSignInSessionDays', 7],
+      ['auth.telegramSignInClaimSeconds', 120],
       ['calls.eventLocalTimes', []],
       ['site.hostRedirectEnabled', false],
       ['site.hostRedirectPermanent', false],

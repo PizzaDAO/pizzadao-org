@@ -7,7 +7,7 @@ vi.mock('./session', () => ({ getSession: () => getSession() }))
 vi.mock('@/app/lib/settings/toggles', () => ({ toggleEnabled: (...a: unknown[]) => adminAllowed(...a) }))
 vi.mock('./discord', () => ({ hasAnyRole: (...a: unknown[]) => hasAnyRole(...a) }))
 
-import { requireSession, requireAdmin, safeEqual, checkSecret } from './auth-guards'
+import { requireSession, requireAdmin, requireAnyRole, safeEqual, checkSecret } from './auth-guards'
 import { ADMIN_ROLE_IDS } from '@/app/ui/constants'
 
 describe('auth guards', () => {
@@ -96,6 +96,16 @@ describe('auth guards', () => {
       hasAnyRole.mockResolvedValue(true)
       expect((await requireAdmin()).ok).toBe(true)
       expect(adminAllowed).not.toHaveBeenCalled()
+    })
+
+    it('every role-gated route (payments, capos, reviewers) refuses a Telegram session too', async () => {
+      getSession.mockResolvedValue(tgSession)
+      adminAllowed.mockResolvedValue(false)
+      hasAnyRole.mockResolvedValue(true)
+      const r = await requireAnyRole(['some-role'])
+      expect(r.ok).toBe(false)
+      if (!r.ok) expect(r.response.status).toBe(403)
+      expect(hasAnyRole).not.toHaveBeenCalled()
     })
 
     it('a Telegram session still works for ordinary member routes', async () => {

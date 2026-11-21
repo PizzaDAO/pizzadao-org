@@ -54,6 +54,11 @@ export async function requireAnyRole(
 ): Promise<GuardResult> {
   const auth = await requireSession();
   if (!auth.ok) return auth;
+  // Role-gated routes never trust a Telegram-started session (unless allowed): defense in depth, since
+  // sign-in already refuses members who hold privileged roles.
+  if (await telegramSessionBlocked(auth.session)) {
+    return { ok: false, response: NextResponse.json({ error: forbiddenMessage }, { status: 403 }) };
+  }
   if (!(await hasAnyRoleSafe(auth.session.discordId, roleIds))) {
     return {
       ok: false,
