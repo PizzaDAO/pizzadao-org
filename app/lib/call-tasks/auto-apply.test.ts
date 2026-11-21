@@ -36,13 +36,13 @@ const APP = 'https://app.example.test'
 const QUOTE = 'the secret transcript sentence'
 
 const call = (over: Record<string, unknown> = {}) => ({
-  id: 'rec1', source: 'DISCORD', status: 'PUBLISHED', crewId: 'ops', crewLabel: 'Ops', eventName: null, title: 'Weekly sync', startedAt: new Date('2026-11-17T18:00:00Z'),
+  id: 'rec1', updatedAt: new Date('2026-11-18T09:00:00Z'), source: 'DISCORD', status: 'PUBLISHED', crewId: 'ops', crewLabel: 'Ops', eventName: null, title: 'Weekly sync', startedAt: new Date('2026-11-17T18:00:00Z'),
   summary: 'A summary', actionItems: [], chapters: [], transcript: [], redactedSpeakerIds: [], redactedSegmentIds: [], reviewHoldAt: null, ...over,
 })
 const proposal = (over: Record<string, unknown> = {}) => ({
   id: 'p1', recordingId: 'rec1', crewId: 'ops', kind: 'CREATE', taskId: null, baseUpdatedAt: null, createdAt: new Date('2026-11-18T10:00:00Z'),
   changes: { label: { from: null, to: 'Book the venue' }, stage: { from: null, to: 'doing' }, leadName: { from: null, to: 'Ann' }, leadMemberId: { from: null, to: '12' } },
-  edited: null, leadName: 'Ann', leadMemberId: '12', candidates: null, status: 'PENDING', reason: 'They agreed to book it', quote: QUOTE, decidedBy: null, ...over,
+  edited: null, leadName: 'Ann', leadMemberId: '12', candidates: null, status: 'PENDING', reason: 'They agreed to book it', quote: QUOTE as string | null, confidence: 'high', decidedBy: null, ...over,
 })
 
 let rows: Array<ReturnType<typeof proposal>> = []
@@ -108,15 +108,31 @@ describe('autoApplyForRecording', () => {
     expect(rows[0].edited).toMatchObject({ skipLead: true })
   })
 
-  it('DONE and RETIRE are applied too (the close is confirmed)', async () => {
+  it('a close is applied (confirmed) only when the model was sure and quoted the call; a retire never', async () => {
+    const close = { kind: 'DONE', taskId: 't1', baseUpdatedAt: BASE, changes: { stage: { from: 'doing', to: 'done' } }, leadName: null, leadMemberId: null }
+    const toClosed = { kind: 'UPDATE', taskId: 't1', baseUpdatedAt: BASE, changes: { stage: { from: 'doing', to: 'done' } }, leadName: null, leadMemberId: null }
     rows = [
-      proposal({ id: 'd', kind: 'DONE', taskId: 't1', baseUpdatedAt: BASE, changes: { stage: { from: 'doing', to: 'done' } }, leadName: null, leadMemberId: null }),
+      proposal({ id: 'd', ...close }),
+      proposal({ id: 'dm', ...close, confidence: 'medium' }),
+      proposal({ id: 'dq', ...close, quote: null }),
+      proposal({ id: 'u', ...toClosed, confidence: 'medium' }),
+      proposal({ id: 'uh', ...toClosed }),
+      proposal({ id: 'up', kind: 'UPDATE', taskId: 't1', baseUpdatedAt: BASE, changes: { stage: { from: 'todo', to: 'doing' } }, confidence: 'medium', quote: null, leadName: null, leadMemberId: null }),
       proposal({ id: 'r', kind: 'RETIRE', taskId: 't2', baseUpdatedAt: BASE, changes: { archived: { from: false, to: true } }, leadName: null, leadMemberId: null }),
     ]
     task.findFirst.mockImplementation((async ({ where }: { where: { id: string } }) => ({ id: where.id, crewId: 'ops', label: 'X', stage: 'doing', priority: null, due: null, leadName: null, leadMemberId: null, archived: false, updatedAt: BASE })) as never)
     const r = await autoApplyForRecording('rec1', noSummary)
-    expect(r).toMatchObject({ applied: 2, left: 0 })
-    expect(rows.map((x) => x.status)).toEqual(['APPLIED', 'APPLIED'])
+    expect(r).toMatchObject({ applied: 3, left: 4 })
+    expect(Object.fromEntries(rows.map((x) => [x.id, x.status]))).toEqual({ d: 'APPLIED', dm: 'PENDING', dq: 'PENDING', u: 'PENDING', uh: 'APPLIED', up: 'APPLIED', r: 'PENDING' })
+    // The ones left were never even tried.
+    expect(prop.findUnique.mock.calls.map((c) => (c[0] as { where: { id: string } }).where.id)).toEqual(['d', 'uh', 'up'])
+  })
+
+  it('the pass is never stamped earlier than the call\'s newest action item', async () => {
+    const later = new Date('2030-01-01T00:00:00Z')
+    prop.findFirst.mockResolvedValue({ createdAt: later } as never)
+    await autoApplyForRecording('rec1', { ...noSummary, now: () => new Date('2026-11-18T12:00:00Z') })
+    expect(auto.upsert.mock.calls[0][0]).toMatchObject({ update: { appliedAt: later } })
   })
 
   it('a task edited since the call is a conflict: left pending, never forced', async () => {
@@ -181,12 +197,47 @@ describe('autoApplyForRecording', () => {
 })
 
 describe('autoApplyDue (the cron sweep)', () => {
-  it('runs calls whose pass has not run yet, skipping those that ran', async () => {
-    prop.findMany.mockImplementationOnce((async () => [{ recordingId: 'rec1' }, { recordingId: 'rec2' }]) as never)
-    auto.findMany.mockResolvedValue([{ recordingId: 'rec2' }] as never)
-    const r = await autoApplyDue(5, { ...noSummary, now: () => new Date('2026-11-18T12:00:00Z') })
-    expect(r).toEqual({ ran: [{ id: 'rec1', result: 'ok', applied: 1 }] })
-    expect(prop.findMany.mock.calls[0][0]).toMatchObject({ where: { status: 'PENDING', createdAt: { gte: SINCE } } })
+  const T = () => new Date('2026-11-18T12:00:00Z')
+  it('the query leaves out calls whose pass covered their newest action item, newest first', async () => {
+    const ranAt = new Date('2026-11-18T11:00:00Z')
+    auto.findMany.mockResolvedValue([{ recordingId: 'rec2', appliedAt: ranAt }] as never)
+    prop.findMany.mockImplementationOnce((async () => [{ recordingId: 'rec1' }]) as never)
+    const r = await autoApplyDue(5, { ...noSummary, now: T, memo: new Map() })
+    expect(r).toEqual({ ran: [{ id: 'rec1', result: 'ok', applied: 1 }], held: 0 })
+    expect(prop.findMany.mock.calls[0][0]).toMatchObject({
+      where: { status: 'PENDING', createdAt: { gte: SINCE }, OR: [{ recordingId: { notIn: ['rec2'] } }, { recordingId: 'rec2', createdAt: { gt: ranAt } }] },
+      distinct: ['recordingId'],
+      orderBy: { createdAt: 'desc' },
+    })
+  })
+
+  it('held calls are skipped cheaply, cached per call version and filter, and never count toward the cap', async () => {
+    const memo = new Map<string, string>()
+    const v1 = new Date('2026-11-18T09:00:00Z')
+    const calls: Record<string, Record<string, unknown>> = {
+      manual: call({ id: 'manual', updatedAt: v1, reviewHoldAt: v1 }),
+      owner: call({ id: 'owner', updatedAt: v1, crewId: 'secret' }),
+      term: call({ id: 'term', updatedAt: v1, title: 'Sensitive plans' }),
+      ok1: call({ id: 'ok1', updatedAt: v1 }),
+    }
+    rec.findUnique.mockImplementation((async ({ where }: { where: { id: string } }) => calls[where.id]) as never)
+    vi.mocked(loadPostFilter).mockResolvedValue({ ...EMPTY_POST_FILTER, ownerOnlyTerms: ['sensitive'], ownerOnlyCrewIds: ['secret'] })
+    const list = [{ recordingId: 'manual' }, { recordingId: 'owner' }, { recordingId: 'term' }, { recordingId: 'ok1' }]
+    prop.findMany.mockImplementation((async (a: { distinct?: unknown }) => (a.distinct ? list : rows)) as never)
+    let r = await autoApplyDue(1, { ...noSummary, now: T, memo })
+    expect(r).toEqual({ ran: [{ id: 'ok1', result: 'ok', applied: 1 }], held: 3 })
+    // Only the term-held one needed the full (transcript) read, and its result is cached.
+    const fullReads = () => rec.findUnique.mock.calls.filter((c) => (c[0] as { select: Record<string, unknown> }).select.transcript).map((c) => (c[0] as { where: { id: string } }).where.id)
+    expect(fullReads()).toEqual(['term', 'ok1'])
+    rec.findUnique.mockClear()
+    r = await autoApplyDue(1, { ...noSummary, now: T, memo })
+    expect(fullReads()).not.toContain('term')
+    // A new version of the call is checked again.
+    calls.term = call({ id: 'term', updatedAt: new Date('2026-11-18T10:00:00Z') })
+    rec.findUnique.mockClear()
+    r = await autoApplyDue(5, { ...noSummary, now: T, memo })
+    expect(fullReads()).toContain('term')
+    expect((r as { ran: Array<{ id: string }> }).ran.map((x) => x.id)).toContain('term')
   })
 
   it('does nothing when off or switched on by env only', async () => {
@@ -216,7 +267,7 @@ const item = (label: string, over: Partial<SummaryItem> = {}): SummaryItem => ({
 describe('renderActionItemSummary', () => {
   it('lists added, updated, closed and what needs a look, with stage, lead and the crew page link', () => {
     const text = renderActionItemSummary(
-      { callTitle: 'Weekly sync', callStartedAt: null, added: [item('Book the venue'), item('Print flyers', { lead: null })], updated: [item('Order stickers', { stage: 'review' })], closed: [item('Fix the bot', { stage: 'done' })], needsLook: 1, moreUrl: `${APP}/crew/ops` },
+      { callTitle: 'Weekly sync', callStartedAt: null, added: [item('Book the venue'), item('Print flyers', { lead: null })], updated: [item('Order stickers', { stage: 'review' })], closed: [item('Fix the bot', { stage: 'done' })], needsLook: 1, moreUrl: `${APP}/crew/ops`, cardsEnabled: true },
       APP,
     )
     expect(text).toContain('Added from **Weekly sync**: 2 tasks')
@@ -225,6 +276,19 @@ describe('renderActionItemSummary', () => {
     expect(text).toContain('Updated: 1 task\n• **Order stickers** · review')
     expect(text).toContain('Closed: 1 task\n• **Fix the bot** · done')
     expect(text).toContain('Needs a look: 1 task (each has its own card)')
+  })
+
+  it('leads with the first section that has something (never "Added: 0 tasks"); the card note only when cards are on', () => {
+    const base = { callTitle: 'Weekly sync', callStartedAt: null, added: [], updated: [], closed: [], needsLook: 0, moreUrl: APP }
+    const upd = renderActionItemSummary({ ...base, updated: [item('Order stickers')], needsLook: 2 }, APP)
+    expect(upd.startsWith('📋 Updated from **Weekly sync**: 1 task\n• **Order stickers**')).toBe(true)
+    expect(upd).not.toContain('Added')
+    expect(upd).toContain('Needs a look: 2 tasks')
+    expect(upd).not.toContain('own card')
+    const closed = renderActionItemSummary({ ...base, closed: [item('Fix the bot', { stage: 'done' })] }, APP)
+    expect(closed.startsWith('📋 Closed from **Weekly sync**: 1 task')).toBe(true)
+    const look = renderActionItemSummary({ ...base, needsLook: 1, cardsEnabled: true }, APP)
+    expect(look).toBe('📋 Needs a look from **Weekly sync**: 1 task (each has its own card)')
   })
 
   it('stays within the Discord limit, cut with "and N more" and a link', () => {
@@ -246,6 +310,7 @@ describe('postActionItemSummary', () => {
   const posts: Array<{ channelId: string; msg: { content: string; allowed_mentions: unknown } }> = []
   const deps = (over: Record<string, unknown> = {}) => ({
     env: { DISCORD_BOT_TOKEN: 'tok' },
+    cardsEnabled: async () => true,
     channelId: async () => '111',
     channelIsPrivate: async () => true,
     appUrl: () => APP,
@@ -281,6 +346,13 @@ describe('postActionItemSummary', () => {
     auto.updateMany.mockResolvedValueOnce({ count: 0 })
     expect(await postActionItemSummary('rec1', deps())).toBe('already')
     expect(posts).toHaveLength(1)
+  })
+
+  it('"Needs a look" counts only what the pass considered (made since the switch); no card note when cards are off', async () => {
+    await postActionItemSummary('rec1', deps({ cardsEnabled: async () => false }))
+    expect(prop.findMany.mock.calls[0][0]).toMatchObject({ where: { recordingId: 'rec1', OR: [{ status: 'APPLIED', decidedBy: AUTO_APPLY_ACTOR }, { status: 'PENDING', createdAt: { gte: SINCE } }] } })
+    expect(posts[0].msg.content).toContain('Needs a look: 1 task')
+    expect(posts[0].msg.content).not.toContain('own card')
   })
 
   it('never posts to a channel that is not private', async () => {

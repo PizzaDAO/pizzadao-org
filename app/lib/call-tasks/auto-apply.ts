@@ -3,7 +3,8 @@
  * action items are made (run.ts), each one is applied through applyProposal as Metalhead (AUTO_APPLY_ACTOR), with
  * the stage and fields from the call and the close confirmation given. No review step:
  *   - an unclear lead (several members match) is left out instead of guessed (a new task gets no lead),
- *   - updates, done, retire and stage closes are applied too,
+ *   - updates are applied too; a close (done, or a stage change to a closed stage) only when the model was sure
+ *     (confidence high) and its quote was found in the visible transcript; a retire never (it waits for review),
  *   - nothing is forced: one whose task changed since the call (conflict), or that failed, stays pending and is
  *     the only kind that gets a card in the capo review channel (cards.ts waits for this pass; see awaitingAutoApply),
  *   - the existing filters still hold (applyProposal: switch, allowlist, excluded crews, age); a call held for the
@@ -17,6 +18,7 @@
  * Everything is best effort and never throws into its caller.
  */
 import { after } from 'next/server'
+import { createHash } from 'node:crypto'
 import { prisma } from '@/app/lib/db'
 import { switchedOnAt } from '@/app/lib/settings/switched-on'
 import { getCrewMappings, isClosedStage } from '@/app/lib/crew-mappings'
@@ -27,7 +29,7 @@ import { callDateTimeFormat } from '@/app/lib/calls/format-call-time'
 import { DiscordPostError, postDiscordMessage } from '@/app/lib/discord-rest'
 import { loadTaskProposalConfig, type TaskProposalConfig } from './config'
 import { applyProposal, effectiveValues, type ApplyOutcome, type ProposalEdits } from './apply'
-import { AUTO_APPLY_ACTOR, AUTO_APPLY_KEY, clean, defaultProposalCardDeps, queueTaskProposalCardSync } from './cards'
+import { AUTO_APPLY_ACTOR, AUTO_APPLY_KEY, clean, defaultProposalCardDeps, proposalCardsEnabled, queueTaskProposalCardSync } from './cards'
 import type { ProposalChanges } from './proposals'
 
 export type AutoApplyResult = 'ok' | 'disabled' | 'not-found' | 'held' | 'failed'
@@ -41,6 +43,18 @@ export interface AutoApplyReport {
 }
 
 const allow = async () => true
+
+/**
+ * Whether an action item may be applied without review. A retire never; a close (done, or a stage change to a
+ * closed stage) only when the model was sure and quoted the call (stored quotes are already verified against the
+ * visible transcript). Everything else may.
+ */
+export function autoApplicable(r: { kind: string; changes: unknown; edited: unknown; confidence: string; quote: string | null }): boolean {
+  if (r.kind === 'RETIRE') return false
+  const eff = effectiveValues((r.changes ?? {}) as ProposalChanges, {}, (r.edited ?? null) as ProposalEdits | null)
+  const closes = r.kind === 'DONE' || (!!eff.stage && isClosedStage(eff.stage))
+  return !closes || (r.confidence === 'high' && !!r.quote?.trim())
+}
 
 /** One action item: applied as proposed; an unclear lead is applied without a lead rather than skipped. */
 export async function autoApplyOne(id: string, apply: typeof applyProposal = applyProposal): Promise<ApplyOutcome> {
@@ -78,13 +92,18 @@ export async function autoApplyForRecording(recordingId: string, deps: AutoApply
       where: { recordingId, status: 'PENDING', ...(since ? { createdAt: { gte: since } } : {}) },
       orderBy: { createdAt: 'asc' },
       take: 60,
-      select: { id: true, crewId: true },
+      select: { id: true, crewId: true, kind: true, changes: true, edited: true, confidence: true, quote: true },
     })
     let applied = 0
     let left = 0
     for (const row of rows) {
       // A task routed to a crew held for the owner is never applied here (capos cannot see it either).
       if (row.crewId !== rec.crewId && autoHoldReason({ crewId: row.crewId }, filter) === 'crew') {
+        left++
+        continue
+      }
+      // A retire, or a close the model was not sure of: left for review (it gets a card).
+      if (!autoApplicable(row)) {
         left++
         continue
       }
@@ -95,11 +114,14 @@ export async function autoApplyForRecording(recordingId: string, deps: AutoApply
       if (r.result === 'applied') applied++
       else if (r.result !== 'not-pending' && r.result !== 'missing-task' && r.result !== 'expired') left++
     }
-    const now = deps.now?.() ?? new Date()
+    // The pass covers every action item of the call made so far: never stamped earlier than the newest one (clock skew).
+    const newest = await prisma.crewTaskProposal.findFirst({ where: { recordingId }, orderBy: { createdAt: 'desc' }, select: { createdAt: true } })
+    const now0 = deps.now?.() ?? new Date()
+    const now = newest?.createdAt && newest.createdAt > now0 ? newest.createdAt : now0
     await prisma.callTaskAutoApply.upsert({ where: { recordingId }, create: { recordingId, appliedAt: now }, update: { appliedAt: now } })
     // A card posted before (none should be) follows the decision.
     if (rows.length) queueTaskProposalCardSync(rows.map((r) => r.id))
-    const summary = applied + left > 0 ? await (deps.summary ?? ((id: string) => postActionItemSummary(id)))(recordingId) : undefined
+    const summary = applied + left > 0 ? await (deps.summary ?? ((id: string) => postActionItemSummary(id, { since: async () => since })))(recordingId) : undefined
     return { result: 'ok', applied, left, ...(summary ? { summary } : {}) }
   } catch (e) {
     console.error('[call-tasks/auto-apply] pass failed:', e instanceof Error ? e.message : e)
@@ -119,11 +141,17 @@ export function queueAutoApply(recordingId: string): void {
   }
 }
 
+/** Auto-hold results (owner-only terms in the transcript) per call version and filter: the transcript is read once, not every run. */
+const holdMemo = new Map<string, string>()
+const filterHash = (f: PostFilter) => createHash('sha1').update(JSON.stringify(f)).digest('hex')
+
 /**
- * The followups cron sweep: calls with action items made since auto-apply was switched on whose pass has not
- * run (it failed, or the call was held and is now released). Held calls are re-checked each run and skipped.
+ * The followups cron sweep: calls with action items made since auto-apply was switched on that its last pass did
+ * not cover (the pass failed, the call was held and is now released, or a re-run made newer ones), newest first.
+ * Held calls are skipped cheaply (manual hold and owner-only crews first; the transcript check is cached per call
+ * version and filter) and never count toward `limit`.
  */
-export async function autoApplyDue(limit = 5, deps: AutoApplyDeps = {}): Promise<{ ran: Array<{ id: string; result: AutoApplyResult; applied: number }> } | { skipped: string }> {
+export async function autoApplyDue(limit = 5, deps: AutoApplyDeps & { memo?: Map<string, string> } = {}): Promise<{ ran: Array<{ id: string; result: AutoApplyResult; applied: number }>; held: number } | { skipped: string }> {
   try {
     const cfg = await (deps.config ?? loadTaskProposalConfig)()
     if (!cfg.autoApply) return { skipped: 'disabled' }
@@ -131,24 +159,46 @@ export async function autoApplyDue(limit = 5, deps: AutoApplyDeps = {}): Promise
     if (!since) return { skipped: 'no switch-on time' }
     const now = deps.now?.() ?? new Date()
     const floor = new Date(Math.max(since.getTime(), now.getTime() - cfg.maxDays * 86_400_000))
+    // A call is done when its pass ran at or after its newest action item: only newer pending ones bring it back.
+    const passes = await prisma.callTaskAutoApply.findMany({ where: { appliedAt: { not: null } }, orderBy: { appliedAt: 'desc' }, take: 1000, select: { recordingId: true, appliedAt: true } })
     const recs = await prisma.crewTaskProposal.findMany({
-      where: { status: 'PENDING', createdAt: { gte: floor } },
+      where: {
+        status: 'PENDING',
+        createdAt: { gte: floor },
+        OR: [{ recordingId: { notIn: passes.map((p) => p.recordingId) } }, ...passes.map((p) => ({ recordingId: p.recordingId, createdAt: { gt: p.appliedAt as Date } }))],
+      },
       distinct: ['recordingId'],
-      orderBy: { recordingId: 'asc' },
-      take: 100,
+      orderBy: { createdAt: 'desc' },
+      take: 50,
       select: { recordingId: true },
     })
-    const ids = recs.map((r) => r.recordingId)
-    if (!ids.length) return { ran: [] }
-    const done = new Set((await prisma.callTaskAutoApply.findMany({ where: { recordingId: { in: ids }, appliedAt: { not: null } }, select: { recordingId: true } })).map((r) => r.recordingId))
+    if (!recs.length) return { ran: [], held: 0 }
+    // Fail closed: an unreadable filter runs nothing (retried next run).
+    const filter = await (deps.filter ?? loadPostFilter)()
+    const fh = filterHash(filter)
+    const memo = deps.memo ?? holdMemo
     const ran: Array<{ id: string; result: AutoApplyResult; applied: number }> = []
-    for (const id of ids) {
-      if (done.has(id)) continue
-      if (ran.filter((r) => r.result !== 'held').length >= limit || ran.length >= limit * 4) break
-      const r = await autoApplyForRecording(id, { ...deps, since: async () => since })
+    let held = 0
+    for (const { recordingId: id } of recs) {
+      if (ran.length >= limit) break
+      const rec = await prisma.callRecording.findUnique({ where: { id }, select: { id: true, updatedAt: true, crewId: true, reviewHoldAt: true } })
+      if (!rec) continue
+      const key = `${rec.updatedAt.getTime()}|${fh}`
+      if (rec.reviewHoldAt || autoHoldReason({ crewId: rec.crewId }, filter) === 'crew' || memo.get(id) === key) {
+        held++
+        continue
+      }
+      const r = await autoApplyForRecording(id, { ...deps, since: async () => since, filter: async () => filter })
+      if (r.result === 'held') {
+        held++
+        if (memo.size > 2000) memo.clear()
+        memo.set(id, key)
+        continue
+      }
+      memo.delete(id)
       ran.push({ id, result: r.result, applied: r.applied })
     }
-    return { ran }
+    return { ran, held }
   } catch (e) {
     console.error('[call-tasks/auto-apply] sweep failed:', e instanceof Error ? e.message : e)
     return { skipped: 'error' }
@@ -175,6 +225,8 @@ export interface SummaryView {
   needsLook: number
   /** Where the rest is, when the list is cut. */
   moreUrl: string
+  /** The capo review cards are on: the ones that need a look have their own card. */
+  cardsEnabled?: boolean
 }
 
 /** Discord allows 2000 characters per message; this leaves room. */
@@ -191,13 +243,17 @@ export function renderActionItemSummary(v: SummaryView, appUrl: string): string 
     const crew = it.crewLabel?.trim() ? clean(it.crewLabel, 60) : clean(it.crewId, 60)
     return `• **${clean(it.label, 120)}** · ${it.stage?.trim() ? clean(it.stage, 40) : 'no stage'} · ${it.lead?.trim() ? clean(it.lead, 60) : 'no lead'} · [${crew}](<${crewPageUrl(it.crewId, appUrl)}>)`
   }
-  const head = [`📋 Added from **${title}**${when}: ${n(v.added.length)}`]
-  const tail = v.needsLook > 0 ? [`Needs a look: ${n(v.needsLook)} (each has its own card)`] : []
-  const sections: Array<{ heading: string | null; items: SummaryItem[] }> = [
-    { heading: null, items: v.added },
-    { heading: v.updated.length ? `Updated: ${n(v.updated.length)}` : null, items: v.updated },
-    { heading: v.closed.length ? `Closed: ${n(v.closed.length)}` : null, items: v.closed },
-  ]
+  const look = `${n(v.needsLook)}${v.cardsEnabled ? ' (each has its own card)' : ''}`
+  // Lead with the first section that has something in it (never "Added: 0 tasks").
+  const filled = [
+    { name: 'Added', items: v.added },
+    { name: 'Updated', items: v.updated },
+    { name: 'Closed', items: v.closed },
+  ].filter((x) => x.items.length > 0)
+  const from = (name: string, count: string) => `📋 ${name} from **${title}**${when}: ${count}`
+  const head = [filled.length ? from(filled[0].name, n(filled[0].items.length)) : from('Needs a look', look)]
+  const tail = v.needsLook > 0 && filled.length ? [`Needs a look: ${look}`] : []
+  const sections = filled.map((x, i) => ({ heading: i === 0 ? null : `${x.name}: ${n(x.items.length)}`, items: x.items }))
   const total = v.added.length + v.updated.length + v.closed.length
   const more = (k: number) => `…and ${k} more: <${v.moreUrl}>`
   // Room for the tail and the "and N more" line, whatever is cut.
@@ -230,6 +286,9 @@ export interface SummaryDeps {
   channelIsPrivate?: (channelId: string) => Promise<boolean>
   post?: (channelId: string, msg: { content: string; allowed_mentions: { parse: never[] }; flags: number }) => Promise<{ id: string | null }>
   appUrl?: () => string
+  /** The pass's switch-on time: only the action items it considered are counted. */
+  since?: () => Promise<Date | null>
+  cardsEnabled?: () => Promise<boolean>
   env?: Record<string, string | undefined>
   now?: () => Date
 }
@@ -256,8 +315,9 @@ export async function postActionItemSummary(recordingId: string, deps: SummaryDe
     // Fail closed: an unreadable filter, an excluded crew or a held call posts nothing.
     const filter = await (deps.filter ?? loadPostFilter)()
     if (heldReason(rec, filter) !== null || (rec.crewId && isCrewExcluded({ id: rec.crewId, label: rec.crewLabel }, filter))) return 'hidden'
+    const since = await (deps.since ?? (() => switchedOnAt(AUTO_APPLY_KEY)))()
     const rows = await prisma.crewTaskProposal.findMany({
-      where: { recordingId, OR: [{ status: 'APPLIED', decidedBy: AUTO_APPLY_ACTOR }, { status: 'PENDING' }] },
+      where: { recordingId, OR: [{ status: 'APPLIED', decidedBy: AUTO_APPLY_ACTOR }, { status: 'PENDING', ...(since ? { createdAt: { gte: since } } : {}) }] },
       orderBy: { createdAt: 'asc' },
       take: 100,
       select: { id: true, crewId: true, kind: true, taskId: true, changes: true, edited: true, status: true },
@@ -278,6 +338,7 @@ export async function postActionItemSummary(recordingId: string, deps: SummaryDe
       updated: [],
       closed: [],
       needsLook: 0,
+      cardsEnabled: await (deps.cardsEnabled ?? (() => proposalCardsEnabled(env as NodeJS.ProcessEnv)))().catch(() => false),
       // The call's crew page; a call that is not a crew call: its admin page (where its action items are listed).
       moreUrl: rec.crewId && !NON_ROSTER_CREW_IDS.has(normalizeCrewId(rec.crewId)) ? crewPageUrl(rec.crewId, appUrl) : `${appUrl}/admin/calls/${encodeURIComponent(recordingId)}#call-updates`,
     }

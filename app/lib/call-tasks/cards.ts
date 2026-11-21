@@ -440,7 +440,8 @@ const botToken = () => process.env.DISCORD_BOT_TOKEN?.trim() ?? ''
 const asEdits = (v: unknown): ProposalEdits => (v && typeof v === 'object' && !Array.isArray(v) ? (v as ProposalEdits) : {})
 
 /**
- * The race guard: with auto-apply on, a call's action items wait for its pass (CallTaskAutoApply.appliedAt) before
+ * The race guard: with auto-apply on, a call's action items wait for its pass (CallTaskAutoApply.appliedAt, at or after
+ * the call's newest action item) before
  * any of them gets a card. Only those made after auto-apply was switched on wait (by env only: the young ones).
  * Fails closed (no card yet, retried next run).
  */
@@ -448,7 +449,11 @@ export async function awaitingAutoApply(cfg: Pick<TaskProposalConfig, 'autoApply
   if (!cfg.autoApply) return false
   try {
     const row = await prisma.callTaskAutoApply.findUnique({ where: { recordingId }, select: { appliedAt: true } })
-    if (row?.appliedAt) return false
+    if (row?.appliedAt) {
+      // The pass covered the call only if it ran at or after its newest action item (a re-run can add newer ones).
+      const newest = await prisma.crewTaskProposal.findFirst({ where: { recordingId }, orderBy: { createdAt: 'desc' }, select: { createdAt: true } })
+      if (!newest || row.appliedAt.getTime() >= newest.createdAt.getTime()) return false
+    }
     const since = await switchedOnAt(AUTO_APPLY_KEY)
     return since ? createdAt.getTime() >= since.getTime() : now.getTime() - createdAt.getTime() < AUTO_APPLY_GRACE_MS
   } catch {

@@ -306,7 +306,14 @@ describe('the auto-apply race guard', () => {
   it('on: an action item made since the switch waits until its call\'s pass ran', async () => {
     expect(await awaitingAutoApply(ON, 'rec1', NOW, NOW)).toBe(true)
     vi.mocked(prisma.callTaskAutoApply.findUnique).mockResolvedValue({ appliedAt: NOW } as never)
+    vi.mocked(prisma.crewTaskProposal.findFirst).mockResolvedValue({ createdAt: NOW } as never)
     expect(await awaitingAutoApply(ON, 'rec1', NOW, NOW)).toBe(false)
+  })
+
+  it('on: a pass older than the call\'s newest action item (a re-run added some) does not count as done', async () => {
+    vi.mocked(prisma.callTaskAutoApply.findUnique).mockResolvedValue({ appliedAt: new Date(NOW.getTime() - 60_000) } as never)
+    vi.mocked(prisma.crewTaskProposal.findFirst).mockResolvedValue({ createdAt: NOW } as never)
+    expect(await awaitingAutoApply(ON, 'rec1', NOW, NOW)).toBe(true)
   })
 
   it('on: older ones (made before the switch) do not wait; by env only, the young ones wait', async () => {

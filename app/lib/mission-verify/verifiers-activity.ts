@@ -178,6 +178,8 @@ export const crewTaskDone: Verifier<{ min: number }> = {
     let sawUnverified = false
     for (const t of tasks) {
       if (!t.closedBy || !t.ledWhenClosed || t.closedBy === ctx.discordId) continue
+      // Closed by the system (an action item applied straight from a call): no crew lead confirmed it, and there is no member to look up.
+      if (t.closedBy.startsWith('system:')) continue
       const memoKey = `crew_task_done:${t.closedBy}:${t.crewId}`
       let ok = ctx.memo.get(memoKey) as boolean | undefined
       if (ok === undefined) {
