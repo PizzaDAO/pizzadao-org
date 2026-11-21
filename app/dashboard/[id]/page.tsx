@@ -48,6 +48,7 @@ import { NextActionPanel } from "./components/NextActionPanel";
 import { LevelCard } from "./components/LevelCard";
 import { SessionsCard } from "./components/SessionsCard";
 import { BuddyCard } from "./components/BuddyCard";
+import { MemeFolderCard } from "./components/MemeFolderCard";
 import { StartHere } from "./components/StartHere";
 import { LaneCard } from "./components/LaneCard";
 import { BoxMafiaSuggestion } from "./components/BoxMafiaSuggestion";
@@ -317,6 +318,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                     <SessionsCard />
 
                     <BuddyCard />
+                    <MemeFolderCard />
 
                     <SliceClaimsCard />
                     <nav className="flex flex-wrap gap-x-5 text-sm" aria-label={t("handbook")}>
