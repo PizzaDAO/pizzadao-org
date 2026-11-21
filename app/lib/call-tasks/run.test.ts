@@ -7,6 +7,7 @@ vi.mock('@/app/lib/followups/draft', () => ({ loadMembers: vi.fn(async () => [])
 vi.mock('@/app/lib/calls/post-filters', async (orig) => ({ ...(await orig<typeof import('@/app/lib/calls/post-filters')>()), loadPostFilter: vi.fn() }))
 vi.mock('@/app/lib/calls/recap', () => ({ redactionsNewerThanSummary: vi.fn(() => false), resolveRecapChannel: vi.fn(async () => ({ channelId: '555', label: '#crew' })) }))
 vi.mock('./extract', () => ({ proposeTaskUpdates: vi.fn(async () => []) }))
+vi.mock('./cards', () => ({ queueTaskProposalCardSync: vi.fn() }))
 vi.mock('./config', async (orig) => ({ ...(await orig<typeof import('./config')>()), loadTaskProposalConfig: vi.fn() }))
 const crewsMock = vi.hoisted(() => vi.fn())
 vi.mock('@/app/lib/crew-mappings', async (orig) => ({ ...(await orig<typeof import('@/app/lib/crew-mappings')>()), getCrewMappings: () => crewsMock() }))
@@ -239,6 +240,15 @@ describe('sweep', () => {
     prop.updateMany.mockResolvedValue({ count: 3 })
     expect(await expireOldProposals(14, new Date('2026-11-20T00:00:00Z'))).toBe(3)
     expect(prop.updateMany.mock.calls[0][0]).toMatchObject({ where: { status: 'PENDING' }, data: { status: 'STALE' } })
+  })
+
+  it('expiry refreshes the Discord cards of the proposals it expires', async () => {
+    vi.mocked(prisma.crewTaskProposalCard.findMany).mockResolvedValue([{ proposalId: 'p1' }] as never)
+    prop.updateMany.mockResolvedValue({ count: 1 })
+    await expireOldProposals(14, new Date('2026-11-20T00:00:00Z'))
+    expect(vi.mocked(prisma.crewTaskProposalCard.findMany).mock.calls[0][0]).toMatchObject({ where: { messageId: { not: null }, proposal: { status: 'PENDING' } } })
+    const { queueTaskProposalCardSync } = await import('./cards')
+    expect(vi.mocked(queueTaskProposalCardSync)).toHaveBeenCalledWith(['p1'])
   })
 })
 

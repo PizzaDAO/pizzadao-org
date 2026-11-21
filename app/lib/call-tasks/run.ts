@@ -247,7 +247,20 @@ export async function listNeedingProposals(limit = 1, now = new Date()): Promise
 
 /** Undecided proposals older than `calls.taskProposalMaxDays` can no longer be applied. Returns how many expired. */
 export async function expireOldProposals(maxDays: number, now = new Date()): Promise<number> {
-  const res = await prisma.crewTaskProposal.updateMany({ where: { status: 'PENDING', createdAt: { lt: new Date(now.getTime() - maxDays * 86_400_000) } }, data: { status: 'STALE' } })
+  const where = { status: 'PENDING', createdAt: { lt: new Date(now.getTime() - maxDays * 86_400_000) } }
+  // The ones with a posted Discord card, so the card can say it is stale (looked up first: they stop being PENDING).
+  let carded: Array<{ proposalId: string }> = []
+  try {
+    carded = (await prisma.crewTaskProposalCard.findMany({ where: { messageId: { not: null }, proposal: where }, select: { proposalId: true }, take: 200 })) ?? []
+  } catch {
+    // best effort: the sweep re-renders live cards anyway
+  }
+  const res = await prisma.crewTaskProposal.updateMany({ where, data: { status: 'STALE' } })
+  if (carded.length) {
+    // Lazy: the cards module imports this one (through apply.ts).
+    const { queueTaskProposalCardSync } = await import('./cards')
+    queueTaskProposalCardSync(carded.map((c) => c.proposalId))
+  }
   return res.count
 }
 

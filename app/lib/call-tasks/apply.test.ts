@@ -223,6 +223,19 @@ describe('dismissProposal', () => {
     prop.findUnique.mockResolvedValue({ crewId: 'ops', status: 'APPLIED' } as never)
     expect(await dismissProposal('p1', 'lead1')).toBe('not-pending')
   })
+
+  it('an authorize override (the Discord cards) replaces the crew-lead check, for apply too', async () => {
+    vi.mocked(canManageCrew).mockResolvedValue(false)
+    prop.findUnique.mockResolvedValue({ crewId: 'ops', status: 'PENDING' } as never)
+    const allow = vi.fn(async () => true)
+    expect(await dismissProposal('p1', 'capo1', new Date(), { authorize: allow })).toBe('dismissed')
+    expect(allow).toHaveBeenCalledWith('capo1', 'ops')
+    expect(await dismissProposal('p1', 'capo1', new Date(), { authorize: async () => false })).toBe('forbidden')
+    prop.findUnique.mockResolvedValue(row() as never)
+    task.findFirst.mockResolvedValue(dbTask() as never)
+    expect(await applyProposal('p1', 'capo1', { confirmed: true, authorize: allow })).toEqual({ result: 'applied', taskId: 't1' })
+    expect(canManageCrew).not.toHaveBeenCalled()
+  })
 })
 
 describe('applyAll', () => {
@@ -236,7 +249,7 @@ describe('applyAll', () => {
     task.findFirst.mockImplementation((async ({ where }: { where: { id: string } }) =>
       where.id === 't2' ? dbTask({ id: 't2', updatedAt: new Date('2026-11-05T00:00:00Z') }) : dbTask({ id: where.id })) as never)
     const r = await applyAll('ops', 'lead1')
-    expect(r).toEqual({ applied: 1, skipped: [{ id: 'b', reason: 'conflict' }, { id: 'c', reason: 'needs-lead' }] })
+    expect(r).toEqual({ applied: 1, touched: ['a', 'b', 'c'], skipped: [{ id: 'b', reason: 'conflict' }, { id: 'c', reason: 'needs-lead' }] })
   })
 
   it('leaves DONE and RETIRE proposals for a single, confirmed apply', async () => {
@@ -244,7 +257,7 @@ describe('applyAll', () => {
     prop.findUnique.mockImplementation((async ({ where }: { where: { id: string } }) =>
       where.id === 'd' ? row({ id: 'd' }) : row({ id: 'r', kind: 'RETIRE', changes: { archived: { from: false, to: true } } })) as never)
     task.findFirst.mockResolvedValue(dbTask() as never)
-    expect(await applyAll('ops', 'lead1')).toEqual({ applied: 0, skipped: [{ id: 'd', reason: 'needs-confirm' }, { id: 'r', reason: 'needs-confirm' }] })
+    expect(await applyAll('ops', 'lead1')).toMatchObject({ applied: 0, skipped: [{ id: 'd', reason: 'needs-confirm' }, { id: 'r', reason: 'needs-confirm' }] })
     expect(task.updateMany).not.toHaveBeenCalled()
   })
 
