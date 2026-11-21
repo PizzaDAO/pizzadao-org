@@ -7,8 +7,10 @@ vi.mock('@/app/lib/crew-leads', () => ({ canManageCrew: vi.fn() }))
 vi.mock('@/app/lib/sheets-import/source', () => ({ usesDb: vi.fn() }))
 vi.mock('@/app/lib/calls/transcript-access', () => ({ canViewCallTranscript: vi.fn() }))
 vi.mock('@/app/lib/call-tasks/apply', () => ({ applyProposal: vi.fn(), dismissProposal: vi.fn(), applyAll: vi.fn() }))
+vi.mock('@/app/lib/call-tasks/cards', () => ({ queueTaskProposalCardSync: vi.fn() }))
 vi.mock('@/app/lib/admin-guard', async (orig) => ({ ...(await orig<typeof import('@/app/lib/admin-guard')>()), rejectUnsafeWrite: vi.fn(() => null) }))
 
+import { queueTaskProposalCardSync } from '@/app/lib/call-tasks/cards'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/app/lib/db'
 import { requireSession } from '@/app/lib/auth-guards'
@@ -91,8 +93,10 @@ describe('POST decisions', () => {
   it('apply-all fails closed', async () => {
     vi.mocked(applyAll).mockResolvedValue('forbidden')
     expect((await applyAllPost(req('http://x', {}), crewParams('ops'))).status).toBe(403)
-    vi.mocked(applyAll).mockResolvedValue({ applied: 2, skipped: [] })
+    vi.mocked(applyAll).mockResolvedValue({ applied: 2, touched: ['a', 'b'], skipped: [] })
     expect(await (await applyAllPost(req('http://x', { recordingId: 'r1' }), crewParams('ops'))).json()).toEqual({ ok: true, applied: 2, skipped: [] })
     expect(vi.mocked(applyAll).mock.calls[1]).toEqual(['ops', 'lead1', { recordingId: 'r1' }])
+    // Their Discord cards are refreshed (edit only).
+    expect(vi.mocked(queueTaskProposalCardSync)).toHaveBeenCalledWith(['a', 'b'])
   })
 })

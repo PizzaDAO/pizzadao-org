@@ -315,6 +315,8 @@ export async function dismissProposal(id: string, actor: string, now = new Date(
 
 export interface ApplyAllReport {
   applied: number
+  /** Every proposal it looked at (their Discord cards are refreshed). */
+  touched: string[]
   skipped: Array<{ id: string; reason: 'needs-lead' | 'needs-confirm' | 'conflict' | 'missing-task' | 'failed' | 'not-pending' | 'disabled' | 'expired' }>
 }
 
@@ -328,7 +330,7 @@ export async function applyAll(crewId: string, actor: string, opts: { recordingI
     take: 60,
     select: { id: true },
   })
-  const report: ApplyAllReport = { applied: 0, skipped: [] }
+  const report: ApplyAllReport = { applied: 0, touched: rows.map((r) => r.id), skipped: [] }
   for (const { id } of rows) {
     const r = await applyProposal(id, actor)
     if (r.result === 'applied') report.applied++

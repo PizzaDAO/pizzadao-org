@@ -8,6 +8,8 @@
  *     to the crew's review page instead,
  *   - a proposal of a crew excluded by the private post filter, or from a call held for the owner (capos
  *     cannot see it), or with an unreadable filter, shows no details and is never posted,
+ *   - a proposal that could not be applied (task proposals off, or the call's crew not in their allowlist)
+ *     gets no new card,
  *   - nothing here pings anyone (allowed_mentions parse: []).
  *
  * `syncTaskProposalCard(id)` is the one entry point: it renders the proposal's current state and posts the
@@ -37,7 +39,7 @@ import { CALL_CAPO_ROLE_IDS, DREAD_PIZZA_ROBERTS_ROLE_ID } from '@/app/ui/consta
 import { proposalApplyId, proposalDismissId } from '@/app/lib/discord-interactions/task-proposal-review'
 import { SITE_URL } from '@/app/lib/site-url'
 import { createHash } from 'node:crypto'
-import { loadTaskProposalConfig } from './config'
+import { crewInAllowlist, loadTaskProposalConfig } from './config'
 import { effectiveValues, needsLeadPick, type ProposalEdits } from './apply'
 import type { ProposalChanges } from './proposals'
 
@@ -76,6 +78,10 @@ export interface ProposalCardView {
   taskGone: boolean
   /** Excluded crew, a call held for the owner, unreadable filter, or a channel that is no longer the configured private one: no details. */
   hidden: boolean
+  /** Why it is hidden: a rule (filter, hold, channel) or a read that failed (retried next run, never remembered). */
+  hiddenBy: 'rule' | 'error' | null
+  /** Task proposals are on and the call's crew is in their allowlist (applyProposal refuses otherwise): only then a new card. */
+  applicable: boolean
   /** Discord buttons are live (calls.capoReviewEnabled): without it the card only links to the website. */
   interactive: boolean
   decidedBy: string | null
@@ -209,10 +215,13 @@ export type ProposalCardOutcome = 'disabled' | 'missing' | 'edited' | 'unchanged
 const isGone = (err: unknown) => err instanceof DiscordPostError && err.status === 404
 const errText = (err: unknown) => (err instanceof Error ? err.message : String(err)).replace(/https?:\/\/\S+/gi, '').replace(/\s+/g, ' ').trim().slice(0, 300)
 
-/** Does this proposal warrant a NEW card? Pending, not hidden, recent enough. (The sweep also applies the switch-on cutoff.) */
+/** Does this proposal warrant a NEW card? Pending, not hidden, applicable, recent enough. (The sweep also applies the switch-on cutoff.) */
 export function needsNewProposalCard(v: ProposalCardView, now: Date, maxAgeDays: number): boolean {
-  return v.status === 'PENDING' && !v.hidden && v.createdAt.getTime() >= now.getTime() - maxAgeDays * 86_400_000
+  return v.status === 'PENDING' && !v.hidden && v.applicable && v.createdAt.getTime() >= now.getTime() - maxAgeDays * 86_400_000
 }
+
+/** Remembered rows with no message (hidden by a rule, or not applicable) are re-checked by the sweep after this (a released hold, a crew switched back on). */
+export const SKIPPED_RECHECK_MS = 3_600_000
 
 async function openAllowed(deps: ProposalCardDeps, channelId: string): Promise<boolean> {
   const current = await deps.channelId()
@@ -229,7 +238,10 @@ export async function syncTaskProposalCard(id: string, deps: ProposalCardDeps = 
     const v = await deps.load(id)
     if (!v) return 'missing'
     // An existing card shows the proposal only while its channel is still the configured, private one.
-    if (v.card?.messageId && v.card.channelId && proposalCardState(v) !== 'hidden' && !(await openAllowed(deps, v.card.channelId))) v.hidden = true
+    if (v.card?.messageId && v.card.channelId && proposalCardState(v) !== 'hidden' && !(await openAllowed(deps, v.card.channelId))) {
+      v.hidden = true
+      v.hiddenBy = 'rule'
+    }
     const appUrl = deps.appUrl()
     const now = deps.now?.() ?? new Date()
     const state = proposalCardState(v)
@@ -256,8 +268,10 @@ export async function syncTaskProposalCard(id: string, deps: ProposalCardDeps = 
     }
 
     if (opts.editOnly || !needsNewProposalCard(v, now, await deps.maxAgeDays())) {
-      // A hidden proposal is remembered (resolved, no message) so the sweep's candidate list is not clogged by it.
-      if (!opts.editOnly && v.hidden && v.status === 'PENDING' && !v.card?.messageId) await deps.saveState(id, { resolvedAt: v.card?.resolvedAt ?? now })
+      // A proposal hidden by a rule, or not applicable, is remembered (resolved, no message) so the sweep's candidate list is
+      // not clogged by it; the sweep re-checks it after SKIPPED_RECHECK_MS. A failed read is not remembered: it is retried next run.
+      const skipped = v.hidden ? v.hiddenBy !== 'error' : !v.applicable
+      if (!opts.editOnly && skipped && v.status === 'PENDING' && !v.card?.messageId) await deps.saveState(id, { resolvedAt: now })
       return 'no_card_needed'
     }
     const channelId = await deps.channelId()
@@ -318,12 +332,14 @@ export async function syncTaskProposalCard(id: string, deps: ProposalCardDeps = 
  * `after()`), or right away outside a request scope. Never posts a new card and never throws. Cheap when
  * the feature is off: the toggle is the first thing checked.
  */
-export function queueTaskProposalCardSync(id: string): void {
-  const run = () =>
-    syncTaskProposalCard(id, defaultProposalCardDeps, { editOnly: true }).then(
-      () => undefined,
-      (err) => console.error('[call-tasks/cards] queued sync failed:', errText(err)),
-    )
+export function queueTaskProposalCardSync(ids: string | string[]): void {
+  const list = [...new Set(Array.isArray(ids) ? ids : [ids])]
+  if (!list.length) return
+  const run = async () => {
+    for (const id of list) {
+      await syncTaskProposalCard(id, defaultProposalCardDeps, { editOnly: true }).catch((err) => console.error('[call-tasks/cards] queued sync failed:', errText(err)))
+    }
+  }
   try {
     after(run)
   } catch {
@@ -414,10 +430,13 @@ const asEdits = (v: unknown): ProposalEdits => (v && typeof v === 'object' && !A
 /** Whether a call is held, per call version and filter: the transcript is read once, not once per proposal. */
 const holdMemo = new Map<string, { key: string; held: boolean }>()
 
-async function callHeld(rec: { id: string; updatedAt: Date }, filter: PostFilter): Promise<boolean> {
+async function callHeld(rec: { id: string; updatedAt: Date; crewId: string | null; reviewHoldAt: Date | null }, filter: PostFilter, lean: boolean): Promise<boolean> {
   const key = `${rec.updatedAt.getTime()}|${createHash('sha1').update(JSON.stringify(filter)).digest('hex')}`
   const hit = holdMemo.get(rec.id)
   if (hit?.key === key) return hit.held
+  // Lean (a button click, 3 s budget): no transcript read; the manual hold and the owner-only crews only.
+  // The card was only posted after a full check, and the sweep re-renders it after every change of the call.
+  if (lean) return !!rec.reviewHoldAt || autoHoldReason({ crewId: rec.crewId }, filter) === 'crew'
   const full = await prisma.callRecording.findUnique({
     where: { id: rec.id },
     select: { source: true, status: true, crewId: true, crewLabel: true, eventName: true, title: true, summary: true, actionItems: true, chapters: true, transcript: true, redactedSpeakerIds: true, redactedSegmentIds: true, reviewHoldAt: true },
@@ -428,7 +447,11 @@ async function callHeld(rec: { id: string; updatedAt: Date }, filter: PostFilter
   return held
 }
 
-export async function loadProposalCardView(id: string): Promise<ProposalCardView | null> {
+/**
+ * The card view. `lean` (the button handler, inside Discord's 3 s window) never reads the transcript for
+ * the hold check (a cached result, else the cheap rules only).
+ */
+export async function loadProposalCardView(id: string, opts: { lean?: boolean } = {}): Promise<ProposalCardView | null> {
   const row = await prisma.crewTaskProposal.findUnique({
     where: { id },
     // Never the quote or its time: the card does not show them.
@@ -439,13 +462,18 @@ export async function loadProposalCardView(id: string): Promise<ProposalCardView
     },
   })
   if (!row) return null
-  const [rec, task, filter, crews, interactive] = await Promise.all([
-    prisma.callRecording.findUnique({ where: { id: row.recordingId }, select: { id: true, updatedAt: true, crewId: true, crewLabel: true, title: true, eventName: true, startedAt: true } }).catch(() => null),
+  let recFailed = false
+  const [rec, task, filter, crews, interactive, cfg] = await Promise.all([
+    prisma.callRecording
+      .findUnique({ where: { id: row.recordingId }, select: { id: true, updatedAt: true, crewId: true, crewLabel: true, title: true, eventName: true, startedAt: true, reviewHoldAt: true } })
+      .catch(() => ((recFailed = true), null)),
     row.taskId ? prisma.crewTask.findUnique({ where: { id: row.taskId }, select: { label: true, updatedAt: true, archived: true } }) : Promise.resolve(null),
     // A filter that can't be read hides the proposal (fail closed).
     loadPostFilter().catch(() => null),
-    getCrewMappings().then((m) => m.crews, () => []),
+    // Never waits on a full registry reload: a stale list is fine for a label.
+    getCrewMappings(false, { staleWhileRevalidate: true }).then((m) => m.crews, () => []),
     toggleEnabled('calls.capoReviewEnabled').catch(() => false),
+    loadTaskProposalConfig(),
   ])
   const changes = (row.changes ?? {}) as ProposalChanges
   const edited = asEdits(row.edited)
@@ -465,13 +493,14 @@ export async function loadProposalCardView(id: string): Promise<ProposalCardView
   const callCrew = rec?.crewId ?? row.crewId
   const crewLabel = crews.find((c) => c.id === row.crewId)?.label ?? (row.crewId === rec?.crewId ? rec?.crewLabel ?? null : null)
   // Fail closed: an unreadable filter or call, an excluded crew, or a call (or crew) held for the owner.
-  const hidden =
-    !filter ||
-    !rec ||
-    isCrewExcluded({ id: callCrew, label: rec.crewLabel }, filter) ||
-    (row.crewId !== callCrew && isCrewExcluded({ id: row.crewId }, filter)) ||
-    autoHoldReason({ crewId: row.crewId }, filter) === 'crew' ||
-    (await callHeld(rec, filter).catch(() => true))
+  let hiddenBy: ProposalCardView['hiddenBy'] = null
+  if (!filter || recFailed) hiddenBy = 'error'
+  else if (!rec) hiddenBy = 'rule' // the call is gone
+  else if (isCrewExcluded({ id: callCrew, label: rec.crewLabel }, filter) || (row.crewId !== callCrew && isCrewExcluded({ id: row.crewId }, filter)) || autoHoldReason({ crewId: row.crewId }, filter) === 'crew') hiddenBy = 'rule'
+  else {
+    const held = await callHeld(rec, filter, !!opts.lean).catch(() => null)
+    hiddenBy = held === null ? 'error' : held ? 'rule' : null
+  }
   const taskGone = row.kind !== 'CREATE' && (!task || task.archived)
   return {
     id: row.id,
@@ -490,7 +519,10 @@ export async function loadProposalCardView(id: string): Promise<ProposalCardView
     needsInput: pick ? 'lead' : row.kind === 'CREATE' && !eff.label ? 'label' : null,
     taskChanged: row.kind !== 'CREATE' && !taskGone && !!task && (!row.baseUpdatedAt || task.updatedAt.getTime() !== row.baseUpdatedAt.getTime()),
     taskGone,
-    hidden,
+    hidden: hiddenBy !== null,
+    hiddenBy,
+    // The same switch and allowlist applyProposal checks (the allowlist is about the call's crew).
+    applicable: cfg.enabled && crewInAllowlist(cfg, callCrew),
     interactive,
     decidedBy: row.decidedBy,
     decidedAt: row.decidedAt,
@@ -558,18 +590,27 @@ export const defaultProposalSweepDeps: ProposalSweepDeps = {
     return changes.find((c) => c.newValue === true && c.oldValue !== true)?.changedAt ?? row.updatedAt
   },
   async listNew(since, limit) {
+    // A card Discord may already hold (posted, not stored) is never a candidate, so it cannot starve the rest.
+    const notUnstored = [{ error: null }, { NOT: { error: { startsWith: POSTED_UNSTORED } } }]
+    // First: no card yet, or a card row with no message that is not remembered (resolvedAt unset).
     const rows = await prisma.crewTaskProposal.findMany({
-      where: {
-        status: 'PENDING',
-        createdAt: { gte: since },
-        // No card yet, or a card row with no message that is not a remembered hidden one (resolvedAt set).
-        OR: [{ card: null }, { card: { messageId: null, resolvedAt: null } }],
-      },
+      where: { status: 'PENDING', createdAt: { gte: since }, OR: [{ card: null }, { card: { messageId: null, resolvedAt: null, OR: notUnstored } }] },
       orderBy: { createdAt: 'asc' },
       take: limit,
       select: { id: true },
     })
-    return rows.map((r) => r.id)
+    const ids = rows.map((r) => r.id)
+    // Then remembered ones (hidden by a rule, not applicable) last checked over an hour ago: a hold may be released.
+    if (ids.length < limit) {
+      const again = await prisma.crewTaskProposal.findMany({
+        where: { status: 'PENDING', createdAt: { gte: since }, card: { messageId: null, resolvedAt: { lt: new Date(Date.now() - SKIPPED_RECHECK_MS) }, OR: notUnstored } },
+        orderBy: { createdAt: 'asc' },
+        take: limit - ids.length,
+        select: { id: true },
+      })
+      ids.push(...again.map((r) => r.id))
+    }
+    return ids
   },
   async markers(ids) {
     // Everything that feeds the render apart from settings: the proposal's own stamp, its task's and its card's message.
@@ -590,8 +631,12 @@ export const defaultProposalSweepDeps: ProposalSweepDeps = {
   },
   interactive: () => toggleEnabled('calls.capoReviewEnabled').catch(() => false),
   async filterKey() {
-    const [filter, crews] = await Promise.all([loadPostFilter().catch(() => null), getCrewMappings().then((m) => m.crews.map((c) => `${c.id}=${c.label}`), () => [])])
-    return createHash('sha1').update(JSON.stringify([filter, crews])).digest('hex')
+    const [filter, crews, cfg] = await Promise.all([
+      loadPostFilter().catch(() => null),
+      getCrewMappings(false, { staleWhileRevalidate: true }).then((m) => m.crews.map((c) => `${c.id}=${c.label}`), () => []),
+      loadTaskProposalConfig(),
+    ])
+    return createHash('sha1').update(JSON.stringify([filter, crews, cfg.enabled, cfg.crews])).digest('hex')
   },
   async listExisting(resolvedSince, limit, cursor) {
     const live = (

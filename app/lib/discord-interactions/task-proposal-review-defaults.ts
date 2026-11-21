@@ -16,7 +16,8 @@ import type { ProposalReviewDeps, ProposalReviewRunDeps, ProposalReviewTarget } 
 const reviewerChecked: DecideAuthorizer = async () => true
 
 export async function loadProposalReviewTarget(id: string, appUrl: string): Promise<ProposalReviewTarget | null> {
-  const v = await loadProposalCardView(id)
+  // Lean: no transcript read and no full crew-registry reload inside Discord's 3 s window.
+  const v = await loadProposalCardView(id, { lean: true })
   if (!v) return null
   return { id: v.id, kind: v.kind, status: v.status, state: proposalCardState(v), url: proposalReviewUrl(v, appUrl) }
 }

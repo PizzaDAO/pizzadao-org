@@ -5,6 +5,10 @@ vi.mock('@/app/lib/db')
 vi.mock('next/server', () => ({ after: (fn: () => unknown) => void fn() }))
 vi.mock('@/app/lib/settings/toggles', async (orig) => ({ ...(await orig<typeof import('@/app/lib/settings/toggles')>()), toggleEnabled: vi.fn(async () => true) }))
 vi.mock('@/app/lib/calls/post-filters', async (orig) => ({ ...(await orig<typeof import('@/app/lib/calls/post-filters')>()), loadPostFilter: vi.fn() }))
+vi.mock('./config', async (orig) => ({
+  ...(await orig<typeof import('./config')>()),
+  loadTaskProposalConfig: vi.fn(async () => ({ enabled: true, crews: ['ops'], maxPerCall: 15, maxDays: 14, model: '', nudge: false })),
+}))
 vi.mock('@/app/lib/crew-mappings', async (orig) => ({
   ...(await orig<typeof import('@/app/lib/crew-mappings')>()),
   getCrewMappings: vi.fn(async () => ({ cached: true, crews: [{ id: 'ops', label: 'Ops', type: 'crew', turtles: [] }] })),
@@ -13,7 +17,9 @@ vi.mock('@/app/lib/crew-mappings', async (orig) => ({
 import { prisma } from '@/app/lib/db'
 import { EMPTY_POST_FILTER, loadPostFilter } from '@/app/lib/calls/post-filters'
 import { DiscordPostError } from '@/app/lib/discord-rest'
-import { renderHash } from '@/app/lib/calls/review-cards'
+import { POSTED_UNSTORED, renderHash } from '@/app/lib/calls/review-cards'
+import { getCrewMappings } from '@/app/lib/crew-mappings'
+import { loadTaskProposalConfig } from './config'
 import {
   loadProposalCardView,
   proposalCardState,
@@ -22,6 +28,8 @@ import {
   syncTaskProposalCard,
   type ProposalCardView,
   type ProposalSweepDeps,
+  defaultProposalSweepDeps,
+  SKIPPED_RECHECK_MS,
 } from './cards'
 
 const NOW = new Date('2026-11-18T12:00:00Z')
@@ -47,6 +55,8 @@ function view(o: Partial<ProposalCardView> = {}): ProposalCardView {
     taskChanged: false,
     taskGone: false,
     hidden: false,
+    hiddenBy: null,
+    applicable: true,
     interactive: true,
     decidedBy: null,
     decidedAt: null,
@@ -197,6 +207,47 @@ describe('loadProposalCardView', () => {
     expect(w?.lead?.to).toBe('Alex A')
   })
 
+  it('lean (the button handler): no transcript read, and the crew registry is never reloaded in full', async () => {
+    vi.mocked(prisma.crewTask.findUnique).mockResolvedValue({ label: 'x', updatedAt: NOW, archived: false } as never)
+    vi.mocked(prisma.crewTaskProposal.findUnique).mockResolvedValue(prop({ recordingId: 'recLean' }))
+    vi.mocked(prisma.callRecording.findUnique).mockResolvedValue({ id: 'recLean', updatedAt: NOW, crewId: 'ops', crewLabel: 'Ops', title: 'W', startedAt: NOW, reviewHoldAt: null } as never)
+    const v = await loadProposalCardView('p1', { lean: true })
+    expect(v?.hidden).toBe(false)
+    expect(prisma.callRecording.findUnique).toHaveBeenCalledTimes(1)
+    const sel = vi.mocked(prisma.callRecording.findUnique).mock.calls[0][0].select as Record<string, unknown>
+    expect(sel.transcript).toBeUndefined()
+    expect(vi.mocked(getCrewMappings).mock.calls.every((c) => c[0] === false && (c[1] as { staleWhileRevalidate?: boolean })?.staleWhileRevalidate === true)).toBe(true)
+    // A manual hold is still seen without the transcript.
+    vi.mocked(prisma.callRecording.findUnique).mockResolvedValue({ id: 'recLean2', updatedAt: NOW, crewId: 'ops', crewLabel: 'Ops', title: 'W', startedAt: NOW, reviewHoldAt: NOW } as never)
+    expect((await loadProposalCardView('p1', { lean: true }))?.hidden).toBe(true)
+    // The full load (the sweep) reads the transcript for the term check.
+    vi.mocked(prisma.callRecording.findUnique).mockClear()
+    vi.mocked(prisma.callRecording.findUnique).mockResolvedValue({ id: 'recFull', updatedAt: NOW, crewId: 'ops', crewLabel: 'Ops', title: 'W', startedAt: NOW, reviewHoldAt: null, transcript: [] } as never)
+    await loadProposalCardView('p1')
+    expect(prisma.callRecording.findUnique).toHaveBeenCalledTimes(2)
+  })
+
+  it('hidden by a failed read is marked as an error (retried), by a rule as a rule', async () => {
+    vi.mocked(prisma.crewTask.findUnique).mockResolvedValue({ label: 'x', updatedAt: NOW, archived: false } as never)
+    vi.mocked(prisma.crewTaskProposal.findUnique).mockResolvedValue(prop())
+    vi.mocked(loadPostFilter).mockRejectedValueOnce(new Error('db'))
+    expect((await loadProposalCardView('p1'))?.hiddenBy).toBe('error')
+    vi.mocked(prisma.callRecording.findUnique).mockRejectedValueOnce(new Error('db'))
+    expect((await loadProposalCardView('p1'))?.hiddenBy).toBe('error')
+    vi.mocked(loadPostFilter).mockResolvedValueOnce({ ...EMPTY_POST_FILTER, excludedCrewIds: ['ops'] })
+    expect((await loadProposalCardView('p1'))?.hiddenBy).toBe('rule')
+  })
+
+  it('applicable only while task proposals are on and the call crew is in the allowlist', async () => {
+    vi.mocked(prisma.crewTask.findUnique).mockResolvedValue({ label: 'x', updatedAt: NOW, archived: false } as never)
+    vi.mocked(prisma.crewTaskProposal.findUnique).mockResolvedValue(prop())
+    expect((await loadProposalCardView('p1'))?.applicable).toBe(true)
+    vi.mocked(loadTaskProposalConfig).mockResolvedValueOnce({ enabled: false, crews: ['ops'], maxPerCall: 15, maxDays: 14, model: '', nudge: false })
+    expect((await loadProposalCardView('p1'))?.applicable).toBe(false)
+    vi.mocked(loadTaskProposalConfig).mockResolvedValueOnce({ enabled: true, crews: ['tech'], maxPerCall: 15, maxDays: 14, model: '', nudge: false })
+    expect((await loadProposalCardView('p1'))?.applicable).toBe(false)
+  })
+
   it('the stale check: a task updated since the proposal is "changed"', async () => {
     vi.mocked(prisma.crewTask.findUnique).mockResolvedValue({ label: 'Order stickers', updatedAt: new Date(NOW.getTime() + 1000), archived: false } as never)
     vi.mocked(prisma.crewTaskProposal.findUnique).mockResolvedValueOnce(prop({ candidates: null, changes: { stage: { from: 'a', to: 'b' } } }))
@@ -258,6 +309,30 @@ describe('syncTaskProposalCard', () => {
     expect(state.v.card?.renderedHash).toBe(renderHash(state.edits[0]))
   })
 
+  it('not applicable (proposals off, crew not in the allowlist): no card, remembered for a later re-check', async () => {
+    const { state, deps } = makeDeps(view({ applicable: false }))
+    expect(await syncTaskProposalCard('p', deps)).toBe('no_card_needed')
+    expect(state.posts).toHaveLength(0)
+    expect(state.saved).toEqual([{ resolvedAt: NOW }])
+  })
+
+  it('hidden by a failed read: skipped this run, never remembered; hidden by a rule: remembered with a fresh stamp', async () => {
+    const err = makeDeps(view({ hidden: true, hiddenBy: 'error' }))
+    expect(await syncTaskProposalCard('p', err.deps)).toBe('no_card_needed')
+    expect(err.state.saved).toHaveLength(0)
+    const old = new Date(NOW.getTime() - 2 * SKIPPED_RECHECK_MS)
+    const rule = makeDeps(view({ hidden: true, hiddenBy: 'rule', card: { channelId: null, messageId: null, renderedHash: null, resolvedAt: old, claimedAt: null } }))
+    expect(await syncTaskProposalCard('p', rule.deps)).toBe('no_card_needed')
+    // Re-stamped, so the hourly re-check does not pick it every run.
+    expect(rule.state.saved).toEqual([{ resolvedAt: NOW }])
+  })
+
+  it('a released hold: the re-check posts the card', async () => {
+    const { state, deps } = makeDeps(view({ card: { channelId: null, messageId: null, renderedHash: null, resolvedAt: new Date(NOW.getTime() - 2 * SKIPPED_RECHECK_MS), claimedAt: null } }))
+    expect(await syncTaskProposalCard('p', deps)).toBe('posted')
+    expect(state.posts).toHaveLength(1)
+  })
+
   it('editOnly never posts a new card', async () => {
     const { state, deps } = makeDeps(view())
     expect(await syncTaskProposalCard('p', deps, { editOnly: true })).toBe('no_card_needed')
@@ -284,6 +359,31 @@ describe('syncTaskProposalCard', () => {
   it('never throws', async () => {
     const { deps } = makeDeps(view(), { post: async () => { throw new Error('boom') } })
     expect(await syncTaskProposalCard('p', deps)).toBe('failed')
+  })
+})
+
+describe('defaultProposalSweepDeps.listNew', () => {
+  it('excludes posted-unstored rows, then fills with remembered rows last checked over an hour ago', async () => {
+    const find = vi.mocked(prisma.crewTaskProposal.findMany)
+    find.mockReset()
+    find.mockResolvedValueOnce([{ id: 'a' }] as never).mockResolvedValueOnce([{ id: 'b' }] as never)
+    const since = new Date('2026-11-18T00:00:00Z')
+    expect(await defaultProposalSweepDeps.listNew(since, 5)).toEqual(['a', 'b'])
+    const first = find.mock.calls[0][0] as { where: { OR: Array<{ card: unknown }> }; take: number }
+    const notUnstored = [{ error: null }, { NOT: { error: { startsWith: POSTED_UNSTORED } } }]
+    expect(first.where.OR).toEqual([{ card: null }, { card: { messageId: null, resolvedAt: null, OR: notUnstored } }])
+    const second = find.mock.calls[1][0] as { where: { card: { messageId: null; resolvedAt: { lt: Date }; OR: unknown } }; take: number }
+    expect(second.where.card.OR).toEqual(notUnstored)
+    expect(second.where.card.resolvedAt.lt.getTime()).toBeLessThanOrEqual(Date.now() - SKIPPED_RECHECK_MS)
+    expect(second.take).toBe(4)
+  })
+
+  it('no re-check query when the fresh candidates fill the limit', async () => {
+    const find = vi.mocked(prisma.crewTaskProposal.findMany)
+    find.mockReset()
+    find.mockResolvedValueOnce([{ id: 'a' }, { id: 'b' }] as never)
+    expect(await defaultProposalSweepDeps.listNew(new Date(), 2)).toEqual(['a', 'b'])
+    expect(find).toHaveBeenCalledTimes(1)
   })
 })
 

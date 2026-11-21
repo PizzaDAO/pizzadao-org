@@ -13,8 +13,8 @@ vi.mock('@/app/lib/calls/review-role', () => ({ callReviewRole: vi.fn() }))
 vi.mock('../call-review-defaults', () => ({ editOriginalReply: vi.fn() }))
 
 import { applyProposal, dismissProposal } from '@/app/lib/call-tasks/apply'
-import { syncTaskProposalCard } from '@/app/lib/call-tasks/cards'
-import { taskProposalRunDeps } from '../task-proposal-review-defaults'
+import { loadProposalCardView, syncTaskProposalCard } from '@/app/lib/call-tasks/cards'
+import { loadProposalReviewTarget, taskProposalRunDeps } from '../task-proposal-review-defaults'
 
 describe('task proposal buttons: the real deps go through the website code', () => {
   it('apply and dismiss call applyProposal / dismissProposal with the reviewer check in place of the crew-lead check', async () => {
@@ -28,6 +28,12 @@ describe('task proposal buttons: the real deps go through the website code', () 
     await deps.dismiss('p1', 'u1')
     expect(vi.mocked(dismissProposal).mock.calls[0][0]).toBe('p1')
     expect(typeof (vi.mocked(dismissProposal).mock.calls[0][3] as { authorize?: unknown }).authorize).toBe('function')
+  })
+
+  it('the handler target is the lean load (inside the 3 s window)', async () => {
+    vi.mocked(loadProposalCardView).mockResolvedValue(null)
+    expect(await loadProposalReviewTarget('p1', 'https://app.example.test')).toBeNull()
+    expect(vi.mocked(loadProposalCardView)).toHaveBeenCalledWith('p1', { lean: true })
   })
 
   it('the card refresh only edits (never posts)', async () => {

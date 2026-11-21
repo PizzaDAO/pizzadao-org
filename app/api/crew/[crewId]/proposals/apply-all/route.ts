@@ -2,6 +2,7 @@ import { requireSession } from '@/app/lib/auth-guards'
 import { json, rejectUnsafeWrite } from '@/app/lib/admin-guard'
 import { normalizeCrewId } from '@/app/lib/crew-id'
 import { applyAll } from '@/app/lib/call-tasks/apply'
+import { queueTaskProposalCardSync } from '@/app/lib/call-tasks/cards'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -24,5 +25,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ cre
   const r = await applyAll(crewId, auth.session.discordId, { recordingId })
   if (r === 'forbidden') return json({ error: 'Only crew leads can decide on this' }, 403)
   if (r === 'not-db-crew') return json({ error: "This is still edited in the crew's Google Sheet" }, 409)
-  return json({ ok: true, ...r })
+  const { touched, ...report } = r
+  // Their Discord cards (if any) follow; edits only, after the response, off unless switched on.
+  queueTaskProposalCardSync(touched)
+  return json({ ok: true, ...report })
 }
