@@ -12,12 +12,12 @@ import { NextResponse } from 'next/server'
 import { requireSession } from '@/app/lib/auth-guards'
 import { getSetting } from '@/app/lib/settings'
 import { toggleEnabled } from '@/app/lib/settings/toggles'
-import { holdsAny, isDreadPizzaRoberts, resolveRoles } from '@/app/lib/mission-review-access'
+import { holdsAny, resolveRoles } from '@/app/lib/mission-review-access'
 import { getCurrentLevel } from '@/app/lib/missions'
 import { completedLevel } from '@/app/lib/level-display'
 import { isDisavowSubject } from '@/app/lib/disavow/access'
 import type { Session } from '@/app/lib/session'
-import { CALL_CAPO_ROLE_IDS } from '@/app/ui/constants'
+import { CALL_CAPO_ROLE_IDS, DREAD_PIZZA_ROBERTS_ROLE_ID } from '@/app/ui/constants'
 
 export function memesEnabled(): Promise<boolean> {
   return toggleEnabled('memes.enabled').catch(() => false)
@@ -27,11 +27,10 @@ export function notAvailable(): NextResponse {
   return NextResponse.json({ error: 'Not available' }, { status: 404 })
 }
 
-/** Capo or Dread Pizza Roberts. Fails closed. */
+/** Capo or Dread Pizza Roberts (one role lookup). Fails closed. */
 export async function isMemeReviewer(discordId: string): Promise<boolean> {
   try {
-    if (await isDreadPizzaRoberts(discordId)) return true
-    return await holdsAny(await resolveRoles(discordId), CALL_CAPO_ROLE_IDS)
+    return await holdsAny(await resolveRoles(discordId), [DREAD_PIZZA_ROBERTS_ROLE_ID, ...CALL_CAPO_ROLE_IDS])
   } catch {
     return false
   }

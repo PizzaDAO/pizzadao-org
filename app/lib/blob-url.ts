@@ -18,7 +18,7 @@ export function getOwnBlobHost(token = process.env.BLOB_READ_WRITE_TOKEN): strin
  * True if `url` is an https URL on our Blob store (or, if the store can't be
  * determined from env, any Vercel Blob public host) under `pathPrefix`.
  */
-export function isOwnBlobUrl(url: string, pathPrefix = "/"): boolean {
+export function isOwnBlobUrl(url: string, pathPrefix = "/", token?: string): boolean {
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -28,7 +28,7 @@ export function isOwnBlobUrl(url: string, pathPrefix = "/"): boolean {
   if (parsed.protocol !== "https:") return false;
   if (parsed.username || parsed.password) return false;
   const host = parsed.hostname.toLowerCase();
-  const own = getOwnBlobHost();
+  const own = getOwnBlobHost(token ?? process.env.BLOB_READ_WRITE_TOKEN);
   const hostOk = own ? host === own : host.endsWith(BLOB_PUBLIC_SUFFIX);
   if (!hostOk) return false;
   return parsed.pathname.startsWith(pathPrefix);

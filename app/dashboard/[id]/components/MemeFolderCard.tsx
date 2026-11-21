@@ -1,6 +1,6 @@
 // app/dashboard/[id]/components/MemeFolderCard.tsx
 //
-// Meme folder card (bellpepper-80127). Reads /api/memes?limit=4&meta=1, which answers { enabled: false }
+// Meme folder card (bellpepper-80127). Reads /api/memes?limit=4&meta=card, which answers { enabled: false }
 // while the setting memes.enabled is off, so with the setting off this renders nothing.
 
 "use client";
@@ -27,7 +27,7 @@ export function MemeFolderCard({ initial }: { initial?: CardState | null }) {
     useEffect(() => {
         if (initial) return;
         let live = true;
-        fetch("/api/memes?limit=4&meta=1", { cache: "no-store" })
+        fetch("/api/memes?limit=4&meta=card", { cache: "no-store" })
             .then((r) => (r.ok ? (r.json() as Promise<CardState>) : null))
             .then((s) => live && setState(s))
             .catch(() => {

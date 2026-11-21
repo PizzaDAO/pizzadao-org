@@ -1269,7 +1269,8 @@
     "errors": {
       "tooMany": "Vous avez atteint la limite de propositions. Réessayez plus tard.",
       "generic": "Une erreur est survenue. Réessayez.",
-      "uploadFailed": "Échec de l'envoi de la photo. Essayez une autre image.",
+      "fileTooLarge": "Ce fichier est trop volumineux. {mb} Mo maximum.",
+    "uploadFailed": "Échec de l'envoi de la photo. Essayez une autre image.",
       "network": "Erreur réseau, réessayez.",
       "pitch": "Dites-nous pourquoi la mettre en avant.",
       "nomineeName": "Saisissez le nom de la personne proposée.",

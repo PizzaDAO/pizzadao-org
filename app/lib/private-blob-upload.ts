@@ -34,6 +34,7 @@ export class PrivateUploadError extends Error {
 export async function uploadPrivate(
   bytes: Uint8Array,
   keyPrefix: string,
+  token?: string,
 ): Promise<{ pathname: string; sha256: string; sizeBytes: number; mime: string }> {
   if (bytes.byteLength === 0) throw new PrivateUploadError('empty', 'File is empty')
   if (bytes.byteLength > PRIVATE_UPLOAD_MAX_BYTES) throw new PrivateUploadError('too_large', 'File too large. Max 8 MB.')
@@ -41,7 +42,7 @@ export async function uploadPrivate(
   if (!kind) throw new PrivateUploadError('bad_type', 'Unsupported file type. Use PNG, JPEG, WebP, GIF or PDF.')
   const key = `${keyPrefix}/${Date.now()}-${randomBytes(6).toString('hex')}.${kind.ext}`
   try {
-    const blob = await put(key, Buffer.from(bytes), { access: 'private', addRandomSuffix: false, contentType: kind.mime })
+    const blob = await put(key, Buffer.from(bytes), { access: 'private', addRandomSuffix: false, contentType: kind.mime, ...(token ? { token } : {}) })
     return { pathname: blob.pathname, sha256: sha256Hex(bytes), sizeBytes: bytes.byteLength, mime: kind.mime }
   } catch {
     throw new PrivateUploadError('unavailable', 'Private file storage is unavailable')
@@ -49,9 +50,9 @@ export async function uploadPrivate(
 }
 
 /** Stream a private blob back. Null when missing or the store cannot serve it. */
-export async function readPrivate(pathname: string): Promise<{ stream: ReadableStream<Uint8Array>; contentType: string; size: number } | null> {
+export async function readPrivate(pathname: string, token?: string): Promise<{ stream: ReadableStream<Uint8Array>; contentType: string; size: number } | null> {
   try {
-    const r = await get(pathname, { access: 'private' })
+    const r = await get(pathname, { access: 'private', ...(token ? { token } : {}) })
     if (!r || r.statusCode !== 200) return null
     return { stream: r.stream, contentType: r.blob.contentType, size: r.blob.size }
   } catch {

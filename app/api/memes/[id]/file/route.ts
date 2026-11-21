@@ -9,6 +9,7 @@ import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { isMemeReviewer, requireMemeMember } from '@/app/lib/memes/access'
 import { privateFileFor } from '@/app/lib/memes/service'
 import { readPrivate } from '@/app/lib/private-blob-upload'
+import { memesPrivateToken } from '@/app/lib/memes/blob'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -22,7 +23,7 @@ const GET_HANDLER = async (_request: NextRequest, ctx: { params: Promise<{ id: s
   if (!meme || !meme.privatePath || (meme.status !== 'PENDING' && meme.status !== 'HIDDEN')) return notFound()
   if (meme.uploaderId !== auth.session.discordId && !(await isMemeReviewer(auth.session.discordId))) return notFound()
 
-  const file = await readPrivate(meme.privatePath)
+  const file = await readPrivate(meme.privatePath, memesPrivateToken())
   if (!file || !/^image\/(png|jpeg|gif|webp)$/.test(file.contentType)) return notFound()
   return new NextResponse(file.stream, {
     headers: {

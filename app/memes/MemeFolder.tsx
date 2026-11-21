@@ -32,6 +32,7 @@ interface Meta {
   canUpload: boolean;
   uploadBlockedReason: "level" | "disavowed" | null;
   minLevel: number | null;
+  maxUploadBytes?: number;
   reviewer: boolean;
   pending: number | null;
 }
@@ -100,7 +101,7 @@ export default function MemeFolder() {
 
   async function remove(item: MemeItemDto) {
     if (!window.confirm(t("deleteConfirm"))) return;
-    const res = await fetch(`/api/memes/${item.id}`, { method: "DELETE" });
+    const res = await fetch(`/api/memes/${item.id}`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: "{}" });
     if (res.ok) setItems((prev) => prev.filter((m) => m.id !== item.id));
     else setFlash(t("actionFailed"));
   }
@@ -210,6 +211,7 @@ export default function MemeFolder() {
 
       {uploadOpen && (
         <UploadDialog
+          maxBytes={meta?.maxUploadBytes ?? 4 * 1024 * 1024}
           onClose={() => setUploadOpen(false)}
           onDone={(status) => {
             setUploadOpen(false);
@@ -223,7 +225,7 @@ export default function MemeFolder() {
   );
 }
 
-function UploadDialog({ onClose, onDone }: { onClose: () => void; onDone: (status: string) => void }) {
+function UploadDialog({ maxBytes, onClose, onDone }: { maxBytes: number; onClose: () => void; onDone: (status: string) => void }) {
   const t = useTranslations("memes");
   const [category, setCategory] = useState<"benny" | "pizzadao">("pizzadao");
   const [caption, setCaption] = useState("");
@@ -236,6 +238,10 @@ function UploadDialog({ onClose, onDone }: { onClose: () => void; onDone: (statu
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!file || !rights) return;
+    if (file.size > maxBytes) {
+      setError(t("fileTooLarge", { mb: Math.max(1, Math.floor(maxBytes / (1024 * 1024))) }));
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -262,7 +268,11 @@ function UploadDialog({ onClose, onDone }: { onClose: () => void; onDone: (statu
         <h2 className="font-display m-0 mb-4 text-xl font-black">{t("uploadTitle")}</h2>
         <label className="mb-3 block text-sm font-semibold">
           {t("file")}
-          <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" required className={`${inputClass} mt-1`} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" required className={`${inputClass} mt-1`} onChange={(e) => {
+              const f = e.target.files?.[0] ?? null;
+              setFile(f);
+              setError(f && f.size > maxBytes ? t("fileTooLarge", { mb: Math.max(1, Math.floor(maxBytes / (1024 * 1024))) }) : "");
+            }} />
         </label>
         <fieldset className="mb-3 border-0 p-0">
           <legend className="text-sm font-semibold">{t("category")}</legend>

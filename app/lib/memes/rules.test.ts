@@ -99,30 +99,72 @@ describe('auto-hide threshold', () => {
 
 describe('stripJpegMetadata', () => {
   const seg = (marker: number, payload: number[]) => [0xff, marker, (payload.length + 2) >> 8, (payload.length + 2) & 255, ...payload]
-
-  it('drops EXIF (APP1) and comments but keeps JFIF, ICC and the picture data', () => {
-    const jpeg = new Uint8Array([
+  // Big-endian EXIF with one Orientation entry and a fake GPS string after it.
+  const exif = (orientation: number) => ascii('Exif\0\0').concat([0x4d, 0x4d, 0, 0x2a, 0, 0, 0, 8, 0, 1, 0x01, 0x12, 0, 3, 0, 0, 0, 1, 0, orientation, 0, 0, 0, 0, 0, 0], ascii('GPS-DATA'))
+  const jpegWith = (exifPayload: number[]) =>
+    new Uint8Array([
       0xff, 0xd8,
       ...seg(0xe0, ascii('JFIF\0')),
-      ...seg(0xe1, ascii('Exif\0GPS-DATA')),
-      ...seg(0xe2, ascii('ICC_PROFILE')),
+      ...seg(0xe1, exifPayload),
+      ...seg(0xe2, ascii('ICC_PROFILE\0data')),
+      ...seg(0xed, ascii('Photoshop')),
       ...seg(0xfe, ascii('a comment')),
       0xff, 0xda, 0, 4, 1, 2, 9, 9, 9, 0xff, 0xd9,
     ])
-    const out = stripJpegMetadata(jpeg)
+
+  it('drops EXIF, comments and Photoshop data but keeps JFIF, ICC and the picture data', () => {
+    const out = stripJpegMetadata(jpegWith(exif(1)))!
     const text = Buffer.from(out).toString('latin1')
     expect(text).not.toContain('GPS-DATA')
     expect(text).not.toContain('a comment')
+    expect(text).not.toContain('Photoshop')
+    expect(text).not.toContain('Exif')
     expect(text).toContain('JFIF')
     expect(text).toContain('ICC_PROFILE')
     expect(Array.from(out.slice(-3))).toEqual([9, 0xff, 0xd9])
-    expect(out.length).toBeLessThan(jpeg.length)
   })
 
-  it('leaves non-JPEG and malformed input unchanged', () => {
-    const p = png(10, 10)
-    expect(stripJpegMetadata(p)).toBe(p)
-    const bad = new Uint8Array([0xff, 0xd8, 0x12, 0x34, 0x56])
-    expect(stripJpegMetadata(bad)).toBe(bad)
+  it('keeps only the Orientation tag so rotated photos stay upright', () => {
+    const out = stripJpegMetadata(jpegWith(exif(6)))!
+    const text = Buffer.from(out).toString('latin1')
+    expect(text).toContain('Exif')
+    expect(text).not.toContain('GPS-DATA')
+    const at = text.indexOf('Exif')
+    // TIFF header (8) then one entry: count 1, tag 0x0112, type 3, count 1, value 6
+    expect(Array.from(out.slice(at + 6 + 8, at + 6 + 8 + 12))).toEqual([0, 1, 0x01, 0x12, 0, 3, 0, 0, 0, 1, 0, 6])
+  })
+
+  it('refuses (null) anything that does not parse, rather than returning the original bytes', () => {
+    expect(stripJpegMetadata(new Uint8Array([0xff, 0xd8, 0x12, 0x34, 0x56]))).toBeNull()
+    expect(stripJpegMetadata(png(10, 10))).toBeNull()
+    const truncated = jpegWith(exif(1)).slice(0, 20)
+    expect(stripJpegMetadata(truncated)).toBeNull()
+  })
+})
+
+describe('GIF limits', () => {
+  const le16 = (n: number) => [n & 255, (n >>> 8) & 255]
+  const frame = (left: number, top: number, w: number, h: number) => [0x2c, ...le16(left), ...le16(top), ...le16(w), ...le16(h), 0, 2, 1, 0x44, 0]
+  const gif = (frames: number[][], screen = 64) => new Uint8Array([...ascii('GIF89a'), ...le16(screen), ...le16(screen), 0, 0, 0, ...frames.flat(), 0x3b])
+
+  it('accepts a normal animated GIF', () => {
+    expect(validateUpload(gif([frame(0, 0, 64, 64), frame(0, 0, 64, 64)]), MB)).toMatchObject({ ok: true, mime: 'image/gif' })
+  })
+
+  it('caps the frame count', () => {
+    const many = Array.from({ length: 5 }, () => frame(0, 0, 8, 8))
+    expect(validateUpload(gif(many), MB, 5).ok).toBe(true)
+    expect(validateUpload(gif(many), MB, 4)).toMatchObject({ ok: false, code: 'too_many_frames' })
+  })
+
+  it('checks each frame rectangle, not just the logical screen', () => {
+    expect(validateUpload(gif([frame(0, 0, 5000, 10)]), MB)).toMatchObject({ ok: false, code: 'too_many_pixels' })
+    expect(validateUpload(gif([frame(4000, 0, 200, 10)]), MB)).toMatchObject({ ok: false, code: 'too_many_pixels' })
+  })
+
+  it('refuses a GIF with no end or no frames', () => {
+    const noEnd = gif([frame(0, 0, 8, 8)]).slice(0, -1)
+    expect(validateUpload(noEnd, MB)).toMatchObject({ ok: false, code: 'bad_dimensions' })
+    expect(validateUpload(gif([]), MB)).toMatchObject({ ok: false, code: 'bad_dimensions' })
   })
 })

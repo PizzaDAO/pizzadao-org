@@ -67,3 +67,53 @@ export function imageDimensions(bytes: Uint8Array, mime: string): ImageSize | nu
   if (!size || size.width < 1 || size.height < 1) return null
   return size
 }
+
+export type GifInfo = { frames: number; maxRight: number; maxBottom: number; maxFrameWidth: number; maxFrameHeight: number }
+
+/**
+ * Walk a GIF's blocks (no decoding): frame count and how far any frame's rectangle reaches. Null when
+ * the structure is malformed or truncated (no trailer), so callers refuse it. Stops early once
+ * `frameLimit` is exceeded, so a hostile file cannot make this loop long.
+ */
+export function gifInfo(b: Uint8Array, frameLimit = Infinity): GifInfo | null {
+  if (b.length < 14) return null
+  let i = 13
+  if (b[10] & 0x80) i += 3 * (1 << ((b[10] & 7) + 1))
+  const info: GifInfo = { frames: 0, maxRight: 0, maxBottom: 0, maxFrameWidth: 0, maxFrameHeight: 0 }
+  const skipSubBlocks = (): boolean => {
+    while (i < b.length) {
+      const n = b[i++]
+      if (n === 0) return true
+      i += n
+    }
+    return false
+  }
+  while (i < b.length) {
+    const t = b[i++]
+    if (t === 0x3b) return info.frames > 0 ? info : null
+    if (t === 0x21) {
+      i++ // label
+      if (!skipSubBlocks()) return null
+    } else if (t === 0x2c) {
+      if (i + 9 > b.length) return null
+      const left = u16le(b, i)
+      const top = u16le(b, i + 2)
+      const w = u16le(b, i + 4)
+      const h = u16le(b, i + 6)
+      const flags = b[i + 8]
+      i += 9
+      if (flags & 0x80) i += 3 * (1 << ((flags & 7) + 1))
+      i++ // LZW minimum code size
+      if (!skipSubBlocks()) return null
+      info.frames++
+      info.maxRight = Math.max(info.maxRight, left + w)
+      info.maxBottom = Math.max(info.maxBottom, top + h)
+      info.maxFrameWidth = Math.max(info.maxFrameWidth, w)
+      info.maxFrameHeight = Math.max(info.maxFrameHeight, h)
+      if (info.frames > frameLimit) return info
+    } else {
+      return null
+    }
+  }
+  return null
+}

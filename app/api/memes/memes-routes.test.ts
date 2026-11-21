@@ -16,7 +16,6 @@ vi.mock('@/app/lib/missions', () => ({ getCurrentLevel: vi.fn(async () => 2) }))
 vi.mock('@/app/lib/level-display', () => ({ completedLevel: (n: number) => n - 1 }))
 vi.mock('@/app/lib/disavow/access', () => ({ isDisavowSubject: vi.fn(async () => false) }))
 vi.mock('@/app/lib/mission-review-access', () => ({
-  isDreadPizzaRoberts: vi.fn(async () => false),
   resolveRoles: vi.fn(async () => []),
   holdsAny: vi.fn(async () => false),
 }))
@@ -26,6 +25,7 @@ vi.mock('@/app/lib/memes/service', () => ({
   MEME_TABS: ['all', 'benny', 'pizzadao', 'mine'],
   listMemes: vi.fn(async () => ({ items: [], nextCursor: null })),
   pendingCount: vi.fn(async () => 3),
+  uploadLimitBytes: vi.fn(async () => 4 * 1024 * 1024),
   createMeme: vi.fn(async () => ({ ok: true, value: { id: 'm1', status: 'PENDING' } })),
   reviewMeme: vi.fn(async () => ({ ok: true, value: { status: 'APPROVED' } })),
   reviewQueue: vi.fn(async () => ({ items: [] })),
@@ -39,15 +39,17 @@ import { toggleEnabled } from '@/app/lib/settings/toggles'
 import { getSetting } from '@/app/lib/settings'
 import { getCurrentLevel } from '@/app/lib/missions'
 import { isDisavowSubject } from '@/app/lib/disavow/access'
-import { holdsAny, isDreadPizzaRoberts } from '@/app/lib/mission-review-access'
+import { holdsAny, resolveRoles } from '@/app/lib/mission-review-access'
+import { DREAD_PIZZA_ROBERTS_ROLE_ID } from '@/app/ui/constants'
 import { enforceRateLimit } from '@/app/lib/rate-limit'
 import { readPrivate } from '@/app/lib/private-blob-upload'
-import { createMeme, privateFileFor, reviewMeme } from '@/app/lib/memes/service'
+import { createMeme, deleteOwnMeme, privateFileFor, reviewMeme } from '@/app/lib/memes/service'
 import { GET as list } from './route'
 import { POST as upload } from './upload/route'
 import { GET as reviewGet, POST as reviewPost } from './review/route'
 import { GET as fileGet } from './[id]/file/route'
 import { POST as report } from './[id]/report/route'
+import { DELETE as del } from './[id]/route'
 
 const ctx = (id = 'm1') => ({ params: Promise.resolve({ id }) })
 const PNG_BYTES = new Uint8Array([0x89, 0x50, 0x4e, 0x47])
@@ -70,7 +72,6 @@ beforeEach(() => {
   vi.mocked(getSetting).mockResolvedValue(1 as never)
   vi.mocked(getCurrentLevel).mockResolvedValue(2 as never)
   vi.mocked(isDisavowSubject).mockResolvedValue(false)
-  vi.mocked(isDreadPizzaRoberts).mockResolvedValue(false)
   vi.mocked(holdsAny).mockResolvedValue(false)
   vi.mocked(enforceRateLimit).mockResolvedValue(null)
 })
@@ -130,8 +131,16 @@ describe('upload gates', () => {
     expect(createMeme).not.toHaveBeenCalled()
   })
 
-  it('refuses an oversized body by its declared length', async () => {
-    expect((await upload(uploadReq({}, { 'content-length': String(50 * 1024 * 1024) }))).status).toBe(413)
+  it('refuses an oversized body by its declared length (the platform limit is 4.5 MB)', async () => {
+    expect((await upload(uploadReq({}, { 'content-length': String(5 * 1024 * 1024) }))).status).toBe(413)
+  })
+
+  it('checks eligibility before reading the body', async () => {
+    vi.mocked(getCurrentLevel).mockResolvedValue(1 as never)
+    const req = uploadReq()
+    const spy = vi.spyOn(req as unknown as Request, 'formData')
+    expect((await upload(req)).status).toBe(403)
+    expect(spy).not.toHaveBeenCalled()
   })
 
   it('creates the meme for an eligible member, using the session id and never a client id', async () => {
@@ -156,6 +165,15 @@ describe('list', () => {
     vi.mocked(toggleEnabled).mockResolvedValue(false)
     const res = await list({ nextUrl: new URL('http://localhost/api/memes') } as never)
     expect(await res.json()).toEqual({ enabled: false })
+  })
+
+  it('the dashboard card (meta=card) does not run the level or disavow lookups, and looks up roles once', async () => {
+    vi.mocked(holdsAny).mockResolvedValue(true)
+    const res = await list({ nextUrl: new URL('http://localhost/api/memes?meta=card') } as never)
+    expect((await res.json()).meta).toEqual({ reviewer: true, pending: 3 })
+    expect(getCurrentLevel).not.toHaveBeenCalled()
+    expect(isDisavowSubject).not.toHaveBeenCalled()
+    expect(resolveRoles).toHaveBeenCalledTimes(1)
   })
 
   it('only reviewers see the waiting count', async () => {
@@ -190,7 +208,7 @@ describe('approval queue permissions', () => {
   })
 
   it('Dread Pizza Roberts can act too', async () => {
-    vi.mocked(isDreadPizzaRoberts).mockResolvedValue(true)
+    vi.mocked(holdsAny).mockImplementation(async (_roles, allowed) => allowed.includes(DREAD_PIZZA_ROBERTS_ROLE_ID))
     expect((await reviewGet()).status).toBe(200)
   })
 
@@ -258,5 +276,29 @@ describe('report route', () => {
     vi.mocked(toggleEnabled).mockResolvedValue(true)
     session.current = null
     expect((await report(req(), ctx())).status).toBe(401)
+  })
+})
+
+describe('delete route', () => {
+  const req = (headers: Record<string, string>, body?: string) => new Request('http://localhost/api/memes/m1', { method: 'DELETE', headers, body }) as never
+
+  it('deletes with the JSON header the page sends', async () => {
+    const res = await del(req({ 'content-type': 'application/json' }, '{}'), ctx())
+    expect(res.status).toBe(200)
+    expect(deleteOwnMeme).toHaveBeenCalledWith('m1', 'u1')
+  })
+
+  it('415 without a JSON content type, 404 when off, 401 signed out', async () => {
+    expect((await del(req({}), ctx())).status).toBe(415)
+    vi.mocked(toggleEnabled).mockResolvedValue(false)
+    expect((await del(req({ 'content-type': 'application/json' }, '{}'), ctx())).status).toBe(404)
+    vi.mocked(toggleEnabled).mockResolvedValue(true)
+    session.current = null
+    expect((await del(req({ 'content-type': 'application/json' }, '{}'), ctx())).status).toBe(401)
+  })
+
+  it("answers 404 for someone else's meme", async () => {
+    vi.mocked(deleteOwnMeme).mockResolvedValueOnce({ ok: false, status: 404, error: 'Not found' })
+    expect((await del(req({ 'content-type': 'application/json' }, '{}'), ctx())).status).toBe(404)
   })
 })

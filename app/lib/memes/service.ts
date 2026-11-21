@@ -16,6 +16,7 @@ import { memberNamesByDiscordId } from '@/app/lib/member-names'
 import { PrivateUploadError, readPrivate, uploadPrivate } from '@/app/lib/private-blob-upload'
 import { sha256Hex } from '@/app/lib/payments/hash'
 import { isOwnBlobUrl } from '@/app/lib/blob-url'
+import { memesPrivateToken, memesPublicToken, memesPublicUrlToken } from './blob'
 import {
   MEME_MAX_NOTE,
   MEME_MAX_PAGE_SIZE,
@@ -33,8 +34,15 @@ import {
   type MemeStatus,
 } from './rules'
 
+/** Uploads go through a function whose request body is limited to 4.5 MB; the setting cannot exceed this. */
+export const MEME_UPLOAD_HARD_MAX_BYTES = 4 * 1024 * 1024
 const DAY_MS = 24 * 60 * 60 * 1000
 const EXT_BY_MIME: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' }
+
+/** The effective largest upload, for the client's pre-check. */
+export async function uploadLimitBytes(): Promise<number> {
+  return Math.min((await loadSettings()).get('memes.maxUploadBytes'), MEME_UPLOAD_HARD_MAX_BYTES)
+}
 
 export type MemeTab = 'all' | 'benny' | 'pizzadao' | 'mine'
 export const MEME_TABS: readonly MemeTab[] = ['all', 'benny', 'pizzadao', 'mine']
@@ -95,7 +103,7 @@ export type MemeItem = {
 
 /** The file URL a viewer's browser may use: the public one when live, else the authenticated file route. Never the storage path. */
 function viewUrl(r: ItemRow): string | null {
-  if (r.status === 'APPROVED' && r.publicUrl && isOwnBlobUrl(r.publicUrl, '/memes/')) return r.publicUrl
+  if (r.status === 'APPROVED' && r.publicUrl && isOwnBlobUrl(r.publicUrl, '/memes/', memesPublicUrlToken())) return r.publicUrl
   if (r.status === 'PENDING' || r.status === 'HIDDEN') return `/api/memes/${r.id}/file`
   return null
 }
@@ -171,10 +179,11 @@ async function bytesOf(stream: ReadableStream<Uint8Array>): Promise<Uint8Array> 
   return new Uint8Array(await new Response(stream).arrayBuffer())
 }
 
-async function deleteQuietly(pathOrUrl: string | null | undefined): Promise<void> {
+async function deleteQuietly(pathOrUrl: string | null | undefined, kind: 'public' | 'private'): Promise<void> {
   if (!pathOrUrl) return
+  const token = kind === 'public' ? memesPublicToken() : memesPrivateToken()
   try {
-    await del(pathOrUrl)
+    await del(pathOrUrl, token ? { token } : undefined)
   } catch {
     // The row no longer points at it; an orphaned file is harmless and can be swept later.
   }
@@ -183,33 +192,35 @@ async function deleteQuietly(pathOrUrl: string | null | undefined): Promise<void
 /** Copy the private file to a public URL (JPEG metadata stripped). Returns the URL, or null when the file cannot be read or stored. */
 async function publishFile(m: { id: string; privatePath: string | null; mime: string }): Promise<string | null> {
   if (!m.privatePath) return null
-  const file = await readPrivate(m.privatePath)
+  const file = await readPrivate(m.privatePath, memesPrivateToken())
   if (!file) return null
   try {
     let bytes = await bytesOf(file.stream)
-    if (m.mime === 'image/jpeg') bytes = stripJpegMetadata(bytes)
+    if (m.mime === 'image/jpeg') {
+      // If the metadata cannot be stripped cleanly, do not publish the original (it may carry GPS).
+      const stripped = stripJpegMetadata(bytes)
+      if (!stripped) return null
+      bytes = stripped
+    }
+    const publicToken = memesPublicToken()
     const ext = EXT_BY_MIME[m.mime] ?? 'bin'
-    const blob = await put(`memes/${m.id}.${ext}`, Buffer.from(bytes), { access: 'public', addRandomSuffix: false, allowOverwrite: true, contentType: m.mime })
-    return isOwnBlobUrl(blob.url, '/memes/') ? blob.url : null
+    const blob = await put(`memes/${m.id}.${ext}`, Buffer.from(bytes), { access: 'public', addRandomSuffix: false, allowOverwrite: true, contentType: m.mime, ...(publicToken ? { token: publicToken } : {}) })
+    return isOwnBlobUrl(blob.url, '/memes/', memesPublicUrlToken()) ? blob.url : null
   } catch {
     return null
   }
 }
 
-/** Move a public file back to private storage (so it can be restored), then delete the public copy. */
-async function unpublishFile(m: { uploaderId: string; publicUrl: string | null }): Promise<string | null> {
-  if (!m.publicUrl) return null
-  let privatePath: string | null = null
+/** Put a private copy of a live meme's file in place (so it can be restored). Null when it cannot be made. */
+async function copyToPrivate(m: { uploaderId: string; publicUrl: string | null }): Promise<string | null> {
+  if (!m.publicUrl || !isOwnBlobUrl(m.publicUrl, '/memes/', memesPublicUrlToken())) return null
   try {
-    if (isOwnBlobUrl(m.publicUrl, '/memes/')) {
-      const res = await fetch(m.publicUrl, { cache: 'no-store' })
-      if (res.ok) privatePath = (await uploadPrivate(new Uint8Array(await res.arrayBuffer()), `memes/pending/${m.uploaderId}`)).pathname
-    }
+    const res = await fetch(m.publicUrl, { cache: 'no-store' })
+    if (!res.ok) return null
+    return (await uploadPrivate(new Uint8Array(await res.arrayBuffer()), `memes/pending/${m.uploaderId}`, memesPrivateToken())).pathname
   } catch {
-    privatePath = null
+    return null
   }
-  await deleteQuietly(m.publicUrl)
-  return privatePath
 }
 
 // ── Upload ─────────────────────────────────────────────────────────────────────────────────────
@@ -222,7 +233,7 @@ export async function createMeme(input: {
   tags?: unknown
 }): Promise<ServiceResult<{ id: string; status: MemeStatus }>> {
   const s = await loadSettings()
-  const check = validateUpload(input.bytes, Math.min(s.get('memes.maxUploadBytes'), 8 * 1024 * 1024))
+  const check = validateUpload(input.bytes, Math.min(s.get('memes.maxUploadBytes'), MEME_UPLOAD_HARD_MAX_BYTES), s.get('memes.maxGifFrames'))
   if (!check.ok) return fail(check.code === 'too_large' ? 413 : 400, check.error)
 
   const since = new Date(Date.now() - DAY_MS)
@@ -239,7 +250,7 @@ export async function createMeme(input: {
 
   let stored: { pathname: string }
   try {
-    stored = await uploadPrivate(input.bytes, `memes/pending/${input.uploaderId}`)
+    stored = await uploadPrivate(input.bytes, `memes/pending/${input.uploaderId}`, memesPrivateToken())
   } catch (err) {
     if (err instanceof PrivateUploadError) return fail(err.code === 'unavailable' ? 503 : 400, err.message)
     throw err
@@ -303,10 +314,10 @@ export async function reviewMeme(opts: { id: string; action: ReviewAction; revie
       data: { status: 'APPROVED', publicUrl, privatePath: null, reportCount: 0, reviewNote: null, ...stamp },
     })
     if (res.count === 0) {
-      await deleteQuietly(publicUrl)
+      await deleteQuietly(publicUrl, 'public')
       return fail(409, 'Someone else just changed this meme')
     }
-    await deleteQuietly(m.privatePath)
+    await deleteQuietly(m.privatePath, 'private')
     if (opts.action === 'restore') await prisma.memeReport.deleteMany({ where: { memeId: m.id } })
     return { ok: true, value: { status: 'APPROVED' } }
   }
@@ -317,18 +328,24 @@ export async function reviewMeme(opts: { id: string; action: ReviewAction; revie
       data: { status: 'REJECTED', privatePath: null, publicUrl: null, reviewNote: note, ...stamp },
     })
     if (res.count === 0) return fail(409, 'Someone else just changed this meme')
-    await deleteQuietly(m.privatePath)
-    await deleteQuietly(m.publicUrl)
+    await deleteQuietly(m.privatePath, 'private')
+    await deleteQuietly(m.publicUrl, 'public')
     return { ok: true, value: { status: 'REJECTED' } }
   }
 
-  // HIDDEN: keep a private copy so it can be restored, then take the public file down.
-  const privatePath = await unpublishFile(m)
+  // HIDDEN: make the private copy first. Without one the meme stays live (a meme must never end up
+  // hidden with no file to restore), and the public file is deleted only after the row says HIDDEN.
+  const privatePath = await copyToPrivate(m)
+  if (!privatePath) return fail(502, 'The file could not be moved aside. Try again.')
   const res = await prisma.meme.updateMany({
     where: { id: m.id, status: 'APPROVED' },
     data: { status: 'HIDDEN', publicUrl: null, privatePath, reviewNote: note, ...stamp },
   })
-  if (res.count === 0) return fail(409, 'Someone else just changed this meme')
+  if (res.count === 0) {
+    await deleteQuietly(privatePath, 'private')
+    return fail(409, 'Someone else just changed this meme')
+  }
+  await deleteQuietly(m.publicUrl, 'public')
   return { ok: true, value: { status: 'HIDDEN' } }
 }
 
@@ -369,8 +386,8 @@ export async function deleteOwnMeme(id: string, uploaderId: string): Promise<Ser
   if (!canTransition(m.status, 'DELETED')) return fail(409, 'Already removed')
   const res = await prisma.meme.updateMany({ where: { id, status: m.status }, data: { status: 'DELETED', privatePath: null, publicUrl: null } })
   if (res.count === 0) return fail(409, 'Someone else just changed this meme')
-  await deleteQuietly(m.privatePath)
-  await deleteQuietly(m.publicUrl)
+  await deleteQuietly(m.privatePath, 'private')
+  await deleteQuietly(m.publicUrl, 'public')
   return { ok: true, value: null }
 }
 

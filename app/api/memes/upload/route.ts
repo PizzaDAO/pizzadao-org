@@ -10,7 +10,6 @@ import { enforceRateLimit } from '@/app/lib/rate-limit'
 import { requireMemeMember, uploadEligibility } from '@/app/lib/memes/access'
 import { parseCategory } from '@/app/lib/memes/rules'
 import { createMeme } from '@/app/lib/memes/service'
-import { PRIVATE_UPLOAD_MAX_BYTES } from '@/app/lib/private-blob-upload'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -23,9 +22,15 @@ const POST_HANDLER = async (request: NextRequest) => {
   const limited = await enforceRateLimit(request, 'memes-upload')
   if (limited) return limited
 
-  // Refuse an oversized body before reading it into memory.
+  // Refuse an oversized body before reading it into memory (the platform's own limit is 4.5 MB).
   const declared = Number(request.headers.get('content-length') ?? 0)
-  if (declared > PRIVATE_UPLOAD_MAX_BYTES + 64 * 1024) return json({ error: 'File too large' }, 413)
+  if (declared > 4.5 * 1024 * 1024) return json({ error: 'File too large. Max 4 MB.' }, 413)
+
+  // Eligibility (level, disavow) before the body is read.
+  const eligibility = await uploadEligibility(auth.session.discordId)
+  if (!eligibility.ok) {
+    return json({ error: eligibility.reason === 'level' ? `Uploading unlocks at level ${eligibility.minLevel}` : 'Uploading is not available for your account', reason: eligibility.reason, minLevel: eligibility.minLevel }, 403)
+  }
 
   let form: FormData
   try {
@@ -38,11 +43,6 @@ const POST_HANDLER = async (request: NextRequest) => {
   const category = parseCategory(form.get('category'))
   if (!category) return json({ error: 'Pick Benny or PizzaDAO' }, 400)
   if (form.get('rights') !== 'true') return json({ error: 'Confirm the meme is PizzaDAO-related and yours to share' }, 400)
-
-  const eligibility = await uploadEligibility(auth.session.discordId)
-  if (!eligibility.ok) {
-    return json({ error: eligibility.reason === 'level' ? `Uploading unlocks at level ${eligibility.minLevel}` : 'Uploading is not available for your account', reason: eligibility.reason, minLevel: eligibility.minLevel }, 403)
-  }
 
   const result = await createMeme({
     uploaderId: auth.session.discordId,

@@ -16,7 +16,8 @@ vi.mock('@/app/lib/private-blob-upload', () => ({
 vi.mock('@/app/lib/member-names', () => ({ memberNamesByDiscordId: vi.fn(async () => new Map()) }))
 
 const SETTINGS: Record<string, unknown> = {
-  'memes.maxUploadBytes': 5 * 1024 * 1024,
+  'memes.maxUploadBytes': 4 * 1024 * 1024,
+  'memes.maxGifFrames': 300,
   'memes.requireApproval': true,
   'memes.maxUploadsPerDay': 10,
   'memes.maxPending': 20,
@@ -43,6 +44,7 @@ function streamOf(bytes: Uint8Array) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.unstubAllEnvs()
   Object.assign(SETTINGS, { 'memes.requireApproval': true, 'memes.maxUploadsPerDay': 10, 'memes.maxPending': 20, 'memes.autoHideReports': 3 })
   vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'vercel_blob_rw_abc123_secret')
   m.count.mockResolvedValue(0)
@@ -59,7 +61,7 @@ describe('createMeme', () => {
   it('stores the file privately and creates a PENDING row', async () => {
     const res = await createMeme(input)
     expect(res).toEqual({ ok: true, value: { id: 'm1', status: 'PENDING' } })
-    expect(uploadPrivate).toHaveBeenCalledWith(PNG, 'memes/pending/u1')
+    expect(uploadPrivate).toHaveBeenCalledWith(PNG, 'memes/pending/u1', undefined)
     expect(m.create.mock.calls[0][0].data).toMatchObject({ uploaderId: 'u1', status: 'PENDING', category: 'benny', caption: 'hi', tags: ['a', 'b'], mime: 'image/png', width: 64, height: 64, privatePath: 'memes/pending/u1/x.png' })
     expect(put).not.toHaveBeenCalled()
   })
@@ -110,7 +112,7 @@ describe('reviewMeme', () => {
     expect(vi.mocked(put).mock.calls[0][0]).toBe('memes/m1.png')
     expect(vi.mocked(put).mock.calls[0][2]).toMatchObject({ access: 'public', contentType: 'image/png' })
     expect(m.updateMany.mock.calls[0][0]).toMatchObject({ where: { id: 'm1', status: 'PENDING' }, data: { status: 'APPROVED', publicUrl: `${STORE}/memes/m1.png`, privatePath: null, reviewedBy: 'capo' } })
-    expect(del).toHaveBeenCalledWith('memes/pending/u1/x.png')
+    expect(del).toHaveBeenCalledWith('memes/pending/u1/x.png', undefined)
   })
 
   it('approve fails (and changes nothing) when the file cannot be read', async () => {
@@ -132,20 +134,55 @@ describe('reviewMeme', () => {
     const res = await reviewMeme({ id: 'm1', action: 'reject', reviewerId: 'capo', note: ' not on topic ' })
     expect(res).toEqual({ ok: true, value: { status: 'REJECTED' } })
     expect(m.updateMany.mock.calls[0][0].data).toMatchObject({ status: 'REJECTED', privatePath: null, publicUrl: null, reviewNote: 'not on topic' })
-    expect(del).toHaveBeenCalledWith('memes/pending/u1/x.png')
+    expect(del).toHaveBeenCalledWith('memes/pending/u1/x.png', undefined)
     expect(m.delete).not.toHaveBeenCalled()
   })
 
-  it('hide keeps a private copy, drops the public file and clears the public URL', async () => {
+  it('hide makes the private copy first, then updates the row, then deletes the public file', async () => {
     const live = { ...pending, status: 'APPROVED', privatePath: null, publicUrl: `${STORE}/memes/m1.png` }
     m.findUnique.mockResolvedValue(live as never)
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(PNG)))
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(Buffer.from(PNG))))
     vi.mocked(uploadPrivate).mockResolvedValue({ pathname: 'memes/pending/u1/back.png', sha256: 'h', sizeBytes: 1, mime: 'image/png' })
+    const order: string[] = []
+    vi.mocked(uploadPrivate).mockImplementation(async () => (order.push('private'), { pathname: 'memes/pending/u1/back.png', sha256: 'h', sizeBytes: 1, mime: 'image/png' }))
+    m.updateMany.mockImplementation((async () => (order.push('row'), { count: 1 })) as never)
+    vi.mocked(del).mockImplementation((async () => void order.push('delete')) as never)
     const res = await reviewMeme({ id: 'm1', action: 'hide', reviewerId: 'capo' })
     expect(res).toEqual({ ok: true, value: { status: 'HIDDEN' } })
+    expect(order).toEqual(['private', 'row', 'delete'])
     expect(m.updateMany.mock.calls[0][0].data).toMatchObject({ status: 'HIDDEN', publicUrl: null, privatePath: 'memes/pending/u1/back.png' })
-    expect(del).toHaveBeenCalledWith(`${STORE}/memes/m1.png`)
+    expect(del).toHaveBeenCalledWith(`${STORE}/memes/m1.png`, undefined)
     vi.unstubAllGlobals()
+  })
+
+  it('hide leaves the meme live when the private copy cannot be made (never HIDDEN with no file)', async () => {
+    const live = { ...pending, status: 'APPROVED', privatePath: null, publicUrl: `${STORE}/memes/m1.png` }
+    m.findUnique.mockResolvedValue(live as never)
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('nope', { status: 500 })))
+    expect(await reviewMeme({ id: 'm1', action: 'hide', reviewerId: 'capo' })).toMatchObject({ ok: false, status: 502 })
+    expect(m.updateMany).not.toHaveBeenCalled()
+    expect(del).not.toHaveBeenCalled()
+    vi.unstubAllGlobals()
+  })
+
+  it('approve refuses to publish a JPEG whose metadata cannot be stripped', async () => {
+    m.findUnique.mockResolvedValue({ ...pending, mime: 'image/jpeg' } as never)
+    vi.mocked(readPrivate).mockResolvedValue({ stream: streamOf(new Uint8Array([0xff, 0xd8, 0xff, 0x00, 0x01])), contentType: 'image/jpeg', size: 5 })
+    expect(await reviewMeme({ id: 'm1', action: 'approve', reviewerId: 'capo' })).toMatchObject({ ok: false, status: 502 })
+    expect(put).not.toHaveBeenCalled()
+  })
+
+  it('uses the dedicated public and private store tokens when set', async () => {
+    vi.stubEnv('MEMES_PUBLIC_BLOB_TOKEN', 'vercel_blob_rw_pubstore_x')
+    vi.stubEnv('MEMES_PRIVATE_BLOB_TOKEN', 'vercel_blob_rw_privstore_x')
+    m.findUnique.mockResolvedValue(pending as never)
+    vi.mocked(readPrivate).mockResolvedValue({ stream: streamOf(PNG), contentType: 'image/png', size: PNG.length })
+    vi.mocked(put).mockResolvedValue({ url: 'https://pubstore.public.blob.vercel-storage.com/memes/m1.png' } as never)
+    const res = await reviewMeme({ id: 'm1', action: 'approve', reviewerId: 'capo' })
+    expect(res.ok).toBe(true)
+    expect(readPrivate).toHaveBeenCalledWith('memes/pending/u1/x.png', 'vercel_blob_rw_privstore_x')
+    expect(vi.mocked(put).mock.calls[0][2]).toMatchObject({ token: 'vercel_blob_rw_pubstore_x' })
+    expect(del).toHaveBeenCalledWith('memes/pending/u1/x.png', { token: 'vercel_blob_rw_privstore_x' })
   })
 
   it('restore only works on a hidden meme', async () => {
@@ -210,7 +247,7 @@ describe('deleteOwnMeme and listing', () => {
     m.findUnique.mockResolvedValue({ id: 'm1', uploaderId: 'u1', status: 'PENDING', privatePath: 'p', publicUrl: null } as never)
     expect(await deleteOwnMeme('m1', 'someone-else')).toMatchObject({ ok: false, status: 404 })
     expect(await deleteOwnMeme('m1', 'u1')).toEqual({ ok: true, value: null })
-    expect(del).toHaveBeenCalledWith('p')
+    expect(del).toHaveBeenCalledWith('p', undefined)
   })
 
   it('lists approved memes only, selecting columns and never exposing the uploader id', async () => {

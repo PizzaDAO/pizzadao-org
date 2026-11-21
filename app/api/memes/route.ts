@@ -8,7 +8,7 @@ import { requireSession } from '@/app/lib/auth-guards'
 import { json } from '@/app/lib/admin-guard'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { isMemeReviewer, memesEnabled, uploadEligibility } from '@/app/lib/memes/access'
-import { MEME_TABS, listMemes, pendingCount, type MemeTab } from '@/app/lib/memes/service'
+import { MEME_TABS, listMemes, pendingCount, uploadLimitBytes, type MemeTab } from '@/app/lib/memes/service'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -26,16 +26,22 @@ const GET_HANDLER = async (request: NextRequest) => {
 
   const page = await listMemes({ tab, viewerId: discordId, cursor: q.get('cursor'), limit: Number.isFinite(limit) && limit > 0 ? limit : undefined })
 
+  // meta=1: everything the page needs. meta=card: only what the dashboard card needs (no level lookup).
   let meta: Record<string, unknown> | undefined
-  if (q.get('meta') === '1') {
+  const wantMeta = q.get('meta')
+  if (wantMeta === '1') {
     const [eligibility, reviewer] = await Promise.all([uploadEligibility(discordId), isMemeReviewer(discordId)])
     meta = {
       canUpload: eligibility.ok,
       uploadBlockedReason: eligibility.ok ? null : eligibility.reason,
       minLevel: eligibility.ok ? null : eligibility.minLevel,
+      maxUploadBytes: await uploadLimitBytes(),
       reviewer,
       pending: reviewer ? await pendingCount() : null,
     }
+  } else if (wantMeta === 'card') {
+    const reviewer = await isMemeReviewer(discordId)
+    meta = { reviewer, pending: reviewer ? await pendingCount() : null }
   }
   return json({ enabled: true, ...page, ...(meta ? { meta } : {}) })
 }

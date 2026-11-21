@@ -1269,7 +1269,8 @@
     "errors": {
       "tooMany": "You have reached the submission limit. Please try again later.",
       "generic": "Something went wrong. Please try again.",
-      "uploadFailed": "Photo upload failed. Please try another image.",
+      "fileTooLarge": "That file is too big. Max {mb} MB.",
+    "uploadFailed": "Photo upload failed. Please try another image.",
       "network": "Network error, please try again.",
       "pitch": "Please tell us why they should be spotlighted.",
       "nomineeName": "Please enter the nominee's name.",
