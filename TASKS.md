@@ -9,7 +9,7 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 |----|------|-------|----------|-----|------|------|------|----|-------|
 | parmesan-10386 | Deliver POAPs automatically to people on the discord channel attendance | todo | P3 |  |  |  |  |  | manual POAP claims shipped in #192; automatic delivery still to do (later); 2026-11-21: paused by Snax |
 | marinara-32633 | generated nametags for rsvp'd members | todo | P2 |  |  |  |  |  |  |
-| calzone-93434 | Add Telegram login | todo | P2 |  |  |  | plans/calzone-93434-telegram-login.md |  | account linking shipped in #128; login itself not built |
+| calzone-93434 | Add Telegram login | review | P2 |  |  |  | plans/calzone-93434.md | #463 | account linking shipped in #128; sign in via the login bot (settings off by default, tester allowlist) |
 | website-refuse-closed-claims | Website: refuse claiming closed crew tasks | review | P3 |  | Snax | crews |  | #460 | follow-up from plans/discord-task-command.md: Discord already refuses closed tasks, the website does not |
 | bellpepper-80127 | Idea para dashboard: carpeta para subir memes de pizzadao y bennys xD | todo | P2 |  |  |  |  |  |  |
 | pineapple-84122 | Auto-Invite member to event or one is near their city | todo | P2 |  |  |  | plans/pineapple-84122-nearby-event-invites.md |  |  |

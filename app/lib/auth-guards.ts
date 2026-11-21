@@ -12,6 +12,7 @@ import { timingSafeEqual } from "crypto";
 import { getSession, type Session } from "./session";
 import { hasAnyRole } from "./discord";
 import { ADMIN_ROLE_IDS } from "@/app/ui/constants";
+import { toggleEnabled } from "@/app/lib/settings/toggles";
 
 export type GuardResult =
   | { ok: true; session: Session }
@@ -72,8 +73,22 @@ export async function isAdminSession(): Promise<boolean> {
   }
 }
 
-/** Require a session belonging to a guild admin. 401 if no session, 403 if not admin. */
+/**
+ * True when this session was started with "Sign in with Telegram" and admin powers over it are not allowed
+ * (the default: admin and DPR checks need a Discord or magic-link session). Fails closed on read errors.
+ */
+export async function telegramSessionBlocked(session: Pick<Session, "authMethod">): Promise<boolean> {
+  if (session.authMethod !== "telegram") return false;
+  return !(await toggleEnabled("auth.telegramSignInAdminAllowed").catch(() => false));
+}
+
+/** Require a session belonging to a guild admin. 401 if no session, 403 if not admin (or Telegram-started). */
 export async function requireAdmin(): Promise<GuardResult> {
+  const auth = await requireSession();
+  if (!auth.ok) return auth;
+  if (await telegramSessionBlocked(auth.session)) {
+    return { ok: false, response: NextResponse.json({ error: "Admin access required" }, { status: 403 }) };
+  }
   return requireAnyRole(ADMIN_ROLE_IDS, "Admin access required");
 }
 

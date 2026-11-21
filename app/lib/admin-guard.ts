@@ -8,7 +8,7 @@
  * preflight) and a browser Origin, when present, must be this host.
  */
 import { NextResponse } from 'next/server'
-import { requireSession, type GuardResult } from '@/app/lib/auth-guards'
+import { requireSession, telegramSessionBlocked, type GuardResult } from '@/app/lib/auth-guards'
 import { isDreadPizzaRoberts } from '@/app/lib/mission-review-access'
 import { NO_STORE_HEADERS } from '@/app/lib/no-store'
 
@@ -20,6 +20,7 @@ export function json(body: unknown, status = 200): NextResponse {
 export async function requireDpr(): Promise<GuardResult> {
   const auth = await requireSession()
   if (!auth.ok) return { ok: false, response: json({ error: 'Not authenticated' }, 401) }
+  if (await telegramSessionBlocked(auth.session)) return { ok: false, response: json({ error: 'Forbidden' }, 403) }
   if (!(await isDreadPizzaRoberts(auth.session.discordId))) {
     return { ok: false, response: json({ error: 'Forbidden' }, 403) }
   }

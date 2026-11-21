@@ -120,6 +120,9 @@ export const RATE_LIMITS = {
   "telegram-host-match": { limit: 3, windowSec: 10 * 60 },
   // The confirm page POST has its own bucket, so asking for DMs cannot starve confirming.
   "telegram-host-match-confirm": { limit: 5, windowSec: 10 * 60 },
+  // "Sign in with Telegram" on /login (plans/calzone-93434.md): starting a request, and the 3-second poll, per IP.
+  "telegram-signin-start": { limit: 5, windowSec: 10 * 60 },
+  "telegram-signin-status": { limit: 300, windowSec: 15 * 60 },
   // Starting a "link with the Telegram app" code: per member.
   "telegram-link-start": { limit: 5, windowSec: 10 * 60 },
   // PFP composer: saving a composite and uploading a base picture, per member.

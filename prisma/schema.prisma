@@ -2568,6 +2568,29 @@ model TelegramLinkCode {
   @@index([expiresAt])
 }
 
+// "Sign in with Telegram" (plans/calzone-93434.md). One row per attempt, made on /login. The browser holds the
+// code and a private secret (only their hashes are stored); the bot claims the row for a linked Telegram account,
+// the member taps the matching number in the bot (approvedAt), and the browser's poll spends it once (consumedAt)
+// to get a session. Never creates or changes a TelegramAccount.
+model TelegramSignInRequest {
+  codeHash    String    @id
+  browserHash String
+  matchNumber Int
+  returnTo    String?
+  tgId        String?
+  discordId   String?
+  ref         String?   @unique // opaque reference in the bot buttons' callback_data (never the code)
+  claimedAt   DateTime?
+  approvedAt  DateTime?
+  consumedAt  DateTime?
+  cancelledAt DateTime?
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+
+  @@index([expiresAt])
+  @@index([tgId, createdAt])
+}
+
 // ---- Google Sheets cutover (plans/sheets-cutover.md) ----
 
 // One row per import run (dry run or apply) from /admin/sheets. Counts only: never cell contents.

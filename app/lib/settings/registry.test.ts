@@ -314,6 +314,11 @@ describe('settings registry', () => {
       ['missions.reviewerRoleIds', []],
       ['announce.roleIds', []],
       ['articles.authorRoleIds', []],
+      // "Sign in with Telegram": off, no testers listed, 5 minutes, no admin powers.
+      ['auth.telegramSignInEnabled', false],
+      ['auth.telegramSignInAllowlist', []],
+      ['auth.telegramSignInTtlMinutes', 5],
+      ['auth.telegramSignInAdminAllowed', false],
       ['calls.eventLocalTimes', []],
       ['site.hostRedirectEnabled', false],
       ['site.hostRedirectPermanent', false],

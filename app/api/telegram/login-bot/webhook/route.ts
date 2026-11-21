@@ -8,6 +8,10 @@
 // A member who already has a different Telegram is never overwritten, and a Telegram linked to another member
 // is refused. The profile card polls and flips to connected.
 //
+// "Sign in with Telegram" (plans/calzone-93434.md) shares this webhook: `/start si_<code>` from a LINKED account
+// is shown three numbers; tapping the one the browser shows approves the sign-in, any other cancels it. It never
+// creates or changes a link, and the bot never sends a login link.
+//
 // Auth: X-Telegram-Bot-Api-Secret-Token must equal TELEGRAM_LOGIN_WEBHOOK_SECRET (unset -> 503, wrong -> 401).
 // Everything after auth answers 200 so Telegram does not retry. Only production acts: previews share the
 // production database. Forwarded messages are ignored. Message text and ids are never logged.
@@ -19,6 +23,9 @@ import { telegramConfig } from "@/app/lib/telegram-auth";
 import { linkTelegramAccount } from "@/app/lib/telegram/link-account";
 import { claimLinkCode, spendByTelegram } from "@/app/lib/telegram/link-code";
 import { loginBotCall, loginBotSend } from "@/app/lib/telegram/login-bot";
+import { prisma } from "@/app/lib/db";
+import { answerSignin, claimSignin, numberChoices, SIGNIN_START_PREFIX } from "@/app/lib/telegram/signin-code";
+import { signinAllowed, signinConfig } from "@/app/lib/telegram/signin-settings";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -70,6 +77,65 @@ const userId = (from: TgFrom | undefined): string | null => {
     return /^\d{1,20}$/.test(raw) ? raw : null;
 };
 
+const SIGNIN_OFF = "Sign in with Telegram isn't available right now. Log in with Discord instead.";
+const SIGNIN_NOT_LINKED = "This Telegram isn't connected to a PizzaDAO member. Log in with Discord once, then connect Telegram on your profile page.";
+const SIGNIN_EXPIRED = "This sign-in expired. Start again from the website.";
+
+/** `/start si_<code>`: a linked account claims the sign-in and gets the three numbers. */
+async function onSigninStart(botToken: string, chatId: number, fromId: string, code: string) {
+    const cfg = await signinConfig();
+    if (!cfg.enabled) {
+        await loginBotSend(botToken, chatId, SIGNIN_OFF);
+        return;
+    }
+    // Only a linked account can claim, and a refusal leaves the code alone so a stranger cannot burn it.
+    const account = await prisma.telegramAccount.findUnique({ where: { telegramId: fromId }, select: { discordId: true } });
+    if (!account) {
+        await loginBotSend(botToken, chatId, SIGNIN_NOT_LINKED);
+        return;
+    }
+    if (!signinAllowed(cfg, account.discordId)) {
+        await loginBotSend(botToken, chatId, SIGNIN_OFF);
+        return;
+    }
+    const claim = await claimSignin(code, fromId, account.discordId);
+    if (claim.status === "limited") {
+        await loginBotSend(botToken, chatId, "Too many attempts. Try again later.");
+        return;
+    }
+    if (claim.status !== "claimed") {
+        await loginBotSend(botToken, chatId, SIGNIN_EXPIRED);
+        return;
+    }
+    const name = await publicLabel(account.discordId).catch(() => null);
+    await loginBotSend(
+        botToken,
+        chatId,
+        `Sign in to PizzaDAO${name ? ` as ${name}` : ""}? Tap the number your browser shows. Only continue if you just pressed Sign in with Telegram on the PizzaDAO website.`,
+        {
+            reply_markup: {
+                inline_keyboard: [numberChoices(claim.matchNumber).map((n) => ({ text: String(n), callback_data: `si:${claim.ref}:${n}` }))],
+            },
+        },
+    );
+}
+
+async function onSigninTap(botToken: string, fromId: string, data: string, msg: TgMessage) {
+    const m = /^si:([A-Za-z0-9_-]{22}):(\d{2})$/.exec(data);
+    if (!m) return;
+    const outcome = await answerSignin(m[1], fromId, Number(m[2]));
+    if (outcome === "ignore") return;
+    const text =
+        outcome === "approved"
+            ? "Signed in. Go back to your browser."
+            : outcome === "cancelled"
+              ? "Cancelled. Start again from the website."
+              : SIGNIN_EXPIRED;
+    if (typeof msg.chat?.id === "number" && typeof msg.message_id === "number") {
+        await loginBotCall(botToken, "editMessageText", { chat_id: msg.chat.id, message_id: msg.message_id, text });
+    }
+}
+
 async function onStart(botToken: string, msg: TgMessage) {
     if (msg.forward_origin || msg.forward_date) return;
     if (msg.chat?.type !== "private" || typeof msg.chat.id !== "number") return;
@@ -83,6 +149,11 @@ async function onStart(botToken: string, msg: TgMessage) {
     }
     const fromId = userId(msg.from);
     if (!fromId || String(chatId) !== fromId) return;
+
+    if (m[1].startsWith(SIGNIN_START_PREFIX)) {
+        await onSigninStart(botToken, chatId, fromId, m[1].slice(SIGNIN_START_PREFIX.length));
+        return;
+    }
 
     const claim = await claimLinkCode(m[1], {
         id: fromId,
@@ -114,7 +185,12 @@ async function onCallback(botToken: string, cq: NonNullable<TgUpdate["callback_q
     const msg = cq.message;
     // Answer first, whatever happens next, so the button never keeps spinning.
     if (queryId) await loginBotCall(botToken, "answerCallbackQuery", { callback_query_id: queryId });
-    if (!queryId || !fromId || !data.startsWith("ok:") || msg?.chat?.type !== "private") return;
+    if (!queryId || !fromId || msg?.chat?.type !== "private") return;
+    if (data.startsWith("si:")) {
+        await onSigninTap(botToken, fromId, data, msg);
+        return;
+    }
+    if (!data.startsWith("ok:")) return;
 
     // The member lookup runs before the code is spent, so a failure or kill in between can't lose the code.
     const who: { name: string | null } = { name: null };

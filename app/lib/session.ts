@@ -20,6 +20,8 @@ export interface Session {
     nick?: string;
     unlockWallet?: string;  // recovered from Unlock SIWE
     createdAt: number;
+    /** How this session was started. Absent = Discord (OAuth or magic link). "telegram" sessions get no admin powers unless allowed. */
+    authMethod?: "telegram";
 }
 
 /**

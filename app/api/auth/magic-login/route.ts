@@ -2,9 +2,8 @@ import { SIGNUP_DRAFT_COOKIE, SIGNUP_DRAFT_TTL_SECONDS } from "@/app/lib/signup-
 import { REF_COOKIE, refCookieOptions } from "@/app/lib/referral-cookie";
 import { NextResponse } from "next/server";
 import { verifyMagicToken } from "@/app/lib/magic-login";
-import { createSessionToken, getSessionCookieOptions, setSessionCookies } from "@/app/lib/session";
-import { syncRolesOnLogin } from "@/app/lib/sync-roles-on-login";
-import { fetchMemberByDiscordId } from "@/app/lib/sheets/member-repository";
+import { getSessionCookieOptions, setSessionCookies } from "@/app/lib/session";
+import { issueLoginSession } from "@/app/lib/auth/issue-login-session";
 import { loginReturnPath } from "@/app/lib/login-return";
 import {
   MAGIC_PENDING_COOKIE,
@@ -39,34 +38,12 @@ export async function GET(req: Request) {
     );
   }
 
-  // Create session — identical to OAuth flow
-  const sessionToken = createSessionToken({
+  // Create session — identical to OAuth flow (the lookup and role sync are shared with Telegram sign-in)
+  const { token: sessionToken, memberId } = await issueLoginSession({
     discordId: result.discordId,
     username: result.username,
     nick: result.nick ?? undefined,
-    createdAt: Date.now(),
   });
-
-  // Look up the member row already linked to this Discord ID (direct lib call).
-  // Unlinked users are sent to onboarding, where the wizard's name-match
-  // auto-claim (/api/auto-claim, session-authenticated) links the row.
-  // Role sync never links rows itself.
-  let memberId: string | undefined;
-  let memberName: string | undefined;
-
-  try {
-    const found = await fetchMemberByDiscordId(result.discordId);
-    if (found?.memberId) {
-      memberId = String(found.memberId);
-      memberName = found.name || undefined;
-    }
-  } catch {
-    // Lookup failure is non-fatal — we'll still create the session
-    // and send the user to onboarding.
-  }
-
-  // Always sync Discord roles to the (already linked) sheet row — mirrors OAuth callback.
-  syncRolesOnLogin(result.discordId, memberName ?? result.nick ?? result.username).catch(() => {});
 
   // Build redirect URL
   const returnTo = loginReturnPath(url.searchParams.get("returnTo"));
