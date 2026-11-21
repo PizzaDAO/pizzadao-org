@@ -3624,3 +3624,44 @@ model DiscordGuildSnapshot {
 
   @@id([guildId, kind])
 }
+
+/// A member-uploaded meme (bellpepper-80127). Pending files live in private Blob storage (privatePath);
+/// approved ones on a public Blob URL (publicUrl). Rejected and deleted rows keep their audit trail but
+/// no file. uploaderId is a Discord id and is never sent to the browser. No FK on purpose.
+model Meme {
+  id            String    @id @default(cuid())
+  uploaderId    String
+  category      String    @db.VarChar(16) // benny | pizzadao
+  caption       String?   @db.VarChar(200)
+  tags          String[]  @default([])
+  status        String    @default("PENDING") @db.VarChar(16) // PENDING | APPROVED | REJECTED | HIDDEN | DELETED
+  privatePath   String?
+  publicUrl     String?
+  mime          String    @db.VarChar(32)
+  sizeBytes     Int
+  width         Int?
+  height        Int?
+  sha256        String    @db.VarChar(64)
+  reviewedBy    String?
+  reviewedAt    DateTime?
+  reviewNote    String?   @db.VarChar(300)
+  reportCount   Int       @default(0)
+  downloadCount Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status, createdAt])
+  @@index([uploaderId, createdAt])
+  @@index([sha256])
+}
+
+/// One report per member per meme (bellpepper-80127).
+model MemeReport {
+  memeId     String
+  reporterId String
+  reason     String   @db.VarChar(300)
+  createdAt  DateTime @default(now())
+
+  @@id([memeId, reporterId])
+  @@index([reporterId, createdAt])
+}

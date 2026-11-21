@@ -32,13 +32,14 @@ import { EDUCATION_SETTINGS } from './education-settings'
 import { NEWSLETTER_SETTINGS } from './newsletter-settings'
 import { BUDDY_SETTINGS } from './buddy-settings'
 import { TRIVIA_SETTINGS } from './trivia-settings'
+import { MEMES_SETTINGS } from './memes-settings'
 import { MANUALS_SETTINGS } from './manuals-settings'
 import { FEATURES_SETTINGS } from './features-settings'
 import { EVENTS_ATTENDED_SETTINGS } from './events-attended-settings'
 import { NAMETAG_SETTINGS } from './nametag-settings'
 import { ADMIN_ROLE_IDS, DREAD_PIZZA_ROBERTS_ROLE_ID, MISSION_REVIEWER_ROLE_IDS } from '@/app/ui/constants'
 
-export type SettingArea = 'missions' | 'calls' | 'disavow' | 'passport' | 'guide' | 'followups' | 'discord' | 'features' | 'payments' | 'proposals' | 'economy' | 'mafia' | 'telegram' | 'sheets' | 'map' | 'reminders' | 'crews' | 'members' | 'marketing' | 'newsletter' | 'buddy' | 'manuals' | 'trivia'
+export type SettingArea = 'missions' | 'calls' | 'disavow' | 'passport' | 'guide' | 'followups' | 'discord' | 'features' | 'payments' | 'proposals' | 'economy' | 'mafia' | 'telegram' | 'sheets' | 'map' | 'reminders' | 'crews' | 'members' | 'marketing' | 'newsletter' | 'buddy' | 'manuals' | 'trivia' | 'memes'
 
 /** Admin-only English group names (kept out of messages/*.json: the disavow feature must not leak into them). */
 export const AREA_LABELS: Record<SettingArea, string> = {
@@ -65,6 +66,7 @@ export const AREA_LABELS: Record<SettingArea, string> = {
   buddy: 'Buddy system',
   manuals: 'Manuals',
   trivia: 'Discord trivia',
+  memes: 'Meme folder',
 }
 
 /** What a reader gets when the stored value cannot be used (DB down, row fails its schema). */
@@ -2738,6 +2740,7 @@ export const SETTINGS = {
   ...EDUCATION_SETTINGS,
   ...BUDDY_SETTINGS,
   ...TRIVIA_SETTINGS,
+  ...MEMES_SETTINGS,
   ...MANUALS_SETTINGS,
   ...FEATURES_SETTINGS,
   ...EVENTS_ATTENDED_SETTINGS,

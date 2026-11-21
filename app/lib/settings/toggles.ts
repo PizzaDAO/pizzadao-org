@@ -159,6 +159,8 @@ export const TOGGLES = {
   'trivia.enabled': { env: 'TRIVIA_DISCORD_ENABLED', legacy: ON_WORDS },
   // Off unless turned on: rounds are posted and judged but pay nothing. Read by app/lib/trivia/channel.ts (triviaSettings), where the env var set to ON forces a dry run (the safe direction) instead of acting as an off switch.
   'trivia.dryRun': { env: 'TRIVIA_DRY_RUN', legacy: ON_WORDS },
+  // Off unless turned on: the member meme folder (bellpepper-80127).
+  'memes.enabled': { env: 'MEMES_ENABLED', legacy: ON_WORDS },
   'buddy.enabled': { env: 'BUDDY_ENABLED', legacy: ON_WORDS },
   'buddy.introThreadsEnabled': { env: 'BUDDY_INTRO_THREADS_ENABLED', legacy: ON_WORDS },
   'buddy.rewardEnabled': { env: 'BUDDY_REWARD_ENABLED', legacy: ON_WORDS },

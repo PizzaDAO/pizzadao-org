@@ -76,6 +76,8 @@ export const prisma = {
   lane: createModelMock(),
   laneStep: createModelMock(),
   memberLane: createModelMock(),
+  meme: createModelMock(),
+  memeReport: createModelMock(),
   $queryRaw: vi.fn(),
   $queryRawUnsafe: vi.fn(),
   $executeRaw: vi.fn(),
