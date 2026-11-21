@@ -24,8 +24,10 @@ import { prismaStore } from './store'
 /** Proposals ran every 5 minutes before the cron went to every minute; they still only run on those minutes. */
 export const PROPOSALS_EVERY_MINUTES = 5
 
-/** Nearby-event invites look for new work every 30 minutes (the feed is small, but the members table is not). */
-export const NEARBY_EVERY_MINUTES = 30
+/** Nearby-event invites are considered once an hour (minute 0); reminders.nearbyEveryHours says on which hours they run. */
+export const NEARBY_SLOT_MINUTE = 0
+/** The nearby phase stops starting sends this long after the cron function started (the function limit is 120 s). */
+export const NEARBY_DEADLINE_MS = 60_000
 
 export type Skipped = { skipped: string }
 export interface RemindersRunResult {
@@ -76,6 +78,7 @@ export async function runRemindersNow(
   env: Record<string, string | undefined> = process.env,
   opts: { dryRun?: boolean } = {},
 ): Promise<RemindersRunResult> {
+  const startedAt = Date.now()
   const calls = await runCallRemindersNow(now, env, opts)
   let proposals: ProposalRunResult | Skipped
   // An on-demand dry run always counts; otherwise proposals wait for their 5-minute slot.
@@ -95,9 +98,9 @@ export async function runRemindersNow(
   // Nearby-event invites: after calls and proposals, only when they left room, on their own 30-minute slot.
   // A failure here never affects the call or proposal results.
   let nearby: NearbyRunResult | Skipped
-  const nearbySlot = !!opts.dryRun || now.getUTCMinutes() % NEARBY_EVERY_MINUTES === 0
+  const nearbySlot = !!opts.dryRun || now.getUTCMinutes() === NEARBY_SLOT_MINUTE
   if (!nearbySlot) nearby = { skipped: 'cadence' }
   else if ('stoppedEarly' in calls && calls.stoppedEarly) nearby = { skipped: 'calls_first' }
-  else nearby = await runNearbyInvitesNow(now, env, { dryRun: opts.dryRun }).catch(() => ({ skipped: 'error' }))
+  else nearby = await runNearbyInvitesNow(now, env, { dryRun: opts.dryRun, deadlineAt: startedAt + NEARBY_DEADLINE_MS }).catch(() => ({ skipped: 'error' }))
   return { calls, proposals, nearby }
 }

@@ -17,6 +17,7 @@ import { prisma } from '@/app/lib/db'
 import { loadReach, recordResult } from '@/app/lib/telegram/reach'
 import { sendDm } from '@/app/lib/telegram/rsv-client'
 import { fetchUpcomingEvents } from './client'
+import { nearbyOptOutUrl } from './optout'
 import { runNearbyInvites, type InviteMember, type NearbyRunResult } from './run'
 import { prismaNearbyStore, sweepOldNearbySends } from './store'
 
@@ -51,12 +52,14 @@ export async function loadInviteMembers(aliases: Parameters<typeof buildPlaceInd
 export async function runNearbyInvitesNow(
   now = new Date(),
   env: Record<string, string | undefined> = process.env,
-  opts: { dryRun?: boolean } = {},
+  opts: { dryRun?: boolean; deadlineAt?: number } = {},
 ): Promise<NearbyRunResult | { skipped: string }> {
   // Preview check first: a preview never reads settings or the database.
   const live = reminderSendAllowed(env) && (await toggleEnabled('reminders.nearbyEventsEnabled', env))
   if (!live && !opts.dryRun) return { skipped: 'disabled' }
   const settings = await loadSettings()
+  // Cadence (reminders.nearbyEveryHours): the cron calls once an hour; run only on every Nth UTC hour.
+  if (!opts.dryRun && now.getUTCHours() % settings.get('reminders.nearbyEveryHours') !== 0) return { skipped: 'cadence' }
   const result = await runNearbyInvites({
     now,
     env,
@@ -73,6 +76,8 @@ export async function runNearbyInvitesNow(
         kinds: settings.get('reminders.nearbyEventKinds'),
       },
       maxSends: settings.get('reminders.nearbyMaxSendsPerRun'),
+      maxPerMemberPerDay: settings.get('reminders.maxPerMemberPerDay'),
+      deadlineAt: opts.deadlineAt ?? Date.now() + 60_000,
       quiet: {
         startHour: settings.get('followups.quietStartHour'),
         endHour: settings.get('followups.quietEndHour'),
@@ -94,6 +99,7 @@ export async function runNearbyInvitesNow(
     },
     sendTelegram: (a) => sendDm(a),
     recordTelegramReach: (telegramId, code, cfg, at) => recordResult(telegramId, code, cfg, at),
+    optOutUrl: (discordId) => nearbyOptOutUrl(discordId, SITE_URL),
     notify: async (o) => {
       await createNotification({
         type: NotificationType.NEARBY_EVENT,

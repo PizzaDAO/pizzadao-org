@@ -32,8 +32,7 @@ export interface NearbyEvent {
   kind: 'gpp' | 'series'
 }
 
-const eventSchema = z
-  .object({
+const eventSchema = z.object({
     eventId: z.string().min(1).max(100),
     url: z.string().max(300),
     name: z.string().min(1).max(200),
@@ -46,11 +45,12 @@ const eventSchema = z
     full: z.boolean().optional(),
     rsvpClosed: z.boolean().optional(),
     kind: z.enum(['gpp', 'series']),
-  })
-  // Unknown fields (anything about hosts or guests) reject the whole answer: the contract is data-minimal.
-  .strict()
+})
 
-const body = z.object({ ok: z.literal(true), events: z.array(eventSchema).max(UPCOMING_EVENTS_LIMIT) })
+/** The wire field names. Anything else (hosts, guests, ...) rejects the whole answer: the contract is data-minimal. */
+const FIELDS = new Set(['eventId', 'url', 'name', 'date', 'timezone', 'city', 'latitude', 'longitude', 'addressIsCityDefault', 'full', 'rsvpClosed', 'kind'])
+
+const body = z.object({ ok: z.literal(true), events: z.array(z.unknown()).max(UPCOMING_EVENTS_LIMIT) })
 
 export interface UpcomingEventsOpts {
   baseUrl: string
@@ -81,7 +81,12 @@ export async function fetchUpcomingEvents(opts: UpcomingEventsOpts): Promise<Nea
     const parsed = body.safeParse(await res.json())
     if (!parsed.success) return null
     const out: NearbyEvent[] = []
-    for (const e of parsed.data.events) {
+    for (const raw of parsed.data.events) {
+      if (raw && typeof raw === 'object' && Object.keys(raw).some((k) => !FIELDS.has(k))) return null
+      // A single bad event (oversized or malformed values) is dropped; the rest still count.
+      const one = eventSchema.safeParse(raw)
+      if (!one.success) continue
+      const e = one.data
       const startsAt = new Date(e.date)
       // Only https links are ever sent to members.
       if (Number.isNaN(startsAt.getTime()) || !/^https:\/\//i.test(e.url)) continue

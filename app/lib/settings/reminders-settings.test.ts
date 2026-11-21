@@ -22,7 +22,8 @@ describe('reminders settings', () => {
       ['reminders.nearbyMaxPerDay', 1],
       ['reminders.nearbyMinLeadHours', 24],
       ['reminders.nearbyMaxLeadDays', 45],
-      ['reminders.nearbyMaxSendsPerRun', 100],
+      ['reminders.nearbyMaxSendsPerRun', 40],
+      ['reminders.nearbyEveryHours', 6],
       ['reminders.maxPerMemberPerDay', 6],
     ])
   })

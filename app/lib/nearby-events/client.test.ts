@@ -17,6 +17,11 @@ describe('fetchUpcomingEvents', () => {
     expect(JSON.parse(String((init as RequestInit).body))).toEqual({ until: '2027-01-01T00:00:00.000Z', limit: 500 })
   })
 
+  it('drops only an oversized or malformed event; the rest still count', async () => {
+    const out = await fetchUpcomingEvents(opts(reply({ ok: true, events: [{ ...wire, name: 'x'.repeat(500) }, { ...wire, eventId: 'e2' }, { ...wire, eventId: 'e3', latitude: 999 }] })))
+    expect(out!.map((e) => e.id)).toEqual(['e2'])
+  })
+
   it('rejects an answer carrying extra (host or guest) fields', async () => {
     expect(await fetchUpcomingEvents(opts(reply({ ok: true, events: [{ ...wire, hostEmail: 'x@y.z' }] })))).toBeNull()
     expect(await fetchUpcomingEvents(opts(reply({ ok: true, events: [{ ...wire, guests: [] }] })))).toBeNull()

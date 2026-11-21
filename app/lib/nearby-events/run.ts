@@ -14,7 +14,7 @@
  *
  * Idempotent: the ReminderSend unique key makes a rerun a no-op. Logs and results carry counts only.
  */
-import { DAY_MS, isKnownTimezone, isQuiet } from '@/app/lib/followups/quiet-hours'
+import { capDecision, DAY_MS, isKnownTimezone, isQuiet } from '@/app/lib/followups/quiet-hours'
 import { deliverDm, deliverTelegram, reminderSendAllowed, type DmSender, type TelegramSender } from '@/app/lib/reminders/deliver'
 import { canTryDm, type DmReach } from '@/app/lib/reminders/reach'
 import { MAX_ATTEMPTS } from '@/app/lib/reminders/store'
@@ -38,6 +38,10 @@ export interface NearbyRunConfig {
   enabled: boolean
   match: MatchConfig
   maxSends: number
+  /** reminders.maxPerMemberPerDay: all reminder kinds together, nearby included. */
+  maxPerMemberPerDay: number
+  /** Wall-clock time (ms) after which no further send starts; the rest waits for the next run. */
+  deadlineAt: number
   quiet: QuietCfg
   telegramRecheck: RecheckCfg
 }
@@ -74,6 +78,10 @@ export interface NearbyRunDeps {
   getTelegram: (discordId: string) => Promise<{ telegramId: string; reach: ReachRow | null } | null>
   sendTelegram: TelegramSender
   recordTelegramReach: (telegramId: string, code: DmFailureCode | 'ok', cfg: RecheckCfg, now: Date) => Promise<void>
+  /** A signed no-login opt-out link for this member (Telegram), or null. */
+  optOutUrl: (discordId: string) => string | null
+  /** The clock (ms), for the deadline. */
+  nowMs?: () => number
   notify: (o: { discordId: string; title: string; message: string; linkUrl: string; eventId: string }) => Promise<void>
   sleep: (ms: number) => Promise<void>
 }
@@ -126,8 +134,7 @@ export async function runNearbyInvites(d: NearbyRunDeps): Promise<NearbyRunResul
     prefRows.map((r) => [r.discordId, { nearbyEvents: r.nearbyEvents, radiusKm: r.nearbyRadiusKm, channel: r.channel }]),
   )
 
-  const handled = await d.store.handled(events.map((e) => e.id))
-  const pairs: Pair[] = []
+  const wanted: Pair[] = []
   for (const e of events) {
     for (const m of near) {
       const v = memberVerdict(m, prefs.get(m.discordId), e, config.match)
@@ -135,21 +142,25 @@ export async function runNearbyInvites(d: NearbyRunDeps): Promise<NearbyRunResul
         if (v.why === 'opted_out') bump(res.skipped, 'opted_out')
         continue
       }
-      if (handled.has(`${m.discordId}|${e.id}`)) continue
-      pairs.push({ m, e, km: v.km })
+      wanted.push({ m, e, km: v.km })
     }
   }
+  // Only the members and events that can actually be invited are looked up.
+  const handled = wanted.length ? await d.store.handled([...new Set(wanted.map((p) => p.e.id))], [...new Set(wanted.map((p) => p.m.discordId))]) : new Set<string>()
+  const pairs = wanted.filter((p) => !handled.has(`${p.m.discordId}|${p.e.id}`))
   res.due = pairs.length
   if (dryRun || !pairs.length) return res
 
   const ids = [...new Set(pairs.map((p) => p.m.discordId))]
   const history = await d.store.sentThisWeek(ids, now)
+  const today = await d.store.sentDay(ids, now)
+  const nowMs = d.nowMs ?? Date.now
   const zones = await d.store.timezones([...new Set(pairs.map((p) => p.m.memberId))])
   const recheck = config.telegramRecheck
   let first = true
 
   for (const { m, e, km } of pairs) {
-    if (res.sent >= config.maxSends) {
+    if (res.sent >= config.maxSends || nowMs() >= config.deadlineAt) {
       res.stoppedEarly = true
       return res
     }
@@ -162,6 +173,11 @@ export async function runNearbyInvites(d: NearbyRunDeps): Promise<NearbyRunResul
     const cap = capVerdict(history.get(id) ?? [], now, config.match)
     if (cap !== 'ok') {
       bump(res.skipped, `cap_${cap}`)
+      continue
+    }
+    // All reminder kinds together (reminders.maxPerMemberPerDay), nearby included.
+    if (!capDecision(today.get(id) ?? [], now, config.maxPerMemberPerDay).ok) {
+      bump(res.skipped, 'cap_all')
       continue
     }
     if (nearbyQuiet(now, zones.get(m.memberId), config.quiet)) {
@@ -180,6 +196,13 @@ export async function runNearbyInvites(d: NearbyRunDeps): Promise<NearbyRunResul
     const claim = await d.store.claim(id, e.id, 'NEARBY_EVENT')
     if (!claim.claimed) {
       bump(res.skipped, 'already')
+      continue
+    }
+    // Re-check the caps INSIDE the claim: an overlapping run may have claimed for this member meanwhile. Both
+    // back off (the next run decides), so the cap is never exceeded.
+    if (capVerdict(await d.store.recent(id, now, e.id), now, config.match) !== 'ok') {
+      await d.store.unclaim(id, e.id)
+      bump(res.skipped, 'cap_race')
       continue
     }
     if (!first) await d.sleep(PACE_MS)
@@ -219,7 +242,7 @@ export async function runNearbyInvites(d: NearbyRunDeps): Promise<NearbyRunResul
       const outcome = await deliverTelegram({
         telegramUserId: tg.telegramId,
         text,
-        buttons: nearbyTelegramButtons(e.url, settingsUrl),
+        buttons: nearbyTelegramButtons(e.url, settingsUrl, d.optOutUrl(id)),
         idempotencyKey: nearbyTelegramKey(e.id, id),
         send: d.sendTelegram,
       })
@@ -270,6 +293,7 @@ export async function runNearbyInvites(d: NearbyRunDeps): Promise<NearbyRunResul
     if (delivered.length) {
       await d.store.markSent(id, e.id, 'NEARBY_EVENT', delivered.join(','))
       history.set(id, [...(history.get(id) ?? []), now])
+      today.set(id, [...(today.get(id) ?? []), now])
       res.sent++
     } else if (failCode) {
       await d.store.markFailed(id, e.id, failCode, 'NEARBY_EVENT')

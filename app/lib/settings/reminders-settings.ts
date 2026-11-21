@@ -155,10 +155,19 @@ export const REMINDERS_SETTINGS = {
   'reminders.nearbyMaxSendsPerRun': int({
     key: 'reminders.nearbyMaxSendsPerRun',
     label: 'Nearby invites: most per scheduler run',
-    help: 'The scheduler looks for nearby invites every 30 minutes. The rest wait for the next run.',
+    help: 'The rest wait for the next run. A run also stops about a minute after the scheduler started, whatever is left.',
     min: 1,
-    max: 500,
-    default: 100,
+    max: 200,
+    default: 40,
+  }),
+  'reminders.nearbyEveryHours': int({
+    key: 'reminders.nearbyEveryHours',
+    label: 'Nearby invites: look for new invites every (hours)',
+    help: 'The scheduler runs the nearby-invite pass on every Nth UTC hour (1 = hourly, 6 = at 00, 06, 12, 18). Each pass reads the members table.',
+    min: 1,
+    max: 24,
+    default: 6,
+    unit: 'h',
   }),
   'reminders.maxPerMemberPerDay': int({
     key: 'reminders.maxPerMemberPerDay',

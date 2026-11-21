@@ -21,20 +21,30 @@ const mem = (n: number, o: Partial<InviteMember> = {}): InviteMember => ({ disco
 type Row = { status: string; attempts: number; channel?: string; at: Date; code?: string }
 
 /** An in-memory NearbyStore with the same claim semantics as the real one. */
-function memStore(o: { prefs?: NearbyPrefRow[]; zones?: Record<string, string>; sent?: Record<string, Date[]> } = {}) {
+function memStore(o: { prefs?: NearbyPrefRow[]; zones?: Record<string, string>; sent?: Record<string, Date[]>; today?: Record<string, Date[]>; racing?: (id: string) => Date[] } = {}) {
   const rows = new Map<string, Row>()
   const key = (d: string, r: string) => `${d}|${r}`
   const store: NearbyStore = {
     listPrefs: async (ids) => (o.prefs ?? []).filter((p) => ids.includes(p.discordId)),
-    handled: async (eventIds) => new Set([...rows].filter(([k, r]) => eventIds.includes(k.split('|')[1]) && (r.status !== 'RETRY' || r.attempts >= 3)).map(([k]) => k)),
+    handled: async (eventIds, ids) => new Set([...rows].filter(([k, r]) => eventIds.includes(k.split('|')[1]) && ids.includes(k.split('|')[0]) && (r.status !== 'RETRY' || r.attempts >= 3)).map(([k]) => k)),
     sentThisWeek: async (ids) => {
       const out = new Map<string, Date[]>()
       for (const id of ids) {
-        const mine = [...(o.sent?.[id] ?? []), ...[...rows].filter(([k, r]) => k.startsWith(`${id}|`) && r.status === 'SENT').map(([, r]) => r.at)]
+        const mine = [...(o.sent?.[id] ?? []), ...[...rows].filter(([k, r]) => k.startsWith(`${id}|`) && (r.status === 'SENT' || r.status === 'CLAIMED')).map(([, r]) => r.at)]
         if (mine.length) out.set(id, mine)
       }
       return out
     },
+    sentDay: async (ids) => {
+      const out = new Map<string, Date[]>()
+      for (const id of ids) if (o.today?.[id]) out.set(id, o.today[id])
+      return out
+    },
+    recent: async (id, _now, except) => [
+      ...(o.racing?.(id) ?? []),
+      ...[...rows].filter(([k, r]) => k.startsWith(`${id}|`) && !k.endsWith(`|${except}`) && (r.status === 'SENT' || r.status === 'CLAIMED')).map(([, r]) => r.at),
+    ],
+    unclaim: async (d, r) => void rows.delete(key(d, r)),
     timezones: async (ids) => new Map(Object.entries(o.zones ?? {}).filter(([k]) => ids.includes(k))),
     claim: async (d, r) => {
       const k = key(d, r)
@@ -66,6 +76,9 @@ function deps(o: {
   send?: NearbyRunDeps['send']
   maxSends?: number
   now?: Date
+  today?: unknown
+  nowMs?: () => number
+  deadlineAt?: number
 } = {}) {
   const sent: Array<{ id: string; text: string }> = []
   const notified: string[] = []
@@ -76,7 +89,7 @@ function deps(o: {
     now: o.now ?? NOW,
     env: o.env ?? PROD,
     siteUrl: 'https://app.example',
-    config: { enabled: o.enabled ?? true, match, maxSends: o.maxSends ?? 100, quiet, telegramRecheck: { dmRecheckDays: 7, dmRecheckMaxDays: 60 } },
+    config: { enabled: o.enabled ?? true, match, maxSends: o.maxSends ?? 100, maxPerMemberPerDay: 6, deadlineAt: o.deadlineAt ?? Number.MAX_SAFE_INTEGER, quiet, telegramRecheck: { dmRecheckDays: 7, dmRecheckMaxDays: 60 } },
     fetchEvents,
     loadMembers,
     store: o.store ?? memStore().store,
@@ -87,6 +100,8 @@ function deps(o: {
     getTelegram: async () => null,
     sendTelegram: async () => ({ ok: true }),
     recordTelegramReach: async () => undefined,
+    optOutUrl: (id) => `https://app.example/nearby-optout?d=${id}`,
+    nowMs: o.nowMs,
     notify: async (n) => void notified.push(n.discordId),
     sleep: async () => undefined,
   }
@@ -242,6 +257,58 @@ describe('runNearbyInvites', () => {
     const r = await runNearbyInvites(t.d)
     expect(r.sent).toBe(2)
     expect(r.stoppedEarly).toBe(true)
+  })
+
+  it('stops starting sends at the wall-clock deadline and leaves the rest for the next run', async () => {
+    const { store, rows } = memStore()
+    let t = 1000
+    const t1 = deps({ store, members: [mem(1), mem(2), mem(3)], deadlineAt: 2000, nowMs: () => (t += 600) })
+    const r = await runNearbyInvites(t1.d)
+    expect(r.stoppedEarly).toBe(true)
+    expect(r.sent).toBeLessThan(3)
+    expect(rows.size).toBe(r.sent)
+    // The next run (no deadline pressure) finishes the rest.
+    const r2 = await runNearbyInvites(deps({ store, members: [mem(1), mem(2), mem(3)] }).d)
+    expect(r.sent + r2.sent).toBe(3)
+  })
+
+  it('an in-flight claim counts toward the cap', async () => {
+    const { store } = memStore()
+    await store.claim('d1', 'other', 'NEARBY_EVENT') // CLAIMED by another run, one a day
+    const t = deps({ store })
+    const r = await runNearbyInvites(t.d)
+    expect(r.sent).toBe(0)
+    expect(r.skipped.cap_day).toBe(1)
+  })
+
+  it('reminders.maxPerMemberPerDay counts every kind of reminder', async () => {
+    const six = Array.from({ length: 6 }, () => new Date(NOW.getTime() - HOUR))
+    const { store } = memStore({ today: { d1: six } })
+    const t = deps({ store })
+    const r = await runNearbyInvites(t.d)
+    expect(r.sent).toBe(0)
+    expect(r.skipped.cap_all).toBe(1)
+  })
+
+  it('re-checks the cap inside the claim: a racing claim makes this run back off and drop its own claim', async () => {
+    const { store, rows } = memStore({ racing: () => [new Date(NOW.getTime() - 1000)] })
+    const t = deps({ store })
+    const r = await runNearbyInvites(t.d)
+    expect(r.sent).toBe(0)
+    expect(r.skipped.cap_race).toBe(1)
+    expect(rows.size).toBe(0)
+    expect(t.sent).toHaveLength(0)
+  })
+
+  it('the Telegram invite carries a signed no-login opt-out link', async () => {
+    const { store } = memStore({ prefs: [{ discordId: 'd1', nearbyEvents: true, nearbyRadiusKm: null, channel: 'TELEGRAM' }] })
+    const sendTelegram = vi.fn(async () => ({ ok: true as const }))
+    const t = deps({ store, env: { ...PROD, RSV_PIZZA_TELEGRAM_KEY: 'k' } })
+    t.d.sendTelegram = sendTelegram
+    t.d.getTelegram = async () => ({ telegramId: 't1', reach: null })
+    await runNearbyInvites(t.d)
+    const arg = (sendTelegram.mock.calls[0] as unknown as [{ buttons: Array<Array<{ url: string }>> }])[0]
+    expect(arg.buttons[1][0].url).toBe('https://app.example/nearby-optout?d=d1')
   })
 
   it('results carry counts only, no member ids', async () => {

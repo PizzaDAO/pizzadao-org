@@ -35,8 +35,10 @@ export function nearbyComponents(url: string, settingsUrl: string | null): unkno
   return [{ type: 1, components: buttons }]
 }
 
-export function nearbyTelegramButtons(url: string, settingsUrl: string | null): Array<Array<{ text: string; url: string }>> {
+export function nearbyTelegramButtons(url: string, settingsUrl: string | null, optOutUrl: string | null = null): Array<Array<{ text: string; url: string }>> {
   const rows = [[{ text: 'RSVP', url: rsvpUrl(url) }]]
-  if (settingsUrl) rows.push([{ text: 'Not interested in nearby events', url: settingsUrl }])
+  // The signed link works without a login; the settings page is the fallback.
+  const off = optOutUrl ?? settingsUrl
+  if (off) rows.push([{ text: 'Not interested in nearby events', url: off }])
   return rows
 }
