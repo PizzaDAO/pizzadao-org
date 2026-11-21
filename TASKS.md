@@ -14,7 +14,7 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 | bellpepper-80127 | Idea para dashboard: carpeta para subir memes de pizzadao y bennys xD | review | P2 |  |  |  | plans/bellpepper-80127.md | 462 | off until memes.enabled is switched on |
 | pineapple-84122 | Auto-Invite member to event or one is near their city | todo | P2 |  |  |  | plans/pineapple-84122-nearby-event-invites.md |  |  |
 | pineapple-71302 | add a email claiming system for memebes to claim a unique pizzadao emails | todo | P3 |  |  |  | plans/pineapple-71302-pizzadao-emails.md |  | 2026-10-17: on hold, not yet (Snax); 2026-11-21: only members level 8+ can claim |
-| neapolitan-96018 | Crew page with start crew call button | todo | P2 |  |  |  |  |  | moved back from Done 2026-11-14: no evidence it shipped |
+| neapolitan-96018 | Crew page with start crew call button | review | P2 |  | Snax | crews | plans/neapolitan-96018.md | PR_NUM | moved back from Done 2026-11-14: no evidence it shipped |
 | discord-guild-channels-timeout | Discord: GET /guilds/{id}/channels times out in prod | review | P2 |  |  |  |  | #460 | found in plans/diavola-24729.md: GET /guilds/{id}/channels times out in prod; blanks public channel names on profiles and recaps |
 
 ## Done

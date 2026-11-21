@@ -66,7 +66,89 @@ const taskUpdatePostsEnabled: SettingDef<boolean> = {
   confirm: (from, to) => (to && !from ? "Crew channels will get a digest of task changes made on the website." : null),
 }
 
+function flag(key: string, label: string, help: string, confirmOn?: string): SettingDef<boolean> {
+  return {
+    key,
+    area: 'crews',
+    label,
+    help,
+    schema: z.boolean(),
+    default: false,
+    onReadFailure: { value: false },
+    input: { type: 'bool' },
+    ...(confirmOn ? { confirm: (from: boolean, to: boolean) => (to && !from ? confirmOn : null) } : {}),
+  }
+}
+
+const CREW_CALL_POST_TEMPLATE_DEFAULT = '{crew} call is starting now. Join: {voice} Live notes: {live}'
+
+const crewCallPostTemplate: SettingDef<string> = {
+  key: 'crewCall.postTemplate',
+  area: 'crews',
+  label: 'Start crew call: channel post',
+  help: 'Posted in the crew channel when a call is started from the crew page. Placeholders: {crew}, {voice} (the voice channel link), {live} (the live notes link). Empty: nothing is posted.',
+  schema: z.string().trim().max(500),
+  default: CREW_CALL_POST_TEMPLATE_DEFAULT,
+  onReadFailure: { value: CREW_CALL_POST_TEMPLATE_DEFAULT },
+  input: { type: 'text', multiline: true, maxLength: 500 },
+}
+
+const crewCallCrews: SettingDef<string[]> = {
+  key: 'crewCall.crews',
+  area: 'crews',
+  label: 'Start crew call: only these crews',
+  help: 'Crew ids, one per line. Only these crews get the Start crew call button. Empty: every crew (once the switch is on). Use it to pilot with one crew.',
+  schema: z.array(z.string().trim().toLowerCase().regex(/^[a-z0-9]+(?:_[a-z0-9]+)*$/, 'Not a valid crew id')).max(40),
+  default: [],
+  onReadFailure: { value: [] },
+  input: { type: 'stringList', maxItems: 40, maxLength: 40 },
+}
+
 export const CREWS_SETTINGS = {
+  'crewCall.startEnabled': flag(
+    'crewCall.startEnabled',
+    'Start crew call button on the crew page',
+    "Crew leads, Pizza Capos and admins get a Start crew call button on their crew's page. It starts the crew's Discord call event (Metalhead then records as usual) and posts a short note in the crew channel. Off: no button and the endpoint refuses. The CREW_CALL_START_ENABLED env var set to off always wins; preview deploys never write to Discord.",
+    "Crew leads, capos and admins will be able to start crew calls from the crew page, which changes the Discord event and posts in the crew channel.",
+  ),
+  'crewCall.allowAdHoc': flag(
+    'crewCall.allowAdHoc',
+    'Start crew call: allow calls outside the schedule',
+    "When the crew has no call scheduled close to now, the button creates a one-off Discord call event so the call is recorded. Off: it answers with the crew's next call time instead.",
+    'Crews will be able to start unscheduled calls, which create Discord events.',
+  ),
+  'crewCall.allowCrewMembers': flag(
+    'crewCall.allowCrewMembers',
+    'Start crew call: any crew member',
+    "Off: only crew leads, Pizza Capos and admins can press the button. On: anyone on the crew's roster can.",
+    "Every member on a crew's roster will be able to start that crew's call.",
+  ),
+  'crewCall.pingRole': flag(
+    'crewCall.pingRole',
+    'Start crew call: ping the crew role',
+    "Off: the channel note mentions nobody. On: it mentions the crew's Discord role.",
+    'The crew role will be pinged each time a call is started from the crew page.',
+  ),
+  'crewCall.startWindowMinutes': int({
+    key: 'crewCall.startWindowMinutes',
+    label: 'Start crew call: schedule window',
+    help: "A scheduled call counts as this call when it starts within this many minutes of now (before or after).",
+    min: 5,
+    max: 60,
+    default: 30,
+    unit: 'minutes',
+  }),
+  'crewCall.cooldownMinutes': int({
+    key: 'crewCall.cooldownMinutes',
+    label: 'Start crew call: cooldown',
+    help: 'After a crew call is started from the page, the crew cannot start another for this long.',
+    min: 5,
+    max: 180,
+    default: 30,
+    unit: 'minutes',
+  }),
+  'crewCall.postTemplate': crewCallPostTemplate,
+  'crewCall.crews': crewCallCrews,
   'crews.taskUpdatePostsEnabled': taskUpdatePostsEnabled,
   'crews.taskUpdateDigestMinutes': int({
     key: 'crews.taskUpdateDigestMinutes',

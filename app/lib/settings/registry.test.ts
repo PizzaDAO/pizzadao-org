@@ -107,7 +107,7 @@ describe('settings registry', () => {
       ['nametags.fields.level', 1],
     ])
     // And the literal values today (a change here is a deliberate, reviewed change).
-    expect(SETTING_KEYS.filter((k) => !k.startsWith('guide.') && !k.startsWith('followups.') && !k.startsWith('payments.') && !k.startsWith('proposals.') && !k.startsWith('telegram.') && !k.startsWith('sheets.') && !k.startsWith('map.') && !k.startsWith('reminders.') && !k.startsWith('crews.') && !k.startsWith('members.') && k !== 'wallets.requireSignature' && !k.startsWith('nametags.') && !k.startsWith('profile.eventsAttended.') && !k.startsWith('calls.updates') && k !== 'discord.metalheadCommandEnabled' && !ECONOMY_KEYS.has(k)).map((k) => [k, SETTINGS[k].default])).toEqual([
+    expect(SETTING_KEYS.filter((k) => !k.startsWith('guide.') && !k.startsWith('followups.') && !k.startsWith('payments.') && !k.startsWith('proposals.') && !k.startsWith('telegram.') && !k.startsWith('sheets.') && !k.startsWith('map.') && !k.startsWith('reminders.') && !k.startsWith('crews.') && !k.startsWith('crewCall.') && !k.startsWith('members.') && k !== 'wallets.requireSignature' && !k.startsWith('nametags.') && !k.startsWith('profile.eventsAttended.') && !k.startsWith('calls.updates') && k !== 'discord.metalheadCommandEnabled' && !ECONOMY_KEYS.has(k)).map((k) => [k, SETTINGS[k].default])).toEqual([
       ['calls.transcriptMinLevel', 6],
       ['calls.summaryMinLevel', 5],
       ['calls.actionItemsMinLevel', 4],

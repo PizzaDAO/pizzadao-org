@@ -190,6 +190,11 @@ export const TOGGLES = {
   'site.sessionBridgeEnabled': { env: 'SITE_SESSION_BRIDGE_ENABLED', legacy: ON_WORDS },
   // Off unless turned on: lane cards link to guides and members can pin a lane (plans/lane-cards-mission-onboarding.md).
   'onboarding.laneCardsEnabled': { env: 'LANE_CARDS_ENABLED', legacy: ON_WORDS },
+  // Off unless turned on: the Start crew call button on the crew page.
+  'crewCall.startEnabled': { env: 'CREW_CALL_START_ENABLED', legacy: ON_WORDS },
+  'crewCall.allowAdHoc': { env: 'CREW_CALL_ALLOW_ADHOC', legacy: ON_WORDS },
+  'crewCall.allowCrewMembers': { env: 'CREW_CALL_ALLOW_CREW_MEMBERS', legacy: ON_WORDS },
+  'crewCall.pingRole': { env: 'CREW_CALL_PING_ROLE', legacy: ON_WORDS },
 } as const satisfies Partial<Record<SettingKey, ToggleDef>>
 
 export type ToggleKey = keyof typeof TOGGLES

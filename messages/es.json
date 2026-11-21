@@ -3073,5 +3073,27 @@
     "cardTitle": "Carpeta de memes",
     "cardEmpty": "Aún no hay memes. Sé el primero en compartir uno.",
     "cardWaiting": "{count, plural, one {# meme esperando revisión} other {# memes esperando revisión}}"
+  },
+  "crewCallStart": {
+    "start": "Iniciar llamada del crew",
+    "starting": "Iniciando...",
+    "live": "En vivo",
+    "recording": "Grabando",
+    "joinVoice": "Unirse a la voz",
+    "openLive": "Abrir vista en vivo",
+    "joinHint": "Entra al canal de voz. Metalhead empieza a grabar cuando estés dentro.",
+    "previewNote": "Vista previa: no se inició nada.",
+    "busyNamed": "{crew} está en vivo en el canal de llamadas ahora.",
+    "errors": {
+      "generic": "No se pudo iniciar la llamada. Inténtalo en un minuto.",
+      "rateLimited": "Demasiados intentos. Espera unos minutos.",
+      "already_live": "Esta llamada ya está en vivo.",
+      "channel_busy": "Otro crew está en vivo en el canal de llamadas ahora.",
+      "cooldown": "Este crew inició una llamada hace un momento.",
+      "not_scheduled": "No hay ninguna llamada programada ahora.",
+      "not_scheduledNext": "No hay ninguna llamada programada ahora. Próxima llamada: {when}.",
+      "not_recordable": "Este canal de llamadas no está configurado para grabar.",
+      "discord_failed": "Discord rechazó iniciar la llamada. Pide a un admin revisar los permisos del bot."
+    }
   }
 }

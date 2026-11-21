@@ -3073,5 +3073,27 @@
     "cardTitle": "Meme folder",
     "cardEmpty": "No memes yet. Be the first to share one.",
     "cardWaiting": "{count, plural, one {# meme waiting for review} other {# memes waiting for review}}"
+  },
+  "crewCallStart": {
+    "start": "Start crew call",
+    "starting": "Starting...",
+    "live": "Live",
+    "recording": "Recording",
+    "joinVoice": "Join voice",
+    "openLive": "Open live view",
+    "joinHint": "Join the voice channel. Metalhead starts recording when you are in.",
+    "previewNote": "Preview: nothing was started.",
+    "busyNamed": "{crew} is live in the call channel now.",
+    "errors": {
+      "generic": "Could not start the call. Try again in a minute.",
+      "rateLimited": "Too many tries. Wait a few minutes.",
+      "already_live": "This call is already live.",
+      "channel_busy": "Another crew is live in the call channel now.",
+      "cooldown": "This crew started a call a moment ago.",
+      "not_scheduled": "No call is scheduled right now.",
+      "not_scheduledNext": "No call is scheduled right now. Next call: {when}.",
+      "not_recordable": "This call channel is not set up for recording.",
+      "discord_failed": "Discord refused to start the call. Ask an admin to check the bot's permissions."
+    }
   }
 }
