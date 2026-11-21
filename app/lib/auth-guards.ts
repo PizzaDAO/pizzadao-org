@@ -12,7 +12,6 @@ import { timingSafeEqual } from "crypto";
 import { getSession, type Session } from "./session";
 import { hasAnyRole } from "./discord";
 import { ADMIN_ROLE_IDS } from "@/app/ui/constants";
-import { toggleEnabled } from "@/app/lib/settings/toggles";
 
 export type GuardResult =
   | { ok: true; session: Session }
@@ -79,7 +78,13 @@ export async function isAdminSession(): Promise<boolean> {
  */
 export async function telegramSessionBlocked(session: Pick<Session, "authMethod">): Promise<boolean> {
   if (session.authMethod !== "telegram") return false;
-  return !(await toggleEnabled("auth.telegramSignInAdminAllowed").catch(() => false));
+  try {
+    // Loaded only for Telegram sessions, so ordinary admin checks never pull in the settings store.
+    const { toggleEnabled } = await import("@/app/lib/settings/toggles");
+    return !(await toggleEnabled("auth.telegramSignInAdminAllowed"));
+  } catch {
+    return true;
+  }
 }
 
 /** Require a session belonging to a guild admin. 401 if no session, 403 if not admin (or Telegram-started). */
