@@ -1901,9 +1901,24 @@ model CrewTaskProposal {
   error         String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+  card          CrewTaskProposalCard?
 
   @@index([crewId, status, createdAt])
   @@index([recordingId])
+}
+
+// The bot's approval card for a proposal in the private capo review channel (app/lib/call-tasks/cards.ts).
+// Mirrors CallReviewCard; kept apart so card bookkeeping never bumps CrewTaskProposal.updatedAt.
+model CrewTaskProposalCard {
+  proposalId   String           @id
+  channelId    String?
+  messageId    String?
+  claimedAt    DateTime? // post claim (stale after 10 min)
+  renderedHash String?          @db.VarChar(64) // edit only when the render changed
+  resolvedAt   DateTime? // applied / dismissed / stale: buttons removed
+  error        String? // last Discord failure, max 300, no URLs
+  updatedAt    DateTime         @updatedAt
+  proposal     CrewTaskProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
 }
 
 // DST sync of crew call times (plans/dst-crew-call-times.md): one row per planned / dry-run / applied /

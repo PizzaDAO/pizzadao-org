@@ -98,6 +98,9 @@ import type { ReminderInteractionDeps } from "@/app/lib/discord-interactions/rem
 import { callReviewHandlerDeps, callReviewRunDeps } from "@/app/lib/discord-interactions/call-review-defaults";
 import { runCallReview } from "@/app/lib/discord-interactions/call-review-run";
 import { syncCallReviewCard } from "@/app/lib/calls/review-cards";
+import { taskProposalHandlerDeps, taskProposalRunDeps } from "@/app/lib/discord-interactions/task-proposal-review-defaults";
+import { runTaskProposalReview } from "@/app/lib/discord-interactions/task-proposal-review";
+import { defaultProposalCardDeps, syncTaskProposalCard } from "@/app/lib/call-tasks/cards";
 import { stopCallReminders, stopProposalReminders } from "@/app/lib/reminders/prefs";
 import { liveCommandEnabled, mayRunLive, runLiveCommand, type LiveJob } from "@/app/lib/calls/live-announce-command";
 import { SITE_URL } from "@/app/lib/site-url";
@@ -366,6 +369,14 @@ const callReview = callReviewHandlerDeps(
   (id) => after(() => syncCallReviewCard(id).then(() => undefined)),
 );
 
+// Task proposal card buttons (calls.taskProposalCardsEnabled; who may press: the call review rule): the
+// apply / dismiss run after the response, through the website's own code.
+const taskProposals = taskProposalHandlerDeps(
+  appUrl(),
+  (job) => after(() => runTaskProposalReview(job, taskProposalRunDeps()).then(() => undefined, (err) => console.error("[task proposal card] job failed:", err))),
+  (id) => after(() => syncTaskProposalCard(id, defaultProposalCardDeps, { editOnly: true }).then(() => undefined)),
+);
+
 const followups: FollowUpInteractionDeps = {
   respond: (a) => applyMemberAction({ ...a, actorId: a.discordId }),
   addLink: (a) => setDoneUrl({ ...a, actorId: a.discordId }),
@@ -440,6 +451,7 @@ function deps(guildId: string | undefined, settings: Settings): HandlerDeps {
     metalhead: { enabled: () => metalheadEnabled(), rateLimit: metalheadRateLimit, defer: deferMetalhead, callChoices: liveCallChoices },
     missionReview,
     callReview,
+    taskProposals,
     followups,
     reminders,
   };

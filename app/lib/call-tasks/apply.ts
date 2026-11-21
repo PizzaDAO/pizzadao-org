@@ -1,7 +1,8 @@
 /**
  * Deciding on proposed crew task updates (plans/post-call-agenda-updates.md, ask 2): apply, edit,
- * dismiss, apply all. Only a lead of the crew or a guild admin (canManageCrew) may decide, and only
- * for crews whose tasks are edited on the website. Applying writes through the shared task writer
+ * dismiss, apply all. Only a lead of the crew or a guild admin (canManageCrew) may decide (from the
+ * Discord proposal cards: a call reviewer, see DecideAuthorizer), and only for crews whose tasks are
+ * edited on the website. Applying writes through the shared task writer
  * (crew-tasks-write.ts), so `doneAt`, the history (CrewTaskEvent, via: 'call-proposal') and the
  * archive-never-delete rule are the same as in the editor. A task that changed since the proposal
  * was made is a conflict: the lead has to confirm again (force) before it is overwritten.
@@ -145,11 +146,17 @@ export async function isValidTargetCrew(crewId: string, filter: PostFilter): Pro
   return usesDb('crewTasks', crewId)
 }
 
-export async function applyProposal(id: string, actor: string, opts: { edits?: unknown; force?: boolean; confirmed?: boolean; now?: Date } = {}): Promise<ApplyOutcome> {
+/**
+ * Who may decide on a proposal of this crew. Defaults to canManageCrew (a crew lead or a guild admin);
+ * the Discord proposal cards pass their own check (the call reviewer role, read from the interaction).
+ */
+export type DecideAuthorizer = (actor: string, crewId: string) => Promise<boolean>
+
+export async function applyProposal(id: string, actor: string, opts: { edits?: unknown; force?: boolean; confirmed?: boolean; now?: Date; authorize?: DecideAuthorizer } = {}): Promise<ApplyOutcome> {
   const row = (await prisma.crewTaskProposal.findUnique({ where: { id } })) as (Row & { createdAt?: Date }) | null
   if (!row) return { result: 'not-found' }
   if (row.status !== 'PENDING') return { result: 'not-pending' }
-  if (!(await canManageCrew(actor, row.crewId))) return { result: 'forbidden' }
+  if (!(await (opts.authorize ?? canManageCrew)(actor, row.crewId))) return { result: 'forbidden' }
   if (!(await usesDb('crewTasks', row.crewId))) return { result: 'not-db-crew' }
   // The feature switch, the crew list, the private exclusion list and the age limit all apply to applying too.
   // The allowlist is about the call: a task routed from a community call to another crew counts as that call's.
@@ -297,10 +304,10 @@ export async function applyProposal(id: string, actor: string, opts: { edits?: u
 
 export type DismissOutcome = 'dismissed' | 'not-found' | 'not-pending' | 'forbidden'
 
-export async function dismissProposal(id: string, actor: string, now = new Date()): Promise<DismissOutcome> {
+export async function dismissProposal(id: string, actor: string, now = new Date(), opts: { authorize?: DecideAuthorizer } = {}): Promise<DismissOutcome> {
   const row = await prisma.crewTaskProposal.findUnique({ where: { id }, select: { crewId: true, status: true } })
   if (!row) return 'not-found'
-  if (!(await canManageCrew(actor, row.crewId))) return 'forbidden'
+  if (!(await (opts.authorize ?? canManageCrew)(actor, row.crewId))) return 'forbidden'
   if (row.status !== 'PENDING') return 'not-pending'
   const res = await prisma.crewTaskProposal.updateMany({ where: { id, status: 'PENDING' }, data: { status: 'DISMISSED', decidedBy: actor, decidedAt: now } })
   return res.count === 1 ? 'dismissed' : 'not-pending'

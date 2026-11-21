@@ -223,6 +223,19 @@ describe('dismissProposal', () => {
     prop.findUnique.mockResolvedValue({ crewId: 'ops', status: 'APPLIED' } as never)
     expect(await dismissProposal('p1', 'lead1')).toBe('not-pending')
   })
+
+  it('an authorize override (the Discord cards) replaces the crew-lead check, for apply too', async () => {
+    vi.mocked(canManageCrew).mockResolvedValue(false)
+    prop.findUnique.mockResolvedValue({ crewId: 'ops', status: 'PENDING' } as never)
+    const allow = vi.fn(async () => true)
+    expect(await dismissProposal('p1', 'capo1', new Date(), { authorize: allow })).toBe('dismissed')
+    expect(allow).toHaveBeenCalledWith('capo1', 'ops')
+    expect(await dismissProposal('p1', 'capo1', new Date(), { authorize: async () => false })).toBe('forbidden')
+    prop.findUnique.mockResolvedValue(row() as never)
+    task.findFirst.mockResolvedValue(dbTask() as never)
+    expect(await applyProposal('p1', 'capo1', { confirmed: true, authorize: allow })).toEqual({ result: 'applied', taskId: 't1' })
+    expect(canManageCrew).not.toHaveBeenCalled()
+  })
 })
 
 describe('applyAll', () => {

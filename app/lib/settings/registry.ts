@@ -1833,6 +1833,13 @@ export const SETTINGS = {
     help: 'When proposals are waiting after a call, Metalhead posts one short line in the crew\'s Discord channel with a link to the crew page (a count only, never the proposals). Uses the private post filter: excluded crews get no post. The CALL_TASK_PROPOSALS_NUDGE_ENABLED env var set to off always wins; on preview deploys only the env var counts.',
     confirmOn: 'Metalhead will post in the crew channel when task proposals from a call are waiting for review.',
   }),
+  'calls.taskProposalCardsEnabled': boolSetting({
+    key: 'calls.taskProposalCardsEnabled',
+    area: 'calls',
+    label: 'Task proposal cards in the capo review channel',
+    help: 'Post each proposed crew task update to the private capo review channel (the same channel as the call review cards) with Apply and Dismiss buttons, and keep the card up to date when it is decided here or on the website. Only proposals made after this is switched on are posted. Cards never show the transcript quote, and nothing is posted unless the channel is hidden from everyone but capos. Buttons work for Pizza Capos (with capo call review on) and Dread Pizza Roberts. The CALL_TASK_PROPOSAL_CARDS_ENABLED env var set to off always wins.',
+    confirmOn: 'The bot will post proposed crew task updates, with Apply and Dismiss buttons, to the capo review channel.',
+  }),
   'calls.taskProposalsDefaultCrew': textSetting({
     key: 'calls.taskProposalsDefaultCrew',
     area: 'calls',

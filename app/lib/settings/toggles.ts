@@ -86,6 +86,8 @@ export const TOGGLES = {
   'calls.liveViewEnabled': { env: 'CALL_LIVE_VIEW_ENABLED', legacy: ON_WORDS },
   'calls.taskProposalsEnabled': { env: 'CALL_TASK_PROPOSALS_ENABLED', legacy: ON_WORDS },
   'calls.taskProposalsNudgeEnabled': { env: 'CALL_TASK_PROPOSALS_NUDGE_ENABLED', legacy: ON_WORDS },
+  // Off unless turned on: the bot posts each proposed task update to the private capo review channel for Apply / Dismiss.
+  'calls.taskProposalCardsEnabled': { env: 'CALL_TASK_PROPOSAL_CARDS_ENABLED', legacy: ON_WORDS },
   'calls.importedRecapPostEnabled': { env: 'CALL_IMPORT_RECAP_ENABLED', legacy: ON_WORDS },
   'calls.importedFollowupsEnabled': { env: 'CALL_IMPORT_FOLLOWUPS_ENABLED', legacy: ON_WORDS },
   'calls.importedAgendaContext': { env: 'CALL_IMPORT_AGENDA_ENABLED', legacy: ON_WORDS },

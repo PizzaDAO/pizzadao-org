@@ -3,6 +3,7 @@ import { json, rejectUnsafeWrite } from '@/app/lib/admin-guard'
 import { normalizeCrewId } from '@/app/lib/crew-id'
 import { prisma } from '@/app/lib/db'
 import { applyProposal, dismissProposal, undoRetire } from '@/app/lib/call-tasks/apply'
+import { queueTaskProposalCardSync } from '@/app/lib/call-tasks/cards'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -27,6 +28,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ cre
   const row = await prisma.crewTaskProposal.findUnique({ where: { id }, select: { crewId: true } })
   if (!row || row.crewId !== crewId) return json({ error: 'Not found' }, 404)
   const actor = auth.session.discordId
+  // Its Discord card (if any) follows the decision; edits only, after the response, off unless switched on.
+  queueTaskProposalCardSync(id)
 
   if (body.action === 'undo') {
     const u = await undoRetire(id, actor)
