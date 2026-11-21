@@ -46,7 +46,7 @@ describe('decideCrewCallStart', () => {
     expect(adhoc.kind).toBe('start_adhoc')
     if (adhoc.kind === 'start_adhoc') {
       expect(adhoc.startMs).toBe(NOW + MIN)
-      expect(adhoc.occurrenceKey).toBe(`adhoc:ops:${Math.floor(NOW / (10 * MIN))}`)
+      expect(adhoc.occurrenceKey).toBe('adhoc:ops:active')
     }
   })
   it('handles a crew with no event', () => {
@@ -66,6 +66,12 @@ describe('decideCrewCallStart', () => {
     expect(decideCrewCallStart(base({ live }))).toEqual({ kind: 'channel_busy', otherCrewLabel: 'Tech' })
     // another crew in a different channel is fine
     expect(decideCrewCallStart(base({ live: [{ ...live[0], channelId: '900000000000000002' }] })).kind).toBe('start_event')
+  })
+  it('treats a recent page start by another crew in the channel as busy, and an active ad hoc event as live', () => {
+    const recentStarts = [{ crewId: 'tech', crewLabel: 'Tech', channelId: VOICE, createdAtMs: NOW - 5 * MIN }]
+    expect(decideCrewCallStart(base({ recentStarts }))).toEqual({ kind: 'channel_busy', otherCrewLabel: 'Tech' })
+    expect(decideCrewCallStart(base({ recentStarts: [{ ...recentStarts[0], createdAtMs: NOW - 40 * MIN }] })).kind).toBe('start_event')
+    expect(decideCrewCallStart(base({ adHocActive: true })).kind).toBe('already_live')
   })
   it('refuses a channel the recorder cannot join', () => {
     expect(decideCrewCallStart(base({ recordable: ['900000000000000009'] })).kind).toBe('not_recordable')
@@ -145,6 +151,20 @@ describe('runCrewCallStart', () => {
     expect(d.claims.size).toBe(0)
     expect(d.discord.post).not.toHaveBeenCalled()
     expect((await runCrewCallStart(input(), d)).status).toBe('started')
+  })
+  it('returns a code, never the raw Discord text', async () => {
+    const d = makeDeps()
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.mocked(d.discord.setActive).mockRejectedValueOnce(Object.assign(new Error('secret detail'), { status: 403 }))
+    expect(await runCrewCallStart(input(), d)).toEqual({ status: 'discord_failed', code: 'bot_permissions' })
+    vi.mocked(d.discord.setActive).mockRejectedValueOnce(new Error('secret detail'))
+    expect(await runCrewCallStart(input(), d)).toEqual({ status: 'discord_failed', code: 'discord_error' })
+  })
+  it('an ad hoc start asks to reclaim a stale per-crew claim after the cooldown', async () => {
+    const d = makeDeps()
+    const decision = decideCrewCallStart(base({ event: null, settings: { ...settings, allowAdHoc: true } }))
+    await runCrewCallStart(input({ decision }), d)
+    expect(vi.mocked(d.claim).mock.calls[0][0]).toMatchObject({ occurrenceKey: 'adhoc:ops:active', reclaimOlderThanMs: 30 * MIN })
   })
   it('a failed post keeps the start', async () => {
     const d = makeDeps()

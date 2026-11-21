@@ -83,7 +83,7 @@ describe('POST /api/crew/[crewId]/call/start', () => {
   it('200 preview answer on a preview deploy, 502 on a Discord failure', async () => {
     vi.mocked(runCrewCallStart).mockResolvedValue({ status: 'preview', wouldDo: 'start_event' })
     expect((await POST(post(), params)).status).toBe(200)
-    vi.mocked(runCrewCallStart).mockResolvedValue({ status: 'discord_failed', message: 'x' })
+    vi.mocked(runCrewCallStart).mockResolvedValue({ status: 'discord_failed', code: 'discord_error' })
     expect((await POST(post(), params)).status).toBe(502)
   })
 })

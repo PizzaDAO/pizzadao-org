@@ -126,9 +126,9 @@ export async function readCrewCallState(ctx: CrewCallContext, crewId: string, no
   const recordable = allowed.length ? allowed : [fallback]
 
   const since = new Date(nowMs - 6 * 60 * 60 * 1000)
-  const [rows, last] = await Promise.all([
+  const [rows, starts] = await Promise.all([
     prisma.callLiveSession.findMany({ where: { endedAt: null, lastSeenAt: { gte: since } }, take: 50 }),
-    prisma.crewCallStart.findFirst({ where: { crewId: normalizeCrewId(crewId), error: null }, orderBy: { createdAt: 'desc' } }),
+    prisma.crewCallStart.findMany({ where: { createdAt: { gte: new Date(nowMs - ctx.settings.cooldownMinutes * 60_000 - 6 * 60 * 60 * 1000) } }, orderBy: { createdAt: 'desc' }, take: 100 }),
   ])
   const live: LiveSessionLite[] = rows.map((r) => ({
     crewId: r.crewId,
@@ -137,6 +137,20 @@ export async function readCrewCallState(ctx: CrewCallContext, crewId: string, no
     lastSeenAtMs: r.lastSeenAt.getTime(),
     endedAt: !!r.endedAt,
   }))
+  const me = normalizeCrewId(crewId)
+  const last = starts.find((r) => r.crewId === me)
+  // An ad hoc event this crew started may still be running (its row can predate the cooldown).
+  let adHocActive = false
+  const adHocRow = starts.find((r) => r.crewId === me && r.adHoc && r.eventId)
+  if (adHocRow?.eventId) {
+    try {
+      const raw = (await discordScheduledEventRequest({ method: 'GET', guildId: env.guildId, eventId: adHocRow.eventId, botToken: env.token })) as DiscordScheduledEventRaw
+      adHocActive = raw.status === EVENT_STATUS_ACTIVE
+    } catch {
+      adHocActive = false
+    }
+  }
+  const crewLabels = new Map((await getCrewMappings().catch(() => ({ crews: [] as CrewOption[] }))).crews.map((c) => [c.id, c.label]))
   const decision = decideCrewCallStart({
     nowMs,
     crewId: normalizeCrewId(crewId),
@@ -144,6 +158,8 @@ export async function readCrewCallState(ctx: CrewCallContext, crewId: string, no
     voiceChannelId,
     recordable,
     live,
+    adHocActive,
+    recentStarts: starts.map((r) => ({ crewId: r.crewId, crewLabel: crewLabels.get(r.crewId) ?? null, channelId: r.channelId, createdAtMs: r.createdAt.getTime() })),
     lastStartMs: last?.createdAt.getTime() ?? null,
     nextCallMs: nextCrewCall(crew.callTime, new Date(nowMs))?.getTime() ?? null,
     settings: ctx.settings,
@@ -176,11 +192,24 @@ export function buildStartDeps(crew: CrewOption): StartDeps {
     isProduction: process.env.VERCEL_ENV === 'production',
     now: () => Date.now(),
     claim: async (row) => {
+      const { reclaimOlderThanMs, ...data } = row
       try {
-        await prisma.crewCallStart.create({ data: row })
+        await prisma.crewCallStart.create({ data })
         return { ok: true }
       } catch (e) {
         if ((e as { code?: string })?.code !== 'P2002') throw e
+        if (reclaimOlderThanMs) {
+          // A stale ad hoc claim (past its cooldown) is replaced; deleteMany is atomic, so one caller wins.
+          const gone = await prisma.crewCallStart.deleteMany({ where: { occurrenceKey: row.occurrenceKey, createdAt: { lt: new Date(Date.now() - reclaimOlderThanMs) } } })
+          if (gone.count > 0) {
+            try {
+              await prisma.crewCallStart.create({ data })
+              return { ok: true }
+            } catch (e2) {
+              if ((e2 as { code?: string })?.code !== 'P2002') throw e2
+            }
+          }
+        }
         const existing = await prisma.crewCallStart.findUnique({ where: { occurrenceKey: row.occurrenceKey } })
         return { ok: false, by: existing?.startedBy ?? '', atMs: existing?.createdAt.getTime() ?? Date.now() }
       }

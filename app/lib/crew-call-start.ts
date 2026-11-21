@@ -13,7 +13,6 @@ export const EVENT_STATUS_CANCELED = 4
 
 /** A live session counts as live while the recorder has reported it this recently. */
 export const LIVE_FRESH_MS = 2 * 60_000
-const ADHOC_BUCKET_MS = 10 * 60_000
 const ADHOC_LEAD_MS = 60_000
 
 export interface CrewCallSettings {
@@ -49,6 +48,10 @@ export interface DecideInput {
   /** Channels the recorder may join. */
   recordable: readonly string[]
   live: readonly LiveSessionLite[]
+  /** Recent starts from the page (any crew), including ones whose channel post failed. */
+  recentStarts?: readonly { crewId: string; crewLabel?: string | null; channelId: string | null; createdAtMs: number }[]
+  /** An ad hoc event this crew started is still ACTIVE in Discord. */
+  adHocActive?: boolean
   /** When this crew last started a call from the page (successfully), or null. */
   lastStartMs: number | null
   /** The crew's next scheduled call, for the not-scheduled answer. */
@@ -70,7 +73,7 @@ const isLive = (s: LiveSessionLite, nowMs: number) => !s.endedAt && nowMs - s.la
 export function decideCrewCallStart(i: DecideInput): Decision {
   const { nowMs, settings } = i
   // Already running: the event is active, or the recorder reports a live session of this crew.
-  if (i.event?.status === EVENT_STATUS_ACTIVE) return { kind: 'already_live' }
+  if (i.event?.status === EVENT_STATUS_ACTIVE || i.adHocActive) return { kind: 'already_live' }
   if (i.live.some((s) => isLive(s, nowMs) && s.crewId === i.crewId)) return { kind: 'already_live' }
 
   if (i.lastStartMs !== null) {
@@ -84,6 +87,11 @@ export function decideCrewCallStart(i: DecideInput): Decision {
   const other = i.live.find((s) => isLive(s, nowMs) && s.channelId === channelId && s.crewId !== i.crewId)
   if (other) return { kind: 'channel_busy', otherCrewLabel: other.crewLabel || other.crewId || 'Another call' }
 
+  // A start from the page by another crew in this channel, within the cooldown, holds the channel too
+  // (the recorder may not have reported it yet).
+  const recent = i.recentStarts?.find((r) => r.crewId !== i.crewId && r.channelId === channelId && r.createdAtMs + settings.cooldownMinutes * 60_000 > nowMs)
+  if (recent) return { kind: 'channel_busy', otherCrewLabel: recent.crewLabel || recent.crewId }
+
   const windowMs = settings.startWindowMinutes * 60_000
   if (i.event && i.event.status === EVENT_STATUS_SCHEDULED && Math.abs(i.event.scheduledStartMs - nowMs) <= windowMs) {
     return {
@@ -96,7 +104,8 @@ export function decideCrewCallStart(i: DecideInput): Decision {
   if (settings.allowAdHoc) {
     return {
       kind: 'start_adhoc',
-      occurrenceKey: `adhoc:${i.crewId}:${Math.floor(nowMs / ADHOC_BUCKET_MS)}`,
+      // One row per crew while its cooldown lasts: a second ad hoc start cannot slip in at a bucket edge.
+      occurrenceKey: `adhoc:${i.crewId}:active`,
       channelId,
       startMs: nowMs + ADHOC_LEAD_MS,
     }
@@ -111,6 +120,8 @@ export interface ClaimRow {
   adHoc: boolean
   channelId: string | null
   startedBy: string
+  /** An existing claim older than this many ms is stale and is replaced (ad hoc rows). */
+  reclaimOlderThanMs?: number
 }
 
 export interface StartDeps {
@@ -148,7 +159,7 @@ export type StartResult =
   | { status: 'started'; occurrenceKey: string; eventId: string; adHoc: boolean; posted: boolean }
   | { status: 'preview'; wouldDo: Decision['kind'] }
   | { status: 'already_started'; by: string; atMs: number }
-  | { status: 'discord_failed'; message: string }
+  | { status: 'discord_failed'; code: 'bot_permissions' | 'discord_error' }
   | { status: Exclude<Decision['kind'], 'start_event' | 'start_adhoc'>; decision: Decision }
 
 /** Fill {crew}, {voice} and {live}; no pings unless the caller adds one. */
@@ -169,6 +180,7 @@ export async function runCrewCallStart(i: StartInput, d: StartDeps): Promise<Sta
     adHoc: dec.kind === 'start_adhoc',
     channelId: dec.channelId,
     startedBy: i.startedBy,
+    ...(dec.kind === 'start_adhoc' ? { reclaimOlderThanMs: i.settings.cooldownMinutes * 60_000 } : {}),
   })
   if (!claim.ok) return { status: 'already_started', by: claim.by, atMs: claim.atMs }
 
@@ -197,7 +209,10 @@ export async function runCrewCallStart(i: StartInput, d: StartDeps): Promise<Sta
   } catch (e) {
     // Nothing started: let the next press try again.
     await d.release(dec.occurrenceKey).catch(() => {})
-    return { status: 'discord_failed', message: e instanceof Error ? e.message.slice(0, 200) : 'Discord write failed' }
+    // Raw Discord text stays in the server log; the client gets a code.
+    console.error('[crew-call-start] Discord write failed:', e instanceof Error ? e.message : e)
+    const code = (e as { status?: number })?.status === 403 ? 'bot_permissions' : 'discord_error'
+    return { status: 'discord_failed', code }
   }
 
   let posted = false

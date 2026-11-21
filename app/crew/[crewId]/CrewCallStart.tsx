@@ -53,7 +53,7 @@ export function CrewCallStart({ crewId }: { crewId: string }) {
         return
       }
       try {
-        const res = await fetch('/api/calls/live', { cache: 'no-store' })
+        const res = await fetch('/api/calls/live/public', { cache: 'no-store' })
         const d = (await res.json()) as { calls?: Array<{ crewId: string | null }> }
         if (d.calls?.some((c) => c.crewId === crewId)) {
           setRecording(true)
