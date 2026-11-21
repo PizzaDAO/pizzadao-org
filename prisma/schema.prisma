@@ -3612,3 +3612,15 @@ model DefaultPfpGeneration {
 
   @@index([createdAt])
 }
+
+/// Last good copy of a guild's channel list (kind "channels") or role list (kind "roles"), so names
+/// do not blank when the Discord REST call times out (app/lib/discord-guild-snapshot.ts). Written
+/// only when the list changes; read only on a cold start or after a failed refresh.
+model DiscordGuildSnapshot {
+  guildId   String
+  kind      String
+  payload   Json
+  updatedAt DateTime
+
+  @@id([guildId, kind])
+}

@@ -90,6 +90,30 @@ describe('claim-task: database path', () => {
     expect(m.prisma.crewTaskEvent.create).not.toHaveBeenCalled()
   })
 
+  it('claims the open task when a closed one shares its label', async () => {
+    m.prisma.crewTask.findMany.mockResolvedValue([
+      { id: 't0', label: 'Bake bread', leadMemberId: null, stage: 'Done' },
+      { id: 't1', label: 'Bake bread', leadMemberId: null, stage: 'todo' },
+    ])
+    expect((await json(await post({ crewId: 'kitchen', taskName: 'Bake bread', action: 'claim' }))).status).toBe(200)
+    expect(m.prisma.crewTask.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ id: 't1' }) }))
+  })
+
+  it('give up targets the duplicate this member leads; claim skips duplicates others lead', async () => {
+    m.prisma.crewTask.findMany.mockResolvedValue([
+      { id: 'a', label: 'Bake bread', leadMemberId: '7', stage: 'todo' },
+      { id: 'b', label: 'Bake bread', leadMemberId: '42', stage: 'todo' },
+    ])
+    expect((await json(await post({ crewId: 'kitchen', taskName: 'Bake bread', action: 'giveup' }))).status).toBe(200)
+    expect(m.prisma.crewTask.updateMany).toHaveBeenLastCalledWith(expect.objectContaining({ where: expect.objectContaining({ id: 'b' }) }))
+    m.prisma.crewTask.findMany.mockResolvedValue([
+      { id: 'a', label: 'Bake bread', leadMemberId: '7', stage: 'todo' },
+      { id: 'c', label: 'Bake bread', leadMemberId: null, stage: 'todo' },
+    ])
+    await post({ crewId: 'kitchen', taskName: 'Bake bread', action: 'claim' })
+    expect(m.prisma.crewTask.updateMany).toHaveBeenLastCalledWith(expect.objectContaining({ where: expect.objectContaining({ id: 'c' }) }))
+  })
+
   it('uses the crew: key prefix when the crew has no sheet', async () => {
     await post({ crewId: 'nosheet', taskName: 'Bake bread', action: 'claim' })
     expect(m.prisma.taskClaimEvent.upsert).toHaveBeenCalledWith({
@@ -174,6 +198,22 @@ describe('claim-task: sheet path', () => {
     m.usesDb.mockResolvedValue(false)
     m.sheetsGet.mockResolvedValue(sheetWith([HEADER, ['Bake bread', 'Doing', '', '']]))
     m.sheetsUpdate.mockResolvedValue({})
+  })
+
+  it('refuses to claim a sheet task whose stage is Done or Skip, but lets the lead give it up', async () => {
+    for (const stage of ['Done', 'skip']) {
+      m.sheetsGet.mockResolvedValue(sheetWith([HEADER, ['Bake bread', stage, '', '']]))
+      expect(await json(await post({ sheetUrl: SHEET_URL, taskName: 'Bake bread', action: 'claim' }))).toEqual({ status: 409, body: { error: 'That task is closed' } })
+    }
+    expect(m.sheetsUpdate).not.toHaveBeenCalled()
+    m.sheetsGet.mockResolvedValue(sheetWith([HEADER, ['Bake bread', 'Done', '', '42']]))
+    expect((await json(await post({ sheetUrl: SHEET_URL, taskName: 'Bake bread', action: 'giveup' }))).status).toBe(200)
+  })
+
+  it('claims the open row when a Done row with the same label sits above it', async () => {
+    m.sheetsGet.mockResolvedValue(sheetWith([HEADER, ['Bake bread', 'Done', '', ''], ['Bake bread', 'todo', '', '']]))
+    expect((await json(await post({ sheetUrl: SHEET_URL, taskName: 'Bake bread', action: 'claim' }))).status).toBe(200)
+    expect(m.sheetsUpdate).toHaveBeenCalledWith(expect.objectContaining({ range: "'Tab'!D3" }))
   })
 
   it('400s on missing fields', async () => {

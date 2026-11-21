@@ -1,0 +1,48 @@
+/**
+ * Durable last-good copy of a guild's channel / role list (table DiscordGuildSnapshot), so a Discord
+ * REST timeout does not blank channel names after a cold start. Cheap by design: reads happen only
+ * when the in-memory copy is missing and Discord just failed; writes happen when the list differs from what this instance last saw or read
+ * (so about once per cold instance, plus real changes).
+ * Everything is best effort and never throws (the table may not exist yet, the database may be down).
+ */
+export type SnapshotKind = 'channels' | 'roles'
+
+const READ_TIMEOUT_MS = 1500
+
+export async function readGuildSnapshot<T>(guildId: string, kind: SnapshotKind): Promise<T[] | null> {
+  if (!process.env.DATABASE_URL) return null
+  try {
+    const { prisma } = await import('./db')
+    const row = await Promise.race([
+      prisma.discordGuildSnapshot.findUnique({ where: { guildId_kind: { guildId, kind } }, select: { payload: true } }),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), READ_TIMEOUT_MS)),
+    ])
+    return row && Array.isArray(row.payload) ? (row.payload as T[]) : null
+  } catch {
+    return null
+  }
+}
+
+/** Schedule the write after the response when inside a request (next/server `after`), else fire and forget. */
+export function writeGuildSnapshotLater(guildId: string, kind: SnapshotKind, payload: unknown[]): void {
+  void (async () => {
+    try {
+      const { after } = await import('next/server')
+      after(() => writeGuildSnapshot(guildId, kind, payload))
+    } catch {
+      void writeGuildSnapshot(guildId, kind, payload)
+    }
+  })()
+}
+
+export async function writeGuildSnapshot(guildId: string, kind: SnapshotKind, payload: unknown[]): Promise<void> {
+  if (!process.env.DATABASE_URL) return
+  try {
+    const { prisma } = await import('./db')
+    const data = { payload: payload as never, updatedAt: new Date() }
+    // select: only the key comes back, never the JSONB payload (egress).
+    await prisma.discordGuildSnapshot.upsert({ where: { guildId_kind: { guildId, kind } }, create: { guildId, kind, ...data }, update: data, select: { guildId: true } })
+  } catch {
+    // best effort
+  }
+}
