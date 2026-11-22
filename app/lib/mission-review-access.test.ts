@@ -85,6 +85,7 @@ describe('canReviewMission (by role list)', () => {
   it('Level 0 (Anytime bonus) is reviewed by the ordinary reviewers, even when DPR-only is set low', async () => {
     for (const role of [LEONARDO, DPR, CAPO, PEP_MAFIA]) await expect(canReviewMission([role], 0)).resolves.toBe(true)
     await expect(canReviewMission([RANDOM], 0)).resolves.toBe(false)
+    clearSettingsCache({ all: true })
     setDprOnlyLevel(9) // loosening is invalid, so it fails to the strictest: DPR-only from level 1, and level 0 follows
     await expect(canReviewMission([CAPO], 0)).resolves.toBe(false)
     await expect(canReviewMission([DPR], 0)).resolves.toBe(true)
