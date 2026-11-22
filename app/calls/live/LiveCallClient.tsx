@@ -17,7 +17,7 @@ import type { PollView, QuestionView } from "@/app/lib/calls/live-qa";
 const MAX_QUESTION = 280;
 
 type PublicResponse = { calls: PublicLive[]; pollSeconds: number };
-type CallState = PublicLive & Partial<Pick<MemberCall, "present" | "stoppedBy" | "itemsLocked" | "questions" | "polls" | "crew" | "hostChecklist">>;
+type CallState = PublicLive & Partial<Pick<MemberCall, "present" | "stoppedBy" | "itemsLocked" | "questions" | "polls" | "crew" | "hostChecklist" | "closingSong">>;
 
 interface State {
     signedIn: boolean;
@@ -199,7 +199,7 @@ function LiveCall({ live, state, items, onChanged, locale }: { live: CallState; 
                 </section>
             ) : (
                 <>
-                    {live.hostChecklist && live.hostChecklist.length > 0 && <HostChecklist sessionId={live.sessionId} steps={live.hostChecklist} />}
+                    {live.hostChecklist && live.hostChecklist.length > 0 && <HostChecklist sessionId={live.sessionId} steps={live.hostChecklist} closingSong={live.closingSong ?? null} />}
                     {live.crew && <CrewSection crew={live.crew} />}
                     <PresentSection present={live.present ?? []} stoppedBy={live.stoppedBy ?? []} />
                     <ItemsSection items={items} locked={live.itemsLocked ?? null} />
@@ -213,8 +213,18 @@ function LiveCall({ live, state, items, onChanged, locale }: { live: CallState; 
 }
 
 /** The Community Call run-of-show. Ticks are kept in this browser only (per call). */
-function HostChecklist({ sessionId, steps }: { sessionId: string; steps: NonNullable<MemberCall["hostChecklist"]> }) {
+function HostChecklist({ sessionId, steps, closingSong }: { sessionId: string; steps: NonNullable<MemberCall["hostChecklist"]>; closingSong: string | null }) {
     const t = useTranslations("callsPage.live");
+    const [song, setSong] = useState<"idle" | "busy" | "ok" | "error">("idle");
+    const playSong = async () => {
+        setSong("busy");
+        try {
+            const res = await fetch("/api/calls/live/song", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId }) });
+            setSong(res.ok ? "ok" : "error");
+        } catch {
+            setSong("error");
+        }
+    };
     const storageKey = `live-checklist:${sessionId}`;
     const [done, setDone] = useState<Set<number>>(() => new Set());
     useEffect(() => {
@@ -243,6 +253,15 @@ function HostChecklist({ sessionId, steps }: { sessionId: string; steps: NonNull
         <section className={`${paperCard} min-w-0 p-5`} aria-labelledby="host-checklist-title">
             <h2 id="host-checklist-title" className="m-0 text-lg font-bold">{t("checklistTitle")}</h2>
             <p className="mt-1 mb-3 text-sm text-foreground/60">{t("checklistHint", { done: done.size, total: steps.length })}</p>
+            {closingSong && (
+                <div className="mb-4 flex flex-wrap items-center gap-3">
+                    <button type="button" className={pillInk} onClick={playSong} disabled={song === "busy"}>
+                        {song === "busy" ? t("songPlaying") : t("playSong", { song: closingSong })}
+                    </button>
+                    {song === "ok" && <span className="text-sm text-foreground/70">{t("songOk")}</span>}
+                    {song === "error" && <span className="text-sm text-tomato-deep">{t("songError")}</span>}
+                </div>
+            )}
             <ol className="m-0 grid list-none gap-2 p-0">
                 {steps.map((s, i) => (
                     <li key={i} className="min-w-0">

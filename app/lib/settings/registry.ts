@@ -1743,6 +1743,14 @@ export const SETTINGS = {
       '5 min | Announce the call date and that it is recorded | Metalhead posts the welcome in the call chat',
     ].join('\n'),
   }),
+  'calls.closingSongCrew': textSetting({
+    key: 'calls.closingSongCrew',
+    area: 'calls',
+    label: 'Live view: closing song button',
+    help: 'The pizza-radio crew song the "Play closing song" button plays in the live call\'s voice channel (hosts only, Community Call checklist). Must be one of pizza-radio\'s crew names. Empty: no button.',
+    maxLength: 40,
+    default: 'Amore',
+  }),
   'calls.hostChecklistMinLevel': intSetting({
     key: 'calls.hostChecklistMinLevel',
     area: 'calls',
