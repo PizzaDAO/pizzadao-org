@@ -21,7 +21,7 @@ export type ReviewPerson = { name: string; discordId: string; memberId?: string;
 const isPreCheck = (r: unknown) => !!r && typeof r === 'object' && Array.isArray((r as { checks?: unknown }).checks)
 
 // GET - List the pending mission submissions this reviewer may review
-// (L1–L7 for admins / DPR / Pizza Capo / Pepperoni Mafia, L8 for DPR only),
+// (L0 Anytime and L1–L7 for admins / DPR / Pizza Capo / Pepperoni Mafia, L8 for DPR only),
 // excluding their own.
 const GET_HANDLER = async () => {
   const session = await getSession()

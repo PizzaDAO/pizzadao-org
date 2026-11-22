@@ -2,7 +2,7 @@
  * Who may review (approve / reject) mission submissions, per level.
  * plans/mission-verification.md §5.1 and decision D10:
  *
- *   - L1–L7: the admin roles (ADMIN_ROLE_IDS, Leonardo) plus the roles that
+ *   - L0 (Anytime bonus) and L1–L7: the admin roles (ADMIN_ROLE_IDS, Leonardo) plus the roles that
  *     are pinged to review (MISSION_REVIEWER_ROLE_IDS: Dread Pizza Roberts,
  *     Pizza Capo, Pepperoni Mafia).
  *   - L8 and up: Dread Pizza Roberts only.
@@ -89,9 +89,10 @@ export async function isDreadPizzaRoberts(who: Reviewer): Promise<boolean> {
 
 /** Whether `who` may approve or reject a submission for a mission of `level`. */
 export async function canReviewMission(who: Reviewer, level: number): Promise<boolean> {
-  if (!Number.isInteger(level) || level < 1) return false
+  // Level 0 is the Anytime bonus section: the same reviewers as L1 (the lowest reviewed level).
+  if (!Number.isInteger(level) || level < 0) return false
   const [roles, dprFrom, narrowed] = await Promise.all([resolveRoles(who), dprOnlyMinLevel(), reviewerRoleSetting()])
-  return holdsAny(roles, missionReviewerRoleIds(level, dprFrom, narrowed))
+  return holdsAny(roles, missionReviewerRoleIds(Math.max(level, 1), dprFrom, narrowed))
 }
 
 /**
@@ -106,7 +107,7 @@ export async function missionReviewScope(who: Reviewer): Promise<((level: number
   ])
   if (!low && !high) return null
   return (level: number) =>
-    Number.isInteger(level) && level >= 1 && (level >= dprFrom ? high : low)
+    Number.isInteger(level) && level >= 0 && (level >= Math.max(dprFrom, 1) ? high : low)
 }
 
 /** Whether `who` may review at least one level (shows the review panel). */

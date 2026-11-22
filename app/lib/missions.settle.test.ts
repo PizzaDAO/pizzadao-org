@@ -150,4 +150,18 @@ describe('approveMission on a held (auto-verified) completion', () => {
     })
     expect(r.levelsPaid).toEqual([1, 2])
   })
+
+  it('approving an Anytime (level 0) bonus mission pays no level and leaves the levels alone', async () => {
+    const BONUS = { id: 9, level: 0, reward: 50, levelTitle: null, isActive: true, bonus: true, title: 'Bonus' }
+    const PENDING = { id: 8, missionId: 9, discordId: 'u', status: 'PENDING', holdReason: null, mission: BONUS }
+    mockFn(prisma.missionCompletion.findUnique).mockResolvedValue(PENDING)
+    mockFn(prisma.missionCompletion.updateMany).mockResolvedValue({ count: 1 })
+    mockFn(prisma.missionCompletion.findUniqueOrThrow).mockResolvedValue({ ...PENDING, status: 'APPROVED' })
+    approved = [9] // only the bonus mission is approved; no required level is complete
+
+    const r = await approveMission('capo-1', 8)
+
+    expect(mockFn(prisma.missionCompletion.updateMany).mock.calls[0][0].data).toMatchObject({ status: 'APPROVED' })
+    expect(r.levelsPaid).toEqual([])
+  })
 })

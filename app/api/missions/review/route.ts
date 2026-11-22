@@ -13,7 +13,7 @@ export const runtime = 'nodejs'
 
 // POST - Approve or reject a mission submission.
 // Reviewers: the admin roles + Dread Pizza Roberts, Pizza Capo and Pepperoni
-// Mafia for L1–L7; Dread Pizza Roberts only for L8 (canReviewMission).
+// Mafia for L0 (Anytime) and L1–L7; Dread Pizza Roberts only for L8 (canReviewMission).
 // Nobody reviews their own submission.
 const POST_HANDLER = async (request: NextRequest) => {
   const session = await getSession()
