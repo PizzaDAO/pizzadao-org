@@ -17,7 +17,7 @@ import type { PollView, QuestionView } from "@/app/lib/calls/live-qa";
 const MAX_QUESTION = 280;
 
 type PublicResponse = { calls: PublicLive[]; pollSeconds: number };
-type CallState = PublicLive & Partial<Pick<MemberCall, "present" | "stoppedBy" | "itemsLocked" | "questions" | "polls" | "crew">>;
+type CallState = PublicLive & Partial<Pick<MemberCall, "present" | "stoppedBy" | "itemsLocked" | "questions" | "polls" | "crew" | "hostChecklist">>;
 
 interface State {
     signedIn: boolean;
@@ -199,6 +199,7 @@ function LiveCall({ live, state, items, onChanged, locale }: { live: CallState; 
                 </section>
             ) : (
                 <>
+                    {live.hostChecklist && live.hostChecklist.length > 0 && <HostChecklist sessionId={live.sessionId} steps={live.hostChecklist} />}
                     {live.crew && <CrewSection crew={live.crew} />}
                     <PresentSection present={live.present ?? []} stoppedBy={live.stoppedBy ?? []} />
                     <ItemsSection items={items} locked={live.itemsLocked ?? null} />
@@ -208,6 +209,55 @@ function LiveCall({ live, state, items, onChanged, locale }: { live: CallState; 
             )}
             <InviteSection />
         </div>
+    );
+}
+
+/** The Community Call run-of-show. Ticks are kept in this browser only (per call). */
+function HostChecklist({ sessionId, steps }: { sessionId: string; steps: NonNullable<MemberCall["hostChecklist"]> }) {
+    const t = useTranslations("callsPage.live");
+    const storageKey = `live-checklist:${sessionId}`;
+    const [done, setDone] = useState<Set<number>>(() => new Set());
+    useEffect(() => {
+        try {
+            const raw = window.localStorage.getItem(storageKey);
+            const ids = raw ? (JSON.parse(raw) as unknown) : [];
+            setDone(new Set(Array.isArray(ids) ? ids.filter((n): n is number => typeof n === "number") : []));
+        } catch {
+            setDone(new Set());
+        }
+    }, [storageKey]);
+    const toggle = (i: number) => {
+        setDone((prev) => {
+            const next = new Set(prev);
+            if (next.has(i)) next.delete(i);
+            else next.add(i);
+            try {
+                window.localStorage.setItem(storageKey, JSON.stringify([...next]));
+            } catch {
+                // ticks just aren't remembered
+            }
+            return next;
+        });
+    };
+    return (
+        <section className={`${paperCard} min-w-0 p-5`} aria-labelledby="host-checklist-title">
+            <h2 id="host-checklist-title" className="m-0 text-lg font-bold">{t("checklistTitle")}</h2>
+            <p className="mt-1 mb-3 text-sm text-foreground/60">{t("checklistHint", { done: done.size, total: steps.length })}</p>
+            <ol className="m-0 grid list-none gap-2 p-0">
+                {steps.map((s, i) => (
+                    <li key={i} className="min-w-0">
+                        <label className="flex cursor-pointer items-start gap-3">
+                            <input type="checkbox" className="mt-1 h-4 w-4 shrink-0" checked={done.has(i)} onChange={() => toggle(i)} />
+                            <span className={`min-w-0 break-words ${done.has(i) ? "text-foreground/50 line-through" : ""}`}>
+                                {s.time && <span className="mr-2 font-semibold tabular-nums">{s.time}</span>}
+                                {s.step}
+                                {s.note && <span className="mt-0.5 block text-sm text-foreground/60 no-underline">{s.note}</span>}
+                            </span>
+                        </label>
+                    </li>
+                ))}
+            </ol>
+        </section>
     );
 }
 

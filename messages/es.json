@@ -1146,6 +1146,8 @@
       "memberAsker": "Un miembro",
       "askedBy": "Pregunta de {name}",
       "hiddenNote": "Oculta para los miembros",
+      "checklistTitle": "Lista del anfitrión",
+      "checklistHint": "{done} de {total} hechos. Las marcas se guardan en este navegador.",
       "hostControls": "Controles de anfitrión",
       "pin": "Destacar",
       "unpin": "Quitar destacado",

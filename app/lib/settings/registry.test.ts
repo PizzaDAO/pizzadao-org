@@ -216,6 +216,8 @@ describe('settings registry', () => {
       ['calls.liveHostRoleIds', ''],
       ['calls.liveQuestionMaxPerMember', 5],
       ['calls.liveQuestionMinGapSeconds', 20],
+      ['calls.hostChecklist', expect.stringContaining('0 min | Start the stream')],
+      ['calls.hostChecklistMinLevel', 4],
       ['calls.livePollSeconds', 10],
       ['calls.liveItemsRetentionDays', 30],
       ['calls.chatActionPrefixes', 'action:, ai:, todo:'],
