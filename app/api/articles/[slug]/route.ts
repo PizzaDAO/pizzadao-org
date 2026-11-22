@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { getSession } from '@/app/lib/session'
+import { telegramSessionBlocked } from '@/app/lib/auth-guards'
 import { hasAnyRole } from '@/app/lib/discord'
 import { ADMIN_ROLE_IDS } from '@/app/ui/constants'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
@@ -50,7 +51,7 @@ const GET_HANDLER = async (_req: NextRequest, { params }: Params) => {
       : false
     const isAdmin = isAuthor || isCollaborator
       ? true
-      : await hasAnyRole(session.discordId, ADMIN_ROLE_IDS)
+      : (!(await telegramSessionBlocked(session)) && (await hasAnyRole(session.discordId, ADMIN_ROLE_IDS)))
     if (!isAuthor && !isCollaborator && !isAdmin) {
       throw new NotFoundError('Article')
     }
@@ -86,7 +87,7 @@ const PATCH_HANDLER = async (request: NextRequest, { params }: Params) => {
   const isCollaborator = myMemberId
     ? (existing.collaboratorMemberIds ?? []).includes(myMemberId)
     : false
-  const isAdmin = await hasAnyRole(session.discordId, ADMIN_ROLE_IDS)
+  const isAdmin = (!(await telegramSessionBlocked(session)) && (await hasAnyRole(session.discordId, ADMIN_ROLE_IDS)))
   if (!isAuthor && !isCollaborator && !isAdmin) {
     throw new ForbiddenError('Only the author, a collaborator, or an admin can edit this article')
   }
@@ -120,7 +121,7 @@ const DELETE_HANDLER = async (_req: NextRequest, { params }: Params) => {
     throw new UnauthorizedError()
   }
 
-  const isAdmin = await hasAnyRole(session.discordId, ADMIN_ROLE_IDS)
+  const isAdmin = (!(await telegramSessionBlocked(session)) && (await hasAnyRole(session.discordId, ADMIN_ROLE_IDS)))
   if (!isAdmin) {
     throw new ForbiddenError('Only admins can delete articles')
   }

@@ -12,7 +12,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { hasAnyRoleSafe, requireSession, type GuardResult } from "@/app/lib/auth-guards";
+import { hasAnyRoleSafe, refuseTelegram, requireSession, type GuardResult } from "@/app/lib/auth-guards";
 import { getSetting } from "@/app/lib/settings";
 import { DREAD_PIZZA_ROBERTS_ROLE_ID } from "@/app/ui/constants";
 
@@ -49,7 +49,7 @@ export function getAnnounceAccessConfig(
   return { mode: "legacy-users", source: "legacy", discordIds: LEGACY_ANNOUNCE_DISCORD_IDS };
 }
 
-async function savedAnnounceRoles(): Promise<string[]> {
+export async function savedAnnounceRoles(): Promise<string[]> {
   try {
     return await getSetting("announce.roleIds");
   } catch {
@@ -68,6 +68,8 @@ export async function canAnnounce(discordId: string, config?: AnnounceAccessConf
 export async function requireAnnouncer(): Promise<GuardResult> {
   const auth = await requireSession();
   if (!auth.ok) return auth;
+  const blocked = await refuseTelegram(auth.session, "Forbidden: you do not have access to fire announcements");
+  if (blocked) return { ok: false, response: blocked };
   if (!(await canAnnounce(auth.session.discordId))) {
     return {
       ok: false,

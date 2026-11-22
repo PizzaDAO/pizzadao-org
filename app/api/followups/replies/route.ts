@@ -14,6 +14,6 @@ export const dynamic = 'force-dynamic'
 export async function GET() {
   const auth = await requireSession()
   if (!auth.ok) return auth.response
-  if (!(await canReadFollowUpReplies(auth.session.discordId))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!(await canReadFollowUpReplies(auth.session.discordId, auth.session))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   return NextResponse.json({ items: await listReplies(), minLevel: await replyMinLevel().catch(() => null) }, { headers: { 'Cache-Control': 'no-store' } })
 }

@@ -45,6 +45,17 @@ describe("session-transfer: bridge tokens", () => {
     expect(create).toHaveBeenCalledWith({ data: { tokenHash: bridge.bridgeTokenHash(b.jti), pollId: "session-bridge" } });
   });
 
+  it("carries a Telegram-started session across (marker, start time and end), so it keeps its limits", async () => {
+    const { GET, bridge, sess } = await setup();
+    const started = Date.now() - 3600_000;
+    const tg = { ...session, createdAt: started, authMethod: "telegram" as const, expiresAt: Date.now() + 86400_000 };
+    const b = bridge.mintBridge(tg, "/crew", SITE)!;
+    const res = await call(GET, b.url, `pd_bridge=${b.jti}`);
+    const cookie = res.headers.getSetCookie().find((c) => c.startsWith(`${sess.COOKIE_NAME}=`))!;
+    const out = sess.verifySession(decodeURIComponent(cookie.split(";")[0].split("=").slice(1).join("=")));
+    expect(out).toMatchObject({ authMethod: "telegram", createdAt: started, expiresAt: tg.expiresAt });
+  });
+
   it("refuses a replay (token already spent) and does not sign in", async () => {
     const { GET, bridge, sess } = await setup();
     create.mockRejectedValue(Object.assign(new Error("dup"), { code: "P2002" }));

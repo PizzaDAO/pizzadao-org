@@ -83,6 +83,7 @@ export function mintBridge(session: Session, nextPath: string, siteUrl: string =
     nick: session.nick ?? "",
     origin,
     jti,
+    ...(session.authMethod === "telegram" ? { authMethod: "telegram" as const, sessionCreatedAt: session.createdAt, sessionExpiresAt: session.expiresAt } : {}),
   });
   const url = new URL(BRIDGE_PATH, origin);
   url.searchParams.set("token", token);

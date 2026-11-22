@@ -134,6 +134,10 @@ export const TOGGLES = {
   'telegram.announceMirrorEnabled': { env: 'TELEGRAM_ANNOUNCE_MIRROR_ENABLED', legacy: ON_WORDS },
   'telegram.sessionMirrorEnabled': { env: 'TELEGRAM_SESSION_MIRROR_ENABLED', legacy: ON_WORDS },
   'telegram.hostMatchEnabled': { env: 'TELEGRAM_HOST_MATCH_ENABLED', legacy: ON_WORDS },
+  // Off unless turned on: members with a connected Telegram can log in through the login bot (plans/calzone-93434.md).
+  'auth.telegramSignInEnabled': { env: 'TELEGRAM_SIGNIN_ENABLED', legacy: ON_WORDS },
+  // Off unless turned on: a Telegram-started session may use admin and DPR powers.
+  'auth.telegramSignInAdminAllowed': { env: 'TELEGRAM_SIGNIN_ADMIN_ALLOWED', legacy: ON_WORDS },
   // On unless the env var is an explicit off (plans/sheets-cutover.md: keep the archive current until the freeze).
   'sheets.mirror.members': { env: 'SHEETS_MIRROR_MEMBERS', legacy: (raw) => !envKillsToggle(raw) },
   // Off unless turned on. The public reach map shows nothing and the endpoint answers 404 until then.

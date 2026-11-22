@@ -1,7 +1,7 @@
 import { disavowEnabled } from '@/app/lib/disavow/constants'
 import { disavowNotFound } from '@/app/lib/disavow/access'
 import { getSession } from '@/app/lib/session'
-import { isAdminDiscordId } from '@/app/lib/auth-guards'
+import { isAdminDiscordId, telegramSessionBlocked } from '@/app/lib/auth-guards'
 import { out, safe, type Ctx } from '@/app/lib/disavow/http'
 import { redact } from '@/app/lib/disavow/store'
 
@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic'
 export const POST = safe('redact', async (request: Request, ctx: Ctx) => {
   if (!(await disavowEnabled())) return disavowNotFound()
   const session = await getSession().catch(() => null)
-  if (!session?.discordId || !(await isAdminDiscordId(session.discordId))) return disavowNotFound()
+  if (!session?.discordId || (await telegramSessionBlocked(session)) || !(await isAdminDiscordId(session.discordId))) return disavowNotFound()
   const body = (await request.json().catch(() => null)) as { confirm?: unknown } | null
   if (body?.confirm !== true) return out({ error: 'Confirmation required' }, 400)
   const { id } = await ctx.params

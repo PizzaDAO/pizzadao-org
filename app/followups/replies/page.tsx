@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "Follow-up replies", robots: { index:
 
 export default async function FollowUpRepliesPage() {
     const session = await getSession();
-    const allowed = session?.discordId ? await canReadFollowUpReplies(session.discordId) : false;
+    const allowed = session?.discordId ? await canReadFollowUpReplies(session.discordId, session) : false;
     if (!allowed) {
         return (
             <main className="min-h-screen bg-background text-foreground flex items-center justify-center p-5">

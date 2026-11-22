@@ -13,6 +13,15 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
+describe('verifySession: shorter Telegram sessions', () => {
+  it('rejects a session past its own expiresAt, keeps one before it', () => {
+    const live = mod.createSessionToken({ discordId: '1', createdAt: Date.now(), authMethod: 'telegram', expiresAt: Date.now() + 60_000 })
+    expect(mod.verifySession(live)?.authMethod).toBe('telegram')
+    const dead = mod.createSessionToken({ discordId: '1', createdAt: Date.now() - 1000, authMethod: 'telegram', expiresAt: Date.now() - 1 })
+    expect(mod.verifySession(dead)).toBeNull()
+  })
+})
+
 describe('verifySession', () => {
   it('accepts a freshly created token', () => {
     const token = mod.createSessionToken({ discordId: '123', createdAt: Date.now() })

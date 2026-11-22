@@ -11,7 +11,7 @@ vi.mock('@/app/lib/session', () => ({ getSession: vi.fn() }))
 vi.mock('@/app/lib/missions', () => ({ getCurrentLevel: vi.fn() }))
 vi.mock('@/app/lib/mission-review-access', () => ({ isDreadPizzaRoberts: vi.fn() }))
 vi.mock('@/app/lib/member-utils', () => ({ findMemberByDiscordId: vi.fn(async () => null) }))
-vi.mock('@/app/lib/auth-guards', () => ({ isAdminDiscordId: vi.fn(async () => false) }))
+vi.mock('@/app/lib/auth-guards', () => ({ isAdminDiscordId: vi.fn(async () => false), telegramSessionBlocked: vi.fn(async () => false) }))
 vi.mock('@/app/lib/rate-limit', () => ({
   enforceRateLimit: vi.fn(async () => null),
   checkKeyedRateLimit: vi.fn(async () => ({ success: true, limit: 60, remaining: 59, reset: Date.now() + 1000 })),
@@ -42,7 +42,7 @@ import { prisma } from '@/app/lib/db'
 import { getSession } from '@/app/lib/session'
 import { getCurrentLevel } from '@/app/lib/missions'
 import { isDreadPizzaRoberts } from '@/app/lib/mission-review-access'
-import { isAdminDiscordId } from '@/app/lib/auth-guards'
+import { isAdminDiscordId, telegramSessionBlocked } from '@/app/lib/auth-guards'
 import { enforceRateLimit, checkKeyedRateLimit } from '@/app/lib/rate-limit'
 import { after } from 'next/server'
 import * as store from '@/app/lib/disavow/store'
@@ -120,6 +120,21 @@ describe('404 for everyone who may not use the list', () => {
       expect(store.redact).not.toHaveBeenCalled()
     })
   }
+  it('a Telegram-started session gets the same 404 on every route that needs the list (a DPR included)', async () => {
+    m(telegramSessionBlocked).mockResolvedValue(true)
+    try {
+      as(8, { dpr: true, admin: true })
+      for (const [name, call] of ALL.filter(([n]) => !/me\//.test(n))) {
+        const r = await call()
+        expect([name, r.status]).toEqual([name, 404])
+      }
+      expect(store.nominate).not.toHaveBeenCalled()
+      expect(store.castVote).not.toHaveBeenCalled()
+      expect(store.redact).not.toHaveBeenCalled()
+    } finally {
+      m(telegramSessionBlocked).mockResolvedValue(false)
+    }
+  })
   it('the 404 body and status are identical to a route that does not exist for the feature (no 401/403)', async () => {
     as(1)
     for (const [, call] of ALL) expect([401, 403]).not.toContain((await call()).status)

@@ -54,6 +54,11 @@ export async function requireAnyRole(
 ): Promise<GuardResult> {
   const auth = await requireSession();
   if (!auth.ok) return auth;
+  // Role-gated routes never trust a Telegram-started session (unless allowed): defense in depth, since
+  // sign-in already refuses members who hold privileged roles.
+  if (await telegramSessionBlocked(auth.session)) {
+    return { ok: false, response: NextResponse.json({ error: forbiddenMessage }, { status: 403 }) };
+  }
   if (!(await hasAnyRoleSafe(auth.session.discordId, roleIds))) {
     return {
       ok: false,
@@ -72,8 +77,36 @@ export async function isAdminSession(): Promise<boolean> {
   }
 }
 
-/** Require a session belonging to a guild admin. 401 if no session, 403 if not admin. */
+/**
+ * True when this session was started with "Sign in with Telegram" and admin powers over it are not allowed
+ * (the default: admin and DPR checks need a Discord or magic-link session). Fails closed on read errors.
+ */
+export async function telegramSessionBlocked(session: Pick<Session, "authMethod">): Promise<boolean> {
+  if (session.authMethod !== "telegram") return false;
+  try {
+    // Loaded only for Telegram sessions, so ordinary admin checks never pull in the settings store.
+    const { toggleEnabled } = await import("@/app/lib/settings/toggles");
+    return !(await toggleEnabled("auth.telegramSignInAdminAllowed"));
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Cheap reuse for guards that read the session themselves: a 403 response when this is a Telegram-started
+ * session that may not use privileged features, else null.
+ */
+export async function refuseTelegram(session: Pick<Session, "authMethod">, message = "Forbidden"): Promise<NextResponse | null> {
+  return (await telegramSessionBlocked(session)) ? NextResponse.json({ error: message }, { status: 403 }) : null;
+}
+
+/** Require a session belonging to a guild admin. 401 if no session, 403 if not admin (or Telegram-started). */
 export async function requireAdmin(): Promise<GuardResult> {
+  const auth = await requireSession();
+  if (!auth.ok) return auth;
+  if (await telegramSessionBlocked(auth.session)) {
+    return { ok: false, response: NextResponse.json({ error: "Admin access required" }, { status: 403 }) };
+  }
   return requireAnyRole(ADMIN_ROLE_IDS, "Admin access required");
 }
 

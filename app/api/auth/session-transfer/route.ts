@@ -78,7 +78,10 @@ export async function GET(req: Request) {
     discordId: transfer.discordId,
     username: transfer.username,
     nick: transfer.nick,
-    createdAt: Date.now(),
+    // A Telegram-started session stays one (same start time), so it keeps its limits across the handover.
+    createdAt: transfer.authMethod === "telegram" && Number.isFinite(transfer.sessionCreatedAt) ? Number(transfer.sessionCreatedAt) : Date.now(),
+    ...(transfer.authMethod === "telegram" ? { authMethod: "telegram" as const } : {}),
+    ...(transfer.authMethod === "telegram" && Number.isFinite(transfer.sessionExpiresAt) ? { expiresAt: Number(transfer.sessionExpiresAt) } : {}),
   });
 
   // Redirect to the requested page, else home - OnboardingWizard.checkSession() handles routing

@@ -2,16 +2,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const getSession = vi.fn()
 const hasAnyRole = vi.fn()
+const adminAllowed = vi.fn()
 vi.mock('./session', () => ({ getSession: () => getSession() }))
+vi.mock('@/app/lib/settings/toggles', () => ({ toggleEnabled: (...a: unknown[]) => adminAllowed(...a) }))
 vi.mock('./discord', () => ({ hasAnyRole: (...a: unknown[]) => hasAnyRole(...a) }))
 
-import { requireSession, requireAdmin, safeEqual, checkSecret } from './auth-guards'
+import { requireSession, requireAdmin, requireAnyRole, refuseTelegram, safeEqual, checkSecret } from './auth-guards'
 import { ADMIN_ROLE_IDS } from '@/app/ui/constants'
 
 describe('auth guards', () => {
   beforeEach(() => {
     getSession.mockReset()
     hasAnyRole.mockReset()
+    adminAllowed.mockReset()
   })
 
   it('requireSession returns 401 without a session', async () => {
@@ -58,6 +61,65 @@ describe('auth guards', () => {
     hasAnyRole.mockResolvedValue(true)
     const r = await requireAdmin()
     expect(r.ok).toBe(true)
+  })
+
+  describe('Telegram-started sessions', () => {
+    const tgSession = { discordId: 'admin', createdAt: Date.now(), authMethod: 'telegram' as const }
+
+    it('requireAdmin refuses an admin on a Telegram session while the setting is off, without checking roles', async () => {
+      getSession.mockResolvedValue(tgSession)
+      adminAllowed.mockResolvedValue(false)
+      hasAnyRole.mockResolvedValue(true)
+      const r = await requireAdmin()
+      expect(r.ok).toBe(false)
+      if (!r.ok) expect(r.response.status).toBe(403)
+      expect(hasAnyRole).not.toHaveBeenCalled()
+      expect(adminAllowed).toHaveBeenCalledWith('auth.telegramSignInAdminAllowed')
+    })
+
+    it('fails closed when the setting cannot be read', async () => {
+      getSession.mockResolvedValue(tgSession)
+      adminAllowed.mockRejectedValue(new Error('db down'))
+      hasAnyRole.mockResolvedValue(true)
+      expect((await requireAdmin()).ok).toBe(false)
+    })
+
+    it('lets an admin through on a Telegram session once the setting is on', async () => {
+      getSession.mockResolvedValue(tgSession)
+      adminAllowed.mockResolvedValue(true)
+      hasAnyRole.mockResolvedValue(true)
+      expect((await requireAdmin()).ok).toBe(true)
+    })
+
+    it('never consults the setting for a Discord session', async () => {
+      getSession.mockResolvedValue({ discordId: 'admin', createdAt: Date.now() })
+      hasAnyRole.mockResolvedValue(true)
+      expect((await requireAdmin()).ok).toBe(true)
+      expect(adminAllowed).not.toHaveBeenCalled()
+    })
+
+    it('every role-gated route (payments, capos, reviewers) refuses a Telegram session too', async () => {
+      getSession.mockResolvedValue(tgSession)
+      adminAllowed.mockResolvedValue(false)
+      hasAnyRole.mockResolvedValue(true)
+      const r = await requireAnyRole(['some-role'])
+      expect(r.ok).toBe(false)
+      if (!r.ok) expect(r.response.status).toBe(403)
+      expect(hasAnyRole).not.toHaveBeenCalled()
+    })
+
+    it('refuseTelegram: a 403 for a blocked Telegram session, null for Discord sessions or once allowed', async () => {
+      adminAllowed.mockResolvedValue(false)
+      expect((await refuseTelegram(tgSession))?.status).toBe(403)
+      expect(await refuseTelegram({})).toBeNull()
+      adminAllowed.mockResolvedValue(true)
+      expect(await refuseTelegram(tgSession)).toBeNull()
+    })
+
+    it('a Telegram session still works for ordinary member routes', async () => {
+      getSession.mockResolvedValue(tgSession)
+      expect((await requireSession()).ok).toBe(true)
+    })
   })
 
   it('safeEqual compares strings safely', () => {

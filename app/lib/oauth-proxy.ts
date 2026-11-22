@@ -33,6 +33,11 @@ export interface TransferPayload {
   origin: string;
   /** Session bridge tokens only: a random id, also kept in a cookie and spent once (see session-bridge.ts). */
   jti?: string;
+  /** Bridge tokens of a Telegram-started session: kept so the handover cannot launder it into a Discord session. */
+  authMethod?: "telegram";
+  /** With authMethod: when that session began, so the handover does not extend its shorter life. */
+  sessionCreatedAt?: number;
+  sessionExpiresAt?: number;
 }
 
 export function isPreviewEnvironment(): boolean {

@@ -85,6 +85,25 @@ export function isNewSession(status: LoginStatus, sentAt: number | undefined): b
   return status.sessionCreatedAt >= sentAt - 5000;
 }
 
+/** "Sign in with Telegram": what the tab shows while it waits for the tap in the bot. */
+type TgState =
+  | { step: "idle" }
+  | { step: "starting" }
+  | { step: "waiting"; url: string; matchNumber: number; until: number }
+  | { step: "ended"; reason: "cancelled" | "expired" | "leftServer" | "privileged" | "unavailable" };
+
+/** Whether /login offers the Telegram button. ?telegram=1 shows it to testers while an allowlist is set. */
+export async function fetchTelegramSignInEnabled(search: string): Promise<boolean> {
+  try {
+    const forced = new URLSearchParams(search).get("telegram") === "1";
+    const res = await fetch(`/api/auth/telegram/start${forced ? "?forced=1" : ""}`, { credentials: "include", cache: "no-store" });
+    if (!res?.ok) return false;
+    return (await res.json())?.enabled === true;
+  } catch {
+    return false;
+  }
+}
+
 /** How often the "check your DMs" tab looks for the login, and for how long (the link lives 10 min). */
 const WATCH_INTERVAL_MS = 3000;
 const WATCH_FOR_MS = 11 * 60 * 1000;
@@ -111,6 +130,83 @@ export function MagicLoginFlow({ onBack, loginError, navigate = assignLocation }
   const [search, setSearch] = useState("");
   useEffect(() => setSearch(window.location.search), []);
   const discordHref = discordLoginHref(search);
+
+  const [tgEnabled, setTgEnabled] = useState(false);
+  const [tg, setTg] = useState<TgState>({ step: "idle" });
+  useEffect(() => {
+    let alive = true;
+    fetchTelegramSignInEnabled(window.location.search).then((on) => { if (alive) setTgEnabled(on); });
+    return () => { alive = false; };
+  }, []);
+
+  async function startTelegram() {
+    setTg({ step: "starting" });
+    try {
+      const res = await fetch("/api/auth/telegram/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ returnTo: new URLSearchParams(window.location.search).get("returnTo") }),
+      });
+      const data = res?.ok ? await res.json() : null;
+      if (!data || typeof data.url !== "string" || typeof data.matchNumber !== "number") {
+        setTg({ step: "ended", reason: "unavailable" });
+        return;
+      }
+      const ttl = typeof data.expiresInSeconds === "number" ? data.expiresInSeconds : 300;
+      setTg({ step: "waiting", url: data.url, matchNumber: data.matchNumber, until: Date.now() + ttl * 1000 });
+    } catch {
+      setTg({ step: "ended", reason: "unavailable" });
+    }
+  }
+
+  async function stopTelegram() {
+    setTg({ step: "idle" });
+    try {
+      await fetch("/api/auth/telegram/start", { method: "DELETE", headers: { "Content-Type": "application/json" }, credentials: "include" });
+    } catch {}
+  }
+
+  // While the number is shown, poll for the tap in the bot. The session comes back on the poll's own
+  // response (only this browser holds the request's secret), so on "approved" we just move on.
+  const tgWaitingUntil = tg.step === "waiting" ? tg.until : null;
+  useEffect(() => {
+    if (tgWaitingUntil === null) return;
+    let stopped = false;
+    let busy = false;
+    const check = async () => {
+      if (stopped || busy) return;
+      if (Date.now() > tgWaitingUntil + 5000) { stop(); setTg({ step: "ended", reason: "expired" }); return; }
+      busy = true;
+      try {
+        const res = await fetch("/api/auth/telegram/status", { credentials: "include", cache: "no-store" });
+        const body = res?.ok ? await res.json() : null;
+        busy = false;
+        if (stopped || !body) return;
+        if (body.status === "approved" && typeof body.href === "string") {
+          stop();
+          navigate(body.href);
+        } else if (body.status === "cancelled" || body.status === "expired") {
+          stop();
+          setTg({ step: "ended", reason: body.status });
+        } else if (body.status === "error") {
+          stop();
+          setTg({ step: "ended", reason: body.code === "telegram_left_server" ? "leftServer" : body.code === "telegram_privileged" ? "privileged" : "unavailable" });
+        } else if (body.status === "none") {
+          stop();
+          setTg({ step: "idle" });
+        }
+      } catch {
+        busy = false;
+      }
+    };
+    const timer = window.setInterval(check, WATCH_INTERVAL_MS);
+    function stop() {
+      stopped = true;
+      window.clearInterval(timer);
+    }
+    return stop;
+  }, [tgWaitingUntil, navigate]);
 
   // Already logged in here (e.g. the link was opened in another tab, or a second open of the same
   // link bounced to "already used"): carry on to where the login was headed instead of the form.
@@ -238,6 +334,63 @@ export function MagicLoginFlow({ onBack, loginError, navigate = assignLocation }
           message={errorMessages[loginError] || t("errorGeneric")}
         />
         <BackLink onBack={onBack} label={t("back")} />
+      </Shell>
+    );
+  }
+
+  // ─── Sign in with Telegram: waiting / ended ─────────────────
+  if (tg.step === "waiting") {
+    return (
+      <Shell>
+        <EditorialHeader overline={t("overline")} headline={t("telegram.waitingHeadline")} />
+        <EditorialNotice tone="info" message={t("telegram.numberHint")} />
+        <p
+          className="font-[family-name:var(--font-display)] font-black text-foreground"
+          style={{ fontSize: "clamp(3rem, 12vw, 5rem)", lineHeight: 1 }}
+          aria-live="polite"
+        >
+          {tg.matchNumber}
+        </p>
+        <p className="text-sm text-foreground/70">{t("telegram.waitingNote")}</p>
+        <div className="grid gap-3">
+          <a
+            href={tg.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-pill-lg group no-underline"
+            style={{ background: "hsl(var(--tomato-deep))", color: "hsl(var(--cream))", boxShadow: "var(--shadow-soft)" }}
+          >
+            {t("telegram.openButton")}
+            <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+          </a>
+          <button
+            type="button"
+            onClick={() => void stopTelegram()}
+            className="btn-pill-lg"
+            style={{ background: "transparent", color: "hsl(var(--foreground))", border: "1px solid hsl(var(--foreground) / 0.25)" }}
+          >
+            {t("telegram.stopButton")}
+          </button>
+        </div>
+      </Shell>
+    );
+  }
+  if (tg.step === "ended") {
+    return (
+      <Shell>
+        <EditorialHeader overline={t("overline")} headline={t("tryAgainHeadline")} />
+        <EditorialNotice tone="error" message={t(`telegram.${tg.reason}`)} />
+        <div className="grid gap-3">
+          <button
+            type="button"
+            onClick={() => setTg({ step: "idle" })}
+            className="btn-pill-lg"
+            style={{ background: "transparent", color: "hsl(var(--foreground))", border: "1px solid hsl(var(--foreground) / 0.25)" }}
+          >
+            {t("telegram.startAgain")}
+          </button>
+          <BackLink onBack={onBack} label={t("back")} />
+        </div>
       </Shell>
     );
   }
@@ -550,6 +703,25 @@ export function MagicLoginFlow({ onBack, loginError, navigate = assignLocation }
       >
         {t("dmHintAlt")}
       </a>
+      {tgEnabled && (
+        <div className="grid justify-items-start gap-1">
+          <button
+            type="button"
+            onClick={() => void startTelegram()}
+            disabled={tg.step === "starting"}
+            className="btn-pill-lg"
+            style={{
+              background: "transparent",
+              color: "hsl(var(--foreground))",
+              border: "1px solid hsl(var(--foreground) / 0.25)",
+              minHeight: 44,
+            }}
+          >
+            {t("telegram.button")}
+          </button>
+          <p className="text-[13px] text-foreground/60">{t("telegram.buttonHint")}</p>
+        </div>
+      )}
 
       <div
         className="relative overflow-hidden rounded-[22px] transition-shadow"
