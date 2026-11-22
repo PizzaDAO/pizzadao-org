@@ -11,6 +11,7 @@
 import { NextResponse } from 'next/server'
 import { notFound } from 'next/navigation'
 import { prisma } from '@/app/lib/db'
+import { telegramSessionBlocked } from '@/app/lib/auth-guards'
 import { getSession, type Session } from '@/app/lib/session'
 import { getCurrentLevel } from '@/app/lib/missions'
 import { isDreadPizzaRoberts } from '@/app/lib/mission-review-access'
@@ -123,6 +124,8 @@ export async function requireDisavowViewer(): Promise<DisavowGuard> {
   if (!(await disavowEnabled())) return { ok: false, response: disavowNotFound() }
   const session = await getSession().catch(() => null)
   if (!session?.discordId) return { ok: false, response: disavowNotFound() }
+  // Voting, nominating and reading the list need a Discord login (unless Telegram sign-ins may be privileged).
+  if (await telegramSessionBlocked(session)) return { ok: false, response: disavowNotFound() }
   const v = await disavowViewer(session.discordId)
   if (!v.allowed) return { ok: false, response: disavowNotFound() }
   return { ok: true, session, isDPR: v.isDPR }

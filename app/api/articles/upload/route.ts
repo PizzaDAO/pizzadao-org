@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/app/lib/session'
+import { telegramSessionBlocked } from '@/app/lib/auth-guards'
 import { hasAnyRole } from '@/app/lib/discord'
 import { articleAuthorRoleIds } from '@/app/lib/settings/roles'
 import { fileFromForm, uploadImageToBlob } from '@/app/lib/blob-image-upload'
@@ -16,7 +17,7 @@ const POST_HANDLER = async (request: NextRequest) => {
     throw new UnauthorizedError()
   }
 
-  const canAuthor = await hasAnyRole(session.discordId, await articleAuthorRoleIds())
+  const canAuthor = !(await telegramSessionBlocked(session)) && (await hasAnyRole(session.discordId, await articleAuthorRoleIds()))
   if (!canAuthor) {
     throw new ForbiddenError('You do not have permission to upload article images')
   }

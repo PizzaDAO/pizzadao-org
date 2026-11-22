@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     .filter((s): s is FollowUpStatus => (STATUSES as string[]).includes(s))
   const recording = url.searchParams.get('recording')?.trim() || undefined
   // Reply text is level-gated: checked once per request, stripped here on the server.
-  const canReadReplies = await canReadFollowUpReplies(auth.session.discordId)
+  const canReadReplies = await canReadFollowUpReplies(auth.session.discordId, auth.session)
   const [list, cfg] = await Promise.all([listFollowUps({ status, recordingId: recording, hasReply: url.searchParams.get('hasReply') === '1' }, { canReadReplies }), loadFollowUpConfig()])
   return json({ ...list, sendEnabled: cfg.sendEnabled, footerTelegram: cfg.footerTelegram, footerDiscord: cfg.footerDiscord })
 }

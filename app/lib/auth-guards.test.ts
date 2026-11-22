@@ -7,7 +7,7 @@ vi.mock('./session', () => ({ getSession: () => getSession() }))
 vi.mock('@/app/lib/settings/toggles', () => ({ toggleEnabled: (...a: unknown[]) => adminAllowed(...a) }))
 vi.mock('./discord', () => ({ hasAnyRole: (...a: unknown[]) => hasAnyRole(...a) }))
 
-import { requireSession, requireAdmin, requireAnyRole, safeEqual, checkSecret } from './auth-guards'
+import { requireSession, requireAdmin, requireAnyRole, refuseTelegram, safeEqual, checkSecret } from './auth-guards'
 import { ADMIN_ROLE_IDS } from '@/app/ui/constants'
 
 describe('auth guards', () => {
@@ -106,6 +106,14 @@ describe('auth guards', () => {
       expect(r.ok).toBe(false)
       if (!r.ok) expect(r.response.status).toBe(403)
       expect(hasAnyRole).not.toHaveBeenCalled()
+    })
+
+    it('refuseTelegram: a 403 for a blocked Telegram session, null for Discord sessions or once allowed', async () => {
+      adminAllowed.mockResolvedValue(false)
+      expect((await refuseTelegram(tgSession))?.status).toBe(403)
+      expect(await refuseTelegram({})).toBeNull()
+      adminAllowed.mockResolvedValue(true)
+      expect(await refuseTelegram(tgSession)).toBeNull()
     })
 
     it('a Telegram session still works for ordinary member routes', async () => {

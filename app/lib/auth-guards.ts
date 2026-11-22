@@ -92,6 +92,14 @@ export async function telegramSessionBlocked(session: Pick<Session, "authMethod"
   }
 }
 
+/**
+ * Cheap reuse for guards that read the session themselves: a 403 response when this is a Telegram-started
+ * session that may not use privileged features, else null.
+ */
+export async function refuseTelegram(session: Pick<Session, "authMethod">, message = "Forbidden"): Promise<NextResponse | null> {
+  return (await telegramSessionBlocked(session)) ? NextResponse.json({ error: message }, { status: 403 }) : null;
+}
+
 /** Require a session belonging to a guild admin. 401 if no session, 403 if not admin (or Telegram-started). */
 export async function requireAdmin(): Promise<GuardResult> {
   const auth = await requireSession();

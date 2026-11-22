@@ -60,7 +60,7 @@ export async function GET(req: Request) {
         const adminAllowed = await toggleEnabled("auth.telegramSignInAdminAllowed").catch(() => false);
         if (!adminAllowed) {
             try {
-                if (await holdsPrivilegedRole(found.member.roles)) return "telegram_privileged";
+                if (await holdsPrivilegedRole(found.member.roles, discordId)) return "telegram_privileged";
             } catch {
                 return "retry";
             }
