@@ -249,19 +249,23 @@ function HostChecklist({ sessionId, steps, closingSong }: { sessionId: string; s
             return next;
         });
     };
+    // The button sits on the step that names the song (else the last step, where the call closes).
+    const songNeedle = closingSong?.toLowerCase() ?? "";
+    const matched = songNeedle ? steps.findIndex((st) => `${st.step} ${st.note ?? ""}`.toLowerCase().includes(songNeedle)) : -1;
+    const songStep = !closingSong ? -1 : matched >= 0 ? matched : steps.length - 1;
+    const songButton = closingSong ? (
+        <span className="mt-2 flex flex-wrap items-center gap-3">
+            <button type="button" className={pillInk} onClick={playSong} disabled={song === "busy"}>
+                {song === "busy" ? t("songPlaying") : t("playSong", { song: closingSong })}
+            </button>
+            {song === "ok" && <span className="text-sm text-foreground/70">{t("songOk")}</span>}
+            {song === "error" && <span className="text-sm text-tomato-deep">{t("songError")}</span>}
+        </span>
+    ) : null;
     return (
         <section className={`${paperCard} min-w-0 p-5`} aria-labelledby="host-checklist-title">
             <h2 id="host-checklist-title" className="m-0 text-lg font-bold">{t("checklistTitle")}</h2>
             <p className="mt-1 mb-3 text-sm text-foreground/60">{t("checklistHint", { done: done.size, total: steps.length })}</p>
-            {closingSong && (
-                <div className="mb-4 flex flex-wrap items-center gap-3">
-                    <button type="button" className={pillInk} onClick={playSong} disabled={song === "busy"}>
-                        {song === "busy" ? t("songPlaying") : t("playSong", { song: closingSong })}
-                    </button>
-                    {song === "ok" && <span className="text-sm text-foreground/70">{t("songOk")}</span>}
-                    {song === "error" && <span className="text-sm text-tomato-deep">{t("songError")}</span>}
-                </div>
-            )}
             <ol className="m-0 grid list-none gap-2 p-0">
                 {steps.map((s, i) => (
                     <li key={i} className="min-w-0">
@@ -273,6 +277,7 @@ function HostChecklist({ sessionId, steps, closingSong }: { sessionId: string; s
                                 {s.note && <span className="mt-0.5 block text-sm text-foreground/60 no-underline">{s.note}</span>}
                             </span>
                         </label>
+                        {i === songStep && <div className="pl-7">{songButton}</div>}
                     </li>
                 ))}
             </ol>
