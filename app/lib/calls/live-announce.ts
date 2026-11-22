@@ -23,11 +23,28 @@ import { enqueueMirror, targetCityKeys, type EnqueueInput, type EnqueueResult } 
 import { telegramSendAllowed } from '@/app/lib/telegram/rsv-client'
 import { normalizeStreamLink } from './live-state'
 import { parseRoleLines } from './live-access'
+import { parseCrewAliases } from '@/app/lib/settings/registry'
+import { attendanceCrewId } from './crew-alias'
 
 type Env = Record<string, string | undefined>
 
 /** The crew id the recorder maps the Community Call to (same slug the recap uses). */
 export const LIVE_ANNOUNCE_CREW_ID = 'community_call'
+
+/**
+ * Whether a recorder / mapped crew id is the Community Call. The recorder files it under its own id,
+ * mapped through calls.attendanceCrewAliases (default `community = community_call`).
+ */
+export function isLiveAnnounceCrew(crewId: string | null | undefined, settings: Pick<Settings, 'get'>): boolean {
+  const id = (crewId ?? '').trim().toLowerCase()
+  if (!id) return false
+  if (id === LIVE_ANNOUNCE_CREW_ID) return true
+  try {
+    return attendanceCrewId(id, parseCrewAliases(settings.get('calls.attendanceCrewAliases'))).toLowerCase() === LIVE_ANNOUNCE_CREW_ID
+  } catch {
+    return false
+  }
+}
 /** The automatic post only fires for a session that started this recently (not mid-call after a toggle flip). */
 export const AUTO_MAX_SESSION_AGE_MS = 20 * 60_000
 /** A reminder not queued within this long after it was due is dropped (the call is over). */
@@ -485,7 +502,7 @@ export async function liveAnnounceTick(s: TickSession | null, deps: LiveDeps = {
     if (!liveAnnounceMayPost(env)) return
     const settings = deps.settings ?? (await loadSettings())
     const now = (deps.now ?? (() => new Date()))()
-    const isCommunity = (s.crewId ?? '').toLowerCase() === LIVE_ANNOUNCE_CREW_ID
+    const isCommunity = isLiveAnnounceCrew(s.crewId, settings)
     if (!isCommunity) return
     // A session without an event id shares the occurrence with /live through the call channel's Discord event.
     let eventId = s.eventId

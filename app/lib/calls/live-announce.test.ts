@@ -258,6 +258,15 @@ describe('liveAnnounceTick', () => {
     expect((h.enqueue.mock.calls as unknown as Array<[{ kind: string }]>).map((c) => c[0].kind)).toEqual(['live', 'liverem'])
   })
 
+  it("announces the recorder's own Community Call id through the crew aliases", async () => {
+    const h = harness({ 'calls.attendanceCrewAliases': 'community = community_call' })
+    await liveAnnounceTick({ ...session, crewId: 'community' }, h.deps)
+    expect(h.postDiscord).toHaveBeenCalledTimes(1)
+    const none = harness({ 'calls.attendanceCrewAliases': '' })
+    await liveAnnounceTick({ ...session, crewId: 'community' }, none.deps)
+    expect(none.postDiscord).not.toHaveBeenCalled()
+  })
+
   it('ignores other crews, hidden or ended sessions, old sessions and the off switch', async () => {
     const h = harness()
     await liveAnnounceTick({ ...session, crewId: 'ops' }, h.deps)
