@@ -1735,7 +1735,12 @@
       "dmClosed": "No pudimos enviarte un MD en Discord. Permite mensajes directos de miembros del servidor y vuelve a intentarlo.",
       "tryAgain": "Intentar de nuevo",
       "proposals": "Envíame un MD cuando se abra una propuesta o esté por cerrar",
-      "proposalsHint": "Si ya recogiste tu boleta, no recibirás el recordatorio de cierre. Cada MD tiene un botón para parar."
+      "proposalsHint": "Si ya recogiste tu boleta, no recibirás el recordatorio de cierre. Cada MD tiene un botón para parar.",
+      "nearby": "Avisarme de fiestas de pizza cerca de mi ciudad",
+      "nearbyHint": "Eventos del Global Pizza Party y de series aprobadas cerca de la ciudad de tu perfil. No te apuntamos a nada. Como mucho unos pocos por semana; cada DM tiene un botón para desactivarlo.",
+      "nearbyRadiusLegend": "A qué distancia",
+      "nearbyRadiusDefault": "Estándar",
+      "nearbyRadiusOption": "A menos de {km} km"
     }
   },
   "reengage": {

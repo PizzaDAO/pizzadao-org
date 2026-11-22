@@ -2,16 +2,18 @@
 
 // Call reminders by DM on the profile edit page: off, the Community Call, or the Community Call plus the
 // member's crews and Discord events they marked Interested; how early (5 to 60 minutes) and where (Discord,
-// Telegram or both). Opt-in only (no row means no reminders). Reads/writes /api/reminder-prefs
+// Telegram or both). Call and proposal reminders are opt-in (no row means none); nearby pizza-party invites are
+// opt-out (on unless turned off, with a radius). Reads/writes /api/reminder-prefs
 // (session-scoped; the server resolves the member).
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 
 type Choice = "NONE" | "COMMUNITY" | "MY_CREWS";
 type Where = "DISCORD" | "TELEGRAM" | "BOTH";
-type Prefs = { calls: Choice; leadMinutes?: number | null; channel?: Where; telegramLinked?: boolean; proposals?: boolean; dmClosed: boolean };
+type Prefs = { calls: Choice; leadMinutes?: number | null; channel?: Where; telegramLinked?: boolean; proposals?: boolean; nearbyEvents?: boolean; nearbyRadiusKm?: number | null; dmClosed: boolean };
 
 const LEADS = [5, 10, 15, 30, 60];
+const RADII = [10, 25, 50, 100, 250];
 const WHERES: Array<{ value: Where; key: "channelDiscord" | "channelTelegram" | "channelBoth" }> = [
     { value: "DISCORD", key: "channelDiscord" },
     { value: "TELEGRAM", key: "channelTelegram" },
@@ -143,7 +145,37 @@ export function ReminderPrefsEditor() {
                     <span style={{ display: "block", fontSize: 13, opacity: 0.7 }}>{t("proposalsHint")}</span>
                 </span>
             </label>
-            {prefs?.dmClosed && (prefs.calls !== "NONE" || prefs.proposals) ? (
+            <label style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 15, marginTop: 6 }}>
+                <input
+                    type="checkbox"
+                    checked={prefs?.nearbyEvents !== false}
+                    disabled={busy || !loaded}
+                    onChange={(e) => void submit({ nearbyEvents: e.target.checked })}
+                />
+                <span>
+                    {t("nearby")}
+                    <span style={{ display: "block", fontSize: 13, opacity: 0.7 }}>{t("nearbyHint")}</span>
+                </span>
+            </label>
+            {prefs?.nearbyEvents !== false ? (
+                <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15 }}>
+                    {t("nearbyRadiusLegend")}
+                    <select
+                        value={prefs?.nearbyRadiusKm ?? ""}
+                        disabled={busy || !loaded}
+                        onChange={(e) => void submit({ nearbyRadiusKm: e.target.value === "" ? null : Number(e.target.value) })}
+                        style={{ fontSize: 15 }}
+                    >
+                        <option value="">{t("nearbyRadiusDefault")}</option>
+                        {RADII.map((km) => (
+                            <option key={km} value={km}>
+                                {t("nearbyRadiusOption", { km })}
+                            </option>
+                        ))}
+                    </select>
+                </label>
+            ) : null}
+            {prefs?.dmClosed && (prefs.calls !== "NONE" || prefs.proposals || prefs.nearbyEvents !== false) ? (
                 <div role="status" style={{ fontSize: 13, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
                     <span>{t("dmClosed")}</span>
                     <button

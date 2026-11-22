@@ -9,11 +9,21 @@ describe('reminders settings', () => {
   it('has an area label and every default is the safe one', () => {
     expect(AREA_LABELS.reminders).toBe('Reminders')
     expect(SETTING_KEYS.filter((k) => k.startsWith('reminders.')).map((k) => [k, SETTINGS[k].default])).toEqual([
+      ['reminders.nearbyEventsEnabled', false],
+      ['reminders.nearbyEventKinds', ['gpp', 'series']],
       ['reminders.callsEnabled', false],
       ['reminders.proposalsEnabled', false],
       ['reminders.proposalClosingHours', 24],
       ['reminders.callLeadMinutes', 60],
       ['reminders.maxSendsPerRun', 40],
+      ['reminders.nearbyDefaultRadiusKm', 50],
+      ['reminders.nearbyCityLevelSlackKm', 25],
+      ['reminders.nearbyMaxPerWeek', 3],
+      ['reminders.nearbyMaxPerDay', 1],
+      ['reminders.nearbyMinLeadHours', 24],
+      ['reminders.nearbyMaxLeadDays', 45],
+      ['reminders.nearbyMaxSendsPerRun', 40],
+      ['reminders.nearbyEveryHours', 6],
       ['reminders.maxPerMemberPerDay', 6],
     ])
   })
@@ -50,5 +60,14 @@ describe('reminders settings', () => {
     expect(resolveToggle('reminders.proposalsEnabled', on, { VERCEL_ENV: 'production' })).toBe(true)
     expect(resolveToggle('reminders.proposalsEnabled', on, { VERCEL_ENV: 'production', REMINDERS_PROPOSALS_ENABLED: 'off' })).toBe(false)
     expect(resolveToggle('reminders.proposalsEnabled', on, { VERCEL_ENV: 'preview' })).toBe(false)
+  })
+
+  it('nearby invites: switch off by default, REMINDERS_NEARBY_EVENTS_ENABLED, env off wins, previews never', () => {
+    expect(TOGGLES['reminders.nearbyEventsEnabled'].env).toBe('REMINDERS_NEARBY_EVENTS_ENABLED')
+    expect(resolveToggle('reminders.nearbyEventsEnabled', none, { VERCEL_ENV: 'production' })).toBe(false)
+    const on = { get: () => true, isSet: () => true, readFailed: false, invalidKeys: [] } as unknown as Settings
+    expect(resolveToggle('reminders.nearbyEventsEnabled', on, { VERCEL_ENV: 'production' })).toBe(true)
+    expect(resolveToggle('reminders.nearbyEventsEnabled', on, { VERCEL_ENV: 'production', REMINDERS_NEARBY_EVENTS_ENABLED: 'off' })).toBe(false)
+    expect(resolveToggle('reminders.nearbyEventsEnabled', on, { VERCEL_ENV: 'preview' })).toBe(false)
   })
 })

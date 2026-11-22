@@ -17,15 +17,23 @@ import { clearSettledProposalReminders, prismaProposalStore } from './proposal-s
 import { runProposalReminders, type ProposalRunResult } from './proposals'
 import { loadDmReach, recordDmClosed, recordDmOk } from './reach'
 import { runCallRemindersNow, type RunResult } from './run'
+import { runNearbyInvitesNow } from '@/app/lib/nearby-events/now'
+import type { NearbyRunResult } from '@/app/lib/nearby-events/run'
 import { prismaStore } from './store'
 
 /** Proposals ran every 5 minutes before the cron went to every minute; they still only run on those minutes. */
 export const PROPOSALS_EVERY_MINUTES = 5
 
+/** Nearby-event invites are considered once an hour (minute 0); reminders.nearbyEveryHours says on which hours they run. */
+export const NEARBY_SLOT_MINUTE = 0
+/** The nearby phase stops starting sends this long after the cron function started (the function limit is 120 s). */
+export const NEARBY_DEADLINE_MS = 60_000
+
 export type Skipped = { skipped: string }
 export interface RemindersRunResult {
   calls: RunResult | Skipped
   proposals: ProposalRunResult | Skipped
+  nearby: NearbyRunResult | Skipped
 }
 
 export async function runProposalRemindersNow(
@@ -70,6 +78,7 @@ export async function runRemindersNow(
   env: Record<string, string | undefined> = process.env,
   opts: { dryRun?: boolean } = {},
 ): Promise<RemindersRunResult> {
+  const startedAt = Date.now()
   const calls = await runCallRemindersNow(now, env, opts)
   let proposals: ProposalRunResult | Skipped
   // An on-demand dry run always counts; otherwise proposals wait for their 5-minute slot.
@@ -86,5 +95,12 @@ export async function runRemindersNow(
   // Privacy sweep: no per-member proposal reminder row outlives its proposal being open. Runs even with the
   // switches off, so rows from an earlier run are still removed. Best effort.
   if (proposalsSlot && reminderSendAllowed(env)) await clearSettledProposalReminders().catch(() => 0)
-  return { calls, proposals }
+  // Nearby-event invites: after calls and proposals, only when they left room, on their own 30-minute slot.
+  // A failure here never affects the call or proposal results.
+  let nearby: NearbyRunResult | Skipped
+  const nearbySlot = !!opts.dryRun || now.getUTCMinutes() === NEARBY_SLOT_MINUTE
+  if (!nearbySlot) nearby = { skipped: 'cadence' }
+  else if ('stoppedEarly' in calls && calls.stoppedEarly) nearby = { skipped: 'calls_first' }
+  else nearby = await runNearbyInvitesNow(now, env, { dryRun: opts.dryRun, deadlineAt: startedAt + NEARBY_DEADLINE_MS }).catch(() => ({ skipped: 'error' }))
+  return { calls, proposals, nearby }
 }

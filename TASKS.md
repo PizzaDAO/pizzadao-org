@@ -12,7 +12,7 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 | calzone-93434 | Add Telegram login | todo | P2 |  |  |  | plans/calzone-93434-telegram-login.md |  | account linking shipped in #128; login itself not built |
 | website-refuse-closed-claims | Website: refuse claiming closed crew tasks | review | P3 |  | Snax | crews |  | #460 | follow-up from plans/discord-task-command.md: Discord already refuses closed tasks, the website does not |
 | bellpepper-80127 | Idea para dashboard: carpeta para subir memes de pizzadao y bennys xD | review | P2 |  |  |  | plans/bellpepper-80127.md | 462 | off until memes.enabled is switched on |
-| pineapple-84122 | Auto-Invite member to event or one is near their city | todo | P2 |  |  |  | plans/pineapple-84122-nearby-event-invites.md |  |  |
+| pineapple-84122 | Auto-Invite member to event or one is near their city | review | P2 |  |  |  | plans/pineapple-84122.md | 465 | opt-out invites; rsv-pizza feed PR 1397 |
 | pineapple-71302 | add a email claiming system for memebes to claim a unique pizzadao emails | todo | P3 |  |  |  | plans/pineapple-71302-pizzadao-emails.md |  | 2026-10-17: on hold, not yet (Snax); 2026-11-21: only members level 8+ can claim |
 | neapolitan-96018 | Crew page with start crew call button | review | P2 |  | Snax | crews | plans/neapolitan-96018.md | #466 | moved back from Done 2026-11-14: no evidence it shipped |
 | discord-guild-channels-timeout | Discord: GET /guilds/{id}/channels times out in prod | review | P2 |  |  |  |  | #460 | found in plans/diavola-24729.md: GET /guilds/{id}/channels times out in prod; blanks public channel names on profiles and recaps |

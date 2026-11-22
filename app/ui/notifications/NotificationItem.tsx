@@ -4,7 +4,7 @@ import React from "react";
 
 export type NotificationData = {
   id: string;
-  type: "BOUNTY_CLAIMED" | "BOUNTY_COMPLETED" | "BOUNTY_COMMENT" | "BOUNTY_SUBMITTED" | "BOUNTY_REJECTED" | "BOUNTY_CANCELLED" | "TASK_ASSIGNED" | "TASK_DUE_SOON" | "VOUCH_ADDED" | "VOUCH_REQUEST";
+  type: "BOUNTY_CLAIMED" | "BOUNTY_COMPLETED" | "BOUNTY_COMMENT" | "BOUNTY_SUBMITTED" | "BOUNTY_REJECTED" | "BOUNTY_CANCELLED" | "TASK_ASSIGNED" | "TASK_DUE_SOON" | "VOUCH_ADDED" | "VOUCH_REQUEST" | "NEARBY_EVENT";
   title: string;
   message: string;
   linkUrl: string | null;
@@ -17,6 +17,20 @@ type NotificationItemProps = {
   onMarkRead: (id: string) => void;
   onNavigate: (url: string) => void;
 };
+
+/** One tap: the same switch as the profile reminder settings (session-scoped). */
+async function turnOffNearbyInvites(): Promise<boolean> {
+  try {
+    const res = await fetch("/api/reminder-prefs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nearbyEvents: false }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
 
 const displayFont =
   "var(--font-display), var(--font-sans), system-ui, sans-serif";
@@ -223,6 +237,7 @@ function timeStyle(): React.CSSProperties {
 
 export function NotificationItem({ notification, onMarkRead, onNavigate }: NotificationItemProps) {
   const isRead = notification.readAt !== null;
+  const [optedOut, setOptedOut] = React.useState(false);
   const iconColor = getIconColor(notification.type);
   const iconBg = getIconBg(notification.type);
 
@@ -231,7 +246,9 @@ export function NotificationItem({ notification, onMarkRead, onNavigate }: Notif
       onMarkRead(notification.id);
     }
     if (notification.linkUrl) {
-      onNavigate(notification.linkUrl);
+      // Nearby-event invites link to the event page on another site.
+      if (/^https:\/\//i.test(notification.linkUrl)) window.open(notification.linkUrl, "_blank", "noopener,noreferrer");
+      else onNavigate(notification.linkUrl);
     }
   };
 
@@ -256,6 +273,32 @@ export function NotificationItem({ notification, onMarkRead, onNavigate }: Notif
         <p style={messageStyle()}>{notification.message}</p>
         <div style={timeStyle()}>{formatRelativeTime(notification.createdAt)}</div>
       </div>
+      {notification.type === "NEARBY_EVENT" && (
+        <button
+          type="button"
+          aria-label="Turn off nearby event invites"
+          disabled={optedOut}
+          onClick={async (e) => {
+            e.stopPropagation();
+            if (await turnOffNearbyInvites()) setOptedOut(true);
+          }}
+          style={{
+            flexShrink: 0,
+            alignSelf: "center",
+            background: "none",
+            border: "1px solid hsl(var(--rule) / 0.25)",
+            borderRadius: 999,
+            padding: "4px 10px",
+            minHeight: 28,
+            fontSize: 11,
+            fontWeight: 700,
+            cursor: optedOut ? "default" : "pointer",
+            color: "hsl(var(--muted-foreground))",
+          }}
+        >
+          {optedOut ? "Turned off" : "Turn off"}
+        </button>
+      )}
       {!isRead && notification.type === "VOUCH_REQUEST" && (
         <button
           type="button"

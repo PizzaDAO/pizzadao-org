@@ -60,6 +60,17 @@ describe('/api/reminder-prefs', () => {
     expect(res.status).toBe(400)
     expect(await res.json()).toMatchObject({ code: 'telegram_not_linked' })
   })
+  it('POST accepts the nearby-invite switch and radius (10, 25, 50, 100, 250 or null), and rejects other radii', async () => {
+    for (const body of [{ nearbyEvents: false }, { nearbyEvents: true }, { nearbyRadiusKm: 10 }, { nearbyRadiusKm: 250 }, { nearbyRadiusKm: null }, { nearbyEvents: true, nearbyRadiusKm: 100 }]) {
+      expect((await POST(post(body))).status).toBe(200)
+      expect(savePrefs).toHaveBeenLastCalledWith('u1', body)
+    }
+    const calls = savePrefs.mock.calls.length
+    for (const body of [{ nearbyRadiusKm: 7 }, { nearbyRadiusKm: 500 }, { nearbyRadiusKm: '50' }, { nearbyEvents: 'no' }]) {
+      expect((await POST(post(body))).status).toBe(400)
+    }
+    expect(savePrefs).toHaveBeenCalledTimes(calls)
+  })
   it('rejects other leads and channels', async () => {
     for (const body of [{ leadMinutes: 3 }, { leadMinutes: 45 }, { leadMinutes: 120 }, { leadMinutes: '10' }, { channel: 'AUTO' }, { channel: 'SMS' }]) {
       expect((await POST(post(body))).status).toBe(400)
