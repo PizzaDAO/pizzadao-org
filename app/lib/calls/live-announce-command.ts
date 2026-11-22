@@ -3,14 +3,14 @@
  * ephemeral "thinking" reply; this runs afterwards via after() and edits the reply in), the role
  * check and the real dependencies. The logic itself is in live-announce.ts.
  */
-import { getSetting, loadSettings } from '@/app/lib/settings'
+import { getSetting, loadSettings, type Settings } from '@/app/lib/settings'
 import { toggleEnabled } from '@/app/lib/settings/toggles'
 import { savedChannelId } from '@/app/lib/settings/channels'
 import { isDreadPizzaRoberts } from '@/app/lib/mission-review-access'
 import { makeEmbed, type EmbedAuthor } from '@/app/lib/discord-interactions/embeds'
 import { DEFAULT_CALL_VOICE_CHANNEL_ID } from '@/app/lib/call-agenda/run'
 import { prisma } from '@/app/lib/db'
-import { canRunLive, LIVE_ANNOUNCE_CREW_ID, runLiveAnnounce, type LiveContext, type LiveDeps, type LiveResult } from './live-announce'
+import { canRunLive, isLiveAnnounceCrew, runLiveAnnounce, type LiveContext, type LiveDeps, type LiveResult } from './live-announce'
 import { currentCallEvent, editOriginalUrl } from './progress-command'
 import { findLiveSessions } from './live-state'
 import { getCrewMappings } from '@/app/lib/crew-mappings'
@@ -47,10 +47,10 @@ export async function mayRunLive(roles: readonly string[], isAdmin: (roles: stri
 export async function resolveLiveContext(now: Date = new Date()): Promise<LiveContext | null> {
   const settings = await loadSettings()
   const sessions = await findLiveSessions(settings, now.getTime()).catch(() => [])
-  const s = sessions.find((x) => (x.crewId ?? '').toLowerCase() === LIVE_ANNOUNCE_CREW_ID)
+  const s = sessions.find((x) => isLiveAnnounceCrew(x.crewId, settings))
   if (s) return { eventId: s.eventId, voiceChannelId: s.channelId, sessionId: s.sessionId, startedAt: s.startedAt }
   const ev = await currentCallEvent({ now }).catch(() => null)
-  if (!ev || !(await isCommunityCallEvent(ev))) return null
+  if (!ev || !(await isCommunityCallEvent(ev, settings))) return null
   const channel = await callVoiceChannel()
   return { eventId: ev.id, voiceChannelId: channel, sessionId: null, startedAt: now, dayAt: ev.startsAt ?? now }
 }
@@ -60,17 +60,17 @@ async function callVoiceChannel(): Promise<string> {
 }
 
 /** Only the Community Call's event may be announced by /live (the call channel hosts other crews' events too). */
-async function isCommunityCallEvent(ev: { id: string; name: string }): Promise<boolean> {
+async function isCommunityCallEvent(ev: { id: string; name: string }, settings: Settings): Promise<boolean> {
   const { crews } = await getCrewMappings()
   const crew = resolveCrewForEvent(crews.map((c) => ({ id: c.id, label: c.label, event: c.event })), { eventId: ev.id, eventName: ev.name })
-  return (crew?.crewId ?? '').toLowerCase() === LIVE_ANNOUNCE_CREW_ID
+  return isLiveAnnounceCrew(crew?.crewId, settings)
 }
 
 /** The community call's event in the call voice channel, when `channelId` is that channel (for a session with no event id). */
 export async function resolveSessionEvent(channelId: string): Promise<{ id: string; startsAt: Date } | null> {
   if (channelId !== (await callVoiceChannel())) return null
   const ev = await currentCallEvent().catch(() => null)
-  if (!ev || !ev.startsAt || !(await isCommunityCallEvent(ev))) return null
+  if (!ev || !ev.startsAt || !(await isCommunityCallEvent(ev, await loadSettings()))) return null
   return { id: ev.id, startsAt: ev.startsAt }
 }
 
