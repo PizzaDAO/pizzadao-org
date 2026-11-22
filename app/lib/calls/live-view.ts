@@ -9,6 +9,7 @@
  * Cost: everything that does not depend on the viewer (items, names, profile ids, question and poll
  * totals) is built once per ~3 s per instance and call; a viewer adds only their own votes.
  */
+import { hostChecklistFor, type HostChecklistStep } from './host-checklist'
 import { prisma } from '@/app/lib/db'
 import type { Settings } from '@/app/lib/settings'
 import { findLiveSessions, streamLinkFor, type LivePresence } from './live-state'
@@ -102,6 +103,8 @@ export interface MemberCall extends PublicLive {
   itemsLocked: number | null
   questions: QuestionView[]
   polls: PollView[]
+  /** The run-of-show (Community Call only) for hosts and members at calls.hostChecklistMinLevel+; else null. */
+  hostChecklist: HostChecklistStep[] | null
 }
 
 export interface MemberLive {
@@ -253,6 +256,7 @@ export async function memberLiveView(
         itemsLocked: access.actionItems.visible ? null : access.actionItems.minLevel,
         questions: qa.questions,
         polls: qa.polls,
+        hostChecklist: access.checklist ? hostChecklistFor(s.crewId, settings) : null,
       }
     }),
   )

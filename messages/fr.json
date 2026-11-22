@@ -1146,6 +1146,8 @@
       "memberAsker": "Un membre",
       "askedBy": "Posée par {name}",
       "hiddenNote": "Masquée pour les membres",
+      "checklistTitle": "Liste de l'hôte",
+      "checklistHint": "{done} sur {total} faits. Les cases sont enregistrées dans ce navigateur.",
       "hostControls": "Contrôles d'hôte",
       "pin": "Mettre en avant",
       "unpin": "Retirer la mise en avant",

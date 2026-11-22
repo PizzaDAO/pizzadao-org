@@ -1146,6 +1146,8 @@
       "memberAsker": "A member",
       "askedBy": "Asked by {name}",
       "hiddenNote": "Hidden from members",
+      "checklistTitle": "Host checklist",
+      "checklistHint": "{done} of {total} done. Ticks are saved in this browser.",
       "hostControls": "Host controls",
       "pin": "Highlight",
       "unpin": "Remove highlight",

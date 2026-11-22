@@ -8,6 +8,7 @@
 import { getUserRoles } from '@/app/lib/discord'
 import { isDreadPizzaRoberts } from '@/app/lib/mission-review-access'
 import { getSetting } from '@/app/lib/settings'
+import { getCurrentLevel } from '@/app/lib/missions'
 import { callSectionAccess } from './transcript-access'
 
 export const LIVE_ACCESS_CACHE_MS = 60_000
@@ -15,9 +16,11 @@ export const LIVE_ACCESS_CACHE_MS = 60_000
 export interface LiveAccess {
   actionItems: { visible: boolean; minLevel: number }
   host: boolean
+  /** Sees the Community Call host checklist: hosts, and members at calls.hostChecklistMinLevel or above. */
+  checklist: boolean
 }
 
-const CLOSED: LiveAccess = { actionItems: { visible: false, minLevel: 10 }, host: false }
+const CLOSED: LiveAccess = { actionItems: { visible: false, minLevel: 10 }, host: false, checklist: false }
 const cache = new Map<string, { at: number; value: LiveAccess }>()
 
 export function clearLiveAccessCache(): void {
@@ -30,14 +33,16 @@ export function parseRoleLines(raw: string): string[] {
 }
 
 async function compute(discordId: string): Promise<LiveAccess> {
-  const [sections, roles, hostRaw] = await Promise.all([
+  const [sections, roles, hostRaw, checklistMin, level] = await Promise.all([
     callSectionAccess(discordId).catch(() => null),
     getUserRoles(discordId).catch(() => [] as string[]),
     getSetting('calls.liveHostRoleIds').catch(() => ''),
+    getSetting('calls.hostChecklistMinLevel').catch(() => 10),
+    getCurrentLevel(discordId).catch(() => 0),
   ])
   const hostRoles = parseRoleLines(hostRaw)
   const host = (await isDreadPizzaRoberts(roles).catch(() => false)) || roles.some((r) => hostRoles.includes(r))
-  return { actionItems: sections?.actionItems ?? CLOSED.actionItems, host }
+  return { actionItems: sections?.actionItems ?? CLOSED.actionItems, host, checklist: host || (typeof checklistMin === 'number' && level >= checklistMin) }
 }
 
 export async function liveAccess(discordId: string, now: number = Date.now()): Promise<LiveAccess> {
