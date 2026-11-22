@@ -105,6 +105,8 @@ export interface MemberCall extends PublicLive {
   polls: PollView[]
   /** The run-of-show (Community Call only) for hosts and members at calls.hostChecklistMinLevel+; else null. */
   hostChecklist: HostChecklistStep[] | null
+  /** Hosts with a checklist: the pizza-radio crew song the closing-song button plays; else null. */
+  closingSong: string | null
 }
 
 export interface MemberLive {
@@ -257,6 +259,7 @@ export async function memberLiveView(
         questions: qa.questions,
         polls: qa.polls,
         hostChecklist: access.checklist ? hostChecklistFor(s.crewId, settings) : null,
+        closingSong: access.host && hostChecklistFor(s.crewId, settings) ? settings.get('calls.closingSongCrew').trim() || null : null,
       }
     }),
   )

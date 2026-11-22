@@ -217,6 +217,7 @@ describe('settings registry', () => {
       ['calls.liveQuestionMaxPerMember', 5],
       ['calls.liveQuestionMinGapSeconds', 20],
       ['calls.hostChecklist', expect.stringContaining('0 min | Start the stream')],
+      ['calls.closingSongCrew', 'Amore'],
       ['calls.hostChecklistMinLevel', 4],
       ['calls.livePollSeconds', 10],
       ['calls.liveItemsRetentionDays', 30],
