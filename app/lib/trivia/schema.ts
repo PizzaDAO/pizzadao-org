@@ -78,6 +78,8 @@ export const QuestionSchema = z
     match: MatchSchema,
     explanation: z.string(),
     sources: z.array(z.object({ url: httpsUrl, note: z.string().min(1) }).strict()),
+    /** A photo shown with the answer (Discord reveal and explanation posts). Only leaves the server through reveal(). */
+    image: httpsUrl.optional(),
     notes: z.string().optional(),
     /** Why a rejected question was retired (who and when). Only rejected questions carry one. */
     rejectedReason: z.string().min(3).optional(),
@@ -155,4 +157,5 @@ export interface QuestionReveal {
   answer: string;
   explanation: string;
   sources: { url: string; note: string }[];
+  image?: string;
 }
