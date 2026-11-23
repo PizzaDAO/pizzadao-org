@@ -16,6 +16,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from 'vitest'
 import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
+import { bodyText } from './test-body'
 
 const DB_URL = process.env.PEP_IT_DATABASE_URL || ''
 const isLocal = (() => {
