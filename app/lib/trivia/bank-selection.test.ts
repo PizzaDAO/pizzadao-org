@@ -2,6 +2,7 @@
 // Question selection with the DB-backed bank: exposed questions (in public git history) are avoided by the web daily and
 // the Discord picker while unexposed ones are left; an empty or unreachable bank makes the cron and the daily no-op
 // (nothing stored, posted or paid). Fixture bank behind the in-memory store; Prisma is a small fake.
+import { bodyText } from "./test-body";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const db = vi.hoisted(() => ({
@@ -90,7 +91,7 @@ afterEach(() => vi.restoreAllMocks());
 const ids = (qs: readonly TriviaQuestion[]) => new Set(qs.map((q) => q.id));
 const fakePost = () => {
   const posted: string[] = [];
-  return { posted, deps: { post: vi.fn(async (_c: string, b: { content?: string }) => (posted.push(b.content ?? ""), { id: "999" })) } };
+  return { posted, deps: { post: vi.fn(async (_c: string, b: { content?: string; embeds?: unknown[] }) => (posted.push(bodyText(b)), { id: "999" })) } };
 };
 
 describe("preferUnexposed", () => {
