@@ -2,6 +2,7 @@ import { prisma } from './db'
 import { validateImageUrl } from './shop-admin'
 import { assertPepAmount, debitInTx, getOrCreateEconomy } from './economy'
 import { toggleEnabled } from './settings/toggles'
+import { reconcileRedemptionCodes } from './redemption-codes'
 import { ConflictError, NotFoundError, ValidationError } from './errors/api-errors'
 
 /**
@@ -82,7 +83,7 @@ export async function buyItem(userId: string, itemId: number, quantity = 1) {
   // decrement, inventory credit. Both conditional updates are atomic in
   // Postgres, so concurrent purchases can't overdraw the wallet or oversell
   // limited stock; any failure rolls back the whole purchase.
-  await prisma.$transaction(async (tx) => {
+  const redemptionCodes = await prisma.$transaction(async (tx) => {
     await debitInTx(tx, userId, totalCost, 'SHOP_PURCHASE', `Purchased ${quantity}x ${item.name}`, { itemId, itemName: item.name, quantity })
 
     // Reduce stock if not unlimited
@@ -110,13 +111,17 @@ export async function buyItem(userId: string, itemId: number, quantity = 1) {
         quantity: { increment: quantity }
       }
     })
+
+    // One redemption code per held unit of the Proof of Pizza item (no-op for every other item).
+    return (await reconcileRedemptionCodes(tx, userId, { touchedItemId: itemId })).minted
   })
 
   return {
     success: true,
     item: item.name,
     quantity,
-    totalCost
+    totalCost,
+    redemptionCodes
   }
 }
 
@@ -146,32 +151,36 @@ export async function hasItem(userId: string, itemId: number, quantity = 1) {
  * Remove item from user's inventory (for redemption)
  */
 export async function removeFromInventory(userId: string, itemId: number, quantity = 1) {
-  const inv = await prisma.inventory.findUnique({
-    where: {
-      userId_itemId: { userId, itemId }
-    }
-  })
-
-  if (!inv || inv.quantity < quantity) {
-    throw new Error('Insufficient items in inventory')
-  }
-
-  if (inv.quantity === quantity) {
-    // Remove the record entirely
-    await prisma.inventory.delete({
+  await prisma.$transaction(async (tx) => {
+    const inv = await tx.inventory.findUnique({
       where: {
         userId_itemId: { userId, itemId }
       }
     })
-  } else {
-    // Decrement quantity
-    await prisma.inventory.update({
-      where: {
-        userId_itemId: { userId, itemId }
-      },
-      data: { quantity: { decrement: quantity } }
-    })
-  }
+
+    if (!inv || inv.quantity < quantity) {
+      throw new Error('Insufficient items in inventory')
+    }
+
+    if (inv.quantity === quantity) {
+      // Remove the record entirely
+      await tx.inventory.delete({
+        where: {
+          userId_itemId: { userId, itemId }
+        }
+      })
+    } else {
+      // Decrement quantity
+      await tx.inventory.update({
+        where: {
+          userId_itemId: { userId, itemId }
+        },
+        data: { quantity: { decrement: quantity } }
+      })
+    }
+
+    await reconcileRedemptionCodes(tx, userId, { touchedItemId: itemId, voidReason: 'removed' })
+  })
 
   return { success: true }
 }

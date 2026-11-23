@@ -3121,5 +3121,26 @@
       "not_recordable": "This call channel is not set up for recording.",
       "discord_failed": "Discord refused to start the call. Ask an admin to check the bot's permissions."
     }
+  },
+  "proofOfPizza": {
+    "title": "Proof of Pizza code",
+    "intro": "Each one is good for a single Proof of Pizza submission.",
+    "step1": "Go to <site>{host}</site>.",
+    "step2": "Upload your receipt and add your wallet.",
+    "step3": "Enter the code below in the PizzaDAO code field.",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copyLabel": "Copy code {code}",
+    "redeemedHeading": "Used",
+    "redeemedOn": "Redeemed {date}",
+    "acquiredOn": "Added {date}",
+    "keepSecret": "Keep your codes private. Sending the item voids your code and gives the new owner theirs.",
+    "dm": {
+      "intro": "Your Proof of Pizza code is ready.",
+      "codes": "Your code: {codes}",
+      "codesMany": "Your codes: {codes}",
+      "steps": "1. Go to {site}\n2. Upload your receipt and add your wallet\n3. Enter the code in the PizzaDAO code field",
+      "outro": "Keep it private. You can always find it in your inventory on {home}."
+    }
   }
 }

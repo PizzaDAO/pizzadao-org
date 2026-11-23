@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { after, NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/app/lib/session'
 import { buyItem } from '@/app/lib/shop'
+import { notifyRedemptionCodes } from '@/app/lib/redemption-code-dm'
 import { requireOnboarded, formatCurrency } from '@/app/lib/economy'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { UnauthorizedError, ValidationError } from '@/app/lib/errors/api-errors'
@@ -28,6 +29,9 @@ const POST_HANDLER = async (request: NextRequest) => {
   }
 
   const result = await buyItem(session.discordId, itemId, Math.floor(quantity))
+
+  // Proof of Pizza codes: DM the buyer (off unless switched on; never blocks the purchase).
+  if (result.redemptionCodes.length) after(() => notifyRedemptionCodes(session.discordId, result.redemptionCodes))
 
   return NextResponse.json({
     success: true,

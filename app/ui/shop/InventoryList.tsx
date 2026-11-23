@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { card } from "../shared-styles";
+import { RedemptionCodes } from "./RedemptionCodes";
 
 type InventoryItem = {
   itemId: number;
@@ -85,6 +86,7 @@ export function InventoryList() {
   }
 
   return (
+    <>
     <div style={card()}>
       {heading}
 
@@ -159,5 +161,7 @@ export function InventoryList() {
         </div>
       )}
     </div>
+    <RedemptionCodes />
+    </>
   );
 }

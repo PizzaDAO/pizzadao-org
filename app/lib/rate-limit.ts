@@ -160,6 +160,11 @@ export const RATE_LIMITS = {
   "wallet-nonce": { limit: 20, windowSec: 10 * 60 },
   // Wallet signature verification attempts, per member.
   "wallet-verify": { limit: 10, windowSec: 10 * 60 },
+  // Proof of Pizza code API (server to server, one shared key): every call per IP before the key is checked,
+  // wrong-key attempts per IP, and a global backstop on lookups.
+  "pop-lookup": { limit: 60, windowSec: 60 },
+  "pop-auth-fail": { limit: 10, windowSec: 10 * 60 },
+  "pop-lookup-global": { limit: 300, windowSec: 60 },
 } as const satisfies Record<string, RateLimitRule>;
 
 export type RateLimitName = keyof typeof RATE_LIMITS;

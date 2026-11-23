@@ -33,6 +33,7 @@ import { ConflictError, NotFoundError, ValidationError } from './errors/api-erro
 import { normalizeReason } from './pep-admin'
 import { normalizeItemName } from './shop-grants'
 import { SHOP_LIMITS } from './shop-admin-shared'
+import { reconcileRedemptionCodes } from './redemption-codes'
 
 export { SHOP_LIMITS }
 
@@ -518,6 +519,7 @@ export async function adminGrantItem(actorId: string, input: AdminGrantInput): P
         create: { userId: discordId, itemId, quantity },
         update: { quantity: { increment: quantity } },
       })
+      await reconcileRedemptionCodes(tx, discordId, { touchedItemId: itemId })
     }
     const status = hasAccount ? ('credited' as const) : ('held' as const)
     await audit(tx, {
@@ -568,6 +570,7 @@ export async function adminRemoveItem(
     }
     const remaining = (await tx.inventory.findUniqueOrThrow({ where: { userId_itemId: { userId, itemId } } })).quantity
     if (remaining === 0) await tx.inventory.deleteMany({ where: { userId, itemId, quantity: 0 } })
+    await reconcileRedemptionCodes(tx, userId, { touchedItemId: itemId, voidReason: 'removed' })
     await audit(tx, {
       actorId,
       action: 'REMOVE',

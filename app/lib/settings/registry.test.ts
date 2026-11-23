@@ -397,6 +397,9 @@ describe('settings registry', () => {
       ['features.contributeUrl', ''],
       ['features.crewId', ''],
       ['features.githubCacheMinutes', 60],
+      ['proofOfPizza.itemId', 0],
+      ['proofOfPizza.dmOnPurchase', false],
+      ['proofOfPizza.siteUrl', 'https://proofof.pizza'],
     ])
   })
 

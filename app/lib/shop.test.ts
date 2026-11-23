@@ -3,6 +3,7 @@ import { buyItem, syncShopItemsFromData } from './shop'
 import { prisma } from './db'
 
 vi.mock('./db')
+vi.mock('./redemption-codes', () => ({ reconcileRedemptionCodes: vi.fn().mockResolvedValue({ minted: [], voided: 0 }) }))
 vi.mock('./economy', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./economy')>()),
   getOrCreateEconomy: vi.fn(),
@@ -21,6 +22,7 @@ vi.mock('./transactions', () => ({
 }))
 
 import { getOrCreateEconomy } from './economy'
+import { reconcileRedemptionCodes } from './redemption-codes'
 import { logTransaction } from './transactions'
 
 const mockFn = (f: unknown) => f as ReturnType<typeof vi.fn>
@@ -39,6 +41,32 @@ function runTx(tx: ReturnType<typeof txClient>) {
 
 const ITEM = { id: 5, name: 'Cool Hat', price: 30, quantity: -1, isAvailable: true }
 
+describe('buyItem redemption codes', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockFn(getOrCreateEconomy).mockResolvedValue({ id: 'buyer-1', wallet: 200 })
+  })
+
+  it('reconciles codes in the purchase transaction and returns the minted ones', async () => {
+    mockFn(prisma.shopItem.findUnique).mockResolvedValue(ITEM)
+    const tx = txClient()
+    runTx(tx)
+    mockFn(reconcileRedemptionCodes).mockResolvedValueOnce({ minted: ['AB23', 'CD45'], voided: 0 })
+
+    const result = await buyItem('buyer-1', 5, 2)
+
+    expect(reconcileRedemptionCodes).toHaveBeenCalledWith(tx, 'buyer-1', { touchedItemId: 5 })
+    expect(result.redemptionCodes).toEqual(['AB23', 'CD45'])
+  })
+
+  it('rolls the purchase back if minting fails', async () => {
+    mockFn(prisma.shopItem.findUnique).mockResolvedValue(ITEM)
+    runTx(txClient())
+    mockFn(reconcileRedemptionCodes).mockRejectedValueOnce(new Error('mint failed'))
+    await expect(buyItem('buyer-1', 5, 1)).rejects.toThrow('mint failed')
+  })
+})
+
 describe('buyItem', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -52,7 +80,7 @@ describe('buyItem', () => {
 
     const result = await buyItem('buyer-1', 5, 2)
 
-    expect(result).toEqual({ success: true, item: 'Cool Hat', quantity: 2, totalCost: 60 })
+    expect(result).toEqual({ success: true, item: 'Cool Hat', quantity: 2, totalCost: 60, redemptionCodes: [] })
     expect(tx.economy.updateMany).toHaveBeenCalledWith({
       where: { id: 'buyer-1', wallet: { gte: 60 } },
       data: { wallet: { decrement: 60 } },

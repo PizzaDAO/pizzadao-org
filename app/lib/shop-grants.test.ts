@@ -8,8 +8,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 vi.mock('./db')
+vi.mock('./redemption-codes', () => ({ reconcileRedemptionCodes: vi.fn().mockResolvedValue({ minted: [], voided: 0 }) }))
 
 import { prisma } from './db'
+import { reconcileRedemptionCodes } from './redemption-codes'
 import {
   applyGrant,
   creditPendingItemGrants,
@@ -106,6 +108,7 @@ describe('applyGrant', () => {
   it('holds (PENDING, no inventory) when the member has no account', async () => {
     const tx = txMock({ hasUser: false })
     expect(await applyGrant(planned({}))).toBe('held')
+    expect(reconcileRedemptionCodes).not.toHaveBeenCalled() // nothing entered inventory
     expect(tx.itemGrant.createMany.mock.calls[0][0].data[0]).toMatchObject({ status: 'PENDING', creditedAt: null, quantity: 3 })
     expect(tx.inventory.upsert).not.toHaveBeenCalled()
   })
@@ -119,6 +122,7 @@ describe('applyGrant', () => {
       create: { userId: NEWBIE, itemId: 3, quantity: 3 },
       update: { quantity: { increment: 3 } },
     })
+    expect(reconcileRedemptionCodes).toHaveBeenCalledWith(tx, NEWBIE, { touchedItemId: 3 })
   })
 
   it('is idempotent through grantKey and never applies non-grant rows', async () => {
@@ -153,6 +157,8 @@ describe('creditPendingItemGrants', () => {
     expect(tx.itemGrant.updateMany).toHaveBeenNthCalledWith(1, { where: { id: 10, status: 'PENDING' }, data: { status: 'CREDITED', creditedAt: expect.any(Date) } })
     expect(tx.inventory.upsert).toHaveBeenCalledTimes(1)
     expect(tx.inventory.upsert).toHaveBeenCalledWith(expect.objectContaining({ create: { userId: NEWBIE, itemId: 9, quantity: 2 } }))
+    expect(reconcileRedemptionCodes).toHaveBeenCalledTimes(1)
+    expect(reconcileRedemptionCodes).toHaveBeenCalledWith(tx, NEWBIE, { touchedItemId: 9 })
   })
 })
 

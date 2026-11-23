@@ -58,6 +58,31 @@ model Inventory {
   @@id([userId, itemId])
 }
 
+enum RedemptionCodeStatus {
+  ACTIVE
+  REDEEMED
+  VOID
+}
+
+// One 4-character code per held unit of the Proof of Pizza shop item (plans/proof-of-pizza-codes.md).
+// No FK to ShopItem: deleteShopItem already refuses held items. VOID codes are never reissued.
+model RedemptionCode {
+  id          Int                  @id @default(autoincrement())
+  code        String               @unique
+  itemId      Int
+  discordId   String
+  status      RedemptionCodeStatus @default(ACTIVE)
+  acquiredAt  DateTime             @default(now())
+  createdAt   DateTime             @default(now())
+  redeemedAt  DateTime?
+  redeemedRef String?              @unique
+  voidedAt    DateTime?
+  voidReason  String?
+  dmSentAt    DateTime?
+
+  @@index([discordId, itemId, status])
+}
+
 // Jobs synced from Google Sheets
 model Job {
   id          Int             @id @default(autoincrement())

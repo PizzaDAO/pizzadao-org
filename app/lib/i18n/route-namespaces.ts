@@ -43,7 +43,7 @@ export const ROUTE_NAMESPACES: Record<string, readonly string[]> = {
   missions: ["missionLinks", "dashboard", "missionHold", "communityTerms"],
   passport: ["passport"],
   payments: ["payments"],
-  pep: ["memberCard", "memberSince", "discordActivity", "bounties", "collectPep", "communityTerms"],
+  pep: ["memberCard", "memberSince", "discordActivity", "bounties", "collectPep", "communityTerms", "proofOfPizza"],
   poaps: ["communityTerms"],
   profile: [
     "eventsAttended",

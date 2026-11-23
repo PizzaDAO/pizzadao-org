@@ -5,6 +5,7 @@ import { getOrCreateEconomy } from '@/app/lib/economy'
 import { resolvePepRecipient } from '@/app/lib/pep-recipient'
 import { ValidationError } from '@/app/lib/errors/api-errors'
 import { safeMessageError } from '@/app/lib/errors/error-response'
+import { reconcileRedemptionCodes } from '@/app/lib/redemption-codes'
 
 export const runtime = 'nodejs'
 
@@ -87,6 +88,12 @@ export async function POST(request: NextRequest) {
           quantity: { increment: quantity }
         }
       })
+
+      // Codes follow the units: the sender's newest codes are voided, the recipient gets fresh ones.
+      // In id order, so two members sending to each other can't take the per-member locks crosswise.
+      for (const id of [session.discordId, recipientId].sort()) {
+        await reconcileRedemptionCodes(tx, id, { touchedItemId: itemId, voidReason: 'sent' })
+      }
     })
 
     return NextResponse.json({
