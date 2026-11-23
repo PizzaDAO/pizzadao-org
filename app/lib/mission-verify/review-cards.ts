@@ -236,12 +236,15 @@ export function renderReviewCard(
     ...(thumb ? { thumbnail: { url: thumb } } : {}),
   })
 
-  const buttons = [
-    v.holdReason && !decided
-      ? { type: 2, style: 3, label: 'Approve', custom_id: reviewButtonId('release', v.id) }
-      : { type: 2, style: 3, label: 'Approve', custom_id: reviewButtonId('approve', v.id) },
-    { type: 2, style: 4, label: 'Reject', custom_id: reviewButtonId('reject', v.id) },
-  ].map((b) => (decided ? { ...b, disabled: true } : b))
+  // Once decided, Approve and Reject are removed (not just disabled); only the link to the app stays.
+  const buttons = decided
+    ? []
+    : [
+        v.holdReason
+          ? { type: 2, style: 3, label: 'Approve', custom_id: reviewButtonId('release', v.id) }
+          : { type: 2, style: 3, label: 'Approve', custom_id: reviewButtonId('approve', v.id) },
+        { type: 2, style: 4, label: 'Reject', custom_id: reviewButtonId('reject', v.id) },
+      ]
   const components = [{ type: 1, components: [...buttons, { type: 2, style: 5, label: 'Open in app', url: `${opts.appUrl}/missions` }] }]
 
   return { content: '', embeds: [embed], components, allowed_mentions: { parse: [] } }

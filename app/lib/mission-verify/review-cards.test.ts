@@ -132,15 +132,15 @@ describe('renderReviewCard', () => {
     expect(e.fields?.[0].value).toBe('I did it @​everyone \\*\\*bold\\*\\*')
   })
 
-  it('approved: green, who and when, buttons disabled', () => {
+  it('approved: green, who and when, Approve and Reject removed', () => {
     const at = new Date('2026-10-02T10:00:00Z')
     const msg = renderReviewCard(view({ status: 'APPROVED', reviewedBy: '100000000000000001', reviewedAt: at, decision: 'APPROVED' }), { appUrl: APP })
     const e = msg.embeds[0]
     expect(e.color).toBe(0x2ecc71)
     expect(e.description).toMatch(/^✅ Approved: L3\.0/)
     expect(e.description).toContain(`✅ Approved by <@100000000000000001> · <t:${at.getTime() / 1000}:f>`)
-    expect(buttons(msg).filter((b) => b.custom_id).every((b) => b.disabled)).toBe(true)
-    expect(buttons(msg).find((b) => b.url)?.disabled).toBeUndefined()
+    expect(buttons(msg).filter((b) => b.custom_id)).toEqual([])
+    expect(buttons(msg).map((b) => b.label)).toEqual(['Open in app'])
   })
 
   it('approved holds and rejected cards say so; the reject reason is shown', () => {
@@ -152,6 +152,7 @@ describe('renderReviewCard', () => {
     expect(rej.embeds[0].color).toBe(0xe74c3c)
     expect(rej.embeds[0].description).toMatch(/❌ Rejected by <@100000000000000001>/)
     expect(rej.embeds[0].fields?.find((f) => f.name === 'Reason')?.value).toBe('Not your post')
+    expect(buttons(rej).map((b) => b.label)).toEqual(['Open in app'])
     const auto = renderReviewCard(view({ status: 'APPROVED', reviewedBy: 'auto:discord_message', reviewedAt: new Date() }), { appUrl: APP })
     expect(auto.embeds[0].description).toMatch(/Verified automatically/)
   })
