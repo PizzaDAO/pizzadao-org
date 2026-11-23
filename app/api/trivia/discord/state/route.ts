@@ -8,7 +8,7 @@ import { internalError } from "@/app/lib/errors/error-response";
 import { reply } from "@/app/lib/trivia/api";
 import { triviaLive } from "@/app/lib/trivia/enabled";
 import { resolveTriviaChannel } from "@/app/lib/trivia/channel";
-import { findOpenRound } from "@/app/lib/trivia/rounds";
+import { findLapsedRound, findOpenRound } from "@/app/lib/trivia/rounds";
 import { recentQuestionPosts } from "@/app/lib/trivia/reports";
 
 export const runtime = "nodejs";
@@ -22,7 +22,9 @@ export async function GET(request: Request): Promise<NextResponse> {
     if (!(await triviaLive())) return reply({ ok: true, open: false, recentMessageIds: [] });
     const channelId = await resolveTriviaChannel();
     if (!channelId) return reply({ ok: true, open: false, recentMessageIds: [] });
-    const round = await findOpenRound(channelId);
+    // A round past its close time that the cron has not expired yet still counts as open, so the first late message
+    // reaches the answer route, which expires it at once (reveal now, "Too late" for a correct answer).
+    const round = (await findOpenRound(channelId)) ?? (await findLapsedRound(channelId));
     // messageId: the question post, so the recorder forwards pick reactions on that message only.
     // recentMessageIds: question posts of the last 7 days, so it also forwards flag reactions and report replies on them
     // when no round is open.
