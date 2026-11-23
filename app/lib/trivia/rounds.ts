@@ -122,6 +122,7 @@ export async function openDiscordRound(opts: OpenOptions, deps: PostDeps = defau
   if (!question) return { ok: false, reason: "no_question" };
   const q = question;
 
+  const closesAt = new Date(now.getTime() + ROUND_MINUTES * 60_000);
   let roundId: number;
   try {
     const created = await prisma.$transaction(async (tx) => {
@@ -137,7 +138,7 @@ export async function openDiscordRound(opts: OpenOptions, deps: PostDeps = defau
           channelId: opts.channelId,
           rewardPep: opts.rewardPep,
           openedAt: now,
-          closesAt: new Date(now.getTime() + ROUND_MINUTES * 60_000),
+          closesAt,
         },
         select: { id: true },
       });
@@ -158,7 +159,7 @@ export async function openDiscordRound(opts: OpenOptions, deps: PostDeps = defau
   }
 
   try {
-    const posted = await deps.post(opts.channelId, questionMessage(q, opts.rewardPep, labels));
+    const posted = await deps.post(opts.channelId, questionMessage(q, opts.rewardPep, labels, closesAt));
     if (posted.id) await prisma.triviaRound.update({ where: { id: roundId }, data: { messageId: posted.id } });
     // The bot's own reactions, in order, so a player answers with one click. A failure never undoes the round.
     if (posted.id && deps.addReactions) {
@@ -295,17 +296,33 @@ export async function expireRounds(now: Date = new Date(), deps: PostDeps = defa
     select: { id: true, questionId: true, channelId: true, messageId: true, rewardPep: true, openedAt: true, closesAt: true },
   });
   let expired = 0;
-  for (const r of due) {
-    const flipped = await prisma.triviaRound.updateMany({ where: { id: r.id, status: "OPEN", closesAt: { lte: now } }, data: { status: "EXPIRED" } });
-    if (flipped.count !== 1) continue; // someone won it, or another run expired it
-    expired++;
-    // The round is over: its answer is (or may be) public now, so the question counts as exposed from here on.
-    await markRevealed([r.questionId]);
-    const q = await getQuestion(r.questionId);
-    const fresh = now.getTime() - r.closesAt.getTime() <= STALE_REVEAL_MINUTES * 60_000;
-    if (q && r.channelId && r.messageId && fresh) await safePost(deps, r.channelId, revealMessage(q), `reveal for round ${r.id}`);
-  }
+  for (const r of due) if (await expireOne(r, now, deps)) expired++;
   return expired;
+}
+
+/** Expire one round (the status flip is the claim, so the cron and a late answer cannot both reveal). True when this call did it. */
+async function expireOne(r: RoundRow, now: Date, deps: PostDeps): Promise<boolean> {
+  const flipped = await prisma.triviaRound.updateMany({ where: { id: r.id, status: "OPEN", closesAt: { lte: now } }, data: { status: "EXPIRED" } });
+  if (flipped.count !== 1) return false; // someone won it, or another run expired it
+  // The round is over: its answer is (or may be) public now, so the question counts as exposed from here on.
+  await markRevealed([r.questionId]);
+  const q = await getQuestion(r.questionId);
+  const fresh = now.getTime() - r.closesAt.getTime() <= STALE_REVEAL_MINUTES * 60_000;
+  if (q && r.channelId && r.messageId && fresh) await safePost(deps, r.channelId, revealMessage(q), `reveal for round ${r.id}`);
+  return true;
+}
+
+/** The channel's round that is still OPEN although its time has passed (the cron has not expired it yet), or null. */
+export async function findLapsedRound(channelId: string, now: Date = new Date()): Promise<RoundRow | null> {
+  return prisma.triviaRound.findFirst({
+    where: { surface: "DISCORD", status: "OPEN", channelId, closesAt: { lte: now } },
+    select: { id: true, questionId: true, channelId: true, messageId: true, rewardPep: true, openedAt: true, closesAt: true },
+  });
+}
+
+/** Expire a lapsed round right away (reveal posted), instead of waiting for the next cron tick. Safe to race the cron. */
+export async function expireLapsedRound(round: RoundRow, now: Date = new Date(), deps: PostDeps = defaultPostDeps): Promise<boolean> {
+  return expireOne(round, now, deps);
 }
 
 /** Post the winner reply and the explanation for a round just won. Failures are logged; the payout stands. */
