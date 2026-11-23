@@ -26,12 +26,21 @@ function fit(content: string): string {
   return clip(content, DISCORD_MESSAGE_LIMIT - 20);
 }
 
+/** Discord timestamp markup: each reader sees their own local time. */
+export function discordTime(at: Date, style: "t" | "R" = "t"): string {
+  return `<t:${Math.floor(at.getTime() / 1000)}:${style}>`;
+}
+
+function closesText(closesAt: Date): string {
+  return `closes ${discordTime(closesAt)} (${discordTime(closesAt, "R")})`;
+}
+
 /**
  * The question post. `rewardPep` 0 = a dry run: the post says nothing is paid. Multiple-choice choices are prefixed
  * with `labels.display` (the turtle emoji, or the regional indicators when one is missing); the bot pre-adds the
  * matching reactions right after posting, and true/false pre-adds the two below. Typed answers keep working.
  */
-export function questionMessage(q: TriviaQuestion, rewardPep: number, labels?: ChoiceLabels): DiscordMessageBody {
+export function questionMessage(q: TriviaQuestion, rewardPep: number, labels?: ChoiceLabels, closesAt?: Date): DiscordMessageBody {
   const head =
     rewardPep > 0
       ? `🎲 Trivia Time! First to answer correctly wins ${rewardPep} $PEP:`
@@ -46,7 +55,7 @@ export function questionMessage(q: TriviaQuestion, rewardPep: number, labels?: C
       : q.type === "multiple_choice"
         ? " · react with your pick, or type the answer"
         : "";
-  lines.push(`(${TYPE_LABEL[q.type]} · ${q.difficulty} · ${ROUND_MINUTES} min${how} · ${FLAG_REACTION} reports a bad question)`);
+  lines.push(`(${TYPE_LABEL[q.type]} · ${q.difficulty} · ${closesAt ? closesText(closesAt) : `${ROUND_MINUTES} min`}${how} · ${FLAG_REACTION} reports a bad question)`);
   return { content: fit(lines.join("\n")), allowed_mentions: NO_PINGS };
 }
 
@@ -71,6 +80,15 @@ export function winnerMessage(discordId: string, rewardPep: number, paid: boolea
     content: `✅ Correct! <@${discordId}> wins${prize}!${note}`,
     allowed_mentions: { parse: [], users: [discordId] },
     message_reference: { message_id: winnerMessageId, fail_if_not_exists: false },
+  };
+}
+
+/** Reply to a correct answer that arrived after the round closed (nobody is pinged). */
+export function tooLateMessage(closesAt: Date, answerMessageId: string): DiscordMessageBody {
+  return {
+    content: `⌛ Too late, the round closed at ${discordTime(closesAt)}.`,
+    allowed_mentions: NO_PINGS,
+    message_reference: { message_id: answerMessageId, fail_if_not_exists: false },
   };
 }
 

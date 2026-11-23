@@ -63,7 +63,7 @@ import { getBank, invalidateBank, servable } from "./bank";
 import { dailyQuestionFor, dayKeyUtc } from "./daily";
 import { pickDailyQuestion, preferUnexposed } from "./exposed";
 import { pickQuestion, slotsForDay } from "./schedule";
-import { announceWin, expireRounds, openDiscordRound } from "./rounds";
+import { announceWin, expireLapsedRound, expireRounds, openDiscordRound } from "./rounds";
 import { prisma } from "@/app/lib/db";
 import { getDailyRound, practicePool, practicePoolOrNull, resetRecentDailyCache } from "./web";
 import { runTriviaCron } from "./cron";
@@ -307,6 +307,16 @@ describe("a revealed answer marks the question exposed", () => {
     expect(fakeBank.rows.get("pd-909")).toMatchObject({ exposed: true, updatedBy: "system:revealed" });
     await announceWin({ id: 4, channelId: "1", questionId: "eb-924" }, { discordId: "5", messageId: "6", rewardPep: 20, paid: true }, deps);
     expect(fakeBank.rows.get("eb-924")!.exposed).toBe(true);
+  });
+
+  it("a late answer expires a lapsed round once: if the cron flipped it first, no second reveal", async () => {
+    const lapsed = { id: 3, questionId: "pd-909", channelId: "1", messageId: "2", rewardPep: 20, openedAt: new Date(NOW.getTime() - 600_000), closesAt: new Date(NOW.getTime() - 1000) };
+    const { deps, posted } = fakePost();
+    expect(await expireLapsedRound(lapsed, NOW, deps)).toBe(true);
+    expect(posted.length).toBe(1);
+    vi.mocked(prisma.triviaRound.updateMany).mockResolvedValueOnce({ count: 0 });
+    expect(await expireLapsedRound(lapsed, NOW, deps)).toBe(false);
+    expect(posted.length).toBe(1);
   });
 
   it("a failure to mark never breaks the round", async () => {

@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("@/app/lib/db");
 vi.mock("@/app/lib/sheets/member-repository", () => ({ fetchMemberIdByDiscordId: vi.fn() }));
-vi.mock("./rounds", () => ({ findOpenRound: vi.fn(), claimWin: vi.fn(), announceWin: vi.fn(async () => undefined), defaultPostDeps: { post: vi.fn() } }));
+vi.mock("./rounds", () => ({ findOpenRound: vi.fn(), findLapsedRound: vi.fn(async () => null), expireLapsedRound: vi.fn(async () => true), claimWin: vi.fn(), announceWin: vi.fn(async () => undefined), defaultPostDeps: { post: vi.fn() } }));
 
 import { processReaction, type AnswerDeps } from "./answer";
 import { announceWin, claimWin, findOpenRound } from "./rounds";

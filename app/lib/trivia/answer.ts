@@ -10,7 +10,8 @@ import { emojiToReaction, judgeReaction, type ReactionEmoji } from "./emoji";
 import { markWrongAttempt, removeMemberReaction } from "./reactions";
 import { hasReportWord, isFlagEmoji, recordReport, roundByQuestionPost, type ReportOutcome, type ReportableRound } from "./reports";
 import { match } from "./match";
-import { announceWin, claimWin, defaultPostDeps, findAttemptByMessage, findOpenRound, hasRecentAttempt, type ClaimResult, type Eligibility, type PostDeps } from "./rounds";
+import { tooLateMessage } from "./post";
+import { announceWin, claimWin, defaultPostDeps, expireLapsedRound, findAttemptByMessage, findLapsedRound, findOpenRound, hasRecentAttempt, type ClaimResult, type Eligibility, type PostDeps } from "./rounds";
 
 export interface AnswerInput {
   channelId: string;
@@ -78,7 +79,7 @@ export async function processAnswer(input: AnswerInput, deps: AnswerDeps): Promi
     if (reported) return reported;
   }
   const round = await findOpenRound(input.channelId, now);
-  if (!round) return { status: "no_round" };
+  if (!round) return handleLapsed(input, input.channelId, now, deps);
 
   // Only messages after the question count: after the bot's post when we know its id, else after the round opened.
   if (round.messageId ? !snowflakeAfter(input.messageId, round.messageId) : snowflakeMs(input.messageId) < round.openedAt.getTime()) {
@@ -121,6 +122,33 @@ export async function processAnswer(input: AnswerInput, deps: AnswerDeps): Promi
   }
 
   return finish(result, input, round, deps);
+}
+
+/**
+ * No round is within its time, but the channel's round may be OPEN past closesAt (the cron only runs every few minutes).
+ * Expire it right away so the "Time's up" reveal is posted now (the atomic status flip keeps it to one reveal, racing the
+ * cron), after the response. A correct late typed answer also gets "Too late"; wrong or chatty messages stay silent.
+ */
+async function handleLapsed(input: AnswerInput | null, channelId: string, now: Date, deps: AnswerDeps): Promise<AnswerOutcome> {
+  const lapsed = await findLapsedRound(channelId, now);
+  if (!lapsed) return { status: "no_round" };
+  let tooLate = false;
+  if (input && (lapsed.messageId ? snowflakeAfter(input.messageId, lapsed.messageId) : snowflakeMs(input.messageId) >= lapsed.openedAt.getTime())) {
+    const question = await getQuestion(lapsed.questionId);
+    tooLate = !!question && match(question, input.content, { strictBoolean: true }).verdict === "correct";
+  }
+  const channel = lapsed.channelId;
+  deps.defer(async () => {
+    await expireLapsedRound(lapsed, now, deps);
+    if (tooLate && input && channel) {
+      try {
+        await deps.post(channel, tooLateMessage(lapsed.closesAt, input.messageId));
+      } catch (e) {
+        console.error(`[trivia] too-late reply failed for round ${lapsed.id}: ${e instanceof Error ? e.message.slice(0, 120) : "error"}`);
+      }
+    }
+  });
+  return tooLate ? { status: "not_won", why: "late" } : { status: "no_round" };
 }
 
 /** Only a correct answer needs the eligibility checks (cheap account age first, then membership). */
@@ -212,7 +240,7 @@ export async function processReaction(input: ReactionInput, deps: AnswerDeps): P
   if (isFlagEmoji(input.emoji)) return processFlag(input, deps);
   const now = deps.now();
   const round = await findOpenRound(input.channelId, now);
-  if (!round) return { status: "no_round" };
+  if (!round) return handleLapsed(null, input.channelId, now, deps); // expire the lapsed round now; a pick gets no reply
   if (!round.messageId || round.messageId !== input.messageId) return { status: "ignored", why: "not_current_message" };
 
   const question = await getQuestion(round.questionId);
