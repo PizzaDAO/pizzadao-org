@@ -2,6 +2,7 @@
 import { describe, it, expect } from "vitest";
 import { buildChoiceLabels, emojiToReaction, judgeReaction, reactionBoolean, reactionChoiceIndex, reactionsFor } from "./emoji";
 import { questionMessage } from "./post";
+import { bodyText } from "./test-body";
 import { CHOICE_EMOJI, CHOICE_FALLBACK, FLAG_REACTION, TF_REACTIONS, reactionAttemptKey } from "./config";
 import { getBank } from "./bank";
 import type { TriviaQuestion } from "./schema";
@@ -120,44 +121,44 @@ describe("question post with the turtles", () => {
 
   it("multiple choice: each choice is prefixed by its turtle instead of A-D, and says to react or type", () => {
     const body = questionMessage(mc, 20, labels);
-    const lines = body.content.split("\n");
-    mc.choices!.forEach((c, i) => expect(lines).toContain(`${labels.display[i]} ${c}`));
-    expect(body.content).not.toMatch(/\u{1F170}|\u{1F171}/u);
-    expect(body.content).toContain("react with your pick, or type the answer");
-    expect(body.content).not.toMatch(/type its letter|\(A\)|\bA\.\s/);
+    const lines = bodyText(body).split("\n");
+    mc.choices!.forEach((c, i) => expect(lines).toContain(`${labels.display[i]}  ${c}`));
+    expect(bodyText(body)).not.toMatch(/\u{1F170}|\u{1F171}/u);
+    expect(bodyText(body)).toContain("React with your pick, or type the answer");
+    expect(bodyText(body)).not.toMatch(/type its letter|\(A\)|\bA\.\s/);
     expect(body.allowed_mentions).toEqual({ parse: [] });
   });
 
   it("multiple choice in the fallback round shows the regional indicators", () => {
     const f = buildChoiceLabels(4, null);
-    expect(questionMessage(mc, 20, f).content).toContain(`${CHOICE_FALLBACK[0]} ${mc.choices![0]}`);
+    expect(bodyText(questionMessage(mc, 20, f))).toContain(`${CHOICE_FALLBACK[0]}  ${mc.choices![0]}`);
   });
 
   it("with no labels (a caller that has none) it still shows plain letters", () => {
-    expect(questionMessage(mc, 20).content).toContain(`A. ${mc.choices![0]}`);
+    expect(bodyText(questionMessage(mc, 20))).toContain(`A.  ${mc.choices![0]}`);
   });
 
   it("true/false says to react with the check or the cross (or type)", () => {
     const body = questionMessage(tf, 20);
-    expect(body.content).toContain("react ✅ or ❌, or type true / false");
-    expect(body.content).toContain("true or false");
+    expect(bodyText(body)).toContain("React ✅ or ❌, or type true / false");
+    expect(bodyText(body)).toContain("True or false");
   });
 
   it("short answers are unchanged: no reaction hint", () => {
-    expect(questionMessage(short, 20).content).not.toContain("react");
+    expect((questionMessage(short, 20).embeds![0] as { description: string }).description).not.toContain("React");
   });
 
   it("every post says the flag reports a bad question", () => {
-    for (const q of [tf, mc, short]) expect(questionMessage(q, 20, labels).content).toContain(`${FLAG_REACTION} reports a bad question`);
+    for (const q of [tf, mc, short]) expect(bodyText(questionMessage(q, 20, labels))).toContain(`${FLAG_REACTION} to report a bad question`);
   });
 
   it("a dry run still says nothing is paid", () => {
-    expect(questionMessage(mc, 0, labels).content).toContain("nothing is paid");
+    expect(bodyText(questionMessage(mc, 0, labels))).toContain("nothing paid");
   });
 
   it("stays well under Discord's limit for the longest bank question", () => {
     for (const q of bank.filter((x) => x.status === "approved") as TriviaQuestion[]) {
-      expect(questionMessage(q, 20, buildChoiceLabels(q.choices?.length ?? 0, ALL)).content.length).toBeLessThan(2000);
+      expect(bodyText(questionMessage(q, 20, buildChoiceLabels(q.choices?.length ?? 0, ALL))).length).toBeLessThan(4000);
     }
   });
 });

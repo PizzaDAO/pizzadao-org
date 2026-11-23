@@ -74,7 +74,7 @@ function fakePosts(opts: { failQuestion?: boolean } = {}) {
   const deps = {
     post: async (channelId: string, body: any) => {
       if (opts.failQuestion && posted.length === 0) throw new Error('discord down')
-      posted.push({ channelId, content: body.content, reference: body.message_reference?.message_id })
+      posted.push({ channelId, content: bodyText(body), reference: body.message_reference?.message_id })
       return { id: snow(-5000) }
     },
   }
@@ -275,7 +275,7 @@ describe.skipIf(!isLocal)('Discord trivia under concurrency (real Postgres)', ()
       const winPost = posts.posted.find((p) => p.content.includes('wins'))
       expect(winPost?.reference).toBe(winMsg)
       expect(winPost?.content).toContain(`<@${member}>`)
-      expect(posts.posted.some((p) => p.content.startsWith('The answer:'))).toBe(true)
+      expect(posts.posted.some((p) => p.content.includes('The answer:'))).toBe(true)
     }, 60_000)
 
     it('a member wins at most 3 rounds a day: the 4th correct answer pays nothing and the round stays open', async () => {
@@ -426,7 +426,7 @@ describe.skipIf(!isLocal)('Discord trivia under concurrency (real Postgres)', ()
       const channelId = chanId()
       const seen: Array<{ kind: string; detail: string }> = []
       const deps = {
-        post: async (_c: string, body: any) => (seen.push({ kind: 'post', detail: body.content }), { id: snow(-5000) }),
+        post: async (_c: string, body: any) => (seen.push({ kind: 'post', detail: bodyText(body) }), { id: snow(-5000) }),
         labels: async (n: number) => L.bank && (await import('./emoji')).buildChoiceLabels(n, new Set(L.config.CHOICE_EMOJI.map((e: any) => e.id))),
         addReactions: async (_c: string, messageId: string, reactions: string[]) => void seen.push({ kind: 'react', detail: `${messageId}|${reactions.join(',')}` }),
       }
