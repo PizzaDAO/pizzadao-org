@@ -34,6 +34,7 @@ const match = (r: Row, where: Record<string, unknown> = {}) =>
 
 const tx = {
   $executeRaw: vi.fn().mockResolvedValue(1),
+  $queryRaw: vi.fn().mockResolvedValue([]),
   inventory: {
     findUnique: vi.fn(async ({ where }: { where: { userId_itemId: { userId: string; itemId: number } } }) => {
       const q = inv.get(`${where.userId_itemId.userId}:${where.userId_itemId.itemId}`)
@@ -84,7 +85,7 @@ vi.mock('./db', () => ({
 vi.mock('./settings', () => ({ getSetting: async (k: string) => settings[k] }))
 vi.mock('./shop-admin-people', () => ({ labelPeople: async (ids: string[]) => Object.fromEntries(ids.map((i) => [i, { name: `Name ${i}` }])) }))
 
-import { CODE_ALPHABET, generateCode, getMyCodes, lookupCode, normalizeCode, normalizeRef, reconcileRedemptionCodes, redeemCode } from './redemption-codes'
+import { lockInventoryRows, CODE_ALPHABET, generateCode, getMyCodes, lookupCode, normalizeCode, normalizeRef, reconcileRedemptionCodes, redeemCode } from './redemption-codes'
 
 const ALICE = '100000000000000001'
 const BOB = '100000000000000002'
@@ -225,6 +226,22 @@ describe('redeemCode', () => {
     inv.delete(`${ALICE}:${ITEM}`) // a write path that skipped reconcile
     expect((await redeemCode(c, 'proofofpizza:s1')).status).toBe('not_found')
     expect(codes[0].status).toBe('VOID')
+  })
+
+  it('locks the holder Inventory row before the advisory lock (row, then advisory)', async () => {
+    const [c] = await holder(1)
+    tx.$queryRaw.mockClear()
+    tx.$executeRaw.mockClear()
+    await redeemCode(c, 'proofofpizza:s1')
+    expect(tx.$queryRaw).toHaveBeenCalledTimes(1)
+    expect(tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(tx.$executeRaw.mock.invocationCallOrder[0])
+  })
+
+  it('lockInventoryRows takes rows in sorted member order, once each', async () => {
+    tx.$queryRaw.mockClear()
+    await lockInventoryRows(tx, [BOB, ALICE, BOB], ITEM)
+    const ids = tx.$queryRaw.mock.calls.map((c: unknown[]) => c[1])
+    expect(ids).toEqual([ALICE, BOB])
   })
 
   it('refuses everything while the feature is off', async () => {

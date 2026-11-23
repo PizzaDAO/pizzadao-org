@@ -69,6 +69,17 @@ async function lockMember(tx: Tx, userId: string): Promise<void> {
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'redeem:' + userId}))`
 }
 
+/**
+ * Lock order everywhere: Inventory row(s) first (sorted by member id), then the per-member advisory lock.
+ * Write sites already hold the row lock from their own inventory write; paths that have not written yet
+ * (redeem, send) take it here, so no two paths can wait on each other in opposite orders.
+ */
+export async function lockInventoryRows(tx: Tx, userIds: string[], itemId: number): Promise<void> {
+  for (const userId of [...new Set(userIds)].sort()) {
+    await tx.$queryRaw`SELECT 1 FROM "Inventory" WHERE "userId" = ${userId} AND "itemId" = ${itemId} FOR UPDATE`
+  }
+}
+
 async function configuredItemId(): Promise<number> {
   try {
     return Number(await getSetting('proofOfPizza.itemId')) || 0
@@ -215,6 +226,7 @@ export async function redeemCode(code: string, ref: string): Promise<RedeemResul
     return await prisma.$transaction(async (tx: Tx): Promise<RedeemResult> => {
       const peek = await tx.redemptionCode.findUnique({ where: { code }, select: { discordId: true } })
       if (!peek) return { status: 'not_found' }
+      await lockInventoryRows(tx, [peek.discordId], itemId)
       await lockMember(tx, peek.discordId)
       let row = await tx.redemptionCode.findUnique({ where: { code } })
       if (!row) return { status: 'not_found' }

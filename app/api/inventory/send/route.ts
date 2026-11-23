@@ -5,7 +5,7 @@ import { getOrCreateEconomy } from '@/app/lib/economy'
 import { resolvePepRecipient } from '@/app/lib/pep-recipient'
 import { ValidationError } from '@/app/lib/errors/api-errors'
 import { safeMessageError } from '@/app/lib/errors/error-response'
-import { reconcileRedemptionCodes } from '@/app/lib/redemption-codes'
+import { lockInventoryRows, reconcileRedemptionCodes } from '@/app/lib/redemption-codes'
 
 export const runtime = 'nodejs'
 
@@ -60,6 +60,9 @@ export async function POST(request: NextRequest) {
 
     // Transfer the item
     await prisma.$transaction(async (tx: any) => {
+      // Lock both members' rows for this item in id order first, so A->B and B->A sends (and a redeem)
+      // can't wait on each other crosswise. Rows are always taken before the per-member advisory lock.
+      await lockInventoryRows(tx, [session.discordId, recipientId], itemId)
       // Atomically decrement the sender only if they still hold enough.
       // (Prevents concurrent sends from duplicating items.)
       const debit = await tx.inventory.updateMany({
@@ -90,7 +93,7 @@ export async function POST(request: NextRequest) {
       })
 
       // Codes follow the units: the sender's newest codes are voided, the recipient gets fresh ones.
-      // In id order, so two members sending to each other can't take the per-member locks crosswise.
+      // In id order, like the row locks above.
       for (const id of [session.discordId, recipientId].sort()) {
         await reconcileRedemptionCodes(tx, id, { touchedItemId: itemId, voidReason: 'sent' })
       }
