@@ -39,6 +39,7 @@ interface FormState {
   tolerance: string;
   explanation: string;
   sources: string;
+  image: string;
   notes: string;
   label: string;
   validUntil: string;
@@ -69,6 +70,7 @@ function toForm(q: Partial<TriviaQuestion>): FormState {
     tolerance: q.match?.tolerance === undefined ? "" : String(q.match.tolerance),
     explanation: q.explanation ?? "",
     sources: (q.sources ?? []).map((s) => `${s.url} | ${s.note}`).join("\n"),
+    image: q.image ?? "",
     notes: q.notes ?? "",
     label: q.label ?? "",
     validUntil: q.validUntil ?? "",
@@ -101,6 +103,7 @@ function fromForm(f: FormState): Record<string, unknown> {
     status: f.status,
   };
   if (f.type === "multiple_choice") q.choices = lines(f.choices);
+  if (f.image.trim()) q.image = f.image.trim();
   if (f.notes.trim()) q.notes = f.notes.trim();
   if (f.label.trim()) q.label = f.label.trim();
   if (f.validUntil.trim()) q.validUntil = f.validUntil.trim();
@@ -302,6 +305,11 @@ function Editor({ editing, template, live, onDone, onCancel }: { editing: Editin
           <div className="sm:col-span-2">
             <Field label="Sources" hint="One per line: https://url | what it shows">
               <textarea value={form.sources} onChange={(e) => set("sources", e.target.value)} rows={3} className={input} style={inputStyle} />
+            </Field>
+          </div>
+          <div className="sm:col-span-2">
+            <Field label="Answer photo" hint="Optional https image URL, shown with the answer in Discord.">
+              <input value={form.image} onChange={(e) => set("image", e.target.value)} className={input} style={inputStyle} />
             </Field>
           </div>
           <Field label="Label" hint="Banner; required for just-for-fun.">

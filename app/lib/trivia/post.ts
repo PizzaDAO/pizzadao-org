@@ -60,6 +60,11 @@ export function questionMessage(q: TriviaQuestion, rewardPep: number, labels?: C
 }
 
 /** First source link, wrapped in <> so Discord shows no preview. */
+/** The question's photo, if it has one, as an image embed under the answer. */
+function photo(image: string | undefined): Pick<DiscordMessageBody, "embeds"> {
+  return image ? { embeds: [{ image: { url: image } }] } : {};
+}
+
 function sourceLine(q: TriviaQuestion): string | null {
   const url = reveal(q).sources[0]?.url;
   return url ? `Source: <${url}>` : null;
@@ -69,7 +74,7 @@ function sourceLine(q: TriviaQuestion): string | null {
 export function revealMessage(q: TriviaQuestion): DiscordMessageBody {
   const r = reveal(q);
   const lines = [`⏰ Time's up! The answer was **${r.answer}**.`, clip(r.explanation, 1200), sourceLine(q)];
-  return { content: fit(lines.filter(Boolean).join("\n")), allowed_mentions: NO_PINGS };
+  return { content: fit(lines.filter(Boolean).join("\n")), allowed_mentions: NO_PINGS, ...photo(r.image) };
 }
 
 /** The winner post, sent as a reply to the winning message. */
@@ -96,7 +101,7 @@ export function tooLateMessage(closesAt: Date, answerMessageId: string): Discord
 export function explanationMessage(q: TriviaQuestion): DiscordMessageBody {
   const r = reveal(q);
   const lines = [`The answer: **${r.answer}**`, clip(r.explanation, 1200), sourceLine(q)];
-  return { content: fit(lines.filter(Boolean).join("\n")), allowed_mentions: NO_PINGS };
+  return { content: fit(lines.filter(Boolean).join("\n")), allowed_mentions: NO_PINGS, ...photo(r.image) };
 }
 
 export function cancelledMessage(): DiscordMessageBody {

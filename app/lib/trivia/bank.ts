@@ -172,11 +172,13 @@ export function publicView(q: TriviaQuestion): PublicQuestion {
 
 /** What may be shown once an attempt has been made. Never includes aliases, rejects or notes. */
 export function reveal(q: TriviaQuestion): QuestionReveal {
-  return {
+  const r: QuestionReveal = {
     answer: q.match.kind === "boolean" ? (q.answer === "true" ? "True" : "False") : q.answer,
     explanation: q.explanation,
     sources: q.sources.map((s) => ({ url: s.url, note: s.note })),
   };
+  if (q.image) r.image = q.image;
+  return r;
 }
 
 export interface BankStats {
