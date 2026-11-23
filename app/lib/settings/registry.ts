@@ -35,6 +35,7 @@ import { TRIVIA_SETTINGS } from './trivia-settings'
 import { MEMES_SETTINGS } from './memes-settings'
 import { MANUALS_SETTINGS } from './manuals-settings'
 import { FEATURES_SETTINGS } from './features-settings'
+import { PROOF_OF_PIZZA_SETTINGS } from './proof-of-pizza-settings'
 import { EVENTS_ATTENDED_SETTINGS } from './events-attended-settings'
 import { NAMETAG_SETTINGS } from './nametag-settings'
 import { ADMIN_ROLE_IDS, DREAD_PIZZA_ROBERTS_ROLE_ID, MISSION_REVIEWER_ROLE_IDS } from '@/app/ui/constants'
@@ -2834,6 +2835,7 @@ export const SETTINGS = {
   ...MEMES_SETTINGS,
   ...MANUALS_SETTINGS,
   ...FEATURES_SETTINGS,
+  ...PROOF_OF_PIZZA_SETTINGS,
   ...EVENTS_ATTENDED_SETTINGS,
   ...NAMETAG_SETTINGS,
   // The Work Payment responses sheet. Empty = form ingest does nothing. Never committed to the repo, and

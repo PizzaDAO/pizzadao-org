@@ -20,6 +20,7 @@
  */
 import { prisma } from './db'
 import { toggleEnabled } from './settings/toggles'
+import { reconcileRedemptionCodes } from './redemption-codes'
 
 export const normalizeItemName = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
 
@@ -213,6 +214,7 @@ export async function applyGrant(row: GrantPlanRow, source = 'unbelievaboat', no
       create: { userId: row.discordId, itemId, quantity: row.qty },
       update: { quantity: { increment: row.qty } },
     })
+    await reconcileRedemptionCodes(tx, row.discordId, { touchedItemId: itemId })
     return 'credited' as const
   })
 }
@@ -247,6 +249,7 @@ export async function creditPendingItemGrants(discordId: string): Promise<Credit
         create: { userId: discordId, itemId: g.itemId, quantity: g.quantity },
         update: { quantity: { increment: g.quantity } },
       })
+      await reconcileRedemptionCodes(tx, discordId, { touchedItemId: g.itemId })
       out.credited++
       out.items.push({ grantKey: g.grantKey, itemId: g.itemId, quantity: g.quantity })
     }

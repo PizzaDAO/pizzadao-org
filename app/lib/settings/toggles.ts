@@ -101,6 +101,8 @@ export const TOGGLES = {
   },
   'names.requireThemed': { env: 'REQUIRE_THEMED_NAMES', legacy: ON_WORDS },
   'telegram.dmEnabled': { env: 'TELEGRAM_DM_ENABLED', legacy: ON_WORDS },
+  // Off unless turned on: a Discord DM with the new Proof of Pizza code when it is bought (plans/proof-of-pizza-codes.md).
+  'proofOfPizza.dmOnPurchase': { env: 'PROOF_OF_PIZZA_DM_ENABLED', legacy: ON_WORDS },
   'proposals.historyEnabled': {
     env: 'PROPOSALS_HISTORY_ENABLED',
     legacy: (raw) => ['true', '1'].includes((raw ?? '').trim().toLowerCase()),

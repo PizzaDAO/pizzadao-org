@@ -3121,5 +3121,26 @@
       "not_recordable": "Ce salon d'appel n'est pas configuré pour l'enregistrement.",
       "discord_failed": "Discord a refusé de démarrer l'appel. Demandez à un admin de vérifier les permissions du bot."
     }
+  },
+  "proofOfPizza": {
+    "title": "Code Proof of Pizza",
+    "intro": "Chacun vaut pour une seule soumission Proof of Pizza.",
+    "step1": "Rendez-vous sur <site>{host}</site>.",
+    "step2": "Téléversez votre reçu et ajoutez votre wallet.",
+    "step3": "Saisissez le code ci-dessous dans le champ code PizzaDAO.",
+    "copy": "Copier",
+    "copied": "Copié",
+    "copyLabel": "Copier le code {code}",
+    "redeemedHeading": "Utilisés",
+    "redeemedOn": "Utilisé le {date}",
+    "acquiredOn": "Ajouté le {date}",
+    "keepSecret": "Gardez vos codes privés. Envoyer l'objet annule votre code et le nouveau propriétaire reçoit le sien.",
+    "dm": {
+      "intro": "Votre code Proof of Pizza est prêt.",
+      "codes": "Votre code : {codes}",
+      "codesMany": "Vos codes : {codes}",
+      "steps": "1. Rendez-vous sur {site}\n2. Téléversez votre reçu et ajoutez votre wallet\n3. Saisissez le code dans le champ code PizzaDAO",
+      "outro": "Gardez-le privé. Vous le retrouvez toujours dans votre inventaire sur {home}."
+    }
   }
 }

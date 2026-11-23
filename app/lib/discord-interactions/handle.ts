@@ -120,7 +120,7 @@ export interface HandlerDeps {
   roulette: (discordId: string, bet: number, space: string) => Spin<{ landed: number; color: string; space: string; multiplier: number }>
   slots: (discordId: string, bet: number) => Spin<{ reels: string[]; multiplier: number }>
   shopItems: () => Promise<Array<{ id: number; name: string; price: number; quantity: number; description?: string | null }>>
-  buy: (discordId: string, itemId: number, quantity: number) => Promise<{ item: string; quantity: number; totalCost: number }>
+  buy: (discordId: string, itemId: number, quantity: number) => Promise<{ item: string; quantity: number; totalCost: number; hasRedemptionCode?: boolean }>
   /** Whether member.roles may run /add-money and /remove-money (ADMIN_ROLE_IDS, Pepperoni Mafia, PEP_ADMIN_ROLE_*). */
   isAdmin: (memberRoles: string[]) => Promise<boolean>
   /** Largest single admin grant (ADMIN_GRANT_MAX). */
@@ -585,7 +585,9 @@ async function command(i: Interaction, userId: string, deps: HandlerDeps, cur: s
       const item = items.find((it) => String(it.id) === raw) ?? items.find((it) => norm(it.name) === norm(raw))
       if (!item) return out.error(`No shop item called "${escapeMd(raw)}".`, 'See /shop.')
       const r = await deps.buy(userId, item.id, quantity)
-      return out.ok('Purchase complete!', `🛍️ You bought ${r.quantity}x **${escapeMd(r.item)}** for ${pep(r.totalCost)}.`, { ephemeral: true })
+      // Never the code itself in a channel reply: it is in the member's inventory on the site.
+      const codeNote = r.hasRedemptionCode ? `\nYour Proof of Pizza code is in your inventory on [${SITE_HOST}/pep](<${SITE_URL}/pep>).` : ''
+      return out.ok('Purchase complete!', `🛍️ You bought ${r.quantity}x **${escapeMd(r.item)}** for ${pep(r.totalCost)}.${codeNote}`, { ephemeral: true })
     }
 
     case 'add-money':

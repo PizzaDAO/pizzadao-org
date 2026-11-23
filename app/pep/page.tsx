@@ -17,6 +17,7 @@ import { ArrowUpRight } from "lucide-react";
 import { CrimeCard, DailyPepCard, GamesCard, Leaderboard, PepIcon, TransactionHistory } from "../ui/economy";
 import { JobBoard } from "../ui/jobs";
 import { ShopGrid } from "../ui/shop";
+import { RedemptionCodes } from "../ui/shop/RedemptionCodes";
 import { BountyBoard } from "../ui/bounties";
 import { NotificationBell } from "../ui/notifications";
 import { useMe } from "../lib/hooks/use-api";
@@ -618,6 +619,7 @@ export default function PepDashboard() {
                 })
               }
             />
+            <RedemptionCodes refreshKey={walletKey} />
 
             {/* Shop — editorial card */}
             <div

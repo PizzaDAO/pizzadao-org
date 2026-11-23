@@ -62,6 +62,6 @@ process.on("exit", cleanup);
 
 const env = { ...process.env, DATABASE_URL: databaseUrl, PEP_IT_DATABASE_URL: databaseUrl, NODE_OPTIONS: "" };
 run("npx", ["prisma", "db", "push", "--accept-data-loss"], { env });
-const r = spawnSync("npx", ["vitest", "run", "app/lib/pep-economy.concurrency.test.ts", "app/lib/shop-admin.concurrency.test.ts", "app/lib/trivia/trivia.concurrency.test.ts", "--no-file-parallelism", ...process.argv.slice(2)], { cwd: ROOT, stdio: "inherit", env });
+const r = spawnSync("npx", ["vitest", "run", "app/lib/pep-economy.concurrency.test.ts", "app/lib/shop-admin.concurrency.test.ts", "app/lib/redemption-codes.concurrency.test.ts", "app/lib/trivia/trivia.concurrency.test.ts", "--no-file-parallelism", ...process.argv.slice(2)], { cwd: ROOT, stdio: "inherit", env });
 cleanup();
 process.exit(r.status ?? 1);

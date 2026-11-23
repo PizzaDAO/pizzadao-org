@@ -72,6 +72,7 @@ import { parseRouletteSpace, playRoulette } from "@/app/lib/pep-games/roulette";
 import { playSlots } from "@/app/lib/pep-games/slots";
 import { getLeaderboard, transfer } from "@/app/lib/economy";
 import { buyItem, getShopItems } from "@/app/lib/shop";
+import { notifyRedemptionCodes } from "@/app/lib/redemption-code-dm";
 import { loadSettings, type Settings } from "@/app/lib/settings";
 import { adminAddMoney, adminGrantMax, adminRemoveMoney, isPepAdmin } from "@/app/lib/pep-admin";
 import { makeEmbed } from "@/app/lib/discord-interactions/embeds";
@@ -429,7 +430,11 @@ function deps(guildId: string | undefined, settings: Settings): HandlerDeps {
     roulette: (id, bet, space) => playRoulette(id, bet, parseRouletteSpace(space)),
     slots: (id, bet) => playSlots(id, bet),
     shopItems: getShopItems,
-    buy: (id, itemId, qty) => buyItem(id, itemId, qty),
+    buy: async (id, itemId, qty) => {
+      const r = await buyItem(id, itemId, qty);
+      if (r.redemptionCodes.length) after(() => notifyRedemptionCodes(id, r.redemptionCodes));
+      return { item: r.item, quantity: r.quantity, totalCost: r.totalCost, hasRedemptionCode: r.redemptionCodes.length > 0 };
+    },
     isAdmin: (roles) =>
       isPepAdmin(roles, { baseRoleIds: ADMIN_ROLE_IDS, getGuildRoles: async () => (guildId ? getGuildRoles(guildId) : null) }),
     adminGrantMax: adminGrantMax(process.env, settings),
