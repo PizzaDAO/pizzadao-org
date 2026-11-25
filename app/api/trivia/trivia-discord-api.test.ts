@@ -8,14 +8,19 @@ vi.mock("next/server", async (importOriginal) => ({ ...(await importOriginal<typ
 vi.mock("@/app/lib/trivia/cron", () => ({ runTriviaCron: vi.fn(async () => ({ status: "skipped", reason: "discord trivia off on preview" })) }));
 vi.mock("@/app/lib/trivia/enabled", () => ({ triviaLive: vi.fn(async () => false), isProductionDeploy: vi.fn(() => false) }));
 vi.mock("@/app/lib/trivia/channel", () => ({ resolveTriviaChannel: vi.fn(async () => "850000000000000001") }));
-vi.mock("@/app/lib/trivia/rounds", () => ({ findOpenRound: vi.fn(async () => null), findLapsedRound: vi.fn(async () => null), expireLapsedRound: vi.fn(async () => true) }));
-vi.mock("@/app/lib/trivia/reports", () => ({ recentQuestionPosts: vi.fn(async () => ["850000000000000010", "850000000000000011"]) }));
+vi.mock("@/app/lib/trivia/rounds", () => ({
+  findChannelOpenRound: vi.fn(async () => null),
+  isLapsed: (r: { closesAt: Date }, now: Date = new Date()) => r.closesAt.getTime() <= now.getTime(),
+  expireLapsedRound: vi.fn(async () => true),
+}));
+vi.mock("@/app/lib/trivia/reports", () => ({ cachedRecentQuestionPosts: vi.fn(async () => ["850000000000000010", "850000000000000011"]) }));
 vi.mock("@/app/lib/trivia/answer", () => ({ defaultAnswerDeps: vi.fn(() => ({})), processAnswer: vi.fn(async () => ({ status: "wrong" })), processReaction: vi.fn(async () => ({ status: "wrong" })) }));
 
 import { GET as cronGET } from "@/app/api/cron/trivia/route";
 import { POST as answerPOST } from "@/app/api/trivia/discord/answer/route";
 import { GET as stateGET } from "@/app/api/trivia/discord/state/route";
-import { expireLapsedRound, findLapsedRound, findOpenRound } from "@/app/lib/trivia/rounds";
+import { expireLapsedRound, findChannelOpenRound } from "@/app/lib/trivia/rounds";
+import { cachedRecentQuestionPosts } from "@/app/lib/trivia/reports";
 import { runTriviaCron } from "@/app/lib/trivia/cron";
 import { isProductionDeploy, triviaLive } from "@/app/lib/trivia/enabled";
 import { processAnswer, processReaction } from "@/app/lib/trivia/answer";
@@ -178,43 +183,62 @@ describe("POST /api/trivia/discord/answer, kind reaction", () => {
 
 describe("GET /api/trivia/discord/state", () => {
   const state = (auth?: string) => stateGET(new Request("https://x.test/api/trivia/discord/state", { headers: auth ? { authorization: auth } : {} }));
+  const inMin = (m: number) => new Date(Date.now() + m * 60_000);
+  beforeEach(() => {
+    vi.mocked(findChannelOpenRound).mockReset();
+    vi.mocked(findChannelOpenRound).mockResolvedValue(null);
+    vi.mocked(expireLapsedRound).mockClear();
+    vi.mocked(cachedRecentQuestionPosts).mockClear();
+  });
 
   it("401 without or with a wrong key", async () => {
     expect((await state()).status).toBe(401);
     expect((await state("Bearer nope")).status).toBe(401);
     expect((await state("Bearer cron-secret")).status).toBe(401);
-    expect(findOpenRound).not.toHaveBeenCalled();
+    expect(findChannelOpenRound).not.toHaveBeenCalled();
   });
 
   it("closed while trivia is off (a preview too), without reading any round", async () => {
     const res = await state("Bearer recorder-key");
     expect(await res.json()).toEqual({ ok: true, open: false, recentMessageIds: [] });
-    expect(findOpenRound).not.toHaveBeenCalled();
+    expect(findChannelOpenRound).not.toHaveBeenCalled();
+    expect(cachedRecentQuestionPosts).not.toHaveBeenCalled();
   });
 
-  it("open only while the trivia channel has an open round", async () => {
+  it("open only while the trivia channel has an open round, with one round query per poll", async () => {
     vi.mocked(triviaLive).mockResolvedValue(true);
-    vi.mocked(findOpenRound).mockResolvedValueOnce(null);
     expect(await (await state("Bearer recorder-key")).json()).toMatchObject({ ok: true, open: false });
-    vi.mocked(findOpenRound).mockResolvedValueOnce({ id: 1, messageId: "850000000000000010" } as never);
+    expect(findChannelOpenRound).toHaveBeenCalledTimes(1);
+    vi.mocked(findChannelOpenRound).mockClear();
+    vi.mocked(findChannelOpenRound).mockResolvedValueOnce({ id: 1, messageId: "850000000000000010", closesAt: inMin(5) } as never);
     expect(await (await state("Bearer recorder-key")).json()).toMatchObject({ ok: true, open: true, channelId: CHAN, messageId: "850000000000000010", recentMessageIds: ["850000000000000010", "850000000000000011"] });
-    expect(findOpenRound).toHaveBeenCalledWith(CHAN);
+    expect(findChannelOpenRound).toHaveBeenCalledTimes(1);
+    expect(findChannelOpenRound).toHaveBeenCalledWith(CHAN);
+  });
+
+  it("an open round in time is not expired, even on production", async () => {
+    vi.mocked(triviaLive).mockResolvedValue(true);
+    vi.mocked(isProductionDeploy).mockReturnValue(true);
+    vi.mocked(after).mockClear();
+    vi.mocked(findChannelOpenRound).mockResolvedValueOnce({ id: 1, messageId: "850000000000000010", closesAt: inMin(5) } as never);
+    await state("Bearer recorder-key");
+    expect(after).not.toHaveBeenCalled();
+    vi.mocked(isProductionDeploy).mockReturnValue(false);
   });
 
   it("stays open for a round past its close time that has not been expired yet, so late answers are forwarded", async () => {
     vi.mocked(triviaLive).mockResolvedValue(true);
-    vi.mocked(findOpenRound).mockResolvedValueOnce(null);
-    vi.mocked(findLapsedRound).mockResolvedValueOnce({ id: 2, messageId: "850000000000000011" } as never);
+    vi.mocked(findChannelOpenRound).mockResolvedValueOnce({ id: 2, messageId: "850000000000000011", closesAt: inMin(-1) } as never);
     expect(await (await state("Bearer recorder-key")).json()).toMatchObject({ ok: true, open: true, messageId: "850000000000000011" });
-    expect(findLapsedRound).toHaveBeenCalledWith(CHAN);
+    expect(findChannelOpenRound).toHaveBeenCalledTimes(1);
   });
 
   it("posts a lapsed round's answer from the poll in production, so it lands within seconds of the close", async () => {
     vi.mocked(triviaLive).mockResolvedValue(true);
     vi.mocked(isProductionDeploy).mockReturnValue(true);
     vi.mocked(after).mockClear();
-    const lapsed = { id: 3, messageId: "850000000000000012" } as never;
-    vi.mocked(findLapsedRound).mockResolvedValueOnce(lapsed);
+    const lapsed = { id: 3, messageId: "850000000000000012", closesAt: inMin(-1) } as never;
+    vi.mocked(findChannelOpenRound).mockResolvedValueOnce(lapsed);
     await state("Bearer recorder-key");
     expect(after).toHaveBeenCalledTimes(1);
     await (vi.mocked(after).mock.calls[0][0] as () => Promise<void>)();
@@ -225,7 +249,7 @@ describe("GET /api/trivia/discord/state", () => {
   it("never expires a round from a preview", async () => {
     vi.mocked(triviaLive).mockResolvedValue(true);
     vi.mocked(after).mockClear();
-    vi.mocked(findLapsedRound).mockResolvedValueOnce({ id: 4, messageId: "850000000000000013" } as never);
+    vi.mocked(findChannelOpenRound).mockResolvedValueOnce({ id: 4, messageId: "850000000000000013", closesAt: inMin(-1) } as never);
     await state("Bearer recorder-key");
     expect(after).not.toHaveBeenCalled();
   });

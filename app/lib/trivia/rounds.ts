@@ -19,7 +19,7 @@ import { dayStartMs } from "./daily";
 import { cancelledMessage, explanationMessage, questionMessage, revealMessage, winnerMessage } from "./post";
 import { buildChoiceLabels, reactionsFor, type ChoiceLabels } from "./emoji";
 import { addQuestionReactions, resolveChoiceLabels } from "./reactions";
-import { getDisabledIds } from "./reports";
+import { getDisabledIds, invalidateRecentQuestionPosts } from "./reports";
 import { pickQuestion } from "./schedule";
 import type { TriviaQuestion } from "./schema";
 
@@ -160,7 +160,10 @@ export async function openDiscordRound(opts: OpenOptions, deps: PostDeps = defau
 
   try {
     const posted = await deps.post(opts.channelId, questionMessage(q, opts.rewardPep, labels, closesAt));
-    if (posted.id) await prisma.triviaRound.update({ where: { id: roundId }, data: { messageId: posted.id } });
+    if (posted.id) {
+      await prisma.triviaRound.update({ where: { id: roundId }, data: { messageId: posted.id } });
+      invalidateRecentQuestionPosts(opts.channelId);
+    }
     // The bot's own reactions, in order, so a player answers with one click. A failure never undoes the round.
     if (posted.id && deps.addReactions) {
       try {
@@ -312,12 +315,22 @@ async function expireOne(r: RoundRow, now: Date, deps: PostDeps): Promise<boolea
   return true;
 }
 
+const ROUND_SELECT = { id: true, questionId: true, channelId: true, messageId: true, rewardPep: true, openedAt: true, closesAt: true } as const;
+
+/** The channel's OPEN Discord round whatever its close time (at most one exists), or null. One query: callers decide open vs lapsed. */
+export async function findChannelOpenRound(channelId: string): Promise<RoundRow | null> {
+  return prisma.triviaRound.findFirst({ where: { surface: "DISCORD", status: "OPEN", channelId }, select: ROUND_SELECT });
+}
+
+/** A round from findChannelOpenRound is lapsed when it is still OPEN but its time has passed (the cron has not expired it yet). */
+export function isLapsed(round: { closesAt: Date }, now: Date = new Date()): boolean {
+  return round.closesAt.getTime() <= now.getTime();
+}
+
 /** The channel's round that is still OPEN although its time has passed (the cron has not expired it yet), or null. */
 export async function findLapsedRound(channelId: string, now: Date = new Date()): Promise<RoundRow | null> {
-  return prisma.triviaRound.findFirst({
-    where: { surface: "DISCORD", status: "OPEN", channelId, closesAt: { lte: now } },
-    select: { id: true, questionId: true, channelId: true, messageId: true, rewardPep: true, openedAt: true, closesAt: true },
-  });
+  const round = await findChannelOpenRound(channelId);
+  return round && isLapsed(round, now) ? round : null;
 }
 
 /** Expire a lapsed round right away (reveal posted), instead of waiting for the next cron tick. Safe to race the cron. */
@@ -350,8 +363,6 @@ export async function cancelOpenRound(channelId: string, deps: PostDeps = defaul
 
 /** The OPEN Discord round of a channel that is still within its time, or null. */
 export async function findOpenRound(channelId: string, now: Date = new Date()): Promise<(RoundRow & { messageId: string | null }) | null> {
-  return prisma.triviaRound.findFirst({
-    where: { surface: "DISCORD", status: "OPEN", channelId, closesAt: { gt: now } },
-    select: { id: true, questionId: true, channelId: true, messageId: true, rewardPep: true, openedAt: true, closesAt: true },
-  });
+  const round = await findChannelOpenRound(channelId);
+  return round && !isLapsed(round, now) ? round : null;
 }

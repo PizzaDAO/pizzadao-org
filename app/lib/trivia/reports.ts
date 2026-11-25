@@ -83,6 +83,31 @@ export async function recentQuestionPosts(channelId: string, now: Date = new Dat
   return rows.flatMap((r) => (r.messageId ? [r.messageId] : []));
 }
 
+const RECENT_POSTS_TTL_MS = 60_000;
+const recentPostsCache = new Map<string, { at: number; value: Promise<string[]> }>();
+
+/**
+ * recentQuestionPosts, cached per instance for 60 s (in-flight reads shared), for the recorder's 5 s state poll.
+ * A new question post invalidates it in-process (invalidateRecentQuestionPosts); other instances may lag up to 60 s,
+ * which only delays flag/report reaction forwarding on a brand-new question post. A failed read is not cached.
+ */
+export async function cachedRecentQuestionPosts(channelId: string, now: number = Date.now()): Promise<string[]> {
+  const hit = recentPostsCache.get(channelId);
+  if (hit && now - hit.at < RECENT_POSTS_TTL_MS) return hit.value;
+  const entry = { at: now, value: recentQuestionPosts(channelId, new Date(now)) };
+  recentPostsCache.set(channelId, entry);
+  entry.value.catch(() => {
+    if (recentPostsCache.get(channelId) === entry) recentPostsCache.delete(channelId);
+  });
+  return entry.value;
+}
+
+/** Drop the cached question-post list (one channel, or all): call wherever a question post is created or changed. */
+export function invalidateRecentQuestionPosts(channelId?: string): void {
+  if (channelId === undefined) recentPostsCache.clear();
+  else recentPostsCache.delete(channelId);
+}
+
 // ---------------------------------------------------------------------------------------------------------------
 // Recording
 // ---------------------------------------------------------------------------------------------------------------
